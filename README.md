@@ -27,7 +27,7 @@ The first intended runtime shape is:
 - A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
-- A single FIFO queue for incoming requests.
+- A single-consumer priority queue for incoming requests, with waiting `speak_live` work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
 - Structured progress and lifecycle events written to `stdout`, with human-readable diagnostics on `stderr`.
 
@@ -69,6 +69,7 @@ Example response and event shapes:
 ```json
 {"event":"worker_status","stage":"warming_resident_model"}
 {"id":"req-1","event":"queued","reason":"waiting_for_resident_model","queue_position":1}
+{"id":"req-2","event":"queued","reason":"waiting_for_active_request","queue_position":2}
 {"event":"worker_status","stage":"resident_model_ready"}
 {"id":"req-1","event":"started","op":"speak_live"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
@@ -79,12 +80,14 @@ Example response and event shapes:
 {"id":"req-9","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
 ```
 
+Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting `speak_live` requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
+
 Current operation families are:
 
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
 - On-demand `1.7B` VoiceDesign profile creation.
 - Immutable profile storage, selection, listing, and removal.
-- FIFO request handling with preload-aware queue status.
+- Playback-prioritized request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
 - Human-friendly `stderr` logs that explain the most likely cause when something breaks.
 
@@ -106,6 +109,12 @@ Use the package baseline checks after each meaningful change.
 ```bash
 swift build
 swift test
+```
+
+Opt-in real-model e2e coverage is available for the resident `0.6B` and on-demand `1.7B` paths:
+
+```bash
+SPEAKSWIFTLY_E2E=1 swift test
 ```
 
 ## License

@@ -3,6 +3,10 @@ import Foundation
 // MARK: - Worker Runtime
 
 actor WorkerRuntime {
+    private enum Environment {
+        static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
+    }
+
     private enum ResidentState: Sendable {
         case warming
         case ready(AnySpeechModel)
@@ -10,6 +14,7 @@ actor WorkerRuntime {
     }
 
     private struct QueueEntry: Sendable, Equatable {
+        let token = UUID()
         let request: WorkerRequest
     }
 
@@ -36,8 +41,12 @@ actor WorkerRuntime {
 
     static func live() async -> WorkerRuntime {
         let dependencies = WorkerDependencies.live()
+        let environment = ProcessInfo.processInfo.environment
         let profileStore = ProfileStore(
-            rootURL: ProfileStore.defaultRootURL(fileManager: dependencies.fileManager),
+            rootURL: ProfileStore.defaultRootURL(
+                fileManager: dependencies.fileManager,
+                overridePath: environment[Environment.profileRootOverride]
+            ),
             fileManager: dependencies.fileManager
         )
         let playbackController = await dependencies.makePlaybackController()
@@ -94,9 +103,16 @@ actor WorkerRuntime {
             return
         }
 
+        if case .failed(let error) = residentState {
+            await emitFailure(id: request.id, error: error)
+            return
+        }
+
         let entry = QueueEntry(request: request)
         queue.append(entry)
-        await emitQueued(for: request)
+        if let queuedEvent = makeQueuedEvent(for: entry) {
+            await emit(queuedEvent)
+        }
         try? await startNextRequestIfPossible()
     }
 
@@ -276,17 +292,36 @@ actor WorkerRuntime {
 
     // MARK: - Emission
 
-    private func emitQueued(for request: WorkerRequest) async {
+    private func makeQueuedEvent(for entry: QueueEntry) -> WorkerQueuedEvent? {
         let reason: WorkerQueuedReason
         switch residentState {
         case .warming:
             reason = .waitingForResidentModel
-        case .ready, .failed:
+        case .failed:
+            return nil
+        case .ready:
+            guard activeRequestID != nil else { return nil }
             reason = .waitingForActiveRequest
         }
 
-        let queuePosition = max(1, queue.count)
-        await emit(WorkerQueuedEvent(id: request.id, reason: reason, queuePosition: queuePosition))
+        let queuePosition = waitingQueuePosition(for: entry)
+        return WorkerQueuedEvent(id: entry.request.id, reason: reason, queuePosition: queuePosition)
+    }
+
+    private func waitingQueuePosition(for entry: QueueEntry) -> Int {
+        let orderedQueue = orderedWaitingQueue()
+
+        guard let index = orderedQueue.firstIndex(of: entry) else {
+            return 1
+        }
+
+        return index + 1
+    }
+
+    private func orderedWaitingQueue() -> [QueueEntry] {
+        let playbackRequests = queue.filter(\.request.isPlayback)
+        let nonPlaybackRequests = queue.filter { !$0.request.isPlayback }
+        return playbackRequests + nonPlaybackRequests
     }
 
     private func emitStarted(for request: WorkerRequest) async {

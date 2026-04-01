@@ -239,7 +239,7 @@ import Testing
     try fileManager.createDirectory(at: profileDirectory, withIntermediateDirectories: false)
     try Data("not-json".utf8).write(to: store.manifestURL(for: profileDirectory))
 
-    #expect(throws: Error.self) {
+    #expect(throws: WorkerError.self) {
         _ = try store.listProfiles()
     }
 }
@@ -285,6 +285,36 @@ import Testing
     })
 }
 
+@Test func requestsThatStartImmediatelyDoNotEmitQueuedEvents() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "started"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-1"
+            && $0["event"] as? String == "queued"
+    })
+}
+
 @Test func residentModelPreloadFailureFailsQueuedRequests() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
@@ -315,6 +345,98 @@ import Testing
             $0["id"] as? String == "req-1"
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "model_generation_failed"
+        }
+    })
+}
+
+@Test func waitingRequestsReportPriorityQueuePositions() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let profileGate = AsyncGate()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"Warm and bright"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "started"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"speak_live","text":"Hi there","profile_name":"default-femme"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+                && $0["queue_position"] as? Int == 1
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-3"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+                && $0["queue_position"] as? Int == 1
+        }
+    })
+
+    await profileGate.open()
+}
+
+@Test func corruptListProfilesManifestBecomesFilesystemFailureResponse() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let brokenDirectory = store.profileDirectoryURL(for: "broken")
+    try FileManager.default.createDirectory(at: brokenDirectory, withIntermediateDirectories: false)
+    try Data("not-json".utf8).write(to: store.manifestURL(for: brokenDirectory))
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "filesystem_error"
         }
     })
 }

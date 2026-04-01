@@ -20,6 +20,7 @@
 - [x] Milestone 2: Resident `0.6B` runtime
 - [x] Milestone 3: On-demand `1.7B` VoiceDesign path
 - [ ] Milestone 4: Integration hardening
+- [ ] Milestone 5: Contract and e2e hardening
 
 ## Milestone 0: Bootstrap
 
@@ -46,13 +47,13 @@ Exit criteria:
 Scope:
 
 - [x] Define the first request, progress-event, success, and failure message shapes.
-- [x] Define preload-aware status events and a single FIFO request queue.
+- [x] Define preload-aware status events and a single-consumer priority request queue.
 
 Tickets:
 
 - [x] Write the first `stdin` read loop and `stdout` JSONL encoder.
 - [x] Add request decoding and terminal response encoding.
-- [x] Add a single-consumer FIFO queue for incoming requests.
+- [x] Add a single-consumer playback-prioritized queue for incoming requests.
 - [x] Add structured status and progress events for preload, queueing, request start, and terminal completion.
 - [x] [P] Add tests for decoding and encoding the JSONL contract.
 
@@ -135,3 +136,32 @@ Exit criteria:
 - [ ] The later file-rendering path can write audio files with a selected stored profile.
 - [ ] Failure modes around malformed JSONL, profile storage, and filesystem issues are covered by tests.
 - [ ] Parent-process integration expectations are documented without adding unnecessary architecture.
+
+## Milestone 5: Contract and e2e hardening
+
+Scope:
+
+- [x] Make the documented queue contract match the implemented playback-priority scheduler.
+- [x] Tighten worker error mapping for broken stored-profile metadata.
+- [x] Add opt-in real-model e2e coverage for both model paths.
+- [ ] Add the remaining runtime and diagnostics assertions that are still missing from the fast test suite.
+
+Tickets:
+
+- [x] Replace lingering FIFO wording with playback-priority wording in the docs.
+- [x] Ensure queued events are emitted only for requests that actually wait.
+- [x] Make `list_profiles` corrupt-manifest failures surface as `filesystem_error`.
+- [x] Add runtime tests for immediate-start requests, queued-event semantics, and filesystem failure mapping.
+- [x] Add an opt-in serialized Swift Testing e2e suite gated by `SPEAKSWIFTLY_E2E=1`.
+- [x] Add real `create_profile` and `speak_live` subprocess e2e coverage using isolated profile storage.
+- [x] Add a silent live-playback e2e mode so the real worker path can be exercised without audible output.
+- [ ] Add assertions for operator-facing `stderr` diagnostics in the automated test suite.
+- [ ] Add a stronger automated check that a real non-`nil` reference-audio object reaches the resident generation path in fast tests without making the unit suite depend on MLX runtime initialization.
+
+Exit criteria:
+
+- [x] The docs describe the real playback-priority queue instead of FIFO behavior.
+- [x] Immediate-start requests do not emit misleading queued events.
+- [x] Corrupt stored-profile manifests returned through `list_profiles` surface as `filesystem_error`.
+- [x] Opt-in serialized real-model e2e coverage exists for both the `1.7B` profile-creation path and the resident `0.6B` live path.
+- [ ] The fast test suite also covers `stderr` diagnostics and the remaining profile-conditioning edge assertions.

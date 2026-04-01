@@ -164,8 +164,16 @@ struct ProfileStore {
         let manifests = try urls
             .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
             .map { directoryURL in
-                let manifestData = try Data(contentsOf: manifestURL(for: directoryURL))
-                return try decoder.decode(ProfileManifest.self, from: manifestData)
+                do {
+                    let manifestPath = manifestURL(for: directoryURL)
+                    let manifestData = try Data(contentsOf: manifestPath)
+                    return try decoder.decode(ProfileManifest.self, from: manifestData)
+                } catch {
+                    throw WorkerError(
+                        code: .filesystemError,
+                        message: "SpeakSwiftly could not list stored profiles because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)"
+                    )
+                }
             }
 
         return manifests.map {
@@ -242,8 +250,12 @@ struct ProfileStore {
         directoryURL.appendingPathComponent(fileName)
     }
 
-    static func defaultRootURL(fileManager: FileManager = .default) -> URL {
-        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    static func defaultRootURL(fileManager: FileManager = .default, overridePath: String? = nil) -> URL {
+        if let overridePath, !overridePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return URL(fileURLWithPath: overridePath, isDirectory: true)
+        }
+
+        return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(directoryName, isDirectory: true)
             .appendingPathComponent(profilesDirectoryName, isDirectory: true)
     }

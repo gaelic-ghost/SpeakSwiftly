@@ -6,6 +6,10 @@ import MLXAudioTTS
 
 // MARK: - Model Client
 
+private enum WorkerEnvironment {
+    static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
+}
+
 private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     let model: any SpeechGenerationModel
 
@@ -165,6 +169,24 @@ final class AnyPlaybackController: @unchecked Sendable {
         )
     }
 
+    static func silent() -> AnyPlaybackController {
+        AnyPlaybackController(
+            play: { _, stream, onFirstChunk in
+                var emittedFirstChunk = false
+
+                for try await chunk in stream {
+                    guard !chunk.isEmpty else { continue }
+
+                    if !emittedFirstChunk {
+                        emittedFirstChunk = true
+                        await onFirstChunk()
+                    }
+                }
+            },
+            stop: {}
+        )
+    }
+
     func play(
         sampleRate: Double,
         stream: AsyncThrowingStream<[Float], Error>,
@@ -247,11 +269,19 @@ struct WorkerDependencies {
     let now: @Sendable () -> Date
 
     static func live(fileManager: FileManager = .default) -> WorkerDependencies {
-        WorkerDependencies(
+        let environment = ProcessInfo.processInfo.environment
+
+        return WorkerDependencies(
             fileManager: fileManager,
             loadResidentModel: { try await ModelFactory.loadResidentModel() },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
-            makePlaybackController: { AnyPlaybackController(PlaybackController()) },
+            makePlaybackController: {
+                if environment[WorkerEnvironment.silentPlayback] == "1" {
+                    return .silent()
+                }
+
+                return AnyPlaybackController(PlaybackController())
+            },
             writeWAV: { samples, sampleRate, url in
                 try AudioUtils.writeWavFile(samples: samples, sampleRate: sampleRate, fileURL: url)
             },
