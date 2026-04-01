@@ -10,6 +10,8 @@
 - Prefer one boring process boundary over multiple internal coordinators or bridges.
 - Make every operator-facing error and progress message readable and specific.
 - Keep the resident `0.6B` path fast, predictable, and easy to reason about.
+- Let `mlx-audio-swift` own model loading and generation whenever its existing API surface already fits.
+- Keep voice profiles immutable once created; require explicit removal instead of silent overwrite.
 
 ## Milestone Progress
 
@@ -39,80 +41,97 @@ Exit criteria:
 - [x] `swift test` passes.
 - [x] The repo explains the intended worker contract clearly enough for the next implementation pass.
 
-## Milestone 1: JSONL worker contract
+## Milestone 1: JSONL worker contract and queue
 
 Scope:
 
 - [ ] Define the first request, progress-event, success, and failure message shapes.
-- [ ] Keep audio exchange file-path-based for the initial implementation.
+- [ ] Define preload-aware status events and a single FIFO request queue.
 
 Tickets:
 
 - [ ] Write the first `stdin` read loop and `stdout` JSONL encoder.
 - [ ] Add request decoding and terminal response encoding.
-- [ ] Add structured progress events for long-running work.
+- [ ] Add a single-consumer FIFO queue for incoming requests.
+- [ ] Add structured status and progress events for preload, queueing, request start, and terminal completion.
 - [ ] [P] Add tests for decoding and encoding the JSONL contract.
 
 Exit criteria:
 
-- [ ] The executable can stay alive, accept requests, and emit deterministic JSONL responses.
+- [ ] The executable can stay alive, accept requests, queue them deterministically, and emit deterministic JSONL responses.
 - [ ] Protocol errors are human-readable and unambiguous.
 
-## Milestone 2: Resident `0.6B` runtime
+## Milestone 2: Resident `0.6B` runtime and live playback
 
 Scope:
 
 - [ ] Pre-warm the `Qwen3-TTS 0.6B` model at worker startup.
-- [ ] Keep the resident model alive for streaming cloned playback requests.
+- [ ] Keep the resident model alive for live playback requests that select a stored profile by name.
+- [ ] Own audio playback inside this executable.
 
 Tickets:
 
 - [ ] Add startup warmup flow for the resident model.
-- [ ] Add streaming playback request handling around the resident path.
-- [ ] Emit progress updates during resident-model work.
+- [ ] Accept requests during warmup and emit queue status that explains the model is still loading.
+- [ ] Emit a status event when the resident model finishes loading and queued work begins.
+- [ ] Add `speak_live` request handling around the resident path.
+- [ ] Pipe streamed audio into AVFoundation playback owned by this process.
+- [ ] Emit progress updates during resident-model generation, buffering, and playback.
 - [ ] Validate resident-model failure reporting when warmup or inference breaks.
 
 Exit criteria:
 
 - [ ] The worker warms the resident model once at startup.
-- [ ] Streaming cloned playback requests do not reload the resident model each time.
+- [ ] `speak_live` requests do not reload the resident model each time.
+- [ ] Live playback is owned by this executable rather than the parent process.
 - [ ] Startup and runtime failures clearly explain the most likely cause.
 
-## Milestone 3: On-demand `1.7B` VoiceDesign path
+## Milestone 3: On-demand `1.7B` profile creation and profile store
 
 Scope:
 
-- [ ] Support audio-file generation with `Qwen3 VoiceDesign 1.7B`.
-- [ ] Load the large model only for the duration of a request.
+- [ ] Support immutable stored voice-profile creation with `Qwen3 VoiceDesign 1.7B`.
+- [ ] Keep the resident `0.6B` model loaded while `1.7B` profile creation work runs.
+- [ ] Add profile storage, lookup, listing, and removal.
 
 Tickets:
 
-- [ ] Add request handling for VoiceDesign file generation.
+- [ ] Add request handling for `create_profile`.
+- [ ] Add request handling for `remove_profile`.
+- [ ] Add request handling for `list_profiles`.
 - [ ] Load the `1.7B` model on demand.
-- [ ] Unload or release the model after request completion.
-- [ ] Add validation around input paths, output paths, and request failures.
+- [ ] Generate a reference audio file plus stored source text for each created profile.
+- [ ] Store profile metadata and assets on disk under immutable profile names.
+- [ ] Reject duplicate profile names instead of overwriting them.
+- [ ] Release the `1.7B` model after request completion.
+- [ ] Add validation around profile names, input text, output paths, and request failures.
 
 Exit criteria:
 
-- [ ] VoiceDesign requests produce audio files through the on-demand path.
+- [ ] `create_profile` requests produce stored immutable profiles through the on-demand path.
+- [ ] Stored profiles are selectable by name for resident `0.6B` playback.
 - [ ] The worker does not keep the `1.7B` model resident after the request completes.
 - [ ] Progress and failure output stay structured and readable.
 
-## Milestone 4: Integration hardening
+## Milestone 4: File rendering and integration hardening
 
 Scope:
 
 - [ ] Make the worker straightforward to own from a parent process.
+- [ ] Add the later `0.6B` file-rendering path for batch-capable profile-based output.
 - [ ] Harden logs, shutdown behavior, and repo validation.
 
 Tickets:
 
+- [ ] Add `render_file` request handling around resident `0.6B`.
+- [ ] Keep the file-rendering path profile-based instead of exposing raw clone inputs.
 - [ ] Add clean EOF and shutdown handling for the worker loop.
-- [ ] Add tests for malformed input, missing files, and process-lifecycle edges.
+- [ ] Add tests for malformed input, missing profiles, duplicate profile creation, removal, and process-lifecycle edges.
 - [ ] Add any minimal packaging notes needed for parent-process ownership.
 
 Exit criteria:
 
 - [ ] The worker exits cleanly on EOF or shutdown requests.
-- [ ] Failure modes around malformed JSONL and filesystem issues are covered by tests.
+- [ ] The later file-rendering path can write audio files with a selected stored profile.
+- [ ] Failure modes around malformed JSONL, profile storage, and filesystem issues are covered by tests.
 - [ ] Parent-process integration expectations are documented without adding unnecessary architecture.

@@ -24,53 +24,64 @@ The first intended runtime shape is:
 
 - A long-lived executable owned by another process.
 - Newline-delimited JSON over `stdin` and `stdout`.
-- File-path-based audio exchange instead of large base64 payloads.
-- A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for streaming cloned playback.
-- An on-demand `Qwen3 VoiceDesign 1.7B` path for audio-file generation that loads only when needed and unloads after the request finishes.
-- Structured progress events written to `stdout` during streaming generation, with human-readable diagnostics on `stderr`.
+- A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
+- An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
+- Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
+- A single FIFO queue for incoming requests.
+- Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
+- Structured progress and lifecycle events written to `stdout`, with human-readable diagnostics on `stderr`.
 
 ## Setup
 
-This repository is a standard Swift package.
+This repository is a standard Swift package with `mlx-audio-swift` wired in as the model/runtime dependency.
 
 ```bash
 swift build
 ```
 
-The future worker will also depend on a local or pinned `mlx-audio-swift` integration once that package wiring is added.
+The executable intentionally leans on the existing `mlx-audio-swift` API surface and keeps its own scope focused on process ownership, queueing, playback, and profile storage.
 
 ## Usage
 
-The current scaffold only proves out the package, test baseline, and documentation shape.
+The current scaffold proves out the package, dependency wiring, test baseline, and documentation shape.
 
 ```bash
 swift run
 ```
 
-Today, `swift run` prints a short bootstrap message to `stderr`. The long-lived worker loop and MLX integration are still to come.
+Today, `swift run` prints a short bootstrap message to `stderr`. The long-lived worker loop, profile store, playback path, and MLX integration are still to come.
 
 ## Command Reference
 
 The intended first protocol is newline-delimited JSON over standard input and output.
 
-Request shape:
+Example request shapes:
 
 ```json
-{"id":"req-1","op":"speak_stream","text":"Hello there","profile":"default","output_path":"/tmp/out.wav"}
+{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
+{"id":"req-3","op":"remove_profile","profile_name":"bright-guide"}
 ```
 
-Response and event shape:
+Example response and event shapes:
 
 ```json
-{"id":"req-1","event":"progress","stage":"warming_resident_model"}
-{"id":"req-1","event":"progress","stage":"streaming_audio","written_frames":4096}
-{"id":"req-1","ok":true,"output_path":"/tmp/out.wav"}
+{"event":"status","stage":"warming_resident_model"}
+{"id":"req-1","event":"queued","stage":"waiting_for_resident_model"}
+{"event":"status","stage":"resident_model_ready"}
+{"id":"req-1","event":"started","stage":"beginning_request"}
+{"id":"req-1","event":"progress","stage":"buffering_audio"}
+{"id":"req-1","event":"progress","stage":"playback_finished"}
+{"id":"req-1","ok":true}
+{"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
 ```
 
 Planned operation families for the first implementation are:
 
-- Resident `0.6B` startup warmup and streaming cloned playback.
-- On-demand `1.7B` VoiceDesign file generation.
+- Resident `0.6B` startup warmup and live playback with named stored profiles.
+- On-demand `1.7B` VoiceDesign profile creation.
+- Immutable profile storage, selection, listing, and removal.
+- FIFO request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
 - Human-friendly `stderr` logs that explain the most likely cause when something breaks.
 
@@ -80,7 +91,9 @@ Keep the package small and concrete.
 
 - Prefer direct data flow over helper abstractions.
 - Keep the executable as the boundary instead of inventing extra internal service layers.
+- Let `mlx-audio-swift` own model loading and generation whenever its existing surface is sufficient.
 - Treat `stdin` and `stdout` as the worker contract and `stderr` as operator-facing logging.
+- Keep stored profiles simple and inspectable: profile metadata, source text, and reference audio on disk.
 - Add new packages only when they clearly simplify the code. Extra dependencies and architecture layers are often unnecessary here and should get extra scrutiny before and after they are introduced.
 
 ## Verification
