@@ -141,4 +141,4 @@ SPEAKSWIFTLY_E2E=1 swift test
 
 ## License
 
-No license has been added yet. Until a license is chosen and committed, this repository should be treated as all rights reserved.
+Apache License 2.0. See [LICENSE](LICENSE).
