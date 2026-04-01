@@ -8,6 +8,7 @@ A thin Swift worker executable for long-lived local speech generation around `ml
 - [Setup](#setup)
 - [Usage](#usage)
 - [Command Reference](#command-reference)
+- [Repository Layout](#repository-layout)
 - [Development](#development)
 - [Verification](#verification)
 - [License](#license)
@@ -90,6 +91,27 @@ Current operation families are:
 - Playback-prioritized request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
 - Human-friendly `stderr` logs that explain the most likely cause when something breaks.
+
+## Repository Layout
+
+SpeakSwiftly is intended to be the source-of-truth standalone repository for this package.
+
+The preferred ownership model is:
+
+- This repository remains the primary development home for `SpeakSwiftly`.
+- A separate GitHub remote is created for this repository.
+- The larger `speak-to-user` repository consumes `SpeakSwiftly` as a Git submodule under `packages/SpeakSwiftly`.
+- Feature work happens here first, and the consuming repository updates its submodule pointer when it is ready to adopt a newer revision.
+
+That arrangement keeps the package history, tags, and releases independent while still letting the larger repository pin an exact commit.
+
+When `speak-to-user` is using this package, the expected package path is:
+
+```text
+../speak-to-user/packages/SpeakSwiftly
+```
+
+The standalone checkout remains the preferred day-to-day development workspace. The submodule checkout in `speak-to-user` is primarily for integration and consumption.
 
 ## Development
 
