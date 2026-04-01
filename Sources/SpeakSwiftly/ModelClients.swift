@@ -6,15 +6,86 @@ import MLXAudioTTS
 
 // MARK: - Model Client
 
-final class AnySpeechModel: @unchecked Sendable {
+private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     let model: any SpeechGenerationModel
-
-    var sampleRate: Int {
-        model.sampleRate
-    }
 
     init(model: any SpeechGenerationModel) {
         self.model = model
+    }
+}
+
+final class AnySpeechModel: @unchecked Sendable {
+    private let sampleRateValue: Int
+    private let generateImpl: @Sendable (
+        _ text: String,
+        _ voice: String?,
+        _ refAudio: MLXArray?,
+        _ refText: String?,
+        _ language: String?
+    ) async throws -> [Float]
+    private let generateSamplesStreamImpl: @Sendable (
+        _ text: String,
+        _ voice: String?,
+        _ refAudio: MLXArray?,
+        _ refText: String?,
+        _ language: String?,
+        _ streamingInterval: Double
+    ) -> AsyncThrowingStream<[Float], Error>
+
+    var sampleRate: Int {
+        sampleRateValue
+    }
+
+    init(
+        sampleRate: Int,
+        generate: @escaping @Sendable (
+            _ text: String,
+            _ voice: String?,
+            _ refAudio: MLXArray?,
+            _ refText: String?,
+            _ language: String?
+        ) async throws -> [Float],
+        generateSamplesStream: @escaping @Sendable (
+            _ text: String,
+            _ voice: String?,
+            _ refAudio: MLXArray?,
+            _ refText: String?,
+            _ language: String?,
+            _ streamingInterval: Double
+        ) -> AsyncThrowingStream<[Float], Error>
+    ) {
+        sampleRateValue = sampleRate
+        generateImpl = generate
+        generateSamplesStreamImpl = generateSamplesStream
+    }
+
+    convenience init(model: any SpeechGenerationModel) {
+        let box = UnsafeSpeechGenerationModelBox(model: model)
+
+        self.init(
+            sampleRate: box.model.sampleRate,
+            generate: { text, voice, refAudio, refText, language in
+                try await box.model.generate(
+                    text: text,
+                    voice: voice,
+                    refAudio: refAudio,
+                    refText: refText,
+                    language: language,
+                    generationParameters: nil
+                ).asArray(Float.self)
+            },
+            generateSamplesStream: { text, voice, refAudio, refText, language, streamingInterval in
+                box.model.generateSamplesStream(
+                    text: text,
+                    voice: voice,
+                    refAudio: refAudio,
+                    refText: refText,
+                    language: language,
+                    generationParameters: nil,
+                    streamingInterval: streamingInterval
+                )
+            }
+        )
     }
 
     func generate(
@@ -24,14 +95,7 @@ final class AnySpeechModel: @unchecked Sendable {
         refText: String?,
         language: String?
     ) async throws -> [Float] {
-        try await model.generate(
-            text: text,
-            voice: voice,
-            refAudio: refAudio,
-            refText: refText,
-            language: language,
-            generationParameters: nil
-        ).asArray(Float.self)
+        try await generateImpl(text, voice, refAudio, refText, language)
     }
 
     func generateSamplesStream(
@@ -42,15 +106,7 @@ final class AnySpeechModel: @unchecked Sendable {
         language: String?,
         streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
-        model.generateSamplesStream(
-            text: text,
-            voice: voice,
-            refAudio: refAudio,
-            refText: refText,
-            language: language,
-            generationParameters: nil,
-            streamingInterval: streamingInterval
-        )
+        generateSamplesStreamImpl(text, voice, refAudio, refText, language, streamingInterval)
     }
 }
 
@@ -73,6 +129,54 @@ enum ModelFactory {
 }
 
 // MARK: - Playback
+
+final class AnyPlaybackController: @unchecked Sendable {
+    private let playImpl: @Sendable (
+        _ sampleRate: Double,
+        _ stream: AsyncThrowingStream<[Float], Error>,
+        _ onFirstChunk: @escaping @Sendable () async -> Void
+    ) async throws -> Void
+    private let stopImpl: @Sendable () async -> Void
+
+    init(
+        play: @escaping @Sendable (
+            _ sampleRate: Double,
+            _ stream: AsyncThrowingStream<[Float], Error>,
+            _ onFirstChunk: @escaping @Sendable () async -> Void
+        ) async throws -> Void,
+        stop: @escaping @Sendable () async -> Void
+    ) {
+        playImpl = play
+        stopImpl = stop
+    }
+
+    convenience init(_ controller: PlaybackController) {
+        self.init(
+            play: { sampleRate, stream, onFirstChunk in
+                try await controller.play(
+                    sampleRate: sampleRate,
+                    stream: stream,
+                    onFirstChunk: onFirstChunk
+                )
+            },
+            stop: {
+                await controller.stop()
+            }
+        )
+    }
+
+    func play(
+        sampleRate: Double,
+        stream: AsyncThrowingStream<[Float], Error>,
+        onFirstChunk: @escaping @Sendable () async -> Void
+    ) async throws {
+        try await playImpl(sampleRate, stream, onFirstChunk)
+    }
+
+    func stop() async {
+        await stopImpl()
+    }
+}
 
 @MainActor
 final class PlaybackController {
@@ -135,9 +239,11 @@ struct WorkerDependencies {
     let fileManager: FileManager
     let loadResidentModel: @Sendable () async throws -> AnySpeechModel
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel
-    let playbackController: @MainActor () -> PlaybackController
+    let makePlaybackController: @MainActor @Sendable () -> AnyPlaybackController
     let writeWAV: @Sendable (_ samples: [Float], _ sampleRate: Int, _ url: URL) throws -> Void
-    let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray
+    let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
+    let writeStdout: @Sendable (Data) throws -> Void
+    let writeStderr: @Sendable (String) -> Void
     let now: @Sendable () -> Date
 
     static func live(fileManager: FileManager = .default) -> WorkerDependencies {
@@ -145,13 +251,23 @@ struct WorkerDependencies {
             fileManager: fileManager,
             loadResidentModel: { try await ModelFactory.loadResidentModel() },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
-            playbackController: { PlaybackController() },
+            makePlaybackController: { AnyPlaybackController(PlaybackController()) },
             writeWAV: { samples, sampleRate, url in
                 try AudioUtils.writeWavFile(samples: samples, sampleRate: sampleRate, fileURL: url)
             },
             loadAudioSamples: { url, sampleRate in
                 let (_, audio) = try MLXAudioCore.loadAudioArray(from: url, sampleRate: sampleRate)
                 return audio
+            },
+            writeStdout: { data in
+                try FileHandle.standardOutput.write(contentsOf: data)
+            },
+            writeStderr: { message in
+                do {
+                    try FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))
+                } catch {
+                    fputs(message + "\n", stderr)
+                }
             },
             now: Date.init
         )

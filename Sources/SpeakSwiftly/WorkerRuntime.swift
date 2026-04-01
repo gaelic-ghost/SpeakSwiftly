@@ -11,15 +11,12 @@ actor WorkerRuntime {
 
     private struct QueueEntry: Sendable, Equatable {
         let request: WorkerRequest
-        let enqueuedAt: Date
     }
 
     private let dependencies: WorkerDependencies
     private let encoder = JSONEncoder()
-    private let output = FileHandle.standardOutput
-    private let errorOutput = FileHandle.standardError
     private let profileStore: ProfileStore
-    private let playbackTaskProvider: @MainActor () -> PlaybackController
+    private let playbackController: AnyPlaybackController
 
     private var residentState: ResidentState = .warming
     private var queue = [QueueEntry]()
@@ -29,25 +26,26 @@ actor WorkerRuntime {
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
-        playbackTaskProvider: @escaping @MainActor () -> PlaybackController
+        playbackController: AnyPlaybackController
     ) {
         self.dependencies = dependencies
         self.profileStore = profileStore
-        self.playbackTaskProvider = playbackTaskProvider
+        self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
     }
 
-    static func live() -> WorkerRuntime {
+    static func live() async -> WorkerRuntime {
         let dependencies = WorkerDependencies.live()
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(fileManager: dependencies.fileManager),
             fileManager: dependencies.fileManager
         )
+        let playbackController = await dependencies.makePlaybackController()
 
         return WorkerRuntime(
             dependencies: dependencies,
             profileStore: profileStore,
-            playbackTaskProvider: dependencies.playbackController
+            playbackController: playbackController
         )
     }
 
@@ -96,7 +94,7 @@ actor WorkerRuntime {
             return
         }
 
-        let entry = QueueEntry(request: request, enqueuedAt: dependencies.now())
+        let entry = QueueEntry(request: request)
         queue.append(entry)
         await emitQueued(for: request)
         try? await startNextRequestIfPossible()
@@ -104,8 +102,7 @@ actor WorkerRuntime {
 
     func shutdown() async {
         preloadTask?.cancel()
-        let playback = await playbackTaskProvider()
-        await playback.stop()
+        await playbackController.stop()
     }
 
     // MARK: - Processing
@@ -184,7 +181,6 @@ actor WorkerRuntime {
         await emitProgress(id: id, stage: .loadingProfile)
         let profile = try profileStore.loadProfile(named: profileName)
         let refAudio = try dependencies.loadAudioSamples(profile.referenceAudioURL, residentModel.sampleRate)
-        let playback = await playbackTaskProvider()
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentModel.generateSamplesStream(
@@ -196,7 +192,7 @@ actor WorkerRuntime {
             streamingInterval: 0.32
         )
 
-        try await playback.play(sampleRate: Double(residentModel.sampleRate), stream: stream) {
+        try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) {
             await self.emitProgress(id: id, stage: .bufferingAudio)
         }
 
@@ -227,6 +223,7 @@ actor WorkerRuntime {
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
 
         let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
         try dependencies.writeWAV(audio, profileModel.sampleRate, tempWavURL)
@@ -247,7 +244,6 @@ actor WorkerRuntime {
             try profileStore.exportCanonicalAudio(for: storedProfile, to: outputPath)
         }
 
-        try? dependencies.fileManager.removeItem(at: tempDirectory)
         return storedProfile
     }
 
@@ -316,18 +312,14 @@ actor WorkerRuntime {
     private func emit<T: Encodable>(_ value: T) async {
         do {
             let data = try encoder.encode(value) + Data("\n".utf8)
-            try output.write(contentsOf: data)
+            try dependencies.writeStdout(data)
         } catch {
             await logError("SpeakSwiftly could not write a JSONL event to stdout. \(error.localizedDescription)")
         }
     }
 
     private func logError(_ message: String) async {
-        do {
-            try errorOutput.write(contentsOf: Data((message + "\n").utf8))
-        } catch {
-            fputs(message + "\n", stderr)
-        }
+        dependencies.writeStderr(message)
     }
 
     private func bestEffortID(from line: String) -> String {

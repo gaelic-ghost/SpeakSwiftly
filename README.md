@@ -60,20 +60,23 @@ Example request shapes:
 ```json
 {"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
-{"id":"req-3","op":"remove_profile","profile_name":"bright-guide"}
+{"id":"req-3","op":"list_profiles"}
+{"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
 ```
 
 Example response and event shapes:
 
 ```json
 {"event":"worker_status","stage":"warming_resident_model"}
-{"id":"req-1","event":"queued","stage":"waiting_for_resident_model"}
+{"id":"req-1","event":"queued","reason":"waiting_for_resident_model","queue_position":1}
 {"event":"worker_status","stage":"resident_model_ready"}
-{"id":"req-1","event":"started","stage":"beginning_request"}
+{"id":"req-1","event":"started","op":"speak_live"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
+{"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
+{"id":"req-9","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
 ```
 
 Current operation families are:

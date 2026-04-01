@@ -5,7 +5,7 @@ import Foundation
 @main
 enum SpeakSwiftly {
     static func main() async {
-        let runtime = WorkerRuntime.live()
+        let runtime = await WorkerRuntime.live()
         await runtime.start()
 
         while let line = readLine() {
