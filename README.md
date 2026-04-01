@@ -43,13 +43,13 @@ The executable intentionally leans on the existing `mlx-audio-swift` API surface
 
 ## Usage
 
-The current scaffold proves out the package, dependency wiring, test baseline, and documentation shape.
+Run the worker and speak JSONL to it over standard input.
 
 ```bash
 swift run
 ```
 
-Today, `swift run` prints a short bootstrap message to `stderr`. The long-lived worker loop, profile store, playback path, and MLX integration are still to come.
+At startup the worker begins preloading the resident `0.6B` model and emits JSONL status events on `stdout`.
 
 ## Command Reference
 
@@ -66,9 +66,9 @@ Example request shapes:
 Example response and event shapes:
 
 ```json
-{"event":"status","stage":"warming_resident_model"}
+{"event":"worker_status","stage":"warming_resident_model"}
 {"id":"req-1","event":"queued","stage":"waiting_for_resident_model"}
-{"event":"status","stage":"resident_model_ready"}
+{"event":"worker_status","stage":"resident_model_ready"}
 {"id":"req-1","event":"started","stage":"beginning_request"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
@@ -76,7 +76,7 @@ Example response and event shapes:
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
 ```
 
-Planned operation families for the first implementation are:
+Current operation families are:
 
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
 - On-demand `1.7B` VoiceDesign profile creation.
