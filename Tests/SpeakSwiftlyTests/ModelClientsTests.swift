@@ -314,6 +314,20 @@ import Testing
     )
 }
 
+@Test func speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable() {
+    let original = """
+    Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
+    """
+
+    let normalized = SpeechTextNormalizer.normalize(original)
+
+    #expect(normalized.contains("Users slash galew slash Workspace slash SpeakSwiftly"))
+    #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
+    #expect(normalized.contains("camel Case Stuff"))
+    #expect(normalized.contains("snake underscore case underscore stuff"))
+    #expect(normalized.contains("profile optional chaining sample Rate nil coalescing 24000"))
+}
+
 @Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

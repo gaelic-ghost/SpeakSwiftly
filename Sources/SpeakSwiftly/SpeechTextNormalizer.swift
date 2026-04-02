@@ -57,6 +57,8 @@ enum SpeechTextNormalizer {
             normalized = normalizeFencedCodeBlocks(normalized)
             normalized = normalizeInlineCode(normalized)
             normalized = normalizeMarkdownLinks(normalized)
+            normalized = normalizeFilePaths(normalized)
+            normalized = normalizeIdentifierTokens(normalized)
 
             if looksCodeHeavy(normalized) {
                 normalized = spokenCode(normalized)
@@ -195,6 +197,42 @@ enum SpeechTextNormalizer {
         }
     }
 
+    private static func normalizeFilePaths(_ text: String) -> String {
+        replacingMatches(
+            in: text,
+            pattern: #"(?<!\w)(~|/)[^\s`),;]+"#
+        ) { match, source in
+            let path = source.substring(with: match.range(at: 0))
+            return " \(spokenPath(path)) "
+        }
+    }
+
+    private static func normalizeIdentifierTokens(_ text: String) -> String {
+        let dottedNormalized = replacingMatches(
+            in: text,
+            pattern: #"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"#
+        ) { match, source in
+            let token = source.substring(with: match.range(at: 0))
+            return " \(spokenIdentifier(token)) "
+        }
+
+        let snakeNormalized = replacingMatches(
+            in: dottedNormalized,
+            pattern: #"\b[a-z0-9]+(?:_[a-z0-9]+)+\b"#
+        ) { match, source in
+            let token = source.substring(with: match.range(at: 0))
+            return " \(spokenIdentifier(token)) "
+        }
+
+        return replacingMatches(
+            in: snakeNormalized,
+            pattern: #"\b[a-z]+(?:[A-Z][a-z0-9]+)+\b"#
+        ) { match, source in
+            let token = source.substring(with: match.range(at: 0))
+            return " \(spokenIdentifier(token)) "
+        }
+    }
+
     private static func looksCodeHeavy(_ text: String) -> Bool {
         let obviousMarkers = [
             "```", "`", "->", "=>", "::", "&&", "||", "==", "!=", "{", "}", "</", "/>",
@@ -288,6 +326,40 @@ enum SpeechTextNormalizer {
         for (source, replacement) in replacements {
             spoken = spoken.replacingOccurrences(of: source, with: replacement)
         }
+
+        spoken = replacingMatches(
+            in: spoken,
+            pattern: #"([a-z0-9])([A-Z])"#
+        ) { match, source in
+            let lhs = source.substring(with: match.range(at: 1))
+            let rhs = source.substring(with: match.range(at: 2))
+            return "\(lhs) \(rhs)"
+        }
+
+        return collapseWhitespace(spoken)
+    }
+
+    private static func spokenPath(_ text: String) -> String {
+        var spoken = text
+        if spoken.hasPrefix("~") {
+            spoken = spoken.replacingOccurrences(of: "~", with: "home", options: [], range: spoken.startIndex..<spoken.index(after: spoken.startIndex))
+        }
+
+        spoken = spoken
+            .replacingOccurrences(of: "/", with: " slash ")
+            .replacingOccurrences(of: "\\", with: " backslash ")
+            .replacingOccurrences(of: ".", with: " dot ")
+            .replacingOccurrences(of: "_", with: " underscore ")
+            .replacingOccurrences(of: "-", with: " dash ")
+
+        return collapseWhitespace(spoken)
+    }
+
+    private static func spokenIdentifier(_ text: String) -> String {
+        var spoken = text
+            .replacingOccurrences(of: ".", with: " dot ")
+            .replacingOccurrences(of: "_", with: " underscore ")
+            .replacingOccurrences(of: "-", with: " dash ")
 
         spoken = replacingMatches(
             in: spoken,
