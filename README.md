@@ -121,11 +121,11 @@ The test suite is organized to mirror the source responsibilities:
 Current live-playback behavior is:
 
 - `speak_live` loads the stored profile and reference audio first.
-- The resident `0.6B` model streams generated chunks at the current `0.32` cadence.
+- The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
 - The local `AVAudioEngine` and `AVAudioPlayerNode` are prepared as part of resident-model warmup and then reused across requests instead of being recreated for each utterance.
-- Real playback uses a duration-based startup buffer instead of the older fixed chunk gate and does not start until roughly 300 ms of queued audio is available, unless generation ends earlier.
+- Real playback uses a duration-based startup buffer instead of the older fixed chunk gate and does not start until roughly 360 ms of queued audio is available, unless generation ends earlier.
 - Requests emit `buffering_audio` when the first non-empty chunk arrives and `preroll_ready` when the startup buffer has been satisfied and audio has been scheduled into the hot player path.
-- The worker keeps a maintained queue-floor policy during playback: if queued audio drops below roughly 180 ms while generation is still active, playback pauses and re-buffers until the queue is healthy again or generation ends.
+- The worker keeps a maintained queue-floor policy during playback: if queued audio drops below roughly 140 ms while generation is still active, playback pauses and re-buffers until the queue is healthy again or generation ends.
 - The worker records queue-depth summaries, chunk-arrival gaps, scheduling gaps, rebuffer durations, callback counts, chunk-boundary shape metrics, and process / MLX memory snapshots so playback health can be diagnosed without guessing from one or two timestamps.
 - The worker logs low-queue warnings below 100 ms, chunk-gap warnings, scheduling-gap warnings, rebuffer start/resume events, rebuffer-thrash warnings, explicit starvation events, and a buffer-shape summary when chunk boundaries look suspicious.
 - After generation finishes, playback drain is bounded by a 5 second timeout so the worker cannot hang forever waiting for the local player to report completion.

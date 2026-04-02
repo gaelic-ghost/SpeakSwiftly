@@ -341,12 +341,14 @@ final class PlaybackSpy: @unchecked Sendable {
 
 final class ResidentModelRecorder: @unchecked Sendable {
     private let lock = NSLock()
+    private(set) var lastText: String?
     private(set) var lastRefText: String?
     private(set) var lastRefAudioWasProvided = false
     private(set) var audioLoadCallCount = 0
 
-    func record(refAudioWasProvided: Bool, refText: String?) {
+    func record(text: String, refAudioWasProvided: Bool, refText: String?) {
         lock.withLock {
+            lastText = text
             lastRefAudioWasProvided = refAudioWasProvided
             lastRefText = refText
         }
@@ -365,8 +367,8 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
         generate: { _, _, _, _, _ in
             [0.1, 0.2]
         },
-        generateSamplesStream: { _, _, refAudio, refText, _, _ in
-            recorder?.record(refAudioWasProvided: refAudio != nil, refText: refText)
+        generateSamplesStream: { text, _, refAudio, refText, _, _ in
+            recorder?.record(text: text, refAudioWasProvided: refAudio != nil, refText: refText)
 
             return AsyncThrowingStream { continuation in
                 for chunkIndex in 0..<chunkCount {

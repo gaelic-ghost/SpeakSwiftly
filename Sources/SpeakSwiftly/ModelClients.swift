@@ -169,8 +169,8 @@ struct PlaybackTraceEvent: Sendable {
 }
 
 enum PlaybackMetricsConfiguration {
-    static let startupBufferTargetMS = 300
-    static let lowWaterTargetMS = 180
+    static let startupBufferTargetMS = 360
+    static let lowWaterTargetMS = 140
     static let chunkGapWarningMS = 450
     static let scheduleGapWarningMS = 180
     static let rebufferThrashWarningCount = 3
@@ -554,6 +554,7 @@ final class PlaybackController {
         var scheduleGapCount = 0
         var maxScheduleGapMS: Int?
         var bufferIndex = 0
+        var lastPreparedTrailingSample: Float?
 
         func bufferedAudioMS() -> Int {
             Int((Double(pendingSampleCount) / sampleRate * 1_000).rounded())
@@ -750,7 +751,13 @@ final class PlaybackController {
                         )
                     )
                 }
-                if let buffer = makePCMBuffer(from: chunk, sampleRate: sampleRate, applyFadeIn: !emittedFirstChunk) {
+                if let buffer = makePCMBuffer(
+                    from: chunk,
+                    sampleRate: sampleRate,
+                    previousTrailingSample: lastPreparedTrailingSample,
+                    applyFadeIn: !emittedFirstChunk
+                ) {
+                    lastPreparedTrailingSample = buffer.lastSample
                     let frameCount = buffer.frameCount
                     if startedPlayback {
                         await scheduleForPlayback(
@@ -1008,6 +1015,7 @@ final class PlaybackController {
     private func makePCMBuffer(
         from samples: [Float],
         sampleRate: Double,
+        previousTrailingSample: Float?,
         applyFadeIn: Bool
     ) -> (buffer: AVAudioPCMBuffer, frameCount: Int, firstSample: Float, lastSample: Float, fadeInApplied: Bool)? {
         guard let format = streamingFormat ?? AVAudioFormat(
@@ -1017,16 +1025,12 @@ final class PlaybackController {
             return nil
         }
 
-        var processedSamples = samples
-        if applyFadeIn {
-            let fadeInSamples = min(Int(format.sampleRate * 0.01), processedSamples.count)
-            if fadeInSamples > 0 {
-                for i in 0..<fadeInSamples {
-                    let factor = Float(i) / Float(fadeInSamples)
-                    processedSamples[i] *= factor
-                }
-            }
-        }
+        let processedSamples = shapePlaybackSamples(
+            samples,
+            sampleRate: format.sampleRate,
+            previousTrailingSample: previousTrailingSample,
+            applyFadeIn: applyFadeIn
+        )
         guard let firstSample = processedSamples.first, let lastSample = processedSamples.last else {
             return nil
         }
@@ -1065,6 +1069,56 @@ final class PlaybackController {
             completionHandler: completion
         )
     }
+}
+
+func shapePlaybackSamples(
+    _ samples: [Float],
+    sampleRate: Double,
+    previousTrailingSample: Float?,
+    applyFadeIn: Bool
+) -> [Float] {
+    guard !samples.isEmpty else { return [] }
+
+    let minimumSampleValue: Float = -1
+    let maximumSampleValue: Float = 1
+
+    var processedSamples = samples.map { sample in
+        if !sample.isFinite {
+            return Float.zero
+        }
+        return min(max(sample, minimumSampleValue), maximumSampleValue)
+    }
+
+    if let previousTrailingSample, let currentLeadingSample = processedSamples.first {
+        let boundaryJump = currentLeadingSample - previousTrailingSample
+        if abs(boundaryJump) >= 0.08 {
+            let rampSampleCount = min(max(Int(sampleRate * 0.005), 8), processedSamples.count)
+            if rampSampleCount > 0 {
+                let rampDivisor = Float(max(rampSampleCount - 1, 1))
+                for index in 0..<rampSampleCount {
+                    let progress = Float(index) / rampDivisor
+                    let correction = boundaryJump * (1 - progress)
+                    processedSamples[index] = min(
+                        max(processedSamples[index] - correction, minimumSampleValue),
+                        maximumSampleValue
+                    )
+                }
+            }
+        }
+    }
+
+    if applyFadeIn {
+        let fadeInSampleCount = min(Int(sampleRate * 0.01), processedSamples.count)
+        if fadeInSampleCount > 0 {
+            let fadeDivisor = Float(max(fadeInSampleCount - 1, 1))
+            for index in 0..<fadeInSampleCount {
+                let factor = Float(index) / fadeDivisor
+                processedSamples[index] *= factor
+            }
+        }
+    }
+
+    return processedSamples
 }
 
 private func milliseconds(since start: Date) -> Int {

@@ -189,9 +189,9 @@ import Testing
             }
 
             return details["chunk_count"] as? Int == 3
-                && details["streaming_interval"] as? Double == 0.32
-                && details["startup_buffer_target_ms"] as? Int == 300
-                && details["low_water_target_ms"] as? Int == 180
+                && details["streaming_interval"] as? Double == 0.18
+                && details["startup_buffer_target_ms"] as? Int == 360
+                && details["low_water_target_ms"] as? Int == 140
                 && details["chunk_gap_warning_threshold_ms"] as? Int == 450
                 && details["schedule_gap_warning_threshold_ms"] as? Int == 180
                 && details["rebuffer_event_count"] as? Int == 0
@@ -261,7 +261,7 @@ import Testing
                 return false
             }
 
-            return details["low_water_target_ms"] as? Int == 180
+            return details["low_water_target_ms"] as? Int == 140
                 && details["queued_audio_ms"] as? Int == 120
         }
     })
@@ -415,4 +415,73 @@ import Testing
 
     #expect(residentRecorder.lastRefAudioWasProvided == true)
     #expect(residentRecorder.audioLoadCallCount == 1)
+}
+
+@Test func speakLiveNormalizesCodeHeavyMarkdownBeforeResidentGeneration() async throws {
+    let output = OutputRecorder()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        audioLoadRecorder: residentRecorder,
+        residentModelLoader: {
+            makeResidentModel(recorder: residentRecorder)
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-1","op":"speak_live","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
+        """#
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    let normalized = try #require(residentRecorder.lastText)
+    #expect(!normalized.contains("```"))
+    #expect(!normalized.contains("`"))
+    #expect(normalized.contains("foo Bar open parenthesis close parenthesis"))
+    #expect(normalized.contains("Code sample."))
+    #expect(normalized.contains("optional chaining"))
+    #expect(normalized.contains("nil coalescing"))
+}
+
+@Test func shapePlaybackSamplesSmoothsBoundaryJumpsAndSanitizesInvalidValues() {
+    let shaped = shapePlaybackSamples(
+        [Float.nan, 1.8, -1.6, 0.25],
+        sampleRate: 24_000,
+        previousTrailingSample: 0.35,
+        applyFadeIn: false
+    )
+
+    #expect(shaped.count == 4)
+    #expect(shaped.allSatisfy { $0.isFinite && $0 >= -1 && $0 <= 1 })
+    #expect(abs(shaped[0] - 0.35) < 0.000_1)
 }

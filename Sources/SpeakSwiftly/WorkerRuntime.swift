@@ -8,9 +8,9 @@ actor WorkerRuntime {
     }
 
     private enum PlaybackConfiguration {
-        // Keep the current aggressive low-latency chunk cadence until queue-depth
-        // metrics from the hot player path tell us whether it should change.
-        static let residentStreamingInterval = 0.32
+        // Shorter chunk cadence gives playback a second chunk in reserve before
+        // the first one drains, which reduces audible shudder from one-chunk starts.
+        static let residentStreamingInterval = 0.18
     }
 
     private enum ResidentState: Sendable {
@@ -409,6 +409,7 @@ actor WorkerRuntime {
     private func handleSpeakLive(id: String, text: String, profileName: String) async throws {
         let residentModel = try residentModelOrThrow()
         let op = WorkerRequest.speakLive(id: id, text: text, profileName: profileName).opName
+        let normalizedText = SpeechTextNormalizer.normalize(text)
 
         await emitProgress(id: id, stage: .loadingProfile)
         let profileLoadStartedAt = dependencies.now()
@@ -441,7 +442,7 @@ actor WorkerRuntime {
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentModel.generateSamplesStream(
-            text: text,
+            text: normalizedText,
             voice: nil,
             refAudio: refAudio,
             refText: profile.manifest.sourceText,

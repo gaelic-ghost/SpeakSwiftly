@@ -193,7 +193,7 @@ struct SpeakSwiftlyE2ETests {
                 return false
             }
 
-            return details["startup_buffer_target_ms"] as? Int == 300
+            return details["startup_buffer_target_ms"] as? Int == 360
                 && details["startup_buffered_audio_ms"] as? Int != nil
                 && details["process_phys_footprint_bytes"] as? Int != nil
                 && details["process_resident_bytes"] as? Int != nil
@@ -212,8 +212,8 @@ struct SpeakSwiftlyE2ETests {
                     return false
                 }
 
-                return details["startup_buffer_target_ms"] as? Int == 300
-                    && details["low_water_target_ms"] as? Int == 180
+                return details["startup_buffer_target_ms"] as? Int == 360
+                    && details["low_water_target_ms"] as? Int == 140
                     && details["chunk_gap_warning_threshold_ms"] as? Int == 450
                     && details["schedule_gap_warning_threshold_ms"] as? Int == 180
                     && details["startup_buffered_audio_ms"] as? Int != nil
