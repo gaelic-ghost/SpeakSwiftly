@@ -24,6 +24,30 @@ struct SpeakSwiftlyE2ETests {
     Also read these oddly spelled words once each: quizzaciously, xylophonic, cwmfjord, lophophore, phthalo, zyzzyva.
     Finish with this sentence exactly once. End of forensic playback probe.
     """
+    private static let segmentedForensicPlaybackText = """
+    # Section One
+
+    Please read this paragraph once and keep a natural tone. The path `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should sound like speech, not code noise.
+
+    ## Section Two
+
+    Read these symbol-heavy identifiers carefully: NSApplication.didFinishLaunchingNotification, AVAudioEngine.mainMixerNode, dot.syntax.stuff, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
+
+    ## Section Three
+
+    ```objc
+    @property(nonatomic, strong) NSString *displayName;
+    [NSFileManager.defaultManager fileExistsAtPath:@"/tmp/Thing"];
+    ```
+
+    ## Section Four
+
+    Also read these words once each: chrommmaticallly, qqqwweerrtyy, phthalo, zyzzyva, lophophore.
+
+    ## Footer
+
+    End this segmented forensic playback probe once, clearly, and without looping.
+    """
 
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
@@ -385,6 +409,79 @@ struct SpeakSwiftlyE2ETests {
 
         #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
             $0["id"] as? String == "req-live-forensic"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
+    @Test func forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest() async throws {
+        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: Self.isPlaybackTraceEnabled
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-segmented","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-segmented"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-segmented","op":"speak_live","text":"\(Self.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-segmented"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == "req-live-segmented",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                    && (details["file_path_count"] as? Int ?? 0) >= 1
+                    && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
+                    && (details["camel_case_token_count"] as? Int ?? 0) >= 1
+                    && (details["snake_case_token_count"] as? Int ?? 0) >= 1
+                    && (details["objc_symbol_count"] as? Int ?? 0) >= 1
+                    && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
+                    && details["looks_code_heavy"] as? Bool == true
+            }
+        )
+
+        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-segmented"
                 && $0["ok"] as? Bool == true
         } != nil)
 

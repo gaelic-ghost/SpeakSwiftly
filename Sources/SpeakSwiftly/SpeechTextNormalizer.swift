@@ -2,6 +2,26 @@ import Foundation
 
 // MARK: - Speech Text Normalization
 
+struct SpeechTextForensicFeatures: Sendable, Equatable {
+    let originalCharacterCount: Int
+    let normalizedCharacterCount: Int
+    let normalizedCharacterDelta: Int
+    let originalParagraphCount: Int
+    let normalizedParagraphCount: Int
+    let markdownHeaderCount: Int
+    let fencedCodeBlockCount: Int
+    let inlineCodeSpanCount: Int
+    let markdownLinkCount: Int
+    let filePathCount: Int
+    let dottedIdentifierCount: Int
+    let camelCaseTokenCount: Int
+    let snakeCaseTokenCount: Int
+    let objcSymbolCount: Int
+    let repeatedLetterRunCount: Int
+    let punctuationHeavyLineCount: Int
+    let looksCodeHeavy: Bool
+}
+
 enum SpeechTextNormalizer {
     static func normalize(_ text: String) -> String {
         var normalized = text
@@ -23,6 +43,28 @@ enum SpeechTextNormalizer {
 
         let finalized = collapseWhitespace(normalized)
         return finalized.isEmpty ? text : finalized
+    }
+
+    static func forensicFeatures(originalText: String, normalizedText: String) -> SpeechTextForensicFeatures {
+        SpeechTextForensicFeatures(
+            originalCharacterCount: originalText.count,
+            normalizedCharacterCount: normalizedText.count,
+            normalizedCharacterDelta: normalizedText.count - originalText.count,
+            originalParagraphCount: paragraphCount(in: originalText),
+            normalizedParagraphCount: paragraphCount(in: normalizedText),
+            markdownHeaderCount: regexMatchCount(in: originalText, pattern: #"(?m)^\s{0,3}#{1,6}\s+\S.*$"#),
+            fencedCodeBlockCount: regexMatchCount(in: originalText, pattern: #"```"#) / 2,
+            inlineCodeSpanCount: regexMatchCount(in: originalText, pattern: #"`[^`\n]+`"#),
+            markdownLinkCount: regexMatchCount(in: originalText, pattern: #"\[[^\]]+\]\([^)]+\)"#),
+            filePathCount: regexMatchCount(in: originalText, pattern: #"(?<!\w)(?:~|/)[^\s`),;]+"#),
+            dottedIdentifierCount: regexMatchCount(in: originalText, pattern: #"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"#),
+            camelCaseTokenCount: regexMatchCount(in: originalText, pattern: #"\b[a-z]+(?:[A-Z][a-z0-9]+)+\b"#),
+            snakeCaseTokenCount: regexMatchCount(in: originalText, pattern: #"\b[a-z0-9]+(?:_[a-z0-9]+)+\b"#),
+            objcSymbolCount: regexMatchCount(in: originalText, pattern: #"\b[A-Z]{2,}[A-Za-z0-9]*(?::[A-Za-z0-9]+)+\b|\bNS[A-Z][A-Za-z0-9]+\b"#),
+            repeatedLetterRunCount: regexMatchCount(in: originalText, pattern: #"(?i)\b\w*([a-z])\1{2,}\w*\b"#),
+            punctuationHeavyLineCount: punctuationHeavyLineCount(in: originalText),
+            looksCodeHeavy: looksCodeHeavy(originalText)
+        )
     }
 
     private static func containsCorrectableText(_ text: String) -> Bool {
@@ -81,6 +123,47 @@ enum SpeechTextNormalizer {
         let letterCharacters = text.filter(\.isLetter).count
         guard letterCharacters > 0 else { return codeCharacters > 0 }
         return Double(codeCharacters) / Double(letterCharacters) >= 0.12
+    }
+
+    private static func paragraphCount(in text: String) -> Int {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        let normalizedBreaks = trimmed.replacingOccurrences(
+            of: #"\n\s*\n"#,
+            with: "\n\n",
+            options: .regularExpression
+        )
+        return normalizedBreaks.components(separatedBy: "\n\n").count
+    }
+
+    private static func punctuationHeavyLineCount(in text: String) -> Int {
+        text
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .reduce(into: 0) { count, rawLine in
+                let line = String(rawLine)
+                let punctuation = line.filter { "{}[]()<>/\\=_*#|~:;.`-".contains($0) }.count
+                let letters = line.filter(\.isLetter).count
+                let containsStructuredCodeMarker =
+                    line.contains("@property")
+                    || line.contains("[")
+                    || line.contains("]")
+                    || line.contains("://")
+                    || line.contains("/")
+                    || line.contains("::")
+                    || line.contains("->")
+                    || line.contains("?.")
+                    || line.contains("??")
+
+                if punctuation >= 6 && (punctuation * 2 >= max(letters, 4) || containsStructuredCodeMarker) {
+                    count += 1
+                }
+            }
+    }
+
+    private static func regexMatchCount(in text: String, pattern: String) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return 0 }
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        return regex.numberOfMatches(in: text, range: range)
     }
 
     private static func spokenCode(_ text: String) -> String {

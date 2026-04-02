@@ -233,6 +233,41 @@ import Testing
     #expect(playback.stopCount == 1)
 }
 
+@Test func speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes() {
+    let original = """
+    # Header
+
+    The path is /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift and the symbol is NSApplication.didFinishLaunchingNotification.
+
+    Please read `dot.syntax.stuff`, camelCaseStuff, snake_case_stuff, and [a markdown link](https://example.com/docs).
+
+    ```objc
+    @property(nonatomic, strong) NSString *displayName;
+    [NSFileManager.defaultManager fileExistsAtPath:@"/tmp/Thing"];
+    ```
+
+    Also say chrommmaticallly and qqqwweerrtyy once.
+    """
+
+    let normalized = SpeechTextNormalizer.normalize(original)
+    let features = SpeechTextNormalizer.forensicFeatures(originalText: original, normalizedText: normalized)
+
+    #expect(features.originalCharacterCount > 0)
+    #expect(features.normalizedCharacterCount > 0)
+    #expect(features.markdownHeaderCount == 1)
+    #expect(features.fencedCodeBlockCount == 1)
+    #expect(features.inlineCodeSpanCount >= 1)
+    #expect(features.markdownLinkCount == 1)
+    #expect(features.filePathCount >= 2)
+    #expect(features.dottedIdentifierCount >= 1)
+    #expect(features.camelCaseTokenCount >= 1)
+    #expect(features.snakeCaseTokenCount >= 1)
+    #expect(features.objcSymbolCount >= 1)
+    #expect(features.repeatedLetterRunCount >= 2)
+    #expect(features.punctuationHeavyLineCount >= 1)
+    #expect(features.looksCodeHeavy)
+}
+
 @Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

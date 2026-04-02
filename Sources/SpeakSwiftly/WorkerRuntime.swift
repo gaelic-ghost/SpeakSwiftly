@@ -410,6 +410,7 @@ actor WorkerRuntime {
         let residentModel = try residentModelOrThrow()
         let op = WorkerRequest.speakLive(id: id, text: text, profileName: profileName).opName
         let normalizedText = SpeechTextNormalizer.normalize(text)
+        let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
 
         await emitProgress(id: id, stage: .loadingProfile)
         let profileLoadStartedAt = dependencies.now()
@@ -486,7 +487,9 @@ actor WorkerRuntime {
                         "text_complexity_class": .string(thresholds.complexityClass.rawValue),
                         "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
                         "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
-                    ].merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
+                    ]
+                    .merging(self.textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
+                    .merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
                 )
             case .queueDepthLow(let queuedAudioMS):
                 await self.logRequestEvent(
@@ -683,6 +686,7 @@ actor WorkerRuntime {
         if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude {
             details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude)
         }
+        details.merge(textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
         details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
         await logRequestEvent(
             "playback_finished",
@@ -793,6 +797,28 @@ actor WorkerRuntime {
         }
 
         return storedProfile
+    }
+
+    private func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {
+        [
+            "original_character_count": .int(features.originalCharacterCount),
+            "normalized_character_count": .int(features.normalizedCharacterCount),
+            "normalized_character_delta": .int(features.normalizedCharacterDelta),
+            "original_paragraph_count": .int(features.originalParagraphCount),
+            "normalized_paragraph_count": .int(features.normalizedParagraphCount),
+            "markdown_header_count": .int(features.markdownHeaderCount),
+            "fenced_code_block_count": .int(features.fencedCodeBlockCount),
+            "inline_code_span_count": .int(features.inlineCodeSpanCount),
+            "markdown_link_count": .int(features.markdownLinkCount),
+            "file_path_count": .int(features.filePathCount),
+            "dotted_identifier_count": .int(features.dottedIdentifierCount),
+            "camel_case_token_count": .int(features.camelCaseTokenCount),
+            "snake_case_token_count": .int(features.snakeCaseTokenCount),
+            "objc_symbol_count": .int(features.objcSymbolCount),
+            "repeated_letter_run_count": .int(features.repeatedLetterRunCount),
+            "punctuation_heavy_line_count": .int(features.punctuationHeavyLineCount),
+            "looks_code_heavy": .bool(features.looksCodeHeavy),
+        ]
     }
 
     private func residentModelOrThrow() throws -> AnySpeechModel {
