@@ -86,7 +86,21 @@ Current status:
   - warmup to steady transition after stable chunk cadence
   - steady to recovery transition after rebuffer
   - recovery back to steady after stable cadence returns
-- Audible verification still needs to be judged by ear and by a fresh trace after this phase-aware pass.
+- Audible verification on the phase-aware build was subjectively better, but still not fully smooth.
+- The phase-aware direct trace ended with:
+  - `avg_inter_chunk_gap_ms: 188`
+  - `avg_queued_audio_ms: 1232`
+  - `startup_buffer_target_ms: 1384`
+  - `low_water_target_ms: 1054`
+  - `resume_buffer_target_ms: 2214`
+  - `startup_buffered_audio_ms: 1120`
+  - `rebuffer_event_count: 10`
+  - `rebuffer_total_duration_ms: 11100`
+  - `longest_rebuffer_duration_ms: 1482`
+  - `time_to_first_chunk_ms: 369`
+  - `time_to_preroll_ready_ms: 1894`
+  - `starvation_event_count: 0`
+- Early direct-trace rebuffers resumed at sturdier queue depths like `1280 ms`, `1440 ms`, `1600 ms`, `1760 ms`, `1920 ms`, `2080 ms`, and `2240 ms`.
 
 Interpretation:
 
@@ -94,6 +108,8 @@ Interpretation:
 - Adaptive buffering materially reduced starvation and made playback much more stable.
 - The remaining skips look more like repeated low-buffer rebuffer cycles than full starvation cascades.
 - The remaining pops are likely a separate boundary-quality issue and should be revisited after buffering behavior is stable enough that the two problem classes do not mask each other.
+- The phase-aware pass appears to have reduced early eagerness and materially strengthened queue recovery, but some requests still skip more often than desired even after warmup and recovery improvements.
+- The remaining gap now looks increasingly likely to involve speakability and text-shape effects in addition to buffering policy alone.
 
 Operational notes:
 
@@ -109,8 +125,6 @@ Operational notes:
 
 Next buffering direction:
 
-- Let repeated rebuffers raise adaptive thresholds even when starvation never occurs.
-- Keep starvation as an immediate stronger escalation path.
-- Bias the `extended` complexity class toward a more conservative startup policy for code-heavy requests, especially early in playback.
+- Explore text-side cadence stabilization for code-heavy or punctuation-heavy spans, since identifiers, paths, punctuation density, and oddly spelled words may still be producing uneven chunk timing even after the buffering improvements.
 - Revisit the worker's stdin-close cancellation behavior after the buffering path is in a better place, because it currently makes direct forensic capture more fragile than it should be.
 - Revisit chunk-boundary smoothing only after the buffering path is no longer the dominant source of audible defects.
