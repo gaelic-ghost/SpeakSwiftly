@@ -253,10 +253,12 @@ Tickets:
 
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
+- [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
 - [ ] Add a lightweight worker `status` operation or equivalent health/introspection surface for resident state, active request id, queue length, profile root, and playback-drain state.
 - [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
 - [ ] Add an explicit qualitative runtime review checklist for future live-service passes so regressions in operability stay visible.
 - [ ] Use the richer playback observability to separate generation jitter, scheduling jitter, queue collapse, and chunk-boundary discontinuity before retuning cadence or DSP behavior again.
+- [ ] Revisit chunk-boundary discontinuity and pop reduction after the adaptive buffering work is stable enough that buffering no longer dominates audible defects.
 - [ ] Document the current tag-time cached-binary refresh into `../speak-to-user-mcp`, including when it runs, what it updates, and what it intentionally does not cover yet.
 - [ ] Expand the adjacent-repo release propagation workflow so other local binary consumers such as `../speak-to-user-server` can be updated intentionally from the same standalone release process instead of drifting silently.
 

@@ -49,6 +49,36 @@ import Testing
     #expect(starved.lowWaterTargetMS >= adapted.lowWaterTargetMS)
 }
 
+@Test func adaptivePlaybackThresholdsRaiseTargetsForRepeatedRebuffers() {
+    var controller = PlaybackThresholdController(
+        text: """
+        Please read this file path and code-heavy explanation carefully.
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift
+        let greeting = user?.displayName ?? "friend"
+        """
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordRebuffer()
+    let afterFirstRebuffer = controller.thresholds
+    controller.recordRebuffer()
+    let afterSecondRebuffer = controller.thresholds
+    controller.recordRebuffer()
+    let afterThirdRebuffer = controller.thresholds
+
+    #expect(afterFirstRebuffer == adapted)
+    #expect(afterSecondRebuffer.startupBufferTargetMS > adapted.startupBufferTargetMS)
+    #expect(afterSecondRebuffer.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(afterSecondRebuffer.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(afterSecondRebuffer.chunkGapWarningMS >= adapted.chunkGapWarningMS)
+    #expect(afterSecondRebuffer.scheduleGapWarningMS >= adapted.scheduleGapWarningMS)
+    #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
+}
+
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
