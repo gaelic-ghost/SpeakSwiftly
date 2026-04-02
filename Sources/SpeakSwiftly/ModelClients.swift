@@ -134,20 +134,36 @@ enum ModelFactory {
 
 // MARK: - Playback
 
+enum PlaybackEvent: Sendable {
+    case firstChunk
+    case prerollReady
+}
+
+private let playbackPrerollChunkTarget = 3
+
+struct PlaybackSummary: Sendable {
+    let chunkCount: Int
+    let sampleCount: Int
+    let prerollChunkCount: Int
+    let timeToFirstChunkMS: Int?
+    let timeToPrerollReadyMS: Int?
+    let timeFromPrerollReadyToDrainMS: Int?
+}
+
 final class AnyPlaybackController: @unchecked Sendable {
     private let playImpl: @Sendable (
         _ sampleRate: Double,
         _ stream: AsyncThrowingStream<[Float], Error>,
-        _ onFirstChunk: @escaping @Sendable () async -> Void
-    ) async throws -> Void
+        _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+    ) async throws -> PlaybackSummary
     private let stopImpl: @Sendable () async -> Void
 
     init(
         play: @escaping @Sendable (
             _ sampleRate: Double,
             _ stream: AsyncThrowingStream<[Float], Error>,
-            _ onFirstChunk: @escaping @Sendable () async -> Void
-        ) async throws -> Void,
+            _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+        ) async throws -> PlaybackSummary,
         stop: @escaping @Sendable () async -> Void
     ) {
         playImpl = play
@@ -156,11 +172,11 @@ final class AnyPlaybackController: @unchecked Sendable {
 
     convenience init(_ controller: PlaybackController) {
         self.init(
-            play: { sampleRate, stream, onFirstChunk in
+            play: { sampleRate, stream, onEvent in
                 try await controller.play(
                     sampleRate: sampleRate,
                     stream: stream,
-                    onFirstChunk: onFirstChunk
+                    onEvent: onEvent
                 )
             },
             stop: {
@@ -171,17 +187,57 @@ final class AnyPlaybackController: @unchecked Sendable {
 
     static func silent() -> AnyPlaybackController {
         AnyPlaybackController(
-            play: { _, stream, onFirstChunk in
+            play: { _, stream, onEvent in
+                let startedAt = Date()
                 var emittedFirstChunk = false
+                var emittedPrerollReady = false
+                var chunkCount = 0
+                var sampleCount = 0
+                var prerollChunkCount = 0
+                var timeToFirstChunkMS: Int?
+                var timeToPrerollReadyMS: Int?
 
                 for try await chunk in stream {
                     guard !chunk.isEmpty else { continue }
+                    chunkCount += 1
+                    sampleCount += chunk.count
 
                     if !emittedFirstChunk {
                         emittedFirstChunk = true
-                        await onFirstChunk()
+                        timeToFirstChunkMS = milliseconds(since: startedAt)
+                        await onEvent(.firstChunk)
+                    }
+
+                    if !emittedPrerollReady, chunkCount >= playbackPrerollChunkTarget {
+                        emittedPrerollReady = true
+                        prerollChunkCount = chunkCount
+                        timeToPrerollReadyMS = milliseconds(since: startedAt)
+                        await onEvent(.prerollReady)
                     }
                 }
+
+                if emittedFirstChunk, !emittedPrerollReady {
+                    emittedPrerollReady = true
+                    prerollChunkCount = chunkCount
+                    timeToPrerollReadyMS = milliseconds(since: startedAt)
+                    await onEvent(.prerollReady)
+                }
+
+                let timeFromPrerollReadyToDrainMS: Int?
+                if let timeToPrerollReadyMS {
+                    timeFromPrerollReadyToDrainMS = max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
+                } else {
+                    timeFromPrerollReadyToDrainMS = nil
+                }
+
+                return PlaybackSummary(
+                    chunkCount: chunkCount,
+                    sampleCount: sampleCount,
+                    prerollChunkCount: prerollChunkCount,
+                    timeToFirstChunkMS: timeToFirstChunkMS,
+                    timeToPrerollReadyMS: timeToPrerollReadyMS,
+                    timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS
+                )
             },
             stop: {}
         )
@@ -190,9 +246,9 @@ final class AnyPlaybackController: @unchecked Sendable {
     func play(
         sampleRate: Double,
         stream: AsyncThrowingStream<[Float], Error>,
-        onFirstChunk: @escaping @Sendable () async -> Void
-    ) async throws {
-        try await playImpl(sampleRate, stream, onFirstChunk)
+        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+    ) async throws -> PlaybackSummary {
+        try await playImpl(sampleRate, stream, onEvent)
     }
 
     func stop() async {
@@ -215,10 +271,19 @@ final class PlaybackController {
     func play(
         sampleRate: Double,
         stream: AsyncThrowingStream<[Float], Error>,
-        onFirstChunk: @escaping @Sendable () async -> Void
-    ) async throws {
+        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+    ) async throws -> PlaybackSummary {
         let streamFinished = AsyncStream<Void>.makeStream()
         let previousCallback = player.onDidFinishStreaming
+        let startedAt = Date()
+        var bufferedChunks = [[Float]]()
+        var startedPlayback = false
+        var emittedFirstChunk = false
+        var chunkCount = 0
+        var sampleCount = 0
+        var prerollChunkCount = 0
+        var timeToFirstChunkMS: Int?
+        var timeToPrerollReadyMS: Int?
         defer { player.onDidFinishStreaming = previousCallback }
         player.onDidFinishStreaming = {
             previousCallback?()
@@ -226,24 +291,71 @@ final class PlaybackController {
             streamFinished.continuation.finish()
         }
 
-        player.startStreaming(sampleRate: sampleRate)
-
-        var emittedFirstChunk = false
-
         do {
             for try await chunk in stream {
                 guard !chunk.isEmpty else { continue }
+                chunkCount += 1
+                sampleCount += chunk.count
 
                 if !emittedFirstChunk {
                     emittedFirstChunk = true
-                    await onFirstChunk()
+                    timeToFirstChunkMS = milliseconds(since: startedAt)
+                    await onEvent(.firstChunk)
                 }
 
-                player.scheduleAudioChunk(chunk)
+                if !startedPlayback {
+                    bufferedChunks.append(chunk)
+
+                    if bufferedChunks.count >= playbackPrerollChunkTarget {
+                        player.startStreaming(sampleRate: sampleRate)
+                        startedPlayback = true
+                        prerollChunkCount = bufferedChunks.count
+                        timeToPrerollReadyMS = milliseconds(since: startedAt)
+                        await onEvent(.prerollReady)
+
+                        for bufferedChunk in bufferedChunks {
+                            player.scheduleAudioChunk(bufferedChunk)
+                        }
+                        bufferedChunks.removeAll(keepingCapacity: true)
+                    }
+                } else {
+                    player.scheduleAudioChunk(chunk)
+                }
+            }
+
+            if !startedPlayback {
+                player.startStreaming(sampleRate: sampleRate)
+                startedPlayback = true
+
+                if !bufferedChunks.isEmpty {
+                    prerollChunkCount = bufferedChunks.count
+                    timeToPrerollReadyMS = milliseconds(since: startedAt)
+                    await onEvent(.prerollReady)
+
+                    for bufferedChunk in bufferedChunks {
+                        player.scheduleAudioChunk(bufferedChunk)
+                    }
+                    bufferedChunks.removeAll(keepingCapacity: true)
+                }
             }
 
             player.finishStreamingInput()
             try await waitForPlaybackDrain(streamFinished.stream)
+            let timeFromPrerollReadyToDrainMS: Int?
+            if let timeToPrerollReadyMS {
+                timeFromPrerollReadyToDrainMS = max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
+            } else {
+                timeFromPrerollReadyToDrainMS = nil
+            }
+
+            return PlaybackSummary(
+                chunkCount: chunkCount,
+                sampleCount: sampleCount,
+                prerollChunkCount: prerollChunkCount,
+                timeToFirstChunkMS: timeToFirstChunkMS,
+                timeToPrerollReadyMS: timeToPrerollReadyMS,
+                timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS
+            )
         } catch is CancellationError {
             player.stopStreaming()
             throw CancellationError()
@@ -283,6 +395,10 @@ final class PlaybackController {
             group.cancelAll()
         }
     }
+}
+
+private func milliseconds(since start: Date) -> Int {
+    Int((Date().timeIntervalSince(start) * 1_000).rounded())
 }
 
 // MARK: - Dependencies

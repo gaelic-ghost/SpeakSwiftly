@@ -38,16 +38,69 @@ actor WorkerRuntime {
         }
     }
 
+    private enum LogLevel: String, Encodable {
+        case info
+        case error
+    }
+
+    private enum LogValue: Encodable, Sendable {
+        case string(String)
+        case int(Int)
+        case double(Double)
+        case bool(Bool)
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .string(let value):
+                try container.encode(value)
+            case .int(let value):
+                try container.encode(value)
+            case .double(let value):
+                try container.encode(value)
+            case .bool(let value):
+                try container.encode(value)
+            }
+        }
+    }
+
+    private struct LogEvent: Encodable {
+        let event: String
+        let level: LogLevel
+        let ts: String
+        let requestID: String?
+        let op: String?
+        let profileName: String?
+        let queueDepth: Int?
+        let elapsedMS: Int?
+        let details: [String: LogValue]?
+
+        enum CodingKeys: String, CodingKey {
+            case event
+            case level
+            case ts
+            case requestID = "request_id"
+            case op
+            case profileName = "profile_name"
+            case queueDepth = "queue_depth"
+            case elapsedMS = "elapsed_ms"
+            case details
+        }
+    }
+
     private let dependencies: WorkerDependencies
     private let encoder = JSONEncoder()
+    private let logEncoder = JSONEncoder()
     private let profileStore: ProfileStore
     private let playbackController: AnyPlaybackController
+    private let logTimestampFormatter = ISO8601DateFormatter()
 
     private var residentState: ResidentState = .warming
     private var queue = [QueueEntry]()
     private var activeRequest: ActiveRequest?
     private var isShuttingDown = false
     private var preloadTask: Task<Void, Never>?
+    private var requestAcceptedAt = [String: Date]()
 
     init(
         dependencies: WorkerDependencies,
@@ -58,6 +111,7 @@ actor WorkerRuntime {
         self.profileStore = profileStore
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
+        logEncoder.outputFormatting = [.sortedKeys]
     }
 
     static func live() async -> WorkerRuntime {
@@ -81,13 +135,28 @@ actor WorkerRuntime {
 
     func start() {
         preloadTask = Task {
+            let preloadStartedAt = dependencies.now()
             await emitStatus(.warmingResidentModel)
+            await logEvent(
+                "resident_model_preload_started",
+                details: [
+                    "model_repo": .string(ModelFactory.residentModelRepo),
+                    "profile_root": .string(profileStore.rootURL.path),
+                ]
+            )
 
             do {
                 try profileStore.ensureRootExists()
                 let model = try await dependencies.loadResidentModel()
                 residentState = .ready(model)
                 await emitStatus(.residentModelReady)
+                await logEvent(
+                    "resident_model_preload_ready",
+                    details: [
+                        "model_repo": .string(ModelFactory.residentModelRepo),
+                        "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
+                    ]
+                )
                 try await startNextRequestIfPossible()
             } catch is CancellationError {
                 guard !isShuttingDown else { return }
@@ -97,12 +166,25 @@ actor WorkerRuntime {
                     message: "Resident model preload was cancelled before \(ModelFactory.residentModelRepo) finished loading."
                 )
                 residentState = .failed(workerError)
-                await logError(workerError.message)
+                await logError(
+                    workerError.message,
+                    details: [
+                        "model_repo": .string(ModelFactory.residentModelRepo),
+                        "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
+                    ]
+                )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch let workerError as WorkerError {
                 residentState = .failed(workerError)
-                await logError("Resident model preload failed while loading \(ModelFactory.residentModelRepo). \(workerError.message)")
+                await logError(
+                    "Resident model preload failed while loading \(ModelFactory.residentModelRepo). \(workerError.message)",
+                    details: [
+                        "model_repo": .string(ModelFactory.residentModelRepo),
+                        "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
+                        "failure_code": .string(workerError.code.rawValue),
+                    ]
+                )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch {
@@ -111,7 +193,13 @@ actor WorkerRuntime {
                     message: "Resident model preload failed while loading \(ModelFactory.residentModelRepo). \(error.localizedDescription)"
                 )
                 residentState = .failed(workerError)
-                await logError(workerError.message)
+                await logError(
+                    workerError.message,
+                    details: [
+                        "model_repo": .string(ModelFactory.residentModelRepo),
+                        "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
+                    ]
+                )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             }
@@ -152,9 +240,24 @@ actor WorkerRuntime {
         }
 
         let entry = QueueEntry(request: request)
+        requestAcceptedAt[request.id] = dependencies.now()
+        await logRequestEvent(
+            "request_accepted",
+            requestID: request.id,
+            op: request.opName,
+            profileName: request.profileName,
+            queueDepth: queue.count
+        )
         queue.append(entry)
         if let queuedEvent = makeQueuedEvent(for: entry) {
             await emit(queuedEvent)
+            await logRequestEvent(
+                "request_queued",
+                requestID: request.id,
+                op: request.opName,
+                profileName: request.profileName,
+                queueDepth: queue.count
+            )
         }
         try? await startNextRequestIfPossible()
     }
@@ -178,6 +281,7 @@ actor WorkerRuntime {
 
         await failQueuedRequests(with: cancellationError)
         await playbackController.stop()
+        await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(queue.count)])
     }
 
     // MARK: - Processing
@@ -200,6 +304,13 @@ actor WorkerRuntime {
 
         let entry = queue.remove(at: index)
         await emitStarted(for: entry.request)
+        await logRequestEvent(
+            "request_started",
+            requestID: entry.request.id,
+            op: entry.request.opName,
+            profileName: entry.request.profileName,
+            queueDepth: queue.count
+        )
 
         let task = Task {
             await self.process(entry.request, token: entry.token)
@@ -233,12 +344,34 @@ actor WorkerRuntime {
                 )
 
             case .listProfiles(let id):
+                let listStartedAt = dependencies.now()
                 let profiles = try profileStore.listProfiles()
+                await logRequestEvent(
+                    "profiles_listed",
+                    requestID: id,
+                    op: request.opName,
+                    details: [
+                        "profile_root": .string(profileStore.rootURL.path),
+                        "count": .int(profiles.count),
+                        "duration_ms": .int(elapsedMS(since: listStartedAt)),
+                    ]
+                )
                 result = .success(WorkerSuccessPayload(id: id, profiles: profiles))
 
             case .removeProfile(let id, let profileName):
                 await emitProgress(id: id, stage: .removingProfile)
+                let removeStartedAt = dependencies.now()
                 try profileStore.removeProfile(named: profileName)
+                await logRequestEvent(
+                    "profile_removed",
+                    requestID: id,
+                    op: request.opName,
+                    profileName: profileName,
+                    details: [
+                        "path": .string(profileStore.profileDirectoryURL(for: profileName).path),
+                        "duration_ms": .int(elapsedMS(since: removeStartedAt)),
+                    ]
+                )
                 result = .success(WorkerSuccessPayload(id: id, profileName: profileName))
             }
         } catch is CancellationError {
@@ -259,10 +392,35 @@ actor WorkerRuntime {
 
     private func handleSpeakLive(id: String, text: String, profileName: String) async throws {
         let residentModel = try residentModelOrThrow()
+        let op = WorkerRequest.speakLive(id: id, text: text, profileName: profileName).opName
 
         await emitProgress(id: id, stage: .loadingProfile)
+        let profileLoadStartedAt = dependencies.now()
         let profile = try profileStore.loadProfile(named: profileName)
+        await logRequestEvent(
+            "profile_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(profile.directoryURL.path),
+                "duration_ms": .int(elapsedMS(since: profileLoadStartedAt)),
+            ]
+        )
+
+        let refAudioLoadStartedAt = dependencies.now()
         let refAudio = try dependencies.loadAudioSamples(profile.referenceAudioURL, residentModel.sampleRate)
+        await logRequestEvent(
+            "reference_audio_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(profile.referenceAudioURL.path),
+                "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
+                "sample_rate": .int(residentModel.sampleRate),
+            ]
+        )
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .startingPlayback)
@@ -275,12 +433,50 @@ actor WorkerRuntime {
             streamingInterval: 0.32
         )
 
-        try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) {
-            await self.emitProgress(id: id, stage: .bufferingAudio)
+        let playbackSummary = try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) { event in
+            switch event {
+            case .firstChunk:
+                await self.emitProgress(id: id, stage: .bufferingAudio)
+                await self.logRequestEvent(
+                    "playback_first_chunk",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName
+                )
+            case .prerollReady:
+                await self.emitProgress(id: id, stage: .prerollReady)
+                await self.logRequestEvent(
+                    "playback_preroll_ready",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName
+                )
+            }
         }
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .playbackFinished)
+        var details: [String: LogValue] = [
+            "chunk_count": .int(playbackSummary.chunkCount),
+            "sample_count": .int(playbackSummary.sampleCount),
+            "preroll_chunk_count": .int(playbackSummary.prerollChunkCount),
+        ]
+        if let timeToFirstChunkMS = playbackSummary.timeToFirstChunkMS {
+            details["time_to_first_chunk_ms"] = .int(timeToFirstChunkMS)
+        }
+        if let timeToPrerollReadyMS = playbackSummary.timeToPrerollReadyMS {
+            details["time_to_preroll_ready_ms"] = .int(timeToPrerollReadyMS)
+        }
+        if let timeFromPrerollReadyToDrainMS = playbackSummary.timeFromPrerollReadyToDrainMS {
+            details["time_from_preroll_ready_to_drain_ms"] = .int(timeFromPrerollReadyToDrainMS)
+        }
+        await logRequestEvent(
+            "playback_finished",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: details
+        )
     }
 
     private func handleCreateProfile(
@@ -290,18 +486,47 @@ actor WorkerRuntime {
         voiceDescription: String,
         outputPath: String?
     ) async throws -> StoredProfile {
+        let op = WorkerRequest.createProfile(
+            id: id,
+            profileName: profileName,
+            text: text,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath
+        ).opName
         try profileStore.validateProfileName(profileName)
         await emitProgress(id: id, stage: .loadingProfileModel)
+        let modelLoadStartedAt = dependencies.now()
         let profileModel = try await dependencies.loadProfileModel()
+        await logRequestEvent(
+            "profile_model_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "model_repo": .string(ModelFactory.profileModelRepo),
+                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
+            ]
+        )
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .generatingProfileAudio)
+        let generationStartedAt = dependencies.now()
         let audio = try await profileModel.generate(
             text: text,
             voice: voiceDescription,
             refAudio: nil,
             refText: nil,
             language: "English"
+        )
+        await logRequestEvent(
+            "profile_audio_generated",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "duration_ms": .int(elapsedMS(since: generationStartedAt)),
+                "sample_count": .int(audio.count),
+            ]
         )
         try Task.checkCancellation()
 
@@ -317,6 +542,7 @@ actor WorkerRuntime {
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
+        let profileWriteStartedAt = dependencies.now()
         let storedProfile = try profileStore.createProfile(
             profileName: profileName,
             modelRepo: ModelFactory.profileModelRepo,
@@ -325,10 +551,31 @@ actor WorkerRuntime {
             sampleRate: profileModel.sampleRate,
             canonicalAudioData: canonicalAudioData
         )
+        await logRequestEvent(
+            "profile_written",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(storedProfile.directoryURL.path),
+                "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
+            ]
+        )
 
         if let outputPath {
             await emitProgress(id: id, stage: .exportingProfileAudio)
+            let exportStartedAt = dependencies.now()
             try profileStore.exportCanonicalAudio(for: storedProfile, to: outputPath)
+            await logRequestEvent(
+                "profile_exported",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "path": .string(profileStore.resolveOutputURL(outputPath).path),
+                    "duration_ms": .int(elapsedMS(since: exportStartedAt)),
+                ]
+            )
         }
 
         return storedProfile
@@ -372,9 +619,16 @@ actor WorkerRuntime {
         guard activeRequest?.token == token else { return }
 
         activeRequest = nil
+        defer { requestAcceptedAt.removeValue(forKey: requestID) }
 
         switch result {
         case .success(let payload):
+            await logRequestEvent(
+                "request_succeeded",
+                requestID: payload.id,
+                op: nil,
+                profileName: payload.profileName
+            )
             await emitSuccess(
                 id: payload.id,
                 profileName: payload.profileName,
@@ -383,7 +637,7 @@ actor WorkerRuntime {
             )
 
         case .failure(let error):
-            await logError(error.message)
+            await logError(error.message, requestID: requestID, details: ["failure_code": .string(error.code.rawValue)])
             await emitFailure(id: requestID, error: error)
         }
 
@@ -468,8 +722,84 @@ actor WorkerRuntime {
         }
     }
 
-    private func logError(_ message: String) async {
-        dependencies.writeStderr(message)
+    private func logError(
+        _ message: String,
+        requestID: String? = nil,
+        op: String? = nil,
+        profileName: String? = nil,
+        details: [String: LogValue]? = nil
+    ) async {
+        var mergedDetails = details ?? [:]
+        mergedDetails["message"] = .string(message)
+        await logEvent(
+            "worker_error",
+            level: .error,
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            elapsedMS: requestID.flatMap(elapsedMS(for:)),
+            details: mergedDetails
+        )
+    }
+
+    private func logRequestEvent(
+        _ event: String,
+        requestID: String,
+        op: String?,
+        profileName: String? = nil,
+        queueDepth: Int? = nil,
+        details: [String: LogValue]? = nil
+    ) async {
+        await logEvent(
+            event,
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            queueDepth: queueDepth,
+            elapsedMS: elapsedMS(for: requestID),
+            details: details
+        )
+    }
+
+    private func logEvent(
+        _ event: String,
+        level: LogLevel = .info,
+        requestID: String? = nil,
+        op: String? = nil,
+        profileName: String? = nil,
+        queueDepth: Int? = nil,
+        elapsedMS: Int? = nil,
+        details: [String: LogValue]? = nil
+    ) async {
+        let logEvent = LogEvent(
+            event: event,
+            level: level,
+            ts: logTimestampFormatter.string(from: dependencies.now()),
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            queueDepth: queueDepth,
+            elapsedMS: elapsedMS,
+            details: details
+        )
+
+        do {
+            let data = try logEncoder.encode(logEvent)
+            dependencies.writeStderr(String(decoding: data, as: UTF8.self))
+        } catch {
+            dependencies.writeStderr(
+                #"{"event":"worker_error","level":"error","ts":"\#(logTimestampFormatter.string(from: dependencies.now()))","details":{"message":"SpeakSwiftly could not encode a stderr log event.","error":"\#(error.localizedDescription)"}}"#
+            )
+        }
+    }
+
+    private func elapsedMS(for requestID: String) -> Int? {
+        guard let startedAt = requestAcceptedAt[requestID] else { return nil }
+        return elapsedMS(since: startedAt)
+    }
+
+    private func elapsedMS(since startedAt: Date) -> Int {
+        Int((dependencies.now().timeIntervalSince(startedAt) * 1_000).rounded())
     }
 
     private func bestEffortID(from line: String) -> String {

@@ -87,6 +87,10 @@ import Testing
     #expect(progress["event"] as? String == "progress")
     #expect(progress["stage"] as? String == "buffering_audio")
 
+    let prerollReady = try jsonObject(WorkerProgressEvent(id: "req-1", stage: .prerollReady))
+    #expect(prerollReady["event"] as? String == "progress")
+    #expect(prerollReady["stage"] as? String == "preroll_ready")
+
     let success = try jsonObject(
         WorkerSuccessResponse(
             id: "req-1",
@@ -563,6 +567,13 @@ import Testing
                 && $0["stage"] as? String == "buffering_audio"
         }
     })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
     #expect(!output.containsJSONObject {
         $0["id"] as? String == "req-1"
             && $0["ok"] as? Bool == true
@@ -639,6 +650,12 @@ import Testing
                 && $0["code"] as? String == "audio_playback_timeout"
         }
     })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_first_chunk"
+                && $0["request_id"] as? String == "req-1"
+        }
+    })
 
     await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
     #expect(await waitUntil {
@@ -686,6 +703,13 @@ import Testing
             $0["id"] as? String == "req-1"
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "buffering_audio"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
 
@@ -798,6 +822,59 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-guide").path))
 }
 
+@Test func stderrLogsUseJSONLAndIncludePlaybackMetrics() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(behavior: .immediate),
+        residentModelLoader: { makeResidentModel(chunkCount: 3) }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "resident_model_preload_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_finished",
+                $0["request_id"] as? String == "req-1",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["chunk_count"] as? Int == 3
+                && details["preroll_chunk_count"] as? Int == 3
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "request_succeeded"
+                && $0["request_id"] as? String == "req-1"
+        }
+    })
+}
+
 // MARK: - Helpers
 
 private extension NSLock {
@@ -865,6 +942,20 @@ private final class OutputRecorder: @unchecked Sendable {
         }
     }
 
+    func containsStderrJSONObject(_ predicate: ([String: Any]) -> Bool) -> Bool {
+        lock.withLock {
+            stderrLines.contains { line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                else {
+                    return false
+                }
+
+                return predicate(object)
+            }
+        }
+    }
+
     func startedEvents() -> [String] {
         lock.withLock {
             stdoutLines.compactMap { line in
@@ -921,17 +1012,36 @@ private final class PlaybackSpy: @unchecked Sendable {
 
     func controller() -> AnyPlaybackController {
         AnyPlaybackController(
-            play: { [self] _, stream, onFirstChunk in
+            play: { [self] _, stream, onEvent in
                 lock.withLock { playCount += 1 }
 
                 var emittedFirstChunk = false
+                var emittedPrerollReady = false
+                var chunkCount = 0
+                var sampleCount = 0
+                var prerollChunkCount = 0
+                let prerollTarget = 3
                 for try await chunk in stream {
                     guard !chunk.isEmpty else { continue }
+                    chunkCount += 1
+                    sampleCount += chunk.count
 
                     if !emittedFirstChunk {
                         emittedFirstChunk = true
-                        await onFirstChunk()
+                        await onEvent(.firstChunk)
                     }
+
+                    if !emittedPrerollReady, chunkCount >= prerollTarget {
+                        emittedPrerollReady = true
+                        prerollChunkCount = chunkCount
+                        await onEvent(.prerollReady)
+                    }
+                }
+
+                if emittedFirstChunk, !emittedPrerollReady {
+                    emittedPrerollReady = true
+                    prerollChunkCount = chunkCount
+                    await onEvent(.prerollReady)
                 }
 
                 switch behavior {
@@ -944,6 +1054,15 @@ private final class PlaybackSpy: @unchecked Sendable {
                 case .throw(let error):
                     throw error
                 }
+
+                return PlaybackSummary(
+                    chunkCount: chunkCount,
+                    sampleCount: sampleCount,
+                    prerollChunkCount: prerollChunkCount,
+                    timeToFirstChunkMS: emittedFirstChunk ? 0 : nil,
+                    timeToPrerollReadyMS: emittedPrerollReady ? 0 : nil,
+                    timeFromPrerollReadyToDrainMS: emittedPrerollReady ? 0 : nil
+                )
             },
             stop: { [self] in
                 lock.withLock { stopCount += 1 }
@@ -972,7 +1091,7 @@ private final class ResidentModelRecorder: @unchecked Sendable {
     }
 }
 
-private func makeResidentModel(recorder: ResidentModelRecorder? = nil) -> AnySpeechModel {
+private func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
     AnySpeechModel(
         sampleRate: 24_000,
         generate: { _, _, _, _, _ in
@@ -982,7 +1101,10 @@ private func makeResidentModel(recorder: ResidentModelRecorder? = nil) -> AnySpe
             recorder?.record(refAudioWasProvided: refAudio != nil, refText: refText)
 
             return AsyncThrowingStream { continuation in
-                continuation.yield([0.1, 0.2])
+                for chunkIndex in 0..<chunkCount {
+                    let base = Float(chunkIndex + 1) / 10
+                    continuation.yield([base, base + 0.1])
+                }
                 continuation.finish()
             }
         }

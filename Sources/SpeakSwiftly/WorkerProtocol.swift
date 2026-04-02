@@ -56,6 +56,17 @@ enum WorkerRequest: Sendable, Equatable {
         return false
     }
 
+    var profileName: String? {
+        switch self {
+        case .speakLive(_, _, let profileName),
+             .createProfile(_, let profileName, _, _, _),
+             .removeProfile(_, let profileName):
+            profileName
+        case .listProfiles:
+            nil
+        }
+    }
+
     static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
         let data = Data(line.utf8)
         let raw: RawWorkerRequest
@@ -125,6 +136,7 @@ enum WorkerProgressStage: String, Codable, Sendable {
     case loadingProfile = "loading_profile"
     case startingPlayback = "starting_playback"
     case bufferingAudio = "buffering_audio"
+    case prerollReady = "preroll_ready"
     case playbackFinished = "playback_finished"
     case loadingProfileModel = "loading_profile_model"
     case generatingProfileAudio = "generating_profile_audio"
