@@ -410,6 +410,62 @@ import Testing
     #expect(playback.stopCount == 1)
 }
 
+@Test func shutdownPathEmitsCancellationNotPlaybackTimeout() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    await runtime.shutdown()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-1"
+            && $0["ok"] as? Bool == false
+            && $0["code"] as? String == "audio_playback_timeout"
+    })
+}
+
 @Test func shutdownRejectsNewRequests() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
