@@ -14,14 +14,13 @@ struct SpeechTextForensicFeatures: Sendable, Equatable {
     let fencedCodeBlockCount: Int
     let inlineCodeSpanCount: Int
     let markdownLinkCount: Int
+    let urlCount: Int
     let filePathCount: Int
     let dottedIdentifierCount: Int
     let camelCaseTokenCount: Int
     let snakeCaseTokenCount: Int
     let objcSymbolCount: Int
     let repeatedLetterRunCount: Int
-    let punctuationHeavyLineCount: Int
-    let looksCodeHeavy: Bool
 }
 
 enum SpeechTextForensicSectionKind: String, Sendable, Equatable {
@@ -121,14 +120,13 @@ enum SpeechTextNormalizer {
             fencedCodeBlockCount: fencedCodeBlockBodies(in: originalText).count,
             inlineCodeSpanCount: inlineCodeBodies(in: originalText).count,
             markdownLinkCount: markdownLinks(in: originalText).count,
+            urlCount: tokens.count(where: isLikelyURL),
             filePathCount: filePathFragments(in: originalText).count,
             dottedIdentifierCount: tokens.count(where: isLikelyDottedIdentifier),
             camelCaseTokenCount: tokens.count(where: isLikelyCamelCaseIdentifier),
             snakeCaseTokenCount: tokens.count(where: isLikelySnakeCaseIdentifier),
             objcSymbolCount: tokens.count(where: isLikelyObjectiveCSymbol),
-            repeatedLetterRunCount: tokens.count(where: containsRepeatedLetterRun),
-            punctuationHeavyLineCount: punctuationHeavyLineCount(in: originalText),
-            looksCodeHeavy: looksCodeHeavy(originalText)
+            repeatedLetterRunCount: tokens.count(where: containsRepeatedLetterRun)
         )
     }
 
@@ -352,31 +350,6 @@ extension SpeechTextNormalizer {
     }
 }
 
-// MARK: - Detection
-
-extension SpeechTextNormalizer {
-    static func looksCodeHeavy(_ text: String) -> Bool {
-        if text.firstMatch(of: codeMarkerRegex) != nil {
-            return true
-        }
-
-        let punctuationCount = text.filter { "{}[]()<>/\\=_*#|~:;".contains($0) }.count
-        let letterCount = text.filter(\.isLetter).count
-        guard letterCount > 0 else { return punctuationCount > 0 }
-        return Double(punctuationCount) / Double(letterCount) >= 0.12
-    }
-
-    static func punctuationHeavyLineCount(in text: String) -> Int {
-        text
-            .split(separator: "\n", omittingEmptySubsequences: true)
-            .reduce(into: 0) { count, line in
-                if isLikelyCodeLine(String(line)) {
-                    count += 1
-                }
-            }
-    }
-}
-
 // MARK: - Speech Conversion
 
 extension SpeechTextNormalizer {
@@ -466,12 +439,18 @@ extension SpeechTextNormalizer {
             return spokenPath(text)
         }
 
+        let scheme = text[..<schemeSeparator.lowerBound].lowercased()
         var remainder = String(text[schemeSeparator.upperBound...])
-        if remainder.hasPrefix("www.") {
-            remainder.removeFirst(4)
+
+        if ["http", "https"].contains(scheme) {
+            if remainder.hasPrefix("www.") {
+                remainder.removeFirst(4)
+            }
+
+            return spokenPath(remainder)
         }
 
-        return spokenPath(remainder)
+        return collapseWhitespace("\(spokenSegment(String(scheme))) colon slash slash \(spokenPath(remainder))")
     }
 
     static func spokenIdentifier(_ text: String) -> String {

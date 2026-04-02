@@ -537,13 +537,13 @@ struct SpeakSwiftlyE2ETests {
                 }
 
                 return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                    && (details["url_count"] as? Int ?? 0) >= 1
                     && (details["file_path_count"] as? Int ?? 0) >= 1
                     && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
                     && (details["camel_case_token_count"] as? Int ?? 0) >= 1
                     && (details["snake_case_token_count"] as? Int ?? 0) >= 1
                     && (details["objc_symbol_count"] as? Int ?? 0) >= 1
                     && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
-                    && details["looks_code_heavy"] as? Bool == true
             }
         )
 
@@ -624,13 +624,13 @@ struct SpeakSwiftlyE2ETests {
                 }
 
                 return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                    && (details["url_count"] as? Int ?? 0) >= 1
                     && (details["file_path_count"] as? Int ?? 0) >= 1
                     && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
                     && (details["camel_case_token_count"] as? Int ?? 0) >= 1
                     && (details["snake_case_token_count"] as? Int ?? 0) >= 1
                     && (details["objc_symbol_count"] as? Int ?? 0) >= 1
                     && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
-                    && details["looks_code_heavy"] as? Bool == true
             }
         )
 

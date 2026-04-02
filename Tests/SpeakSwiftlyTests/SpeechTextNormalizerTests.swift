@@ -54,6 +54,14 @@ struct SpeechTextNormalizerTests {
         #expect(!normalized.contains("www"))
     }
 
+    @Test func nonHTTPURLsKeepTheirScheme() {
+        let text = "Open file://tmp/Thing now."
+
+        let normalized = SpeechTextNormalizer.normalizeURLs(text)
+
+        #expect(normalized.contains("file colon slash slash tmp slash Thing"))
+    }
+
     @Test func filePathsBecomeSpokenPaths() {
         let text = "Path: /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift."
 

@@ -180,7 +180,7 @@ That shape is intentionally conservative. No extra manager, scorer, protocol, co
 
 ## Detection model
 
-The current detector strategy is intentionally split into narrow shape detectors plus a single broad fallback signal:
+The current detector strategy is intentionally split into narrow shape detectors plus one local line-level fallback pass:
 
 - narrow shape detectors:
   - fenced code
@@ -192,11 +192,13 @@ The current detector strategy is intentionally split into narrow shape detectors
   - snake case
   - camel case
   - repeated-letter words
-- broad fallback signal:
-  - `looksCodeHeavy(_:)`
+- local fallback pass:
   - `isLikelyCodeLine(_:)`
 
-`looksCodeHeavy(_:)` still exists because the forensic payload needs a coarse code-heaviness flag. The difference is that normalization no longer uses a global “all or nothing” gate before doing anything useful.
+The important boundary now is simple:
+
+- there is no remaining broad request-level code-heaviness classifier in the normalizer
+- the only broad heuristic left is the local `normalizeCodeHeavyLines(_:)` pass, which operates line-by-line after the narrower shape passes have already had their turn
 
 ## Forensics
 
@@ -208,9 +210,19 @@ The forensic APIs were preserved:
 
 The current counters now derive from the same parsing helpers that the normalizer uses, instead of separate regex-only counting paths. That keeps the feature report more aligned with the real transformations.
 
-One current gap remains:
+Current counters include:
 
-- URLs have their own normalization pass, but the forensic payload still does not expose a dedicated URL count. URL-heavy prompts therefore only show up indirectly through normalized text shape and any overlapping punctuation or section signals.
+- markdown headers
+- fenced code blocks
+- inline code spans
+- markdown links
+- URLs
+- file paths
+- dotted identifiers
+- `camelCase`
+- `snake_case`
+- Objective-C-like symbols
+- repeated-letter runs
 
 ## Test coverage
 

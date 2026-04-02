@@ -838,14 +838,13 @@ actor WorkerRuntime {
             "fenced_code_block_count": .int(features.fencedCodeBlockCount),
             "inline_code_span_count": .int(features.inlineCodeSpanCount),
             "markdown_link_count": .int(features.markdownLinkCount),
+            "url_count": .int(features.urlCount),
             "file_path_count": .int(features.filePathCount),
             "dotted_identifier_count": .int(features.dottedIdentifierCount),
             "camel_case_token_count": .int(features.camelCaseTokenCount),
             "snake_case_token_count": .int(features.snakeCaseTokenCount),
             "objc_symbol_count": .int(features.objcSymbolCount),
             "repeated_letter_run_count": .int(features.repeatedLetterRunCount),
-            "punctuation_heavy_line_count": .int(features.punctuationHeavyLineCount),
-            "looks_code_heavy": .bool(features.looksCodeHeavy),
         ]
     }
 

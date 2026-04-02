@@ -253,7 +253,7 @@ import Testing
 
     The path is /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift and the symbol is NSApplication.didFinishLaunchingNotification.
 
-    Please read `dot.syntax.stuff`, camelCaseStuff, snake_case_stuff, and [a markdown link](https://example.com/docs).
+    Please read `dot.syntax.stuff`, camelCaseStuff, snake_case_stuff, [a markdown link](https://example.com/docs), and https://example.com/reference.
 
     ```objc
     @property(nonatomic, strong) NSString *displayName;
@@ -272,14 +272,13 @@ import Testing
     #expect(features.fencedCodeBlockCount == 1)
     #expect(features.inlineCodeSpanCount >= 1)
     #expect(features.markdownLinkCount == 1)
+    #expect(features.urlCount >= 1)
     #expect(features.filePathCount >= 2)
     #expect(features.dottedIdentifierCount >= 1)
     #expect(features.camelCaseTokenCount >= 1)
     #expect(features.snakeCaseTokenCount >= 1)
     #expect(features.objcSymbolCount >= 1)
     #expect(features.repeatedLetterRunCount >= 2)
-    #expect(features.punctuationHeavyLineCount >= 1)
-    #expect(features.looksCodeHeavy)
 }
 
 @Test func speechTextForensicSectionsAndWindowsTrackSegmentedMarkdownStructure() {

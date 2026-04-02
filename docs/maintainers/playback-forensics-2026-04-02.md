@@ -191,18 +191,16 @@ Interpretation:
   - `Section One`: `1`
   - one final late rebuffer fell just past the estimated final section window boundary
 - The prose-versus-code comparison is useful but also exposed a detection problem:
-  - the sectioned conversational prose still logged `looks_code_heavy: true`
+  - the sectioned conversational prose previously logged a stale broad code-heaviness forensic flag even though playback seeding was already length-only
   - the same prose also landed in `text_complexity_class: "extended"`
-  - that likely means the current code-heaviness heuristic is overreacting to markdown section structure rather than actual code-ish content
 - Important clarification:
-  - `looks_code_heavy` is currently a forensic normalizer signal emitted by [SpeechTextNormalizer.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift)
   - the playback controller's `text_complexity_class` is currently length-only in [PlaybackController.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift)
-  - those two fields should not be read as the same detector or as evidence that code-heaviness is currently feeding threshold seeding
+  - the stale broad normalizer code-heaviness flag has now been removed, so future forensic comparisons should not conflate section punctuation with request-level playback seeding
 - The latest cross-family comparison suggests:
   - prose is somewhat better than code-heavy material, but not dramatically better
   - reversing the section order helps both families, which keeps startup-phase sensitivity in the picture
   - identifier-heavy and section-leading content still appear to be meaningful contributors
-  - the current complexity detector probably needs its own tuning pass before prose-versus-code classification can be trusted as a strong signal
+  - prose-versus-code comparisons should now be interpreted through the narrow per-shape counters instead of a leftover broad code-heaviness boolean
 
 Operational notes:
 

@@ -146,6 +146,8 @@ Current `stderr` observability is JSONL with fields such as:
 
 That log stream currently covers resident-model preload, request accept / queue / start / success / failure, playback milestones, queue-depth warnings, scheduling and chunk-gap warnings, rebuffer durations, starvation events, buffer-shape summaries, optional chunk-level playback tracing, profile-store operations, and process / MLX memory fields such as resident size, physical footprint, active MLX memory, cache memory, and peak MLX memory at key playback checkpoints.
 
+For text-shape forensics, the worker also logs narrow per-shape counts such as markdown headers, fenced code blocks, inline code spans, markdown links, URLs, file paths, identifier families, and repeated-letter runs. Playback threshold seeding itself remains length-based up front; those forensic counters are there to help explain difficult prompt shapes after the fact.
+
 ## Repository Layout
 
 SpeakSwiftly is intended to be the source-of-truth standalone repository for this package.
