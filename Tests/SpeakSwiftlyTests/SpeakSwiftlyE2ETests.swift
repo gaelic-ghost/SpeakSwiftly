@@ -10,6 +10,20 @@ struct SpeakSwiftlyE2ETests {
     private static let testingPlaybackText = """
     Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
     """
+    private static let forensicPlaybackText = """
+    Forensic playback probe begins now. Please read this exactly once and do not repeat yourself.
+    The path `/Users/galew/Workspace/speak-to-user-mcp/src/speak_to_user_mcp/speakswiftly.py` contains a helper named `SpeakSwiftlyOwner.speak_live`.
+    The config file `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should be spoken as plain speech rather than spiraling into code noise.
+    Read this fenced code sample calmly.
+    ```swift
+    let sourcePath = "/Users/galew/Workspace/speak-to-user-mcp/src/speak_to_user_mcp/speakswiftly.py"
+    let weirdWords = ["Xobni", "quizzaciously", "Cwmfjord", "phthalo", "lophophore"]
+    let fallback = weirdWords.first(where: { $0.hasPrefix("q") }) ?? "nothing"
+    print(sourcePath, fallback)
+    ```
+    Also read these oddly spelled words once each: quizzaciously, xylophonic, cwmfjord, lophophore, phthalo, zyzzyva.
+    Finish with this sentence exactly once. End of forensic playback probe.
+    """
 
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
@@ -298,6 +312,83 @@ struct SpeakSwiftlyE2ETests {
         try await worker.waitForExit(timeout: .seconds(30))
     }
 
+    @Test func forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest() async throws {
+        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: Self.isPlaybackTraceEnabled
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-forensic","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-forensic"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-forensic","op":"speak_live","text":"\(Self.forensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-forensic"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-forensic"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == "req-live-forensic",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["chunk_count"] as? Int != nil
+                    && details["sample_count"] as? Int != nil
+                    && details["time_to_first_chunk_ms"] as? Int != nil
+                    && details["time_to_preroll_ready_ms"] as? Int != nil
+                    && details["schedule_callback_count"] as? Int != nil
+                    && details["played_back_callback_count"] as? Int != nil
+            }
+        )
+
+        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+        #expect((playbackDetails["chunk_count"] as? Int ?? 0) > 1)
+        #expect((playbackDetails["sample_count"] as? Int ?? 0) > 0)
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-forensic"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
     private static var e2eTimeout: Duration {
         .seconds(1_200)
     }
@@ -308,6 +399,10 @@ struct SpeakSwiftlyE2ETests {
 
     private static var isPlaybackTraceEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_PLAYBACK_TRACE"] == "1"
+    }
+
+    private static var isForensicE2EEnabled: Bool {
+        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_FORENSIC_E2E"] == "1"
     }
 }
 
@@ -664,5 +759,13 @@ private struct WorkerProcessError: Error, CustomStringConvertible {
 
     init(_ description: String) {
         self.description = description
+    }
+}
+
+private extension String {
+    var jsonEscaped: String {
+        let data = (try? JSONSerialization.data(withJSONObject: [self])) ?? Data("[\"\"]".utf8)
+        let encoded = String(decoding: data, as: UTF8.self)
+        return String(encoded.dropFirst(2).dropLast(2))
     }
 }
