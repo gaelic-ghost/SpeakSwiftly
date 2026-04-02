@@ -396,6 +396,12 @@ extension SpeechTextNormalizer {
     static func spokenPath(_ text: String) -> String {
         var segments: [String] = []
         var buffer = ""
+        var remainder = text[...]
+
+        if let alias = aliasedPathPrefix(in: text) {
+            segments.append(alias.spokenName)
+            remainder = text[alias.range.upperBound...]
+        }
 
         func flushBuffer() {
             guard !buffer.isEmpty else { return }
@@ -403,7 +409,7 @@ extension SpeechTextNormalizer {
             buffer.removeAll(keepingCapacity: true)
         }
 
-        for character in text {
+        for character in remainder {
             switch character {
             case "~":
                 flushBuffer()
@@ -861,6 +867,26 @@ extension SpeechTextNormalizer {
         }
 
         return String(token[start..<end])
+    }
+
+    private static func aliasedPathPrefix(in text: String) -> (range: Range<String.Index>, spokenName: String)? {
+        let aliases = [
+            ("/Users/galew", "gale wumbo"),
+            ("/Users/galem", "gale mini"),
+        ]
+
+        for (prefix, spokenName) in aliases {
+            guard text.hasPrefix(prefix) else { continue }
+
+            let prefixEnd = text.index(text.startIndex, offsetBy: prefix.count)
+            let isExactMatch = prefixEnd == text.endIndex
+            let continuesAsPath = !isExactMatch && text[prefixEnd] == "/"
+            if isExactMatch || continuesAsPath {
+                return (text.startIndex..<prefixEnd, spokenName)
+            }
+        }
+
+        return nil
     }
 
     static func isLikelyFilePath(_ token: String) -> Bool {

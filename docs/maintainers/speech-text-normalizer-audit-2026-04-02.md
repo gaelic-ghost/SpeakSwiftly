@@ -98,6 +98,9 @@ This pass rewrites path-like tokens with `spokenPath(_:)`.
 
 Current path behavior:
 
+- rewrites a small set of known local home-directory prefixes into spoken aliases before reading the rest of the path:
+  - `/Users/galew` as `gale wumbo`
+  - `/Users/galem` as `gale mini`
 - keeps path segments readable with `NLTokenizer`
 - says separators explicitly:
   - `/` as `slash`
