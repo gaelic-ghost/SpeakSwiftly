@@ -1,0 +1,494 @@
+import Foundation
+@preconcurrency import MLX
+import Testing
+@testable import SpeakSwiftly
+
+private extension NSLock {
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock()
+        defer { unlock() }
+        return try body()
+    }
+}
+
+final class OutputRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stdoutLines = [String]()
+    private var stderrLines = [String]()
+
+    func writeStdout(_ data: Data) throws {
+        let string = String(decoding: data, as: UTF8.self)
+        let lines = string
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+
+        lock.withLock {
+            stdoutLines.append(contentsOf: lines)
+        }
+    }
+
+    func writeStderr(_ message: String) {
+        lock.withLock {
+            stderrLines.append(message)
+        }
+    }
+
+    func containsJSONObject(_ predicate: ([String: Any]) -> Bool) -> Bool {
+        lock.withLock {
+            stdoutLines.contains { line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                else {
+                    return false
+                }
+
+                return predicate(object)
+            }
+        }
+    }
+
+    func countJSONObjects(_ predicate: ([String: Any]) -> Bool) -> Int {
+        lock.withLock {
+            stdoutLines.reduce(into: 0) { count, line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                    predicate(object)
+                else {
+                    return
+                }
+
+                count += 1
+            }
+        }
+    }
+
+    func containsStderrJSONObject(_ predicate: ([String: Any]) -> Bool) -> Bool {
+        lock.withLock {
+            stderrLines.contains { line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                else {
+                    return false
+                }
+
+                return predicate(object)
+            }
+        }
+    }
+
+    func startedEvents() -> [String] {
+        lock.withLock {
+            stdoutLines.compactMap { line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                    object["event"] as? String == "started",
+                    let id = object["id"] as? String,
+                    let op = object["op"] as? String
+                else {
+                    return nil
+                }
+
+                return "\(id):\(op)"
+            }
+        }
+    }
+}
+
+actor AsyncGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        guard !isOpen else { return }
+
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+final class PlaybackSpy: @unchecked Sendable {
+    enum Behavior: Sendable {
+        case immediate
+        case gate(AsyncGate)
+        case sleep(Duration)
+        case emitLowQueueThenStarve
+        case emitObservabilityBurst
+        case `throw`(WorkerError)
+    }
+
+    private let lock = NSLock()
+    private let behavior: Behavior
+    private(set) var playCount = 0
+    private(set) var prepareCount = 0
+    private(set) var stopCount = 0
+
+    init(behavior: Behavior = .immediate) {
+        self.behavior = behavior
+    }
+
+    func controller() -> AnyPlaybackController {
+        AnyPlaybackController(
+            prepare: { [self] _ in
+                lock.withLock { prepareCount += 1 }
+                return prepareCount == 1
+            },
+            play: { [self] _, stream, onEvent in
+                lock.withLock { playCount += 1 }
+
+                var emittedFirstChunk = false
+                var emittedPrerollReady = false
+                var chunkCount = 0
+                var sampleCount = 0
+                var startupBufferedAudioMS: Int?
+                var minQueuedAudioMS: Int?
+                var maxQueuedAudioMS: Int?
+                var queueDepthTotalMS = 0
+                var queueDepthSampleCount = 0
+                var rebufferEventCount = 0
+                var starvationEventCount = 0
+                var pendingSampleCount = 0
+                var maxInterChunkGapMS: Int?
+                var avgInterChunkGapMS: Int?
+                var maxScheduleGapMS: Int?
+                var avgScheduleGapMS: Int?
+                var maxBoundaryDiscontinuity: Double?
+                var maxLeadingAbsAmplitude: Double?
+                var maxTrailingAbsAmplitude: Double?
+                var fadeInChunkCount = 0
+                var rebufferTotalDurationMS = 0
+                var longestRebufferDurationMS = 0
+                var scheduleCallbackCount = 0
+                var playedBackCallbackCount = 0
+
+                func bufferedAudioMS() -> Int {
+                    Int((Double(pendingSampleCount) / 24_000.0 * 1_000).rounded())
+                }
+
+                func recordQueueDepth() {
+                    let queuedAudioMS = bufferedAudioMS()
+                    minQueuedAudioMS = min(minQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
+                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
+                    queueDepthTotalMS += queuedAudioMS
+                    queueDepthSampleCount += 1
+                }
+
+                for try await (chunkIndex, chunk) in [Float].asyncEnumerated(stream) {
+                    guard !chunk.isEmpty else { continue }
+                    chunkCount += 1
+                    sampleCount += chunk.count
+                    pendingSampleCount += chunk.count
+                    scheduleCallbackCount += 1
+                    playedBackCallbackCount += 1
+                    recordQueueDepth()
+
+                    if let firstSample = chunk.first, let lastSample = chunk.last {
+                        let leadingAbs = Double(abs(firstSample))
+                        let trailingAbs = Double(abs(lastSample))
+                        maxLeadingAbsAmplitude = max(maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
+                        maxTrailingAbsAmplitude = max(maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
+                        if chunkIndex > 0 {
+                            let jump = Double(abs(firstSample - (Float(chunkIndex) / 10 + 0.1)))
+                            maxBoundaryDiscontinuity = max(maxBoundaryDiscontinuity ?? jump, jump)
+                        }
+                    }
+
+                    if !emittedFirstChunk {
+                        emittedFirstChunk = true
+                        fadeInChunkCount = 1
+                        await onEvent(.firstChunk)
+                    }
+
+                    if !emittedPrerollReady, bufferedAudioMS() >= PlaybackMetricsConfiguration.startupBufferTargetMS {
+                        emittedPrerollReady = true
+                        startupBufferedAudioMS = bufferedAudioMS()
+                        minQueuedAudioMS = startupBufferedAudioMS
+                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+                    }
+                }
+
+                if !emittedPrerollReady, pendingSampleCount > 0 {
+                    emittedPrerollReady = true
+                    startupBufferedAudioMS = bufferedAudioMS()
+                    minQueuedAudioMS = startupBufferedAudioMS
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+                }
+
+                switch behavior {
+                case .immediate:
+                    break
+                case .gate(let drainGate):
+                    await drainGate.wait()
+                case .sleep(let duration):
+                    try await Task.sleep(for: duration)
+                case .emitLowQueueThenStarve:
+                    await onEvent(.rebufferStarted(queuedAudioMS: 120))
+                    await onEvent(.rebufferResumed(bufferedAudioMS: 320))
+                    rebufferEventCount = 1
+                    rebufferTotalDurationMS = 90
+                    longestRebufferDurationMS = 90
+                    await onEvent(.queueDepthLow(queuedAudioMS: 50))
+                    await onEvent(.starved)
+                    starvationEventCount = 1
+                    minQueuedAudioMS = 0
+                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? 320, 320)
+                    maxInterChunkGapMS = 510
+                    avgInterChunkGapMS = 510
+                    maxScheduleGapMS = 220
+                    avgScheduleGapMS = 220
+                case .emitObservabilityBurst:
+                    await onEvent(.chunkGapWarning(gapMS: 520, chunkIndex: 2))
+                    await onEvent(.scheduleGapWarning(gapMS: 210, bufferIndex: 2, queuedAudioMS: 140))
+                    await onEvent(.rebufferStarted(queuedAudioMS: 90))
+                    await onEvent(.rebufferResumed(bufferedAudioMS: 340))
+                    await onEvent(.rebufferThrashWarning(rebufferEventCount: 3, windowMS: 2_000))
+                    await onEvent(
+                        .bufferShapeSummary(
+                            maxBoundaryDiscontinuity: 0.42,
+                            maxLeadingAbsAmplitude: 0.31,
+                            maxTrailingAbsAmplitude: 0.37,
+                            fadeInChunkCount: 1
+                        )
+                    )
+                    await onEvent(
+                        .trace(
+                            PlaybackTraceEvent(
+                                name: "chunk_received",
+                                chunkIndex: 1,
+                                bufferIndex: nil,
+                                sampleCount: 9_600,
+                                durationMS: 400,
+                                queuedAudioBeforeMS: 0,
+                                queuedAudioAfterMS: 400,
+                                gapMS: nil,
+                                isRebuffering: false,
+                                fadeInApplied: true
+                            )
+                        )
+                    )
+                    await onEvent(
+                        .trace(
+                            PlaybackTraceEvent(
+                                name: "buffer_scheduled",
+                                chunkIndex: 1,
+                                bufferIndex: 1,
+                                sampleCount: 9_600,
+                                durationMS: 400,
+                                queuedAudioBeforeMS: 0,
+                                queuedAudioAfterMS: 400,
+                                gapMS: nil,
+                                isRebuffering: false,
+                                fadeInApplied: true
+                            )
+                        )
+                    )
+                    rebufferEventCount = 3
+                    rebufferTotalDurationMS = 180
+                    longestRebufferDurationMS = 80
+                    minQueuedAudioMS = 90
+                    maxQueuedAudioMS = 400
+                    maxInterChunkGapMS = 520
+                    avgInterChunkGapMS = 410
+                    maxScheduleGapMS = 210
+                    avgScheduleGapMS = 155
+                    maxBoundaryDiscontinuity = 0.42
+                    maxLeadingAbsAmplitude = 0.31
+                    maxTrailingAbsAmplitude = 0.37
+                    fadeInChunkCount = 1
+                case .throw(let error):
+                    throw error
+                }
+
+                return PlaybackSummary(
+                    chunkCount: chunkCount,
+                    sampleCount: sampleCount,
+                    startupBufferedAudioMS: startupBufferedAudioMS,
+                    timeToFirstChunkMS: emittedFirstChunk ? 0 : nil,
+                    timeToPrerollReadyMS: emittedPrerollReady ? 0 : nil,
+                    timeFromPrerollReadyToDrainMS: emittedPrerollReady ? 0 : nil,
+                    minQueuedAudioMS: minQueuedAudioMS,
+                    maxQueuedAudioMS: maxQueuedAudioMS,
+                    avgQueuedAudioMS: queueDepthSampleCount == 0 ? nil : queueDepthTotalMS / queueDepthSampleCount,
+                    queueDepthSampleCount: queueDepthSampleCount,
+                    rebufferEventCount: rebufferEventCount,
+                    rebufferTotalDurationMS: rebufferTotalDurationMS,
+                    longestRebufferDurationMS: longestRebufferDurationMS,
+                    starvationEventCount: starvationEventCount,
+                    scheduleCallbackCount: scheduleCallbackCount,
+                    playedBackCallbackCount: playedBackCallbackCount,
+                    maxInterChunkGapMS: maxInterChunkGapMS,
+                    avgInterChunkGapMS: avgInterChunkGapMS,
+                    maxScheduleGapMS: maxScheduleGapMS,
+                    avgScheduleGapMS: avgScheduleGapMS,
+                    maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
+                    maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
+                    maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
+                    fadeInChunkCount: fadeInChunkCount
+                )
+            },
+            stop: { [self] in
+                lock.withLock { stopCount += 1 }
+            }
+        )
+    }
+}
+
+final class ResidentModelRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var lastRefText: String?
+    private(set) var lastRefAudioWasProvided = false
+    private(set) var audioLoadCallCount = 0
+
+    func record(refAudioWasProvided: Bool, refText: String?) {
+        lock.withLock {
+            lastRefAudioWasProvided = refAudioWasProvided
+            lastRefText = refText
+        }
+    }
+
+    func recordAudioLoad() {
+        lock.withLock {
+            audioLoadCallCount += 1
+        }
+    }
+}
+
+func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
+    AnySpeechModel(
+        sampleRate: 24_000,
+        generate: { _, _, _, _, _ in
+            [0.1, 0.2]
+        },
+        generateSamplesStream: { _, _, refAudio, refText, _, _ in
+            recorder?.record(refAudioWasProvided: refAudio != nil, refText: refText)
+
+            return AsyncThrowingStream { continuation in
+                for chunkIndex in 0..<chunkCount {
+                    let base = Float(chunkIndex + 1) / 10
+                    continuation.yield([base, base + 0.1])
+                }
+                continuation.finish()
+            }
+        }
+    )
+}
+
+func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -> AnySpeechModel {
+    AnySpeechModel(
+        sampleRate: 24_000,
+        generate: { _, _, _, _, _ in
+            if let waitBeforeGenerate {
+                await waitBeforeGenerate()
+            }
+            return [0.1, 0.2, 0.3]
+        },
+        generateSamplesStream: { _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.finish()
+            }
+        }
+    )
+}
+
+func makeProfileStore(rootURL: URL) throws -> ProfileStore {
+    let store = ProfileStore(rootURL: rootURL, fileManager: .default)
+    try store.ensureRootExists()
+    return store
+}
+
+func makeRuntime(
+    rootURL: URL = makeTempDirectoryURL(),
+    output: OutputRecorder,
+    playback: PlaybackSpy,
+    audioLoadRecorder: ResidentModelRecorder? = nil,
+    loadedAudioSamples: MLXArray? = nil,
+    residentModelLoader: @escaping @Sendable () async throws -> AnySpeechModel,
+    profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
+        makeProfileModel()
+    }
+) async throws -> WorkerRuntime {
+    let store = try makeProfileStore(rootURL: rootURL)
+    let playbackController = playback.controller()
+    let dependencies = WorkerDependencies(
+        fileManager: .default,
+        loadResidentModel: residentModelLoader,
+        loadProfileModel: profileModelLoader,
+        makePlaybackController: { playbackController },
+        writeWAV: { samples, _, url in
+            let bytes = samples.map(\.bitPattern).flatMap { value in
+                withUnsafeBytes(of: value.littleEndian, Array.init)
+            }
+            try Data(bytes).write(to: url, options: .atomic)
+        },
+        loadAudioSamples: { _, _ in
+            audioLoadRecorder?.recordAudioLoad()
+            return loadedAudioSamples
+        },
+        writeStdout: output.writeStdout,
+        writeStderr: output.writeStderr,
+        now: Date.init,
+        readRuntimeMemory: { nil }
+    )
+
+    return WorkerRuntime(
+        dependencies: dependencies,
+        profileStore: store,
+        playbackController: playbackController
+    )
+}
+
+func makeTempDirectoryURL() -> URL {
+    URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+}
+
+func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
+    let data = try JSONEncoder().encode(value)
+    return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+}
+
+func waitUntil(
+    timeout: Duration = .seconds(1),
+    pollInterval: Duration = .milliseconds(10),
+    _ condition: @escaping @Sendable () -> Bool
+) async -> Bool {
+    let clock = ContinuousClock()
+    let deadline = clock.now + timeout
+
+    while clock.now < deadline {
+        if condition() {
+            return true
+        }
+
+        try? await Task.sleep(for: pollInterval)
+    }
+
+    return condition()
+}
+
+private extension Array where Element == Float {
+    static func asyncEnumerated(
+        _ stream: AsyncThrowingStream<[Float], Error>
+    ) -> AsyncThrowingStream<(Int, [Float]), Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                var index = 0
+                do {
+                    for try await chunk in stream {
+                        continuation.yield((index, chunk))
+                        index += 1
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+}

@@ -22,8 +22,8 @@
 - [ ] Milestone 4: Integration hardening
 - [ ] Milestone 5: Contract and e2e hardening
 - [ ] Milestone 6: Multi-process profile-store hardening
-- [ ] Milestone 7: Playback and shutdown safety hardening
-- [ ] Milestone 8: Observability and instrumentation
+- [x] Milestone 7: Playback and shutdown safety hardening
+- [x] Milestone 8: Observability and instrumentation
 - [ ] Milestone 9: Live-service operability review
 
 ## Milestone 0: Bootstrap
@@ -159,8 +159,9 @@ Tickets:
 - [x] Add an opt-in serialized Swift Testing e2e suite gated by `SPEAKSWIFTLY_E2E=1`.
 - [x] Add real `create_profile` and `speak_live` subprocess e2e coverage using isolated profile storage.
 - [x] Add a silent live-playback e2e mode so the real worker path can be exercised without audible output.
-- [ ] Add assertions for operator-facing `stderr` diagnostics in the automated test suite.
-- [ ] Add a stronger automated check that a real non-`nil` reference-audio object reaches the resident generation path in fast tests without making the unit suite depend on MLX runtime initialization.
+- [x] Add a real non-silent `speak_live` e2e that exercises the local `AVAudioEngine` playback path and its stderr playback diagnostics.
+- [x] Add assertions for operator-facing `stderr` diagnostics in the automated test suite.
+- [x] Add a stronger automated check that a real non-`nil` reference-audio object reaches the resident generation path in fast tests without making the unit suite depend on MLX runtime initialization.
 
 Exit criteria:
 
@@ -168,7 +169,7 @@ Exit criteria:
 - [x] Immediate-start requests do not emit misleading queued events.
 - [x] Corrupt stored-profile manifests returned through `list_profiles` surface as `filesystem_error`.
 - [x] Opt-in serialized real-model e2e coverage exists for both the `1.7B` profile-creation path and the resident `0.6B` live path.
-- [ ] The fast test suite also covers `stderr` diagnostics and the remaining profile-conditioning edge assertions.
+- [x] The fast test suite also covers the remaining profile-conditioning edge assertions.
 
 ## Milestone 6: Multi-process profile-store hardening
 
@@ -197,46 +198,47 @@ Exit criteria:
 
 Scope:
 
-- [ ] Make stuck playback and drain completion failures visible, bounded, and recoverable.
-- [ ] Make worker shutdown deterministic when requests are in flight.
-- [ ] Keep the current simple single-actor shape without adding unnecessary service layers.
+- [x] Make stuck playback and drain completion failures visible, bounded, and recoverable.
+- [x] Make worker shutdown deterministic when requests are in flight.
+- [x] Keep the current simple single-actor shape without adding unnecessary service layers.
 
 Tickets:
 
-- [ ] Add an explicit timeout or other bounded completion strategy around playback drain after streaming input finishes.
-- [ ] Distinguish generated-audio completion from local-player drain completion in both code paths and diagnostics.
-- [ ] Track the active request task so shutdown can cancel or finish it intentionally instead of orphaning it.
-- [ ] Define and implement the exact terminal behavior for in-flight requests during shutdown, including operator-facing diagnostics.
-- [ ] Add automated coverage for stuck playback-drain, cancelled shutdown, and in-flight request teardown paths.
+- [x] Add an explicit timeout or other bounded completion strategy around playback drain after streaming input finishes.
+- [x] Distinguish generated-audio completion from local-player drain completion in both code paths and diagnostics.
+- [x] Track the active request task so shutdown can cancel or finish it intentionally instead of orphaning it.
+- [x] Define and implement the exact terminal behavior for in-flight requests during shutdown, including operator-facing diagnostics.
+- [x] Add automated coverage for stuck playback-drain, cancelled shutdown, and in-flight request teardown paths.
 
 Exit criteria:
 
-- [ ] A stalled playback callback cannot wedge the worker indefinitely without a clear failure path.
-- [ ] Worker shutdown is deterministic and observable even with active playback or profile-generation work in progress.
-- [ ] The runtime safety behavior is covered by automated tests and readable diagnostics.
+- [x] A stalled playback callback cannot wedge the worker indefinitely without a clear failure path.
+- [x] Worker shutdown is deterministic and observable even with active playback or profile-generation work in progress.
+- [x] The runtime safety behavior is covered by automated tests and readable diagnostics.
 
 ## Milestone 8: Observability and instrumentation
 
 Scope:
 
-- [ ] Add grounded operator-facing logs and timing signals so live-service behavior is explainable from stderr alone.
-- [ ] Keep stdout reserved for the JSONL worker contract while making stderr useful for debugging and production support.
-- [ ] Add only the minimum instrumentation needed to understand latency, queueing, and failure modes clearly.
+- [x] Add grounded operator-facing logs and timing signals so live-service behavior is explainable from stderr alone.
+- [x] Keep stdout reserved for the JSONL worker contract while making stderr useful for debugging and production support.
+- [x] Add only the minimum instrumentation needed to understand latency, queueing, and failure modes clearly.
 
 Tickets:
 
-- [ ] Add request lifecycle timing logs for accept, queue, start, first audio chunk, playback finish, terminal success, and terminal failure.
-- [ ] Include request id, operation name, relevant profile name, queue depth, and elapsed time in operator-facing runtime logs.
-- [ ] Add resident-model preload instrumentation for start time, finish time, duration, model repo, and failure classification.
-- [ ] Add playback instrumentation for profile-load time, time to first generated chunk, time from first chunk to drain, and generated chunk or sample counts.
-- [ ] Add profile-store instrumentation for create, load, list, remove, and export with concrete filesystem paths.
-- [ ] Add automated assertions for important stderr diagnostics in the fast test suite.
+- [x] Add request lifecycle timing logs for accept, queue, start, first audio chunk, playback finish, terminal success, and terminal failure.
+- [x] Include request id, operation name, relevant profile name, queue depth, and elapsed time in operator-facing runtime logs.
+- [x] Add resident-model preload instrumentation for start time, finish time, duration, model repo, and failure classification.
+- [x] Add playback instrumentation for profile-load time, time to first generated chunk, time from first chunk to drain, and generated chunk or sample counts.
+- [x] Add playback queue-depth instrumentation so low-buffer and starvation conditions are visible in stderr logs.
+- [x] Add profile-store instrumentation for create, load, list, remove, and export with concrete filesystem paths.
+- [x] Add automated assertions for important stderr diagnostics in the fast test suite.
 
 Exit criteria:
 
-- [ ] A live-service latency complaint can be broken down into warmup, queueing, generation, playback, and filesystem phases from existing logs.
-- [ ] Operator-facing diagnostics contain enough context to identify the request, profile, path, and likely failure point without attaching a debugger.
-- [ ] The JSONL contract remains clean while stderr becomes a trustworthy operational signal.
+- [x] A live-service latency complaint can be broken down into warmup, queueing, generation, playback, and filesystem phases from existing logs.
+- [x] Operator-facing diagnostics contain enough context to identify the request, profile, path, and likely failure point without attaching a debugger.
+- [x] The JSONL contract remains clean while stderr becomes a trustworthy operational signal.
 
 ## Milestone 9: Live-service operability review
 
@@ -244,6 +246,7 @@ Scope:
 
 - [ ] Tighten the worker contract around service ownership and operational inspection for long-lived local deployments.
 - [ ] Make filesystem behavior and service-state inspection predictable for parent processes.
+- [ ] Make adjacent local consumer update flows explicit and reliable when standalone `SpeakSwiftly` releases are tagged.
 - [ ] Preserve the current direct architecture and avoid adding wrappers or coordinators unless they are clearly necessary.
 
 Tickets:
@@ -253,9 +256,25 @@ Tickets:
 - [ ] Add a lightweight worker `status` operation or equivalent health/introspection surface for resident state, active request id, queue length, profile root, and playback-drain state.
 - [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
 - [ ] Add an explicit qualitative runtime review checklist for future live-service passes so regressions in operability stay visible.
+- [ ] Use the richer playback observability to separate generation jitter, scheduling jitter, queue collapse, and chunk-boundary discontinuity before retuning cadence or DSP behavior again.
+- [ ] Document the current tag-time cached-binary refresh into `../speak-to-user-mcp`, including when it runs, what it updates, and what it intentionally does not cover yet.
+- [ ] Expand the adjacent-repo release propagation workflow so other local binary consumers such as `../speak-to-user-server` can be updated intentionally from the same standalone release process instead of drifting silently.
 
 Exit criteria:
 
 - [ ] Parent processes can inspect worker state and reason about service health without log scraping alone.
 - [ ] Path resolution and profile-store behavior are predictable across different launch environments.
+- [ ] The standalone release workflow clearly describes which adjacent local consumers are updated automatically and which still require explicit follow-up.
 - [ ] The worker stays small and concrete while becoming easier to operate as a long-lived local service.
+
+## Current Review Findings To Address
+
+These findings came out of the latest live-service review pass and are duplicated here on purpose so they stay visible after the current chat context is gone.
+
+- [ ] Tighten shutdown so terminal cancellation is not emitted until in-flight work has actually unwound, especially around post-generation filesystem work during `create_profile`.
+- [ ] Add or document stronger cancellation checkpoints around temp WAV writing, profile persistence, and export so shutdown behavior is not only bounded but also truly quiescent.
+- [ ] Make `list_profiles` resilient to stray files, partial directories, and one-off corrupt entries instead of poisoning the full operation on the first bad manifest.
+- [ ] Revisit relative `output_path` resolution so exports do not silently depend on the worker process launch directory.
+- [ ] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
+- [ ] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
+- [ ] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.

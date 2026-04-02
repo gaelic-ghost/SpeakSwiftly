@@ -7,6 +7,9 @@ struct SpeakSwiftlyE2ETests {
     private static let testingProfileName = "testing-profile"
     private static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
     private static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
+    private static let testingPlaybackText = """
+    Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
+    """
 
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
@@ -94,7 +97,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live","op":"speak_live","text":"Hello from the real zero point six billion resident model path.","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -122,12 +125,189 @@ struct SpeakSwiftlyE2ETests {
         try await worker.waitForExit(timeout: .seconds(30))
     }
 
+    @Test func speakLiveRunsEndToEndWithStoredProfileAndRealPlaybackPath() async throws {
+        guard Self.isE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: false
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_engine_ready",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["process_phys_footprint_bytes"] as? Int != nil
+                && details["process_resident_bytes"] as? Int != nil
+                && details["mlx_active_memory_bytes"] as? Int != nil
+                && details["mlx_cache_memory_bytes"] as? Int != nil
+                && details["mlx_peak_memory_bytes"] as? Int != nil
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-real","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-real"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-real","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-real"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-real"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_started",
+                $0["request_id"] as? String == "req-live-real",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["startup_buffer_target_ms"] as? Int == 300
+                && details["startup_buffered_audio_ms"] as? Int != nil
+                && details["process_phys_footprint_bytes"] as? Int != nil
+                && details["process_resident_bytes"] as? Int != nil
+                && details["mlx_active_memory_bytes"] as? Int != nil
+                && details["mlx_cache_memory_bytes"] as? Int != nil
+                && details["mlx_peak_memory_bytes"] as? Int != nil
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == "req-live-real",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["startup_buffer_target_ms"] as? Int == 300
+                    && details["low_water_target_ms"] as? Int == 180
+                    && details["chunk_gap_warning_threshold_ms"] as? Int == 450
+                    && details["schedule_gap_warning_threshold_ms"] as? Int == 180
+                    && details["startup_buffered_audio_ms"] as? Int != nil
+                    && details["min_queued_audio_ms"] as? Int != nil
+                    && details["max_queued_audio_ms"] as? Int != nil
+                    && details["avg_queued_audio_ms"] as? Int != nil
+                    && details["queue_depth_sample_count"] as? Int != nil
+                    && details["schedule_callback_count"] as? Int != nil
+                    && details["played_back_callback_count"] as? Int != nil
+                    && details["fade_in_chunk_count"] as? Int != nil
+                    && details["starvation_event_count"] as? Int != nil
+                    && details["process_phys_footprint_bytes"] as? Int != nil
+                    && details["process_resident_bytes"] as? Int != nil
+                    && details["mlx_active_memory_bytes"] as? Int != nil
+                    && details["mlx_cache_memory_bytes"] as? Int != nil
+                    && details["mlx_peak_memory_bytes"] as? Int != nil
+            }
+        )
+
+        #expect(playbackFinished["event"] as? String == "playback_finished")
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-real"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
+    @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
+        guard Self.isE2EEnabled, Self.isPlaybackTraceEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: true
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-trace","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-trace"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-trace","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "playback_trace_chunk_received"
+                && $0["request_id"] as? String == "req-live-trace"
+        } != nil)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "playback_trace_buffer_scheduled"
+                && $0["request_id"] as? String == "req-live-trace"
+        } != nil)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "playback_trace_buffer_played_back"
+                && $0["request_id"] as? String == "req-live-trace"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-trace"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
     private static var e2eTimeout: Duration {
         .seconds(1_200)
     }
 
     private static var isE2EEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_E2E"] == "1"
+    }
+
+    private static var isPlaybackTraceEnabled: Bool {
+        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_PLAYBACK_TRACE"] == "1"
     }
 }
 
@@ -159,6 +339,7 @@ private extension NSLock {
 private final class JSONLineRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var stdoutObjects = [[String: Any]]()
+    private var stderrObjects = [[String: Any]]()
     private var stderrLines = [String]()
 
     func appendStdout(_ line: String) {
@@ -177,6 +358,14 @@ private final class JSONLineRecorder: @unchecked Sendable {
     func appendStderr(_ line: String) {
         lock.withLock {
             stderrLines.append(line)
+            guard
+                let data = line.data(using: .utf8),
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return
+            }
+
+            stderrObjects.append(object)
         }
     }
 
@@ -191,6 +380,12 @@ private final class JSONLineRecorder: @unchecked Sendable {
             stderrLines.joined(separator: "\n")
         }
     }
+
+    func firstMatchingStderrJSONObject(_ predicate: ([String: Any]) -> Bool) -> [String: Any]? {
+        lock.withLock {
+            stderrObjects.first(where: predicate)
+        }
+    }
 }
 
 private final class WorkerProcess: @unchecked Sendable {
@@ -198,6 +393,7 @@ private final class WorkerProcess: @unchecked Sendable {
         static let dyldFrameworkPath = "DYLD_FRAMEWORK_PATH"
         static let profileRoot = "SPEAKSWIFTLY_PROFILE_ROOT"
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
+        static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
     }
 
     private static let executableURLResult = Result(catching: {
@@ -210,7 +406,7 @@ private final class WorkerProcess: @unchecked Sendable {
     private let stdoutTask: Task<Void, Never>
     private let stderrTask: Task<Void, Never>
 
-    init(profileRootURL: URL, silentPlayback: Bool) throws {
+    init(profileRootURL: URL, silentPlayback: Bool, playbackTrace: Bool = false) throws {
         process = Process()
         stdinPipe = Pipe()
         let recorder = JSONLineRecorder()
@@ -230,6 +426,9 @@ private final class WorkerProcess: @unchecked Sendable {
         environment[Environment.profileRoot] = profileRootURL.path
         if silentPlayback {
             environment[Environment.silentPlayback] = "1"
+        }
+        if playbackTrace {
+            environment[Environment.playbackTrace] = "1"
         }
         process.environment = environment
 
@@ -324,6 +523,35 @@ private final class WorkerProcess: @unchecked Sendable {
                 "The SpeakSwiftly worker exited with status \(process.terminationStatus). Current stderr:\n\(stderr)"
             )
         }
+    }
+
+    func waitForStderrJSONObject(
+        timeout: Duration,
+        _ predicate: @escaping @Sendable ([String: Any]) -> Bool
+    ) async throws -> [String: Any]? {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+
+        while clock.now < deadline {
+            if let object = recorder.firstMatchingStderrJSONObject(predicate) {
+                return object
+            }
+
+            if !process.isRunning {
+                break
+            }
+
+            try await Task.sleep(for: .milliseconds(250))
+        }
+
+        if let object = recorder.firstMatchingStderrJSONObject(predicate) {
+            return object
+        }
+
+        let stderr = recorder.stderrText()
+        throw WorkerProcessError(
+            "Timed out waiting for a matching worker stderr JSON event. Current stderr:\n\(stderr)"
+        )
     }
 
     private static func captureLines(

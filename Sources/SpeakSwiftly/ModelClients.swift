@@ -1,4 +1,5 @@
-import AVFoundation
+@preconcurrency import AVFoundation
+import Darwin
 import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
@@ -8,6 +9,7 @@ import MLXAudioTTS
 
 private enum WorkerEnvironment {
     static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
+    static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
 }
 
 private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
@@ -136,21 +138,84 @@ enum ModelFactory {
 
 enum PlaybackEvent: Sendable {
     case firstChunk
-    case prerollReady
+    case prerollReady(startupBufferedAudioMS: Int)
+    case queueDepthLow(queuedAudioMS: Int)
+    case rebufferStarted(queuedAudioMS: Int)
+    case rebufferResumed(bufferedAudioMS: Int)
+    case chunkGapWarning(gapMS: Int, chunkIndex: Int)
+    case scheduleGapWarning(gapMS: Int, bufferIndex: Int, queuedAudioMS: Int)
+    case rebufferThrashWarning(rebufferEventCount: Int, windowMS: Int)
+    case bufferShapeSummary(
+        maxBoundaryDiscontinuity: Double,
+        maxLeadingAbsAmplitude: Double,
+        maxTrailingAbsAmplitude: Double,
+        fadeInChunkCount: Int
+    )
+    case trace(PlaybackTraceEvent)
+    case starved
 }
 
-private let playbackPrerollChunkTarget = 3
+struct PlaybackTraceEvent: Sendable {
+    let name: String
+    let chunkIndex: Int?
+    let bufferIndex: Int?
+    let sampleCount: Int?
+    let durationMS: Int?
+    let queuedAudioBeforeMS: Int?
+    let queuedAudioAfterMS: Int?
+    let gapMS: Int?
+    let isRebuffering: Bool?
+    let fadeInApplied: Bool?
+}
+
+enum PlaybackMetricsConfiguration {
+    static let startupBufferTargetMS = 300
+    static let lowWaterTargetMS = 180
+    static let chunkGapWarningMS = 450
+    static let scheduleGapWarningMS = 180
+    static let rebufferThrashWarningCount = 3
+    static let rebufferThrashWindowMS = 2_000
+}
 
 struct PlaybackSummary: Sendable {
     let chunkCount: Int
     let sampleCount: Int
-    let prerollChunkCount: Int
+    let startupBufferedAudioMS: Int?
     let timeToFirstChunkMS: Int?
     let timeToPrerollReadyMS: Int?
     let timeFromPrerollReadyToDrainMS: Int?
+    let minQueuedAudioMS: Int?
+    let maxQueuedAudioMS: Int?
+    let avgQueuedAudioMS: Int?
+    let queueDepthSampleCount: Int
+    let rebufferEventCount: Int
+    let rebufferTotalDurationMS: Int
+    let longestRebufferDurationMS: Int
+    let starvationEventCount: Int
+    let scheduleCallbackCount: Int
+    let playedBackCallbackCount: Int
+    let maxInterChunkGapMS: Int?
+    let avgInterChunkGapMS: Int?
+    let maxScheduleGapMS: Int?
+    let avgScheduleGapMS: Int?
+    let maxBoundaryDiscontinuity: Double?
+    let maxLeadingAbsAmplitude: Double?
+    let maxTrailingAbsAmplitude: Double?
+    let fadeInChunkCount: Int
+}
+
+struct RuntimeMemorySnapshot: Sendable {
+    let processResidentBytes: Int?
+    let processPhysFootprintBytes: Int?
+    let mlxActiveMemoryBytes: Int?
+    let mlxCacheMemoryBytes: Int?
+    let mlxPeakMemoryBytes: Int?
+    let mlxCacheLimitBytes: Int?
+    let mlxMemoryLimitBytes: Int?
 }
 
 final class AnyPlaybackController: @unchecked Sendable {
+    private let prepareImpl: @Sendable (_ sampleRate: Double) async throws -> Bool
     private let playImpl: @Sendable (
         _ sampleRate: Double,
         _ stream: AsyncThrowingStream<[Float], Error>,
@@ -159,6 +224,7 @@ final class AnyPlaybackController: @unchecked Sendable {
     private let stopImpl: @Sendable () async -> Void
 
     init(
+        prepare: @escaping @Sendable (_ sampleRate: Double) async throws -> Bool,
         play: @escaping @Sendable (
             _ sampleRate: Double,
             _ stream: AsyncThrowingStream<[Float], Error>,
@@ -166,12 +232,16 @@ final class AnyPlaybackController: @unchecked Sendable {
         ) async throws -> PlaybackSummary,
         stop: @escaping @Sendable () async -> Void
     ) {
+        prepareImpl = prepare
         playImpl = play
         stopImpl = stop
     }
 
     convenience init(_ controller: PlaybackController) {
         self.init(
+            prepare: { sampleRate in
+                try await controller.prepare(sampleRate: sampleRate)
+            },
             play: { sampleRate, stream, onEvent in
                 try await controller.play(
                     sampleRate: sampleRate,
@@ -185,42 +255,118 @@ final class AnyPlaybackController: @unchecked Sendable {
         )
     }
 
-    static func silent() -> AnyPlaybackController {
+    static func silent(traceEnabled: Bool = false) -> AnyPlaybackController {
         AnyPlaybackController(
-            play: { _, stream, onEvent in
+            prepare: { _ in true },
+            play: { sampleRate, stream, onEvent in
                 let startedAt = Date()
                 var emittedFirstChunk = false
                 var emittedPrerollReady = false
                 var chunkCount = 0
                 var sampleCount = 0
-                var prerollChunkCount = 0
+                var startupBufferedAudioMS: Int?
                 var timeToFirstChunkMS: Int?
                 var timeToPrerollReadyMS: Int?
+                var minQueuedAudioMS: Int?
+                var maxQueuedAudioMS: Int?
+                var queueDepthTotalMS = 0
+                var queueDepthSampleCount = 0
+                var maxInterChunkGapMS: Int?
+                var interChunkGapTotalMS = 0
+                var interChunkGapCount = 0
+                var maxBoundaryDiscontinuity: Double?
+                var maxLeadingAbsAmplitude: Double?
+                var maxTrailingAbsAmplitude: Double?
+                var fadeInChunkCount = 0
+                let starvationEventCount = 0
+                var pendingSampleCount = 0
+                var lastChunkAt: Date?
+                var previousTrailingSample: Float?
+
+                func bufferedAudioMS() -> Int {
+                    Int((Double(pendingSampleCount) / sampleRate * 1_000).rounded())
+                }
+
+                func recordQueueDepth() {
+                    let queuedAudioMS = bufferedAudioMS()
+                    minQueuedAudioMS = min(minQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
+                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
+                    queueDepthTotalMS += queuedAudioMS
+                    queueDepthSampleCount += 1
+                }
 
                 for try await chunk in stream {
                     guard !chunk.isEmpty else { continue }
+                    let now = Date()
                     chunkCount += 1
                     sampleCount += chunk.count
+                    pendingSampleCount += chunk.count
+                    recordQueueDepth()
+
+                    if let lastChunkAt {
+                        let gapMS = milliseconds(since: lastChunkAt)
+                        maxInterChunkGapMS = max(maxInterChunkGapMS ?? gapMS, gapMS)
+                        interChunkGapTotalMS += gapMS
+                        interChunkGapCount += 1
+                        if gapMS >= PlaybackMetricsConfiguration.chunkGapWarningMS {
+                            await onEvent(.chunkGapWarning(gapMS: gapMS, chunkIndex: chunkCount))
+                        }
+                    }
+                    lastChunkAt = now
+
+                    if let firstSample = chunk.first, let lastSample = chunk.last {
+                        let leadingAbs = Double(abs(firstSample))
+                        let trailingAbs = Double(abs(lastSample))
+                        maxLeadingAbsAmplitude = max(maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
+                        maxTrailingAbsAmplitude = max(maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
+                        if let previousTrailingSample {
+                            let jump = Double(abs(firstSample - previousTrailingSample))
+                            maxBoundaryDiscontinuity = max(maxBoundaryDiscontinuity ?? jump, jump)
+                        }
+                        previousTrailingSample = lastSample
+                    }
 
                     if !emittedFirstChunk {
                         emittedFirstChunk = true
+                        fadeInChunkCount = 1
                         timeToFirstChunkMS = milliseconds(since: startedAt)
                         await onEvent(.firstChunk)
                     }
 
-                    if !emittedPrerollReady, chunkCount >= playbackPrerollChunkTarget {
+                    if !emittedPrerollReady, bufferedAudioMS() >= PlaybackMetricsConfiguration.startupBufferTargetMS {
                         emittedPrerollReady = true
-                        prerollChunkCount = chunkCount
+                        startupBufferedAudioMS = bufferedAudioMS()
+                        minQueuedAudioMS = startupBufferedAudioMS
                         timeToPrerollReadyMS = milliseconds(since: startedAt)
-                        await onEvent(.prerollReady)
+                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+                    }
+
+                    if traceEnabled {
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
+                                    name: "chunk_received",
+                                    chunkIndex: chunkCount,
+                                    bufferIndex: nil,
+                                    sampleCount: chunk.count,
+                                    durationMS: Int((Double(chunk.count) / sampleRate * 1_000).rounded()),
+                                    queuedAudioBeforeMS: nil,
+                                    queuedAudioAfterMS: bufferedAudioMS(),
+                                    gapMS: maxInterChunkGapMS,
+                                    isRebuffering: false,
+                                    fadeInApplied: chunkCount == 1
+                                )
+                            )
+                        )
                     }
                 }
 
-                if emittedFirstChunk, !emittedPrerollReady {
+                if !emittedPrerollReady, pendingSampleCount > 0 {
                     emittedPrerollReady = true
-                    prerollChunkCount = chunkCount
+                    startupBufferedAudioMS = bufferedAudioMS()
+                    minQueuedAudioMS = startupBufferedAudioMS
                     timeToPrerollReadyMS = milliseconds(since: startedAt)
-                    await onEvent(.prerollReady)
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
                 }
 
                 let timeFromPrerollReadyToDrainMS: Int?
@@ -230,17 +376,50 @@ final class AnyPlaybackController: @unchecked Sendable {
                     timeFromPrerollReadyToDrainMS = nil
                 }
 
+                if let maxBoundaryDiscontinuity, let maxLeadingAbsAmplitude, let maxTrailingAbsAmplitude {
+                    await onEvent(
+                        .bufferShapeSummary(
+                            maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
+                            maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
+                            maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
+                            fadeInChunkCount: fadeInChunkCount
+                        )
+                    )
+                }
+
                 return PlaybackSummary(
                     chunkCount: chunkCount,
                     sampleCount: sampleCount,
-                    prerollChunkCount: prerollChunkCount,
+                    startupBufferedAudioMS: startupBufferedAudioMS,
                     timeToFirstChunkMS: timeToFirstChunkMS,
                     timeToPrerollReadyMS: timeToPrerollReadyMS,
-                    timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS
+                    timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS,
+                    minQueuedAudioMS: minQueuedAudioMS,
+                    maxQueuedAudioMS: maxQueuedAudioMS,
+                    avgQueuedAudioMS: queueDepthSampleCount == 0 ? nil : queueDepthTotalMS / queueDepthSampleCount,
+                    queueDepthSampleCount: queueDepthSampleCount,
+                    rebufferEventCount: 0,
+                    rebufferTotalDurationMS: 0,
+                    longestRebufferDurationMS: 0,
+                    starvationEventCount: starvationEventCount,
+                    scheduleCallbackCount: chunkCount,
+                    playedBackCallbackCount: chunkCount,
+                    maxInterChunkGapMS: maxInterChunkGapMS,
+                    avgInterChunkGapMS: interChunkGapCount == 0 ? nil : interChunkGapTotalMS / interChunkGapCount,
+                    maxScheduleGapMS: nil,
+                    avgScheduleGapMS: nil,
+                    maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
+                    maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
+                    maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
+                    fadeInChunkCount: fadeInChunkCount
                 )
             },
             stop: {}
         )
+    }
+
+    func prepare(sampleRate: Double) async throws -> Bool {
+        try await prepareImpl(sampleRate)
     }
 
     func play(
@@ -258,14 +437,82 @@ final class AnyPlaybackController: @unchecked Sendable {
 
 @MainActor
 final class PlaybackController {
-    private enum PlaybackConfiguration {
-        static let drainTimeout: Duration = .seconds(5)
+    @MainActor
+    private final class RequestPlaybackState {
+        let requestID: UInt64
+        var generationFinished = false
+        var isRebuffering = false
+        var scheduledSampleCount = 0
+        var playedBackSampleCount = 0
+        var minQueuedAudioMS: Int?
+        var maxQueuedAudioMS: Int?
+        var queueDepthTotalMS = 0
+        var queueDepthSampleCount = 0
+        var rebufferEventCount = 0
+        var rebufferStartedAt: Date?
+        var rebufferTotalDurationMS = 0
+        var longestRebufferDurationMS = 0
+        var recentRebufferStartTimes = [Date]()
+        var emittedRebufferThrashWarning = false
+        var starvationEventCount = 0
+        var emittedLowQueueWarning = false
+        var scheduleCallbackCount = 0
+        var playedBackCallbackCount = 0
+        var lastTrailingSample: Float?
+        var maxBoundaryDiscontinuity: Double?
+        var maxLeadingAbsAmplitude: Double?
+        var maxTrailingAbsAmplitude: Double?
+        var fadeInChunkCount = 0
+        var drainContinuation: CheckedContinuation<Void, Error>?
+
+        init(requestID: UInt64) {
+            self.requestID = requestID
+        }
+
+        func queuedAudioMS(sampleRate: Double) -> Int {
+            let queuedSamples = max(scheduledSampleCount - playedBackSampleCount, 0)
+            return Int((Double(queuedSamples) / sampleRate * 1_000).rounded())
+        }
+
+        func recordQueuedAudioDepth(sampleRate: Double) {
+            let currentQueuedAudioMS = queuedAudioMS(sampleRate: sampleRate)
+            minQueuedAudioMS = min(minQueuedAudioMS ?? currentQueuedAudioMS, currentQueuedAudioMS)
+            maxQueuedAudioMS = max(maxQueuedAudioMS ?? currentQueuedAudioMS, currentQueuedAudioMS)
+            queueDepthTotalMS += currentQueuedAudioMS
+            queueDepthSampleCount += 1
+        }
     }
 
-    private let player: AudioPlayer
+    private enum PlaybackConfiguration {
+        static let drainTimeout: Duration = .seconds(5)
+        static let lowQueueThresholdMS = 100
+        static let channels: AVAudioChannelCount = 1
+    }
 
-    init(player: AudioPlayer = AudioPlayer()) {
-        self.player = player
+    private var audioEngine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
+    private var streamingFormat: AVAudioFormat?
+    private var engineSampleRate: Double?
+    private var nextRequestID: UInt64 = 0
+    private let traceEnabled: Bool
+
+    init(traceEnabled: Bool = false) {
+        self.traceEnabled = traceEnabled
+    }
+
+    func prepare(sampleRate: Double) throws -> Bool {
+        let needsSetup = audioEngine == nil || playerNode == nil || engineSampleRate != sampleRate
+        if needsSetup {
+            try rebuildEngine(sampleRate: sampleRate)
+        } else if audioEngine?.isRunning == false {
+            try audioEngine?.start()
+        }
+
+        if playerNode?.isPlaying == false {
+            playerNode?.play()
+        }
+
+        return needsSetup
     }
 
     func play(
@@ -273,29 +520,275 @@ final class PlaybackController {
         stream: AsyncThrowingStream<[Float], Error>,
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
     ) async throws -> PlaybackSummary {
-        let streamFinished = AsyncStream<Void>.makeStream()
-        let previousCallback = player.onDidFinishStreaming
+        _ = try prepare(sampleRate: sampleRate)
+
         let startedAt = Date()
-        var bufferedChunks = [[Float]]()
-        var startedPlayback = false
+        let requestID = nextRequestID
+        nextRequestID += 1
+        let state = RequestPlaybackState(requestID: requestID)
         var emittedFirstChunk = false
+        var emittedPrerollReady = false
+        var startedPlayback = false
         var chunkCount = 0
         var sampleCount = 0
-        var prerollChunkCount = 0
+        var startupBufferedAudioMS: Int?
         var timeToFirstChunkMS: Int?
         var timeToPrerollReadyMS: Int?
-        defer { player.onDidFinishStreaming = previousCallback }
-        player.onDidFinishStreaming = {
-            previousCallback?()
-            streamFinished.continuation.yield(())
-            streamFinished.continuation.finish()
+        var pendingBuffers = [
+            (
+                buffer: AVAudioPCMBuffer,
+                frameCount: Int,
+                firstSample: Float,
+                lastSample: Float,
+                fadeInApplied: Bool,
+                chunkIndex: Int
+            )
+        ]()
+        var pendingSampleCount = 0
+        var lastChunkReceivedAt: Date?
+        var interChunkGapTotalMS = 0
+        var interChunkGapCount = 0
+        var maxInterChunkGapMS: Int?
+        var lastScheduleAt: Date?
+        var scheduleGapTotalMS = 0
+        var scheduleGapCount = 0
+        var maxScheduleGapMS: Int?
+        var bufferIndex = 0
+
+        func bufferedAudioMS() -> Int {
+            Int((Double(pendingSampleCount) / sampleRate * 1_000).rounded())
+        }
+
+        func scheduleForPlayback(
+            _ buffer: AVAudioPCMBuffer,
+            frameCount: Int,
+            firstSample: Float,
+            lastSample: Float,
+            fadeInApplied: Bool,
+            chunkIndex: Int
+        ) async {
+            let queuedAudioBeforeMS = state.queuedAudioMS(sampleRate: sampleRate)
+            let scheduledAt = Date()
+            if let lastScheduleAt {
+                let gapMS = milliseconds(since: lastScheduleAt)
+                maxScheduleGapMS = max(maxScheduleGapMS ?? gapMS, gapMS)
+                scheduleGapTotalMS += gapMS
+                scheduleGapCount += 1
+                if startedPlayback, gapMS >= PlaybackMetricsConfiguration.scheduleGapWarningMS {
+                    await onEvent(
+                        .scheduleGapWarning(
+                            gapMS: gapMS,
+                            bufferIndex: bufferIndex + 1,
+                            queuedAudioMS: queuedAudioBeforeMS
+                        )
+                    )
+                }
+            }
+            lastScheduleAt = scheduledAt
+            bufferIndex += 1
+            let currentBufferIndex = bufferIndex
+
+            let leadingAbs = Double(abs(firstSample))
+            let trailingAbs = Double(abs(lastSample))
+            state.maxLeadingAbsAmplitude = max(state.maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
+            state.maxTrailingAbsAmplitude = max(state.maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
+            if fadeInApplied {
+                state.fadeInChunkCount += 1
+            }
+            if let lastTrailingSample = state.lastTrailingSample {
+                let jump = Double(abs(firstSample - lastTrailingSample))
+                state.maxBoundaryDiscontinuity = max(state.maxBoundaryDiscontinuity ?? jump, jump)
+            }
+            state.lastTrailingSample = lastSample
+
+            state.scheduledSampleCount += frameCount
+            state.scheduleCallbackCount += 1
+            state.recordQueuedAudioDepth(sampleRate: sampleRate)
+            let queuedAudioAfterMS = state.queuedAudioMS(sampleRate: sampleRate)
+            if traceEnabled {
+                await onEvent(
+                    .trace(
+                        PlaybackTraceEvent(
+                            name: "buffer_scheduled",
+                            chunkIndex: chunkIndex,
+                            bufferIndex: currentBufferIndex,
+                            sampleCount: frameCount,
+                            durationMS: Int((Double(frameCount) / sampleRate * 1_000).rounded()),
+                            queuedAudioBeforeMS: queuedAudioBeforeMS,
+                            queuedAudioAfterMS: queuedAudioAfterMS,
+                            gapMS: maxScheduleGapMS,
+                            isRebuffering: state.isRebuffering,
+                            fadeInApplied: fadeInApplied
+                        )
+                    )
+                )
+            }
+            scheduleBuffer(buffer, callbackType: .dataPlayedBack) { callbackType in
+                guard callbackType == .dataPlayedBack else { return }
+                Task { @MainActor in
+                    guard requestID + 1 == self.nextRequestID else { return }
+
+                    state.playedBackSampleCount += frameCount
+                    state.playedBackCallbackCount += 1
+                    state.recordQueuedAudioDepth(sampleRate: sampleRate)
+
+                    let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+                    if self.traceEnabled {
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
+                                    name: "buffer_played_back",
+                                    chunkIndex: chunkIndex,
+                                    bufferIndex: currentBufferIndex,
+                                    sampleCount: frameCount,
+                                    durationMS: Int((Double(frameCount) / sampleRate * 1_000).rounded()),
+                                    queuedAudioBeforeMS: nil,
+                                    queuedAudioAfterMS: currentQueuedAudioMS,
+                                    gapMS: nil,
+                                    isRebuffering: state.isRebuffering,
+                                    fadeInApplied: fadeInApplied
+                                )
+                            )
+                        )
+                    }
+                    if !state.generationFinished, currentQueuedAudioMS <= 0 {
+                        state.starvationEventCount += 1
+                        await onEvent(.starved)
+                        return
+                    }
+
+                    if !state.generationFinished,
+                       currentQueuedAudioMS <= PlaybackMetricsConfiguration.lowWaterTargetMS,
+                       !state.isRebuffering
+                    {
+                        state.isRebuffering = true
+                        state.rebufferEventCount += 1
+                        let now = Date()
+                        state.rebufferStartedAt = now
+                        state.recentRebufferStartTimes.append(now)
+                        state.recentRebufferStartTimes.removeAll {
+                            now.timeIntervalSince($0) * 1_000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
+                        }
+                        self.playerNode?.pause()
+                        await onEvent(.rebufferStarted(queuedAudioMS: currentQueuedAudioMS))
+                        if !state.emittedRebufferThrashWarning,
+                           state.recentRebufferStartTimes.count >= PlaybackMetricsConfiguration.rebufferThrashWarningCount
+                        {
+                            state.emittedRebufferThrashWarning = true
+                            await onEvent(
+                                .rebufferThrashWarning(
+                                    rebufferEventCount: state.rebufferEventCount,
+                                    windowMS: PlaybackMetricsConfiguration.rebufferThrashWindowMS
+                                )
+                            )
+                        }
+                    }
+
+                    if !state.generationFinished,
+                       currentQueuedAudioMS <= PlaybackConfiguration.lowQueueThresholdMS,
+                       !state.emittedLowQueueWarning
+                    {
+                        state.emittedLowQueueWarning = true
+                        await onEvent(.queueDepthLow(queuedAudioMS: currentQueuedAudioMS))
+                    } else if currentQueuedAudioMS > PlaybackConfiguration.lowQueueThresholdMS {
+                        state.emittedLowQueueWarning = false
+                    }
+
+                    if state.isRebuffering,
+                       (currentQueuedAudioMS >= PlaybackMetricsConfiguration.startupBufferTargetMS || state.generationFinished)
+                    {
+                        self.playerNode?.play()
+                        state.isRebuffering = false
+                        if let rebufferStartedAt = state.rebufferStartedAt {
+                            let durationMS = milliseconds(since: rebufferStartedAt)
+                            state.rebufferTotalDurationMS += durationMS
+                            state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
+                            state.rebufferStartedAt = nil
+                        }
+                        await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS))
+                    }
+
+                    if state.generationFinished, currentQueuedAudioMS == 0 {
+                        state.drainContinuation?.resume()
+                        state.drainContinuation = nil
+                    }
+                }
+            }
         }
 
         do {
             for try await chunk in stream {
                 guard !chunk.isEmpty else { continue }
+                let now = Date()
                 chunkCount += 1
                 sampleCount += chunk.count
+                if let lastChunkReceivedAt {
+                    let gapMS = milliseconds(since: lastChunkReceivedAt)
+                    maxInterChunkGapMS = max(maxInterChunkGapMS ?? gapMS, gapMS)
+                    interChunkGapTotalMS += gapMS
+                    interChunkGapCount += 1
+                    if startedPlayback, gapMS >= PlaybackMetricsConfiguration.chunkGapWarningMS {
+                        await onEvent(.chunkGapWarning(gapMS: gapMS, chunkIndex: chunkCount))
+                    }
+                }
+                lastChunkReceivedAt = now
+                if traceEnabled {
+                    await onEvent(
+                        .trace(
+                            PlaybackTraceEvent(
+                                name: "chunk_received",
+                                chunkIndex: chunkCount,
+                                bufferIndex: nil,
+                                sampleCount: chunk.count,
+                                durationMS: Int((Double(chunk.count) / sampleRate * 1_000).rounded()),
+                                queuedAudioBeforeMS: startedPlayback ? state.queuedAudioMS(sampleRate: sampleRate) : bufferedAudioMS(),
+                                queuedAudioAfterMS: nil,
+                                gapMS: maxInterChunkGapMS,
+                                isRebuffering: state.isRebuffering,
+                                fadeInApplied: !emittedFirstChunk
+                            )
+                        )
+                    )
+                }
+                if let buffer = makePCMBuffer(from: chunk, sampleRate: sampleRate, applyFadeIn: !emittedFirstChunk) {
+                    let frameCount = buffer.frameCount
+                    if startedPlayback {
+                        await scheduleForPlayback(
+                            buffer.buffer,
+                            frameCount: frameCount,
+                            firstSample: buffer.firstSample,
+                            lastSample: buffer.lastSample,
+                            fadeInApplied: buffer.fadeInApplied,
+                            chunkIndex: chunkCount
+                        )
+                        if state.isRebuffering {
+                            let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+                            if currentQueuedAudioMS >= PlaybackMetricsConfiguration.startupBufferTargetMS {
+                                playerNode?.play()
+                                state.isRebuffering = false
+                                if let rebufferStartedAt = state.rebufferStartedAt {
+                                    let durationMS = milliseconds(since: rebufferStartedAt)
+                                    state.rebufferTotalDurationMS += durationMS
+                                    state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
+                                    state.rebufferStartedAt = nil
+                                }
+                                await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS))
+                            }
+                        }
+                    } else {
+                        pendingBuffers.append(
+                            (
+                                buffer: buffer.buffer,
+                                frameCount: frameCount,
+                                firstSample: buffer.firstSample,
+                                lastSample: buffer.lastSample,
+                                fadeInApplied: buffer.fadeInApplied,
+                                chunkIndex: chunkCount
+                            )
+                        )
+                        pendingSampleCount += frameCount
+                    }
+                }
 
                 if !emittedFirstChunk {
                     emittedFirstChunk = true
@@ -303,44 +796,85 @@ final class PlaybackController {
                     await onEvent(.firstChunk)
                 }
 
-                if !startedPlayback {
-                    bufferedChunks.append(chunk)
+                if !startedPlayback, bufferedAudioMS() >= PlaybackMetricsConfiguration.startupBufferTargetMS {
+                    startupBufferedAudioMS = bufferedAudioMS()
 
-                    if bufferedChunks.count >= playbackPrerollChunkTarget {
-                        player.startStreaming(sampleRate: sampleRate)
-                        startedPlayback = true
-                        prerollChunkCount = bufferedChunks.count
-                        timeToPrerollReadyMS = milliseconds(since: startedAt)
-                        await onEvent(.prerollReady)
-
-                        for bufferedChunk in bufferedChunks {
-                            player.scheduleAudioChunk(bufferedChunk)
-                        }
-                        bufferedChunks.removeAll(keepingCapacity: true)
+                    for pending in pendingBuffers {
+                        await scheduleForPlayback(
+                            pending.buffer,
+                            frameCount: pending.frameCount,
+                            firstSample: pending.firstSample,
+                            lastSample: pending.lastSample,
+                            fadeInApplied: pending.fadeInApplied,
+                            chunkIndex: pending.chunkIndex
+                        )
                     }
-                } else {
-                    player.scheduleAudioChunk(chunk)
-                }
-            }
 
-            if !startedPlayback {
-                player.startStreaming(sampleRate: sampleRate)
-                startedPlayback = true
-
-                if !bufferedChunks.isEmpty {
-                    prerollChunkCount = bufferedChunks.count
+                    pendingBuffers.removeAll(keepingCapacity: true)
+                    pendingSampleCount = 0
+                    startedPlayback = true
+                    emittedPrerollReady = true
                     timeToPrerollReadyMS = milliseconds(since: startedAt)
-                    await onEvent(.prerollReady)
-
-                    for bufferedChunk in bufferedChunks {
-                        player.scheduleAudioChunk(bufferedChunk)
-                    }
-                    bufferedChunks.removeAll(keepingCapacity: true)
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
                 }
             }
 
-            player.finishStreamingInput()
-            try await waitForPlaybackDrain(streamFinished.stream)
+            state.generationFinished = true
+            if !startedPlayback, !pendingBuffers.isEmpty {
+                startupBufferedAudioMS = bufferedAudioMS()
+
+                for pending in pendingBuffers {
+                    await scheduleForPlayback(
+                        pending.buffer,
+                        frameCount: pending.frameCount,
+                        firstSample: pending.firstSample,
+                        lastSample: pending.lastSample,
+                        fadeInApplied: pending.fadeInApplied,
+                        chunkIndex: pending.chunkIndex
+                    )
+                }
+
+                pendingBuffers.removeAll(keepingCapacity: true)
+                pendingSampleCount = 0
+                startedPlayback = true
+                if state.isRebuffering {
+                    let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+                    playerNode?.play()
+                    state.isRebuffering = false
+                    if let rebufferStartedAt = state.rebufferStartedAt {
+                        let durationMS = milliseconds(since: rebufferStartedAt)
+                        state.rebufferTotalDurationMS += durationMS
+                        state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
+                        state.rebufferStartedAt = nil
+                    }
+                    await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS))
+                }
+            }
+
+            if !emittedPrerollReady, chunkCount > 0 {
+                emittedPrerollReady = true
+                startupBufferedAudioMS = startupBufferedAudioMS ?? state.queuedAudioMS(sampleRate: sampleRate)
+                timeToPrerollReadyMS = milliseconds(since: startedAt)
+                await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+            }
+
+            try await waitForPlaybackDrain(
+                state: state,
+                sampleRate: sampleRate
+            )
+            if let maxBoundaryDiscontinuity = state.maxBoundaryDiscontinuity,
+               let maxLeadingAbsAmplitude = state.maxLeadingAbsAmplitude,
+               let maxTrailingAbsAmplitude = state.maxTrailingAbsAmplitude
+            {
+                await onEvent(
+                    .bufferShapeSummary(
+                        maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
+                        maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
+                        maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
+                        fadeInChunkCount: state.fadeInChunkCount
+                    )
+                )
+            }
             let timeFromPrerollReadyToDrainMS: Int?
             if let timeToPrerollReadyMS {
                 timeFromPrerollReadyToDrainMS = max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
@@ -348,19 +882,40 @@ final class PlaybackController {
                 timeFromPrerollReadyToDrainMS = nil
             }
 
+            resetPlayerNodeForNextRequest()
+
             return PlaybackSummary(
                 chunkCount: chunkCount,
                 sampleCount: sampleCount,
-                prerollChunkCount: prerollChunkCount,
+                startupBufferedAudioMS: startupBufferedAudioMS,
                 timeToFirstChunkMS: timeToFirstChunkMS,
                 timeToPrerollReadyMS: timeToPrerollReadyMS,
-                timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS
+                timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS,
+                minQueuedAudioMS: state.minQueuedAudioMS,
+                maxQueuedAudioMS: state.maxQueuedAudioMS,
+                avgQueuedAudioMS: state.queueDepthSampleCount == 0 ? nil : state.queueDepthTotalMS / state.queueDepthSampleCount,
+                queueDepthSampleCount: state.queueDepthSampleCount,
+                rebufferEventCount: state.rebufferEventCount,
+                rebufferTotalDurationMS: state.rebufferTotalDurationMS,
+                longestRebufferDurationMS: state.longestRebufferDurationMS,
+                starvationEventCount: state.starvationEventCount
+                ,
+                scheduleCallbackCount: state.scheduleCallbackCount,
+                playedBackCallbackCount: state.playedBackCallbackCount,
+                maxInterChunkGapMS: maxInterChunkGapMS,
+                avgInterChunkGapMS: interChunkGapCount == 0 ? nil : interChunkGapTotalMS / interChunkGapCount,
+                maxScheduleGapMS: maxScheduleGapMS,
+                avgScheduleGapMS: scheduleGapCount == 0 ? nil : scheduleGapTotalMS / scheduleGapCount,
+                maxBoundaryDiscontinuity: state.maxBoundaryDiscontinuity,
+                maxLeadingAbsAmplitude: state.maxLeadingAbsAmplitude,
+                maxTrailingAbsAmplitude: state.maxTrailingAbsAmplitude,
+                fadeInChunkCount: state.fadeInChunkCount
             )
         } catch is CancellationError {
-            player.stopStreaming()
+            resetPlayerNodeForNextRequest()
             throw CancellationError()
         } catch {
-            player.stopStreaming()
+            resetPlayerNodeForNextRequest()
             if let workerError = error as? WorkerError {
                 throw workerError
             }
@@ -373,14 +928,33 @@ final class PlaybackController {
     }
 
     func stop() {
-        player.stop()
+        playerNode?.stop()
+        audioEngine?.stop()
+        playerNode = nil
+        audioEngine = nil
+        streamingFormat = nil
+        engineSampleRate = nil
     }
 
-    private func waitForPlaybackDrain(_ stream: AsyncStream<Void>) async throws {
+    private func waitForPlaybackDrain(
+        state: RequestPlaybackState,
+        sampleRate: Double
+    ) async throws {
+        let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+        if currentQueuedAudioMS == 0 {
+            return
+        }
+
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
-                for await _ in stream {
-                    break
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    Task { @MainActor in
+                        state.drainContinuation = continuation
+                        if state.queuedAudioMS(sampleRate: sampleRate) == 0 {
+                            state.drainContinuation?.resume()
+                            state.drainContinuation = nil
+                        }
+                    }
                 }
             }
             group.addTask {
@@ -394,6 +968,102 @@ final class PlaybackController {
             _ = try await group.next()
             group.cancelAll()
         }
+    }
+
+    private func rebuildEngine(sampleRate: Double) throws {
+        stop()
+
+        let engine = AVAudioEngine()
+        let node = AVAudioPlayerNode()
+        let format = AVAudioFormat(
+            standardFormatWithSampleRate: sampleRate,
+            channels: PlaybackConfiguration.channels
+        )
+
+        guard let format else {
+            throw WorkerError(
+                code: .audioPlaybackFailed,
+                message: "Live playback could not create an AVAudioFormat for sample rate \(sampleRate)."
+            )
+        }
+
+        engine.attach(node)
+        engine.connect(node, to: engine.mainMixerNode, format: format)
+        engine.prepare()
+        try engine.start()
+        node.play()
+
+        audioEngine = engine
+        playerNode = node
+        streamingFormat = format
+        engineSampleRate = sampleRate
+    }
+
+    private func resetPlayerNodeForNextRequest() {
+        playerNode?.stop()
+        playerNode?.reset()
+        playerNode?.play()
+    }
+
+    private func makePCMBuffer(
+        from samples: [Float],
+        sampleRate: Double,
+        applyFadeIn: Bool
+    ) -> (buffer: AVAudioPCMBuffer, frameCount: Int, firstSample: Float, lastSample: Float, fadeInApplied: Bool)? {
+        guard let format = streamingFormat ?? AVAudioFormat(
+            standardFormatWithSampleRate: sampleRate,
+            channels: PlaybackConfiguration.channels
+        ) else {
+            return nil
+        }
+
+        var processedSamples = samples
+        if applyFadeIn {
+            let fadeInSamples = min(Int(format.sampleRate * 0.01), processedSamples.count)
+            if fadeInSamples > 0 {
+                for i in 0..<fadeInSamples {
+                    let factor = Float(i) / Float(fadeInSamples)
+                    processedSamples[i] *= factor
+                }
+            }
+        }
+        guard let firstSample = processedSamples.first, let lastSample = processedSamples.last else {
+            return nil
+        }
+
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: AVAudioFrameCount(processedSamples.count)
+        ) else {
+            return nil
+        }
+
+        buffer.frameLength = AVAudioFrameCount(processedSamples.count)
+        if let channelData = buffer.floatChannelData {
+            processedSamples.withUnsafeBufferPointer { src in
+                channelData[0].update(from: src.baseAddress!, count: processedSamples.count)
+            }
+        }
+
+        return (
+            buffer: buffer,
+            frameCount: Int(buffer.frameLength),
+            firstSample: firstSample,
+            lastSample: lastSample,
+            fadeInApplied: applyFadeIn
+        )
+    }
+
+    private func scheduleBuffer(
+        _ buffer: AVAudioPCMBuffer,
+        callbackType: AVAudioPlayerNodeCompletionCallbackType,
+        completion: @escaping @Sendable (AVAudioPlayerNodeCompletionCallbackType) -> Void
+    ) {
+        playerNode?.scheduleBuffer(
+            buffer,
+            completionCallbackType: callbackType,
+            completionHandler: completion
+        )
     }
 }
 
@@ -413,6 +1083,7 @@ struct WorkerDependencies {
     let writeStdout: @Sendable (Data) throws -> Void
     let writeStderr: @Sendable (String) -> Void
     let now: @Sendable () -> Date
+    let readRuntimeMemory: @Sendable () -> RuntimeMemorySnapshot?
 
     static func live(fileManager: FileManager = .default) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
@@ -423,10 +1094,12 @@ struct WorkerDependencies {
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
             makePlaybackController: {
                 if environment[WorkerEnvironment.silentPlayback] == "1" {
-                    return .silent()
+                    return .silent(traceEnabled: environment[WorkerEnvironment.playbackTrace] == "1")
                 }
 
-                return AnyPlaybackController(PlaybackController())
+                return AnyPlaybackController(
+                    PlaybackController(traceEnabled: environment[WorkerEnvironment.playbackTrace] == "1")
+                )
             },
             writeWAV: { samples, sampleRate, url in
                 try AudioUtils.writeWavFile(samples: samples, sampleRate: sampleRate, fileURL: url)
@@ -445,7 +1118,28 @@ struct WorkerDependencies {
                     fputs(message + "\n", stderr)
                 }
             },
-            now: Date.init
+            now: Date.init,
+            readRuntimeMemory: currentRuntimeMemorySnapshot
         )
     }
+}
+
+private func currentRuntimeMemorySnapshot() -> RuntimeMemorySnapshot? {
+    var usage = rusage_info_current()
+    let usageResult = withUnsafeMutablePointer(to: &usage) { pointer in
+        pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rebound in
+            proc_pid_rusage(getpid(), RUSAGE_INFO_CURRENT, rebound)
+        }
+    }
+
+    let snapshot = Memory.snapshot()
+    return RuntimeMemorySnapshot(
+        processResidentBytes: usageResult == 0 ? Int(usage.ri_resident_size) : nil,
+        processPhysFootprintBytes: usageResult == 0 ? Int(usage.ri_phys_footprint) : nil,
+        mlxActiveMemoryBytes: snapshot.activeMemory,
+        mlxCacheMemoryBytes: snapshot.cacheMemory,
+        mlxPeakMemoryBytes: snapshot.peakMemory,
+        mlxCacheLimitBytes: Memory.cacheLimit,
+        mlxMemoryLimitBytes: Memory.memoryLimit
+    )
 }

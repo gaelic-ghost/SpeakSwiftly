@@ -30,7 +30,7 @@ The first intended runtime shape is:
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
 - A single-consumer priority queue for incoming requests, with waiting `speak_live` work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
-- Structured progress and lifecycle events written to `stdout`, with human-readable diagnostics on `stderr`.
+- Structured progress and lifecycle events written to `stdout`, with structured JSONL operator diagnostics on `stderr`.
 
 ## Setup
 
@@ -91,6 +91,7 @@ Example response and event shapes:
 {"event":"worker_status","stage":"resident_model_ready"}
 {"id":"req-1","event":"started","op":"speak_live"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
+{"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
@@ -107,7 +108,43 @@ Current operation families are:
 - Immutable profile storage, selection, listing, and removal.
 - Playback-prioritized request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
-- Human-friendly `stderr` logs that explain the most likely cause when something breaks.
+- Structured JSONL `stderr` logs that explain the most likely cause when something breaks and include request timing context.
+
+The test suite is organized to mirror the source responsibilities:
+
+- `WorkerProtocolTests.swift`
+- `ProfileStoreTests.swift`
+- `WorkerRuntimeTests.swift`
+- `ModelClientsTests.swift`
+- `SpeakSwiftlyE2ETests.swift`
+
+Current live-playback behavior is:
+
+- `speak_live` loads the stored profile and reference audio first.
+- The resident `0.6B` model streams generated chunks at the current `0.32` cadence.
+- The local `AVAudioEngine` and `AVAudioPlayerNode` are prepared as part of resident-model warmup and then reused across requests instead of being recreated for each utterance.
+- Real playback uses a duration-based startup buffer instead of the older fixed chunk gate and does not start until roughly 300 ms of queued audio is available, unless generation ends earlier.
+- Requests emit `buffering_audio` when the first non-empty chunk arrives and `preroll_ready` when the startup buffer has been satisfied and audio has been scheduled into the hot player path.
+- The worker keeps a maintained queue-floor policy during playback: if queued audio drops below roughly 180 ms while generation is still active, playback pauses and re-buffers until the queue is healthy again or generation ends.
+- The worker records queue-depth summaries, chunk-arrival gaps, scheduling gaps, rebuffer durations, callback counts, chunk-boundary shape metrics, and process / MLX memory snapshots so playback health can be diagnosed without guessing from one or two timestamps.
+- The worker logs low-queue warnings below 100 ms, chunk-gap warnings, scheduling-gap warnings, rebuffer start/resume events, rebuffer-thrash warnings, explicit starvation events, and a buffer-shape summary when chunk boundaries look suspicious.
+- After generation finishes, playback drain is bounded by a 5 second timeout so the worker cannot hang forever waiting for the local player to report completion.
+- If drain completion times out, the request fails with `audio_playback_timeout` and the worker stays alive for later requests.
+- For short forensic captures, set `SPEAKSWIFTLY_PLAYBACK_TRACE=1` to emit chunk-level trace JSONL events such as `playback_trace_chunk_received`, `playback_trace_buffer_scheduled`, and `playback_trace_buffer_played_back`. Leave that mode off for normal runs.
+
+Current `stderr` observability is JSONL with fields such as:
+
+- `event`
+- `level`
+- `ts`
+- `request_id`
+- `op`
+- `profile_name`
+- `queue_depth`
+- `elapsed_ms`
+- `details`
+
+That log stream currently covers resident-model preload, request accept / queue / start / success / failure, playback milestones, queue-depth warnings, scheduling and chunk-gap warnings, rebuffer durations, starvation events, buffer-shape summaries, optional chunk-level playback tracing, profile-store operations, and process / MLX memory fields such as resident size, physical footprint, active MLX memory, cache memory, and peak MLX memory at key playback checkpoints.
 
 ## Repository Layout
 
@@ -121,6 +158,14 @@ The preferred ownership model is:
 - Feature work happens here first, and the consuming repository updates its submodule pointer when it is ready to adopt a newer revision.
 
 That arrangement keeps the package history, tags, and releases independent while still letting the larger repository pin an exact commit.
+
+The local release workflow also has one adjacent-repo integration step now: the adjacent `../speak-to-user-mcp` checkout includes a repo-managed hook installer at `scripts/install-speakswiftly-release-hook.sh` and a tag handler at `scripts/handle-adjacent-speakswiftly-release-tag.sh`. When that hook is installed there, a new local `SpeakSwiftly` release tag created here refreshes the cached worker runtime in `../speak-to-user-mcp` so the day-to-day MCP consumer stays aligned with the latest tagged standalone release.
+
+Today that adjacent-repo refresh is intentionally narrow:
+
+- It updates the cached binary used by `../speak-to-user-mcp`.
+- It does not yet fan out to every other neighboring local repository that may also consume a cached `SpeakSwiftly` binary.
+- Other adjacent consumers such as `../speak-to-user-server` still need an explicit follow-up expansion of that release propagation workflow.
 
 When `speak-to-user` is using this package, the expected package path is:
 
@@ -160,10 +205,16 @@ xcodebuild build \
   -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
 ```
 
-Opt-in real-model e2e coverage is available for the resident `0.6B` and on-demand `1.7B` paths, and the harness now builds and launches that Xcode-backed worker automatically:
+Opt-in real-model e2e coverage is available for the on-demand `1.7B` path, the resident `0.6B` path with silent playback, and the resident `0.6B` path through the real local `AVAudioEngine` playback stack. The harness builds and launches that Xcode-backed worker automatically:
 
 ```bash
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
+```
+
+If you want chunk-level playback trace logs during that real run, add the trace env flag:
+
+```bash
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
 The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each test still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.

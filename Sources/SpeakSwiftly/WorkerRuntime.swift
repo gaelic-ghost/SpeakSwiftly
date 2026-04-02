@@ -7,6 +7,12 @@ actor WorkerRuntime {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
 
+    private enum PlaybackConfiguration {
+        // Keep the current aggressive low-latency chunk cadence until queue-depth
+        // metrics from the hot player path tell us whether it should change.
+        static let residentStreamingInterval = 0.32
+    }
+
     private enum ResidentState: Sendable {
         case warming
         case ready(AnySpeechModel)
@@ -148,6 +154,7 @@ actor WorkerRuntime {
             do {
                 try profileStore.ensureRootExists()
                 let model = try await dependencies.loadResidentModel()
+                let playbackEngineWasPrepared = try await playbackController.prepare(sampleRate: Double(model.sampleRate))
                 residentState = .ready(model)
                 await emitStatus(.residentModelReady)
                 await logEvent(
@@ -155,8 +162,17 @@ actor WorkerRuntime {
                     details: [
                         "model_repo": .string(ModelFactory.residentModelRepo),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                    ]
+                    ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
                 )
+                if playbackEngineWasPrepared {
+                    await logEvent(
+                        "playback_engine_ready",
+                        details: [
+                            "sample_rate": .int(model.sampleRate),
+                            "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
+                        ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
+                    )
+                }
                 try await startNextRequestIfPossible()
             } catch is CancellationError {
                 guard !isShuttingDown else { return }
@@ -405,7 +421,7 @@ actor WorkerRuntime {
             details: [
                 "path": .string(profile.directoryURL.path),
                 "duration_ms": .int(elapsedMS(since: profileLoadStartedAt)),
-            ]
+            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
         )
 
         let refAudioLoadStartedAt = dependencies.now()
@@ -419,7 +435,7 @@ actor WorkerRuntime {
                 "path": .string(profile.referenceAudioURL.path),
                 "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
                 "sample_rate": .int(residentModel.sampleRate),
-            ]
+            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
         )
         try Task.checkCancellation()
 
@@ -430,7 +446,7 @@ actor WorkerRuntime {
             refAudio: refAudio,
             refText: profile.manifest.sourceText,
             language: "English",
-            streamingInterval: 0.32
+            streamingInterval: PlaybackConfiguration.residentStreamingInterval
         )
 
         let playbackSummary = try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) { event in
@@ -443,13 +459,152 @@ actor WorkerRuntime {
                     op: op,
                     profileName: profileName
                 )
-            case .prerollReady:
+            case .prerollReady(let startupBufferedAudioMS):
                 await self.emitProgress(id: id, stage: .prerollReady)
                 await self.logRequestEvent(
                     "playback_preroll_ready",
                     requestID: id,
                     op: op,
+                    profileName: profileName,
+                    details: [
+                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
+                    ]
+                )
+                await self.logRequestEvent(
+                    "playback_started",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
+                    ].merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
+                )
+            case .queueDepthLow(let queuedAudioMS):
+                await self.logRequestEvent(
+                    "playback_queue_depth_low",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: ["queued_audio_ms": .int(queuedAudioMS)]
+                )
+            case .chunkGapWarning(let gapMS, let chunkIndex):
+                await self.logRequestEvent(
+                    "playback_chunk_gap_warning",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "gap_ms": .int(gapMS),
+                        "chunk_index": .int(chunkIndex),
+                    ]
+                )
+            case .scheduleGapWarning(let gapMS, let bufferIndex, let queuedAudioMS):
+                await self.logRequestEvent(
+                    "playback_schedule_gap_warning",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "gap_ms": .int(gapMS),
+                        "buffer_index": .int(bufferIndex),
+                        "queued_audio_ms": .int(queuedAudioMS),
+                    ]
+                )
+            case .starved:
+                await self.logRequestEvent(
+                    "playback_starved",
+                    requestID: id,
+                    op: op,
                     profileName: profileName
+                )
+            case .rebufferThrashWarning(let rebufferEventCount, let windowMS):
+                await self.logRequestEvent(
+                    "playback_rebuffer_thrash_warning",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "rebuffer_event_count": .int(rebufferEventCount),
+                        "window_ms": .int(windowMS),
+                    ]
+                )
+            case .rebufferStarted(let queuedAudioMS):
+                await self.logRequestEvent(
+                    "playback_rebuffer_started",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "low_water_target_ms": .int(PlaybackMetricsConfiguration.lowWaterTargetMS),
+                        "queued_audio_ms": .int(queuedAudioMS),
+                    ]
+                )
+            case .rebufferResumed(let bufferedAudioMS):
+                await self.logRequestEvent(
+                    "playback_rebuffer_resumed",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "buffered_audio_ms": .int(bufferedAudioMS),
+                    ]
+                )
+            case .bufferShapeSummary(
+                let maxBoundaryDiscontinuity,
+                let maxLeadingAbsAmplitude,
+                let maxTrailingAbsAmplitude,
+                let fadeInChunkCount
+            ):
+                await self.logRequestEvent(
+                    "playback_buffer_shape_summary",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "max_boundary_discontinuity": .double(maxBoundaryDiscontinuity),
+                        "max_leading_abs_amplitude": .double(maxLeadingAbsAmplitude),
+                        "max_trailing_abs_amplitude": .double(maxTrailingAbsAmplitude),
+                        "fade_in_chunk_count": .int(fadeInChunkCount),
+                    ]
+                )
+            case .trace(let trace):
+                var details = [String: LogValue]()
+                if let chunkIndex = trace.chunkIndex {
+                    details["chunk_index"] = .int(chunkIndex)
+                }
+                if let bufferIndex = trace.bufferIndex {
+                    details["buffer_index"] = .int(bufferIndex)
+                }
+                if let sampleCount = trace.sampleCount {
+                    details["sample_count"] = .int(sampleCount)
+                }
+                if let durationMS = trace.durationMS {
+                    details["duration_ms"] = .int(durationMS)
+                }
+                if let queuedAudioBeforeMS = trace.queuedAudioBeforeMS {
+                    details["queued_audio_before_ms"] = .int(queuedAudioBeforeMS)
+                }
+                if let queuedAudioAfterMS = trace.queuedAudioAfterMS {
+                    details["queued_audio_after_ms"] = .int(queuedAudioAfterMS)
+                }
+                if let gapMS = trace.gapMS {
+                    details["gap_ms"] = .int(gapMS)
+                }
+                if let isRebuffering = trace.isRebuffering {
+                    details["is_rebuffering"] = .bool(isRebuffering)
+                }
+                if let fadeInApplied = trace.fadeInApplied {
+                    details["fade_in_applied"] = .bool(fadeInApplied)
+                }
+                await self.logRequestEvent(
+                    "playback_trace_\(trace.name)",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: details
                 )
             }
         }
@@ -459,8 +614,23 @@ actor WorkerRuntime {
         var details: [String: LogValue] = [
             "chunk_count": .int(playbackSummary.chunkCount),
             "sample_count": .int(playbackSummary.sampleCount),
-            "preroll_chunk_count": .int(playbackSummary.prerollChunkCount),
+            "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
+            "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+            "low_water_target_ms": .int(PlaybackMetricsConfiguration.lowWaterTargetMS),
+            "chunk_gap_warning_threshold_ms": .int(PlaybackMetricsConfiguration.chunkGapWarningMS),
+            "schedule_gap_warning_threshold_ms": .int(PlaybackMetricsConfiguration.scheduleGapWarningMS),
+            "rebuffer_event_count": .int(playbackSummary.rebufferEventCount),
+            "rebuffer_total_duration_ms": .int(playbackSummary.rebufferTotalDurationMS),
+            "longest_rebuffer_duration_ms": .int(playbackSummary.longestRebufferDurationMS),
+            "starvation_event_count": .int(playbackSummary.starvationEventCount),
+            "queue_depth_sample_count": .int(playbackSummary.queueDepthSampleCount),
+            "schedule_callback_count": .int(playbackSummary.scheduleCallbackCount),
+            "played_back_callback_count": .int(playbackSummary.playedBackCallbackCount),
+            "fade_in_chunk_count": .int(playbackSummary.fadeInChunkCount),
         ]
+        if let startupBufferedAudioMS = playbackSummary.startupBufferedAudioMS {
+            details["startup_buffered_audio_ms"] = .int(startupBufferedAudioMS)
+        }
         if let timeToFirstChunkMS = playbackSummary.timeToFirstChunkMS {
             details["time_to_first_chunk_ms"] = .int(timeToFirstChunkMS)
         }
@@ -470,6 +640,37 @@ actor WorkerRuntime {
         if let timeFromPrerollReadyToDrainMS = playbackSummary.timeFromPrerollReadyToDrainMS {
             details["time_from_preroll_ready_to_drain_ms"] = .int(timeFromPrerollReadyToDrainMS)
         }
+        if let minQueuedAudioMS = playbackSummary.minQueuedAudioMS {
+            details["min_queued_audio_ms"] = .int(minQueuedAudioMS)
+        }
+        if let maxQueuedAudioMS = playbackSummary.maxQueuedAudioMS {
+            details["max_queued_audio_ms"] = .int(maxQueuedAudioMS)
+        }
+        if let avgQueuedAudioMS = playbackSummary.avgQueuedAudioMS {
+            details["avg_queued_audio_ms"] = .int(avgQueuedAudioMS)
+        }
+        if let maxInterChunkGapMS = playbackSummary.maxInterChunkGapMS {
+            details["max_inter_chunk_gap_ms"] = .int(maxInterChunkGapMS)
+        }
+        if let avgInterChunkGapMS = playbackSummary.avgInterChunkGapMS {
+            details["avg_inter_chunk_gap_ms"] = .int(avgInterChunkGapMS)
+        }
+        if let maxScheduleGapMS = playbackSummary.maxScheduleGapMS {
+            details["max_schedule_gap_ms"] = .int(maxScheduleGapMS)
+        }
+        if let avgScheduleGapMS = playbackSummary.avgScheduleGapMS {
+            details["avg_schedule_gap_ms"] = .int(avgScheduleGapMS)
+        }
+        if let maxBoundaryDiscontinuity = playbackSummary.maxBoundaryDiscontinuity {
+            details["max_boundary_discontinuity"] = .double(maxBoundaryDiscontinuity)
+        }
+        if let maxLeadingAbsAmplitude = playbackSummary.maxLeadingAbsAmplitude {
+            details["max_leading_abs_amplitude"] = .double(maxLeadingAbsAmplitude)
+        }
+        if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude {
+            details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude)
+        }
+        details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
         await logRequestEvent(
             "playback_finished",
             requestID: id,
@@ -759,6 +960,36 @@ actor WorkerRuntime {
             elapsedMS: elapsedMS(for: requestID),
             details: details
         )
+    }
+
+    private func memoryDetails() -> [String: LogValue] {
+        guard let snapshot = dependencies.readRuntimeMemory() else {
+            return [:]
+        }
+
+        var details = [String: LogValue]()
+        if let processResidentBytes = snapshot.processResidentBytes {
+            details["process_resident_bytes"] = .int(processResidentBytes)
+        }
+        if let processPhysFootprintBytes = snapshot.processPhysFootprintBytes {
+            details["process_phys_footprint_bytes"] = .int(processPhysFootprintBytes)
+        }
+        if let mlxActiveMemoryBytes = snapshot.mlxActiveMemoryBytes {
+            details["mlx_active_memory_bytes"] = .int(mlxActiveMemoryBytes)
+        }
+        if let mlxCacheMemoryBytes = snapshot.mlxCacheMemoryBytes {
+            details["mlx_cache_memory_bytes"] = .int(mlxCacheMemoryBytes)
+        }
+        if let mlxPeakMemoryBytes = snapshot.mlxPeakMemoryBytes {
+            details["mlx_peak_memory_bytes"] = .int(mlxPeakMemoryBytes)
+        }
+        if let mlxCacheLimitBytes = snapshot.mlxCacheLimitBytes {
+            details["mlx_cache_limit_bytes"] = .int(mlxCacheLimitBytes)
+        }
+        if let mlxMemoryLimitBytes = snapshot.mlxMemoryLimitBytes {
+            details["mlx_memory_limit_bytes"] = .int(mlxMemoryLimitBytes)
+        }
+        return details
     }
 
     private func logEvent(
