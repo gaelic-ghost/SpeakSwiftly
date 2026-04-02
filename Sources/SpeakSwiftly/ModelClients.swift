@@ -202,6 +202,10 @@ final class AnyPlaybackController: @unchecked Sendable {
 
 @MainActor
 final class PlaybackController {
+    private enum PlaybackConfiguration {
+        static let drainTimeout: Duration = .seconds(5)
+    }
+
     private let player: AudioPlayer
 
     init(player: AudioPlayer = AudioPlayer()) {
@@ -215,6 +219,7 @@ final class PlaybackController {
     ) async throws {
         let streamFinished = AsyncStream<Void>.makeStream()
         let previousCallback = player.onDidFinishStreaming
+        defer { player.onDidFinishStreaming = previousCallback }
         player.onDidFinishStreaming = {
             previousCallback?()
             streamFinished.continuation.yield(())
@@ -238,11 +243,16 @@ final class PlaybackController {
             }
 
             player.finishStreamingInput()
-            for await _ in streamFinished.stream {
-                break
-            }
+            try await waitForPlaybackDrain(streamFinished.stream)
+        } catch is CancellationError {
+            player.stopStreaming()
+            throw CancellationError()
         } catch {
             player.stopStreaming()
+            if let workerError = error as? WorkerError {
+                throw workerError
+            }
+
             throw WorkerError(
                 code: .audioPlaybackFailed,
                 message: "Live playback failed while scheduling generated audio into the local audio player. \(error.localizedDescription)"
@@ -252,6 +262,26 @@ final class PlaybackController {
 
     func stop() {
         player.stop()
+    }
+
+    private func waitForPlaybackDrain(_ stream: AsyncStream<Void>) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await _ in stream {
+                    break
+                }
+            }
+            group.addTask {
+                try await Task.sleep(for: PlaybackConfiguration.drainTimeout)
+                throw WorkerError(
+                    code: .audioPlaybackTimeout,
+                    message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(PlaybackConfiguration.drainTimeout.components.seconds) seconds."
+                )
+            }
+
+            _ = try await group.next()
+            group.cancelAll()
+        }
     }
 }
 

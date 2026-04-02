@@ -13,9 +13,29 @@ actor WorkerRuntime {
         case failed(WorkerError)
     }
 
+    private struct ActiveRequest: Sendable {
+        let token: UUID
+        let id: String
+        let task: Task<Void, Never>
+    }
+
     private struct QueueEntry: Sendable, Equatable {
         let token = UUID()
         let request: WorkerRequest
+    }
+
+    private struct WorkerSuccessPayload: Sendable {
+        let id: String
+        let profileName: String?
+        let profilePath: String?
+        let profiles: [ProfileSummary]?
+
+        init(id: String, profileName: String? = nil, profilePath: String? = nil, profiles: [ProfileSummary]? = nil) {
+            self.id = id
+            self.profileName = profileName
+            self.profilePath = profilePath
+            self.profiles = profiles
+        }
     }
 
     private let dependencies: WorkerDependencies
@@ -25,7 +45,8 @@ actor WorkerRuntime {
 
     private var residentState: ResidentState = .warming
     private var queue = [QueueEntry]()
-    private var activeRequestID: String?
+    private var activeRequest: ActiveRequest?
+    private var isShuttingDown = false
     private var preloadTask: Task<Void, Never>?
 
     init(
@@ -68,6 +89,17 @@ actor WorkerRuntime {
                 residentState = .ready(model)
                 await emitStatus(.residentModelReady)
                 try await startNextRequestIfPossible()
+            } catch is CancellationError {
+                guard !isShuttingDown else { return }
+
+                let workerError = WorkerError(
+                    code: .modelGenerationFailed,
+                    message: "Resident model preload was cancelled before \(ModelFactory.residentModelRepo) finished loading."
+                )
+                residentState = .failed(workerError)
+                await logError(workerError.message)
+                await emitStatus(.residentModelFailed)
+                await failQueuedRequests(with: workerError)
             } catch let workerError as WorkerError {
                 residentState = .failed(workerError)
                 await logError("Resident model preload failed while loading \(ModelFactory.residentModelRepo). \(workerError.message)")
@@ -103,6 +135,17 @@ actor WorkerRuntime {
             return
         }
 
+        if isShuttingDown {
+            await emitFailure(
+                id: request.id,
+                error: WorkerError(
+                    code: .workerShuttingDown,
+                    message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down."
+                )
+            )
+            return
+        }
+
         if case .failed(let error) = residentState {
             await emitFailure(id: request.id, error: error)
             return
@@ -117,14 +160,31 @@ actor WorkerRuntime {
     }
 
     func shutdown() async {
+        guard !isShuttingDown else { return }
+
+        isShuttingDown = true
         preloadTask?.cancel()
+
+        let cancellationError = WorkerError(
+            code: .requestCancelled,
+            message: "The request was cancelled because the SpeakSwiftly worker is shutting down."
+        )
+
+        if let activeRequest {
+            self.activeRequest = nil
+            activeRequest.task.cancel()
+            await emitFailure(id: activeRequest.id, error: cancellationError)
+        }
+
+        await failQueuedRequests(with: cancellationError)
         await playbackController.stop()
     }
 
     // MARK: - Processing
 
     private func startNextRequestIfPossible() async throws {
-        guard activeRequestID == nil else { return }
+        guard !isShuttingDown else { return }
+        guard activeRequest == nil else { return }
 
         switch residentState {
         case .warming:
@@ -139,25 +199,22 @@ actor WorkerRuntime {
         guard let index = nextQueueIndex() else { return }
 
         let entry = queue.remove(at: index)
-        activeRequestID = entry.request.id
         await emitStarted(for: entry.request)
 
-        Task {
-            await self.process(entry.request)
+        let task = Task {
+            await self.process(entry.request, token: entry.token)
         }
+        activeRequest = ActiveRequest(token: entry.token, id: entry.request.id, task: task)
     }
 
-    private func process(_ request: WorkerRequest) async {
-        defer {
-            activeRequestID = nil
-            Task { try? await startNextRequestIfPossible() }
-        }
+    private func process(_ request: WorkerRequest, token: UUID) async {
+        let result: Result<WorkerSuccessPayload, WorkerError>
 
         do {
             switch request {
             case .speakLive(let id, let text, let profileName):
                 try await handleSpeakLive(id: id, text: text, profileName: profileName)
-                await emitSuccess(id: id, profileName: nil, profilePath: nil, profiles: nil)
+                result = .success(WorkerSuccessPayload(id: id))
 
             case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
                 let storedProfile = try await handleCreateProfile(
@@ -167,28 +224,37 @@ actor WorkerRuntime {
                     voiceDescription: voiceDescription,
                     outputPath: outputPath
                 )
-                await emitSuccess(id: id, profileName: storedProfile.manifest.profileName, profilePath: storedProfile.directoryURL.path, profiles: nil)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        profileName: storedProfile.manifest.profileName,
+                        profilePath: storedProfile.directoryURL.path
+                    )
+                )
 
             case .listProfiles(let id):
                 let profiles = try profileStore.listProfiles()
-                await emitSuccess(id: id, profileName: nil, profilePath: nil, profiles: profiles)
+                result = .success(WorkerSuccessPayload(id: id, profiles: profiles))
 
             case .removeProfile(let id, let profileName):
                 await emitProgress(id: id, stage: .removingProfile)
                 try profileStore.removeProfile(named: profileName)
-                await emitSuccess(id: id, profileName: profileName, profilePath: nil, profiles: nil)
+                result = .success(WorkerSuccessPayload(id: id, profileName: profileName))
             }
+        } catch is CancellationError {
+            result = .failure(cancellationError(for: request.id))
         } catch let workerError as WorkerError {
-            await logError(workerError.message)
-            await emitFailure(id: request.id, error: workerError)
+            result = .failure(workerError)
         } catch {
-            let workerError = WorkerError(
-                code: .internalError,
-                message: "Request '\(request.id)' failed due to an unexpected internal error. \(error.localizedDescription)"
+            result = .failure(
+                WorkerError(
+                    code: .internalError,
+                    message: "Request '\(request.id)' failed due to an unexpected internal error. \(error.localizedDescription)"
+                )
             )
-            await logError(workerError.message)
-            await emitFailure(id: request.id, error: workerError)
         }
+
+        await finishActiveRequest(token: token, requestID: request.id, result: result)
     }
 
     private func handleSpeakLive(id: String, text: String, profileName: String) async throws {
@@ -197,6 +263,7 @@ actor WorkerRuntime {
         await emitProgress(id: id, stage: .loadingProfile)
         let profile = try profileStore.loadProfile(named: profileName)
         let refAudio = try dependencies.loadAudioSamples(profile.referenceAudioURL, residentModel.sampleRate)
+        try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentModel.generateSamplesStream(
@@ -211,6 +278,7 @@ actor WorkerRuntime {
         try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) {
             await self.emitProgress(id: id, stage: .bufferingAudio)
         }
+        try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .playbackFinished)
     }
@@ -225,6 +293,7 @@ actor WorkerRuntime {
         try profileStore.validateProfileName(profileName)
         await emitProgress(id: id, stage: .loadingProfileModel)
         let profileModel = try await dependencies.loadProfileModel()
+        try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .generatingProfileAudio)
         let audio = try await profileModel.generate(
@@ -234,6 +303,7 @@ actor WorkerRuntime {
             refText: nil,
             language: "English"
         )
+        try Task.checkCancellation()
 
         let tempDirectory = dependencies.fileManager.temporaryDirectory
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
@@ -244,6 +314,7 @@ actor WorkerRuntime {
         let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
         try dependencies.writeWAV(audio, profileModel.sampleRate, tempWavURL)
         let canonicalAudioData = try Data(contentsOf: tempWavURL)
+        try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let storedProfile = try profileStore.createProfile(
@@ -264,6 +335,13 @@ actor WorkerRuntime {
     }
 
     private func residentModelOrThrow() throws -> AnySpeechModel {
+        if isShuttingDown {
+            throw WorkerError(
+                code: .workerShuttingDown,
+                message: "The resident model cannot be used because the SpeakSwiftly worker is shutting down."
+            )
+        }
+
         switch residentState {
         case .ready(let model):
             return model
@@ -290,6 +368,43 @@ actor WorkerRuntime {
         }
     }
 
+    private func finishActiveRequest(token: UUID, requestID: String, result: Result<WorkerSuccessPayload, WorkerError>) async {
+        guard activeRequest?.token == token else { return }
+
+        activeRequest = nil
+
+        switch result {
+        case .success(let payload):
+            await emitSuccess(
+                id: payload.id,
+                profileName: payload.profileName,
+                profilePath: payload.profilePath,
+                profiles: payload.profiles
+            )
+
+        case .failure(let error):
+            await logError(error.message)
+            await emitFailure(id: requestID, error: error)
+        }
+
+        guard !isShuttingDown else { return }
+        try? await startNextRequestIfPossible()
+    }
+
+    private func cancellationError(for id: String) -> WorkerError {
+        if isShuttingDown {
+            return WorkerError(
+                code: .requestCancelled,
+                message: "Request '\(id)' was cancelled because the SpeakSwiftly worker is shutting down."
+            )
+        }
+
+        return WorkerError(
+            code: .requestCancelled,
+            message: "Request '\(id)' was cancelled before it could complete."
+        )
+    }
+
     // MARK: - Emission
 
     private func makeQueuedEvent(for entry: QueueEntry) -> WorkerQueuedEvent? {
@@ -300,7 +415,7 @@ actor WorkerRuntime {
         case .failed:
             return nil
         case .ready:
-            guard activeRequestID != nil else { return nil }
+            guard activeRequest != nil else { return nil }
             reason = .waitingForActiveRequest
         }
 

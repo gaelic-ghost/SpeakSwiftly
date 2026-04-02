@@ -102,12 +102,12 @@ import Testing
     let failure = try jsonObject(
         WorkerFailureResponse(
             id: "req-1",
-            code: .profileNotFound,
+            code: .audioPlaybackTimeout,
             message: "Profile 'ghost' was not found in the SpeakSwiftly profile store."
         )
     )
     #expect(failure["ok"] as? Bool == false)
-    #expect(failure["code"] as? String == "profile_not_found")
+    #expect(failure["code"] as? String == "audio_playback_timeout")
 }
 
 // MARK: - Profile Store
@@ -522,7 +522,7 @@ import Testing
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
-    let playback = PlaybackSpy(drainGate: playbackDrain)
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
     let residentRecorder = ResidentModelRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -593,6 +593,211 @@ import Testing
     #expect(playback.stopCount == 1)
 }
 
+@Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let playback = PlaybackSpy(
+        behavior: .throw(
+            WorkerError(
+                code: .audioPlaybackTimeout,
+                message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within 5 seconds."
+            )
+        )
+    )
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "audio_playback_timeout"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["ok"] as? Bool == true
+        }
+    })
+}
+
+@Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "queued"
+        }
+    })
+
+    await runtime.shutdown()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(output.countJSONObjects {
+        $0["id"] as? String == "req-1"
+            && $0["ok"] as? Bool == false
+    } == 1)
+    #expect(playback.stopCount == 1)
+}
+
+@Test func shutdownRejectsNewRequests() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    await runtime.shutdown()
+    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "worker_shutting_down"
+        }
+    })
+}
+
+@Test func shutdownCancelsActiveProfileCreationBeforeProfileIsWritten() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            AnySpeechModel(
+                sampleRate: 24_000,
+                generate: { _, _, _, _, _ in
+                    try await Task.sleep(for: .seconds(30))
+                    return [0.1, 0.2, 0.3]
+                },
+                generateSamplesStream: { _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                }
+            )
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"Warm and bright"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "generating_profile_audio"
+        }
+    })
+
+    await runtime.shutdown()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-guide").path))
+}
+
 // MARK: - Helpers
 
 private extension NSLock {
@@ -645,6 +850,21 @@ private final class OutputRecorder: @unchecked Sendable {
         }
     }
 
+    func countJSONObjects(_ predicate: ([String: Any]) -> Bool) -> Int {
+        lock.withLock {
+            stdoutLines.reduce(into: 0) { count, line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                    predicate(object)
+                else {
+                    return
+                }
+
+                count += 1
+            }
+        }
+    }
+
     func startedEvents() -> [String] {
         lock.withLock {
             stdoutLines.compactMap { line in
@@ -683,13 +903,20 @@ private actor AsyncGate {
 }
 
 private final class PlaybackSpy: @unchecked Sendable {
+    enum Behavior: Sendable {
+        case immediate
+        case gate(AsyncGate)
+        case sleep(Duration)
+        case `throw`(WorkerError)
+    }
+
     private let lock = NSLock()
-    private let drainGate: AsyncGate?
+    private let behavior: Behavior
     private(set) var playCount = 0
     private(set) var stopCount = 0
 
-    init(drainGate: AsyncGate? = nil) {
-        self.drainGate = drainGate
+    init(behavior: Behavior = .immediate) {
+        self.behavior = behavior
     }
 
     func controller() -> AnyPlaybackController {
@@ -707,8 +934,15 @@ private final class PlaybackSpy: @unchecked Sendable {
                     }
                 }
 
-                if let drainGate {
+                switch behavior {
+                case .immediate:
+                    break
+                case .gate(let drainGate):
                     await drainGate.wait()
+                case .sleep(let duration):
+                    try await Task.sleep(for: duration)
+                case .throw(let error):
+                    throw error
                 }
             },
             stop: { [self] in
