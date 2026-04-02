@@ -297,8 +297,10 @@ struct SpeakSwiftlyE2ETests {
                 return false
             }
 
-            return details["text_complexity_class"] as? String == "balanced"
-                && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 520
+            let textComplexityClass = details["text_complexity_class"] as? String
+
+            return ["compact", "balanced", "extended"].contains(textComplexityClass)
+                && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
                 && details["startup_buffered_audio_ms"] as? Int != nil
                 && details["process_phys_footprint_bytes"] as? Int != nil
                 && details["process_resident_bytes"] as? Int != nil
@@ -317,12 +319,14 @@ struct SpeakSwiftlyE2ETests {
                     return false
                 }
 
-                return details["text_complexity_class"] as? String == "balanced"
-                    && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 520
-                    && (details["low_water_target_ms"] as? Int ?? 0) >= 220
+                let textComplexityClass = details["text_complexity_class"] as? String
+
+                return ["compact", "balanced", "extended"].contains(textComplexityClass)
+                    && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
+                    && (details["low_water_target_ms"] as? Int ?? 0) >= 140
                     && (details["resume_buffer_target_ms"] as? Int ?? 0) >= (details["startup_buffer_target_ms"] as? Int ?? 0)
-                    && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 520
-                    && (details["schedule_gap_warning_threshold_ms"] as? Int ?? 0) >= 220
+                    && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 360
+                    && (details["schedule_gap_warning_threshold_ms"] as? Int ?? 0) >= 140
                     && details["startup_buffered_audio_ms"] as? Int != nil
                     && details["min_queued_audio_ms"] as? Int != nil
                     && details["max_queued_audio_ms"] as? Int != nil

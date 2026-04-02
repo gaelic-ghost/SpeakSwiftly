@@ -6,19 +6,13 @@ import Testing
 @Test func adaptivePlaybackThresholdsSeedFromTextComplexityClasses() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(
-        text: "Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift and explain why optionals like user?.displayName matter."
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7)
     ).thresholds
     let extended = PlaybackThresholdController(
-        text: """
-        Please read this markdown block and path dump carefully.
-        ```swift
-        let greeting = user?.displayName ?? "friend"
-        let path = "/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift"
-        let fallback = settings["voice_profile"] ?? defaults["voice_profile"]
-        print(greeting, path, fallback)
-        ```
-        Also compare /tmp/speakswiftly-forensic-capture-run2/stderr.jsonl with ~/Library/Logs/speak-to-user-mcp/v0.3.1/stderr.log and spell out qqqwweerrtyy carefully.
-        """
+        text: String(
+            repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
+            count: 9
+        )
     ).thresholds
 
     #expect(compact.complexityClass == .compact)
@@ -28,6 +22,26 @@ import Testing
     #expect(balanced.startupBufferTargetMS < extended.startupBufferTargetMS)
     #expect(compact.resumeBufferTargetMS < balanced.resumeBufferTargetMS)
     #expect(balanced.resumeBufferTargetMS < extended.resumeBufferTargetMS)
+}
+
+@Test func adaptivePlaybackThresholdsIgnoreContentShapeWhenLengthsMatch() {
+    let plainText = String(repeating: "Please explain this clearly. ", count: 8)
+    let codeishSeed = """
+    /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift
+    user?.displayName ?? defaults["voice_profile"]
+    NSApplication.didFinishLaunchingNotification
+    """
+    let paddedCodeishText = codeishSeed + String(repeating: ".", count: max(0, plainText.count - codeishSeed.count))
+
+    let plain = PlaybackThresholdController(text: plainText).thresholds
+    let codeish = PlaybackThresholdController(text: paddedCodeishText).thresholds
+
+    #expect(plain.complexityClass == codeish.complexityClass)
+    #expect(plain.startupBufferTargetMS == codeish.startupBufferTargetMS)
+    #expect(plain.lowWaterTargetMS == codeish.lowWaterTargetMS)
+    #expect(plain.resumeBufferTargetMS == codeish.resumeBufferTargetMS)
+    #expect(plain.chunkGapWarningMS == codeish.chunkGapWarningMS)
+    #expect(plain.scheduleGapWarningMS == codeish.scheduleGapWarningMS)
 }
 
 @Test func adaptivePlaybackThresholdsRaiseTargetsForSlowCadenceAndStarvation() {

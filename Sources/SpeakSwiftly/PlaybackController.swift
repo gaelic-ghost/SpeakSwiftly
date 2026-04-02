@@ -431,20 +431,7 @@ struct PlaybackThresholdController: Sendable {
 
     private static func classify(text: String) -> PlaybackComplexityClass {
         let textLength = text.count
-        let newlineCount = text.filter(\.isNewline).count
-        let slashCount = text.filter { $0 == "/" || $0 == "\\" }.count
-        let punctuationCount = text.filter { "`{}[]()<>=:_?.#*$".contains($0) }.count
-        let digitCount = text.filter(\.isNumber).count
-        let uppercaseCount = text.filter(\.isUppercase).count
-
-        let complexityScore = textLength
-            + newlineCount * 30
-            + slashCount * 12
-            + punctuationCount * 8
-            + digitCount * 3
-            + uppercaseCount
-
-        return switch complexityScore {
+        return switch textLength {
         case ..<220:
             PlaybackComplexityClass.compact
         case ..<620:
