@@ -21,6 +21,7 @@
 - [x] Milestone 3: On-demand `1.7B` VoiceDesign path
 - [ ] Milestone 4: Integration hardening
 - [ ] Milestone 5: Contract and e2e hardening
+- [ ] Milestone 6: Multi-process profile-store hardening
 
 ## Milestone 0: Bootstrap
 
@@ -165,3 +166,26 @@ Exit criteria:
 - [x] Corrupt stored-profile manifests returned through `list_profiles` surface as `filesystem_error`.
 - [x] Opt-in serialized real-model e2e coverage exists for both the `1.7B` profile-creation path and the resident `0.6B` live path.
 - [ ] The fast test suite also covers `stderr` diagnostics and the remaining profile-conditioning edge assertions.
+
+## Milestone 6: Multi-process profile-store hardening
+
+Scope:
+
+- [ ] Make the on-disk profile store safe and predictable when multiple local processes use it at the same time.
+- [ ] Preserve the current simple shared store shape without adding unnecessary architecture around it.
+- [ ] Keep profile creation, listing, loading, and removal human-readable when cross-process contention or stale state appears.
+
+Tickets:
+
+- [ ] Add cross-process coordination for profile creation and removal so concurrent workers cannot partially stomp each other.
+- [ ] Keep profile writes atomic across manifest and reference-audio creation, including cleanup of abandoned temp data after failed writes.
+- [ ] Make profile listing and loading resilient to in-flight writes from another process without producing misleading corruption failures.
+- [ ] Add clear operator-facing diagnostics for lock contention, stale temp directories, and cross-process filesystem races.
+- [ ] Add automated coverage for concurrent create/load/remove access against the shared profile root.
+- [ ] Document the shared per-user default profile root and the override path for process-isolated profile stores.
+
+Exit criteria:
+
+- [ ] Two local processes can share the default profile store without silent corruption or partially written profiles.
+- [ ] Cross-process profile creation and removal failures are explicit, structured, and recoverable.
+- [ ] The shared-store behavior and override-based isolation path are documented clearly for downstream apps and services.
