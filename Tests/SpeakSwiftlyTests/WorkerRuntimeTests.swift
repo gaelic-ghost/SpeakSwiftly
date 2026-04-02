@@ -275,6 +275,63 @@ import Testing
     #expect(startedOps == ["req-1:create_profile", "req-3:speak_live", "req-2:remove_profile"])
 }
 
+@Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let profileGate = AsyncGate()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"brand-new","text":"Hello there","voice_description":"Warm and bright"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "create_profile"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-2","op":"speak_live","text":"Hi there","profile_name":"brand-new"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"list_profiles"}"#)
+
+    await profileGate.open()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "speak_live"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    let startedOps = output.startedEvents()
+    #expect(startedOps == ["req-1:create_profile", "req-2:speak_live", "req-3:list_profiles"])
+}
+
 @Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

@@ -21,7 +21,7 @@ actor WorkerRuntime {
 
     private struct ActiveRequest: Sendable {
         let token: UUID
-        let id: String
+        let request: WorkerRequest
         let task: Task<Void, Never>
     }
 
@@ -292,7 +292,7 @@ actor WorkerRuntime {
         if let activeRequest {
             self.activeRequest = nil
             activeRequest.task.cancel()
-            await emitFailure(id: activeRequest.id, error: cancellationError)
+            await emitFailure(id: activeRequest.request.id, error: cancellationError)
         }
 
         await failQueuedRequests(with: cancellationError)
@@ -331,7 +331,7 @@ actor WorkerRuntime {
         let task = Task {
             await self.process(entry.request, token: entry.token)
         }
-        activeRequest = ActiveRequest(token: entry.token, id: entry.request.id, task: task)
+        activeRequest = ActiveRequest(token: entry.token, request: entry.request, task: task)
     }
 
     private func process(_ request: WorkerRequest, token: UUID) async {
@@ -814,10 +814,42 @@ actor WorkerRuntime {
     }
 
     private func nextQueueIndex() -> Int? {
-        if let playbackIndex = queue.firstIndex(where: { $0.request.isPlayback }) {
-            return playbackIndex
+        let prioritizedIndices = queue.indices
+            .filter { queue[$0].request.isPlayback }
+            + queue.indices.filter { !queue[$0].request.isPlayback }
+
+        for index in prioritizedIndices where !isBlockedByProfileCreation(queue[index]) {
+            return index
         }
-        return queue.isEmpty ? nil : queue.startIndex
+
+        return nil
+    }
+
+    private func isBlockedByProfileCreation(_ entry: QueueEntry) -> Bool {
+        guard case .speakLive(_, _, let profileName) = entry.request else {
+            return false
+        }
+
+        if let activeRequest,
+           case .createProfile(_, let activeProfileName, _, _, _) = activeRequest.request,
+           activeProfileName == profileName
+        {
+            return true
+        }
+
+        for queuedEntry in queue {
+            if queuedEntry.token == entry.token {
+                break
+            }
+
+            if case .createProfile(_, let queuedProfileName, _, _, _) = queuedEntry.request,
+               queuedProfileName == profileName
+            {
+                return true
+            }
+        }
+
+        return false
     }
 
     private func failQueuedRequests(with error: WorkerError) async {
