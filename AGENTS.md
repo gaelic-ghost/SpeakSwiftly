@@ -88,6 +88,8 @@
 - Keep formatting consistent with `swift-format` conventions.
 - Keep linting clean against `swiftlint` with clear, maintainable rule intent.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
+- Never run multiple build toolchains, package managers, test runners, or heavy validation commands at the same time on Gale's machine. Commands such as `swift build`, `swift test`, `swift package`, and `xcodebuild` must be run strictly one at a time, with one process fully exited before another begins.
+- Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository. A second `swift build`, `swift test`, `swift package`, or `xcodebuild` invocation must never be started while another build or test invocation is still active.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`

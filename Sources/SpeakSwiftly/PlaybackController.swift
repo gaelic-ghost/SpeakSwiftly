@@ -69,9 +69,9 @@ struct PlaybackThresholdController: Sendable {
     private static let adaptationSampleCount = 6
     private static let warmupStableChunkRequirement = 6
     private static let recoveryStableChunkRequirement = 4
-    private static let maxStartupBufferTargetMS = 2_400
-    private static let maxResumeBufferTargetMS = 2_800
-    private static let maxLowWaterTargetMS = 1_600
+    private static let maxStartupBufferTargetMS = 20_000
+    private static let maxResumeBufferTargetMS = 24_000
+    private static let maxLowWaterTargetMS = 12_000
     private static let maxChunkGapWarningMS = 1_200
     private static let maxScheduleGapWarningMS = 900
 
@@ -336,11 +336,11 @@ struct PlaybackThresholdController: Sendable {
         case .extended:
             PlaybackAdaptiveThresholds(
                 complexityClass: .extended,
-                startupBufferTargetMS: 960,
-                lowWaterTargetMS: 480,
-                resumeBufferTargetMS: 1_120,
-                chunkGapWarningMS: 620,
-                scheduleGapWarningMS: 260
+                startupBufferTargetMS: 12_800,
+                lowWaterTargetMS: 4_800,
+                resumeBufferTargetMS: 16_000,
+                chunkGapWarningMS: 900,
+                scheduleGapWarningMS: 400
             )
         }
 
@@ -768,9 +768,15 @@ final class PlaybackController {
     }
 
     private enum PlaybackConfiguration {
-        static let drainTimeout: Duration = .seconds(5)
+        static let minimumDrainTimeout: Duration = .seconds(5)
+        static let drainTimeoutPaddingMS = 3_000
         static let lowQueueThresholdMS = 100
         static let channels: AVAudioChannelCount = 1
+
+        static func drainTimeout(forQueuedAudioMS queuedAudioMS: Int) -> Duration {
+            let paddedQueuedAudioMS = queuedAudioMS + drainTimeoutPaddingMS
+            return max(minimumDrainTimeout, .milliseconds(paddedQueuedAudioMS))
+        }
     }
 
     private var audioEngine: AVAudioEngine?
@@ -1261,6 +1267,7 @@ final class PlaybackController {
         if currentQueuedAudioMS == 0 {
             return
         }
+        let drainTimeout = PlaybackConfiguration.drainTimeout(forQueuedAudioMS: currentQueuedAudioMS)
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -1275,10 +1282,10 @@ final class PlaybackController {
                 }
             }
             group.addTask {
-                try await Task.sleep(for: PlaybackConfiguration.drainTimeout)
+                try await Task.sleep(for: drainTimeout)
                 throw WorkerError(
                     code: .audioPlaybackTimeout,
-                    message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(PlaybackConfiguration.drainTimeout.components.seconds) seconds."
+                    message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(drainTimeout.components.seconds) seconds."
                 )
             }
 

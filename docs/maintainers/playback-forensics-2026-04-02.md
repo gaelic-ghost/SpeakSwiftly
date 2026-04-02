@@ -217,3 +217,171 @@ Next buffering direction:
 - Explore text-side cadence stabilization for code-heavy or punctuation-heavy spans, since identifiers, paths, punctuation density, and oddly spelled words may still be producing uneven chunk timing even after the buffering improvements.
 - Revisit the worker's stdin-close cancellation behavior after the buffering path is in a better place, because it currently makes direct forensic capture more fragile than it should be.
 - Revisit chunk-boundary smoothing only after the buffering path is no longer the dominant source of audible defects.
+
+## 2026-04-02 long prose threshold tuning log
+
+Context:
+
+- Gale asked for the long sectioned conversational prose forensic to be tuned directly against audible playback until rebuffering was eliminated.
+- The tuning target in this pass was the direct worker capture path with trace enabled and the same long prose payload on every run.
+- Every set below records the actual values in code at the time of the run, the exact test path used, and the observed result.
+
+### Set A: pre-tuning baseline
+
+Code values:
+
+- `maxStartupBufferTargetMS: 2400`
+- `maxResumeBufferTargetMS: 2800`
+- `maxLowWaterTargetMS: 1600`
+- `.extended` seed:
+  - `startupBufferTargetMS: 960`
+  - `lowWaterTargetMS: 480`
+  - `resumeBufferTargetMS: 1120`
+  - `chunkGapWarningMS: 620`
+  - `scheduleGapWarningMS: 260`
+- fixed drain timeout:
+  - `5 seconds`
+
+Validation path:
+
+- direct audible worker capture
+- trace file:
+  - `/tmp/speakswiftly-prose-tune-1/stderr.jsonl`
+
+Observed result:
+
+- `playback_started` logged:
+  - `startup_buffer_target_ms: 1127`
+  - `startup_buffered_audio_ms: 1280`
+- `playback_finished` logged:
+  - `rebuffer_event_count: 11`
+  - `rebuffer_total_duration_ms: 12220`
+  - `starvation_event_count: 0`
+  - `avg_inter_chunk_gap_ms: 194`
+  - `avg_queued_audio_ms: 1300`
+  - `time_to_preroll_ready_ms: 2179`
+- conclusion:
+  - baseline long prose was still audibly skipping and still rebuffering too often
+
+### Set B: first aggressive seed attempt, stale worker binary
+
+Code values:
+
+- `maxStartupBufferTargetMS: 20000`
+- `maxResumeBufferTargetMS: 24000`
+- `maxLowWaterTargetMS: 12000`
+- `.extended` seed:
+  - `startupBufferTargetMS: 12800`
+  - `lowWaterTargetMS: 4800`
+  - `resumeBufferTargetMS: 16000`
+  - `chunkGapWarningMS: 900`
+  - `scheduleGapWarningMS: 400`
+- fixed drain timeout:
+  - `5 seconds`
+
+Validation path:
+
+- direct audible worker capture
+- trace file:
+  - `/tmp/speakswiftly-prose-tune-2/stderr.jsonl`
+
+Observed result:
+
+- the direct capture still logged roughly the old startup values:
+  - `startup_buffer_target_ms: 1118`
+  - `startup_buffered_audio_ms: 1120`
+- `playback_finished` logged:
+  - `rebuffer_event_count: 9`
+  - `rebuffer_total_duration_ms: 9704`
+- conclusion:
+  - this run did not actually exercise the new thresholds because the direct worker command was still pointing at a stale Xcode-built binary
+  - keep the numbers for provenance, but do not treat this run as a valid threshold result
+
+### Set C: aggressive seed on rebuilt worker, fixed drain timeout
+
+Code values:
+
+- `maxStartupBufferTargetMS: 20000`
+- `maxResumeBufferTargetMS: 24000`
+- `maxLowWaterTargetMS: 12000`
+- `.extended` seed:
+  - `startupBufferTargetMS: 12800`
+  - `lowWaterTargetMS: 4800`
+  - `resumeBufferTargetMS: 16000`
+  - `chunkGapWarningMS: 900`
+  - `scheduleGapWarningMS: 400`
+- fixed drain timeout:
+  - `5 seconds`
+
+Validation path:
+
+- rebuilt the Xcode worker with `xcodebuild`
+- direct audible worker capture
+- trace file:
+  - `/tmp/speakswiftly-prose-tune-3/stderr.jsonl`
+
+Observed result:
+
+- `playback_started` logged:
+  - `startup_buffer_target_ms: 12800`
+  - `startup_buffered_audio_ms: 12800`
+- there were:
+  - `0` `playback_rebuffer_started` events
+  - `0` `playback_rebuffer_resumed` events
+  - `0` starvation events
+  - `0` schedule-gap warnings
+- stdout ended with:
+  - `audio_playback_timeout`
+- stderr logged:
+  - `worker_error`
+  - `failure_code: "audio_playback_timeout"`
+- conclusion:
+  - the aggressive preroll and resume floors eliminated rebuffering for the long prose run
+  - the next bottleneck was drain completion, because the worker still used a fixed `5 second` post-generation drain timeout even though more than `12.8 seconds` of audio had been buffered ahead
+
+### Set D: aggressive seed plus dynamic drain timeout
+
+Code values:
+
+- `maxStartupBufferTargetMS: 20000`
+- `maxResumeBufferTargetMS: 24000`
+- `maxLowWaterTargetMS: 12000`
+- `.extended` seed:
+  - `startupBufferTargetMS: 12800`
+  - `lowWaterTargetMS: 4800`
+  - `resumeBufferTargetMS: 16000`
+  - `chunkGapWarningMS: 900`
+  - `scheduleGapWarningMS: 400`
+- dynamic drain timeout:
+  - minimum `5 seconds`
+  - actual timeout = `queued audio at drain start + 3000 ms`
+
+Validation path:
+
+- rebuilt the Xcode worker with `xcodebuild`
+- direct audible worker capture
+- trace file:
+  - `/tmp/speakswiftly-prose-tune-4/stderr.jsonl`
+
+Observed result:
+
+- `playback_started` logged:
+  - `startup_buffer_target_ms: 12800`
+  - `startup_buffered_audio_ms: 12800`
+- `playback_finished` logged:
+  - `rebuffer_event_count: 0`
+  - `rebuffer_total_duration_ms: 0`
+  - `starvation_event_count: 0`
+  - `avg_inter_chunk_gap_ms: 189`
+  - `avg_queued_audio_ms: 8734`
+  - `max_queued_audio_ms: 12960`
+  - `low_water_target_ms: 4800`
+  - `resume_buffer_target_ms: 16000`
+  - `time_to_preroll_ready_ms: 16715`
+  - `time_from_preroll_ready_to_drain_ms: 57146`
+- stdout ended with:
+  - `playback_finished`
+  - final `ok: true`
+- conclusion:
+  - this set met the pass target for the long prose forensic: no rebuffering and clean playback completion
+  - the tradeoff is much higher startup latency, which is now explicit and traceable
