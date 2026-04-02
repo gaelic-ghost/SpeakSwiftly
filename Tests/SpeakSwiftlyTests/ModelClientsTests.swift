@@ -109,6 +109,48 @@ import Testing
     #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
 }
 
+@Test func adaptivePlaybackThresholdsLeaveWarmupAfterStableChunkCadence() {
+    var controller = PlaybackThresholdController(
+        text: """
+        Please read this code-heavy diagnostic trace.
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        let greeting = user?.displayName ?? "friend"
+        """
+    )
+
+    #expect(controller.phase == .warmup)
+
+    for _ in 0..<12 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 182)
+    }
+
+    #expect(controller.phase == .steady)
+}
+
+@Test func adaptivePlaybackThresholdsEnterRecoveryAfterRebufferAndReturnToSteadyAfterStableChunks() {
+    var controller = PlaybackThresholdController(
+        text: """
+        Please read this code-heavy diagnostic trace.
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        let greeting = user?.displayName ?? "friend"
+        """
+    )
+
+    for _ in 0..<12 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 182)
+    }
+    #expect(controller.phase == .steady)
+
+    controller.recordRebuffer()
+    #expect(controller.phase == .recovery)
+
+    for _ in 0..<8 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 184)
+    }
+
+    #expect(controller.phase == .steady)
+}
+
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()

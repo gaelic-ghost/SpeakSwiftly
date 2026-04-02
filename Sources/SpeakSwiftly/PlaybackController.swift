@@ -58,9 +58,17 @@ struct PlaybackAdaptiveThresholds: Sendable, Equatable {
     let scheduleGapWarningMS: Int
 }
 
+enum PlaybackPhase: String, Sendable {
+    case warmup
+    case steady
+    case recovery
+}
+
 struct PlaybackThresholdController: Sendable {
     private static let codecTokenRateHz = 12.5
     private static let adaptationSampleCount = 6
+    private static let warmupStableChunkRequirement = 6
+    private static let recoveryStableChunkRequirement = 4
     private static let maxStartupBufferTargetMS = 2_400
     private static let maxResumeBufferTargetMS = 2_800
     private static let maxLowWaterTargetMS = 1_600
@@ -68,10 +76,12 @@ struct PlaybackThresholdController: Sendable {
     private static let maxScheduleGapWarningMS = 900
 
     private(set) var thresholds: PlaybackAdaptiveThresholds
+    private(set) var phase: PlaybackPhase = .warmup
     private var chunkDurationsMS = [Int]()
     private var interChunkGapsMS = [Int]()
     private var rebufferCount = 0
     private var starvationCount = 0
+    private var stableChunkStreak = 0
     private var startupBufferFloorMS: Int
     private var lowWaterFloorMS: Int
     private var resumeBufferFloorMS: Int
@@ -109,11 +119,20 @@ struct PlaybackThresholdController: Sendable {
 
         let maxInterChunkGapMS = interChunkGapsMS.max() ?? avgInterChunkGapMS
         let jitterMS = max(maxInterChunkGapMS - avgInterChunkGapMS, 0)
+        updatePhase(
+            latestInterChunkGapMS: interChunkGapMS,
+            avgChunkDurationMS: avgChunkDurationMS,
+            avgInterChunkGapMS: avgInterChunkGapMS,
+            jitterMS: jitterMS
+        )
+
         let cadenceDeficitMS = max(avgInterChunkGapMS - avgChunkDurationMS, 0)
+        let seeded = Self.seededThresholds(for: thresholds.complexityClass, phase: phase)
         let startupBufferTargetMS = min(
             Self.maxStartupBufferTargetMS,
             max(
                 startupBufferFloorMS,
+                seeded.startupBufferTargetMS,
                 Int((Double(avgInterChunkGapMS) * 2.2).rounded()) + avgChunkDurationMS + jitterMS + cadenceDeficitMS * 4
             )
         )
@@ -121,6 +140,7 @@ struct PlaybackThresholdController: Sendable {
             Self.maxLowWaterTargetMS,
             max(
                 lowWaterFloorMS,
+                seeded.lowWaterTargetMS,
                 avgInterChunkGapMS + max(jitterMS, avgChunkDurationMS / 2) + cadenceDeficitMS * 2
             )
         )
@@ -128,20 +148,21 @@ struct PlaybackThresholdController: Sendable {
             Self.maxResumeBufferTargetMS,
             max(
                 resumeBufferFloorMS,
+                seeded.resumeBufferTargetMS,
                 startupBufferTargetMS,
                 lowWaterTargetMS + max(avgChunkDurationMS * 2, avgInterChunkGapMS) + cadenceDeficitMS * 4
             )
         )
         let chunkGapWarningMS = min(
             Self.maxChunkGapWarningMS,
-            max(chunkGapWarningFloorMS, avgInterChunkGapMS + avgChunkDurationMS)
+            max(chunkGapWarningFloorMS, seeded.chunkGapWarningMS, avgInterChunkGapMS + avgChunkDurationMS)
         )
         let scheduleGapWarningMS = min(
             Self.maxScheduleGapWarningMS,
-            max(scheduleGapWarningFloorMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8))
+            max(scheduleGapWarningFloorMS, seeded.scheduleGapWarningMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8))
         )
 
-        applyFloors(
+        applyThresholds(
             PlaybackAdaptiveThresholds(
                 complexityClass: thresholds.complexityClass,
                 startupBufferTargetMS: startupBufferTargetMS,
@@ -149,12 +170,15 @@ struct PlaybackThresholdController: Sendable {
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: chunkGapWarningMS,
                 scheduleGapWarningMS: scheduleGapWarningMS
-            )
+            ),
+            preserveFloors: false
         )
     }
 
     mutating func recordStarvation() {
         starvationCount += 1
+        phase = .recovery
+        stableChunkStreak = 0
 
         let avgChunkDurationMS = average(chunkDurationsMS) ?? Self.defaultChunkDurationMS
         let avgInterChunkGapMS = average(interChunkGapsMS) ?? max(avgChunkDurationMS, Self.defaultChunkDurationMS)
@@ -178,7 +202,7 @@ struct PlaybackThresholdController: Sendable {
             max(thresholds.startupBufferTargetMS, resumeBufferTargetMS)
         )
 
-        applyFloors(
+        applyThresholds(
             PlaybackAdaptiveThresholds(
                 complexityClass: thresholds.complexityClass,
                 startupBufferTargetMS: startupBufferTargetMS,
@@ -186,12 +210,17 @@ struct PlaybackThresholdController: Sendable {
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: thresholds.chunkGapWarningMS,
                 scheduleGapWarningMS: thresholds.scheduleGapWarningMS
-            )
+            ),
+            preserveFloors: true
         )
     }
 
     mutating func recordRebuffer() {
         rebufferCount += 1
+        if phase == .steady {
+            phase = .recovery
+        }
+        stableChunkStreak = 0
 
         guard rebufferCount >= 2 else { return }
 
@@ -244,7 +273,7 @@ struct PlaybackThresholdController: Sendable {
             )
         )
 
-        applyFloors(
+        applyThresholds(
             PlaybackAdaptiveThresholds(
                 complexityClass: thresholds.complexityClass,
                 startupBufferTargetMS: startupBufferTargetMS,
@@ -252,16 +281,20 @@ struct PlaybackThresholdController: Sendable {
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: chunkGapWarningMS,
                 scheduleGapWarningMS: scheduleGapWarningMS
-            )
+            ),
+            preserveFloors: true
         )
     }
 
-    private mutating func applyFloors(_ thresholds: PlaybackAdaptiveThresholds) {
-        startupBufferFloorMS = max(startupBufferFloorMS, thresholds.startupBufferTargetMS)
-        lowWaterFloorMS = max(lowWaterFloorMS, thresholds.lowWaterTargetMS)
-        resumeBufferFloorMS = max(resumeBufferFloorMS, thresholds.resumeBufferTargetMS)
-        chunkGapWarningFloorMS = max(chunkGapWarningFloorMS, thresholds.chunkGapWarningMS)
-        scheduleGapWarningFloorMS = max(scheduleGapWarningFloorMS, thresholds.scheduleGapWarningMS)
+    private mutating func applyThresholds(_ thresholds: PlaybackAdaptiveThresholds, preserveFloors: Bool) {
+        if preserveFloors {
+            startupBufferFloorMS = max(startupBufferFloorMS, thresholds.startupBufferTargetMS)
+            lowWaterFloorMS = max(lowWaterFloorMS, thresholds.lowWaterTargetMS)
+            resumeBufferFloorMS = max(resumeBufferFloorMS, thresholds.resumeBufferTargetMS)
+            chunkGapWarningFloorMS = max(chunkGapWarningFloorMS, thresholds.chunkGapWarningMS)
+            scheduleGapWarningFloorMS = max(scheduleGapWarningFloorMS, thresholds.scheduleGapWarningMS)
+        }
+
         self.thresholds = PlaybackAdaptiveThresholds(
             complexityClass: thresholds.complexityClass,
             startupBufferTargetMS: max(thresholds.startupBufferTargetMS, startupBufferFloorMS),
@@ -277,11 +310,11 @@ struct PlaybackThresholdController: Sendable {
     }
 
     private static func seedThresholds(for text: String) -> PlaybackAdaptiveThresholds {
-        seededThresholds(for: classify(text: text))
+        seededThresholds(for: classify(text: text), phase: .steady)
     }
 
-    private static func seededThresholds(for complexityClass: PlaybackComplexityClass) -> PlaybackAdaptiveThresholds {
-        switch complexityClass {
+    private static func seededThresholds(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> PlaybackAdaptiveThresholds {
+        let base = switch complexityClass {
         case .compact:
             PlaybackAdaptiveThresholds(
                 complexityClass: .compact,
@@ -310,6 +343,90 @@ struct PlaybackThresholdController: Sendable {
                 scheduleGapWarningMS: 260
             )
         }
+
+        let phaseBias = phaseThresholdBias(for: complexityClass, phase: phase)
+        return PlaybackAdaptiveThresholds(
+            complexityClass: base.complexityClass,
+            startupBufferTargetMS: min(Self.maxStartupBufferTargetMS, base.startupBufferTargetMS + phaseBias.startupBufferMS),
+            lowWaterTargetMS: min(Self.maxLowWaterTargetMS, base.lowWaterTargetMS + phaseBias.lowWaterMS),
+            resumeBufferTargetMS: min(Self.maxResumeBufferTargetMS, base.resumeBufferTargetMS + phaseBias.resumeBufferMS),
+            chunkGapWarningMS: min(Self.maxChunkGapWarningMS, base.chunkGapWarningMS + phaseBias.chunkGapWarningMS),
+            scheduleGapWarningMS: min(Self.maxScheduleGapWarningMS, base.scheduleGapWarningMS + phaseBias.scheduleGapWarningMS)
+        )
+    }
+
+    private static func phaseThresholdBias(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> (
+        startupBufferMS: Int,
+        lowWaterMS: Int,
+        resumeBufferMS: Int,
+        chunkGapWarningMS: Int,
+        scheduleGapWarningMS: Int
+    ) {
+        switch (complexityClass, phase) {
+        case (_, .steady):
+            (0, 0, 0, 0, 0)
+        case (.compact, .warmup):
+            (120, 80, 180, 40, 20)
+        case (.balanced, .warmup):
+            (200, 120, 280, 50, 30)
+        case (.extended, .warmup):
+            (320, 200, 480, 60, 40)
+        case (.compact, .recovery):
+            (80, 60, 140, 30, 20)
+        case (.balanced, .recovery):
+            (140, 100, 220, 40, 30)
+        case (.extended, .recovery):
+            (220, 160, 360, 50, 40)
+        }
+    }
+
+    private mutating func updatePhase(
+        latestInterChunkGapMS: Int?,
+        avgChunkDurationMS: Int,
+        avgInterChunkGapMS: Int,
+        jitterMS: Int
+    ) {
+        guard let latestInterChunkGapMS else { return }
+
+        if isStableChunk(
+            latestInterChunkGapMS: latestInterChunkGapMS,
+            avgChunkDurationMS: avgChunkDurationMS,
+            avgInterChunkGapMS: avgInterChunkGapMS,
+            jitterMS: jitterMS
+        ) {
+            stableChunkStreak += 1
+        } else {
+            stableChunkStreak = 0
+        }
+
+        let requiredStableChunkCount = switch phase {
+        case .warmup:
+            Self.warmupStableChunkRequirement
+        case .recovery:
+            Self.recoveryStableChunkRequirement
+        case .steady:
+            Int.max
+        }
+
+        guard phase != .steady else { return }
+        guard interChunkGapsMS.count >= Self.adaptationSampleCount else { return }
+        guard stableChunkStreak >= requiredStableChunkCount else { return }
+
+        phase = .steady
+        stableChunkStreak = 0
+    }
+
+    private func isStableChunk(
+        latestInterChunkGapMS: Int,
+        avgChunkDurationMS: Int,
+        avgInterChunkGapMS: Int,
+        jitterMS: Int
+    ) -> Bool {
+        let allowedJitterMS = max(avgChunkDurationMS / 2, 40)
+        guard jitterMS <= allowedJitterMS else { return false }
+
+        let allowedGapMS = avgInterChunkGapMS + max(jitterMS, avgChunkDurationMS / 4, 20)
+        return latestInterChunkGapMS <= allowedGapMS
     }
 
     private static func classify(text: String) -> PlaybackComplexityClass {
