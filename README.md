@@ -45,7 +45,11 @@ The executable intentionally leans on the existing `mlx-audio-swift` API surface
 For real MLX-backed runs, use `xcodebuild` instead of relying on the SwiftPM command-line executable. Upstream `mlx-swift` is explicit that command-line SwiftPM does not build the Metal shader bundle, while `xcodebuild` does, and command-line tools need that bundle visible at runtime.
 
 ```bash
-xcodebuild build -scheme SpeakSwiftly -destination 'platform=macOS'
+xcodebuild build \
+  -scheme SpeakSwiftly \
+  -destination 'platform=macOS' \
+  -derivedDataPath "$PWD/.derived" \
+  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
 ```
 
 ## Usage
@@ -53,6 +57,12 @@ xcodebuild build -scheme SpeakSwiftly -destination 'platform=macOS'
 Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, build with `xcodebuild` and run the product from the Xcode build directory with `DYLD_FRAMEWORK_PATH` pointing at that same products directory.
 
 ```bash
+xcodebuild build \
+  -scheme SpeakSwiftly \
+  -destination 'platform=macOS' \
+  -derivedDataPath "$PWD/.derived" \
+  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
+
 DYLD_FRAMEWORK_PATH="$PWD/.derived/Build/Products/Debug" \
   "$PWD/.derived/Build/Products/Debug/SpeakSwiftly"
 ```
@@ -146,7 +156,7 @@ Real MLX-backed validation should use an Xcode-built worker product. A reproduci
 xcodebuild build \
   -scheme SpeakSwiftly \
   -destination 'platform=macOS' \
-  -derivedDataPath /tmp/SpeakSwiftly-xcodebuild-dd \
+  -derivedDataPath "$PWD/.derived" \
   -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
 ```
 
