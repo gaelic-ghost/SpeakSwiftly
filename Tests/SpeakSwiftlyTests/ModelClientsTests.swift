@@ -44,7 +44,7 @@ import Testing
     #expect(adapted.startupBufferTargetMS > seeded.startupBufferTargetMS)
     #expect(adapted.lowWaterTargetMS > seeded.lowWaterTargetMS)
     #expect(adapted.resumeBufferTargetMS > seeded.resumeBufferTargetMS)
-    #expect(starved.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(starved.resumeBufferTargetMS >= adapted.resumeBufferTargetMS)
     #expect(starved.startupBufferTargetMS >= starved.resumeBufferTargetMS)
     #expect(starved.lowWaterTargetMS >= adapted.lowWaterTargetMS)
 }
@@ -77,6 +77,36 @@ import Testing
     #expect(afterSecondRebuffer.chunkGapWarningMS >= adapted.chunkGapWarningMS)
     #expect(afterSecondRebuffer.scheduleGapWarningMS >= adapted.scheduleGapWarningMS)
     #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
+}
+
+@Test func adaptivePlaybackThresholdsKeepEscalatedRebufferTargetsAcrossLaterChunks() {
+    var controller = PlaybackThresholdController(
+        text: """
+        Please read this code-heavy diagnostic trace.
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        let greeting = user?.displayName ?? "friend"
+        """
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    controller.recordRebuffer()
+    controller.recordRebuffer()
+    let escalated = controller.thresholds
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 182)
+    }
+
+    let afterMoreChunks = controller.thresholds
+
+    #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
+    #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
+    #expect(afterMoreChunks.chunkGapWarningMS >= escalated.chunkGapWarningMS)
+    #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
 }
 
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {

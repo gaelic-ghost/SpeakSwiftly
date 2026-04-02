@@ -72,9 +72,19 @@ struct PlaybackThresholdController: Sendable {
     private var interChunkGapsMS = [Int]()
     private var rebufferCount = 0
     private var starvationCount = 0
+    private var startupBufferFloorMS: Int
+    private var lowWaterFloorMS: Int
+    private var resumeBufferFloorMS: Int
+    private var chunkGapWarningFloorMS: Int
+    private var scheduleGapWarningFloorMS: Int
 
     init(text: String) {
         thresholds = Self.seedThresholds(for: text)
+        startupBufferFloorMS = thresholds.startupBufferTargetMS
+        lowWaterFloorMS = thresholds.lowWaterTargetMS
+        resumeBufferFloorMS = thresholds.resumeBufferTargetMS
+        chunkGapWarningFloorMS = thresholds.chunkGapWarningMS
+        scheduleGapWarningFloorMS = thresholds.scheduleGapWarningMS
     }
 
     mutating func recordChunk(durationMS: Int, interChunkGapMS: Int?) {
@@ -99,45 +109,47 @@ struct PlaybackThresholdController: Sendable {
 
         let maxInterChunkGapMS = interChunkGapsMS.max() ?? avgInterChunkGapMS
         let jitterMS = max(maxInterChunkGapMS - avgInterChunkGapMS, 0)
-        let seeded = Self.seededThresholds(for: thresholds.complexityClass)
-
+        let cadenceDeficitMS = max(avgInterChunkGapMS - avgChunkDurationMS, 0)
         let startupBufferTargetMS = min(
             Self.maxStartupBufferTargetMS,
             max(
-                seeded.startupBufferTargetMS,
-                Int((Double(avgInterChunkGapMS) * 2.2).rounded()) + avgChunkDurationMS + jitterMS
+                startupBufferFloorMS,
+                Int((Double(avgInterChunkGapMS) * 2.2).rounded()) + avgChunkDurationMS + jitterMS + cadenceDeficitMS * 4
             )
         )
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
             max(
-                seeded.lowWaterTargetMS,
-                avgInterChunkGapMS + max(jitterMS, avgChunkDurationMS / 2)
+                lowWaterFloorMS,
+                avgInterChunkGapMS + max(jitterMS, avgChunkDurationMS / 2) + cadenceDeficitMS * 2
             )
         )
         let resumeBufferTargetMS = min(
             Self.maxResumeBufferTargetMS,
             max(
+                resumeBufferFloorMS,
                 startupBufferTargetMS,
-                lowWaterTargetMS + max(avgChunkDurationMS * 2, avgInterChunkGapMS)
+                lowWaterTargetMS + max(avgChunkDurationMS * 2, avgInterChunkGapMS) + cadenceDeficitMS * 4
             )
         )
         let chunkGapWarningMS = min(
             Self.maxChunkGapWarningMS,
-            max(seeded.chunkGapWarningMS, avgInterChunkGapMS + avgChunkDurationMS)
+            max(chunkGapWarningFloorMS, avgInterChunkGapMS + avgChunkDurationMS)
         )
         let scheduleGapWarningMS = min(
             Self.maxScheduleGapWarningMS,
-            max(seeded.scheduleGapWarningMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8))
+            max(scheduleGapWarningFloorMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8))
         )
 
-        thresholds = PlaybackAdaptiveThresholds(
-            complexityClass: thresholds.complexityClass,
-            startupBufferTargetMS: startupBufferTargetMS,
-            lowWaterTargetMS: lowWaterTargetMS,
-            resumeBufferTargetMS: resumeBufferTargetMS,
-            chunkGapWarningMS: chunkGapWarningMS,
-            scheduleGapWarningMS: scheduleGapWarningMS
+        applyFloors(
+            PlaybackAdaptiveThresholds(
+                complexityClass: thresholds.complexityClass,
+                startupBufferTargetMS: startupBufferTargetMS,
+                lowWaterTargetMS: lowWaterTargetMS,
+                resumeBufferTargetMS: resumeBufferTargetMS,
+                chunkGapWarningMS: chunkGapWarningMS,
+                scheduleGapWarningMS: scheduleGapWarningMS
+            )
         )
     }
 
@@ -166,13 +178,15 @@ struct PlaybackThresholdController: Sendable {
             max(thresholds.startupBufferTargetMS, resumeBufferTargetMS)
         )
 
-        thresholds = PlaybackAdaptiveThresholds(
-            complexityClass: thresholds.complexityClass,
-            startupBufferTargetMS: startupBufferTargetMS,
-            lowWaterTargetMS: lowWaterTargetMS,
-            resumeBufferTargetMS: resumeBufferTargetMS,
-            chunkGapWarningMS: thresholds.chunkGapWarningMS,
-            scheduleGapWarningMS: thresholds.scheduleGapWarningMS
+        applyFloors(
+            PlaybackAdaptiveThresholds(
+                complexityClass: thresholds.complexityClass,
+                startupBufferTargetMS: startupBufferTargetMS,
+                lowWaterTargetMS: lowWaterTargetMS,
+                resumeBufferTargetMS: resumeBufferTargetMS,
+                chunkGapWarningMS: thresholds.chunkGapWarningMS,
+                scheduleGapWarningMS: thresholds.scheduleGapWarningMS
+            )
         )
     }
 
@@ -185,38 +199,39 @@ struct PlaybackThresholdController: Sendable {
         let avgInterChunkGapMS = average(interChunkGapsMS) ?? max(avgChunkDurationMS, Self.defaultChunkDurationMS)
         let maxInterChunkGapMS = interChunkGapsMS.max() ?? avgInterChunkGapMS
         let jitterMS = max(maxInterChunkGapMS - avgInterChunkGapMS, 0)
-        let seeded = Self.seededThresholds(for: thresholds.complexityClass)
+        let cadenceDeficitMS = max(avgInterChunkGapMS - avgChunkDurationMS, 0)
         let rebufferPenaltyMS = max(avgChunkDurationMS / 2, 40) * (rebufferCount - 1)
 
         let startupBufferTargetMS = min(
             Self.maxStartupBufferTargetMS,
             max(
                 thresholds.startupBufferTargetMS,
-                seeded.startupBufferTargetMS,
-                avgInterChunkGapMS * 2 + avgChunkDurationMS + jitterMS + rebufferPenaltyMS
+                startupBufferFloorMS,
+                avgInterChunkGapMS * 2 + avgChunkDurationMS + jitterMS + cadenceDeficitMS * 4 + rebufferPenaltyMS
             )
         )
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
             max(
                 thresholds.lowWaterTargetMS,
-                seeded.lowWaterTargetMS,
-                avgInterChunkGapMS + jitterMS + max(avgChunkDurationMS / 2, 20) + rebufferPenaltyMS
+                lowWaterFloorMS,
+                avgInterChunkGapMS + jitterMS + max(avgChunkDurationMS / 2, 20) + cadenceDeficitMS * 2 + rebufferPenaltyMS
             )
         )
         let resumeBufferTargetMS = min(
             Self.maxResumeBufferTargetMS,
             max(
                 thresholds.resumeBufferTargetMS,
+                resumeBufferFloorMS,
                 startupBufferTargetMS,
-                lowWaterTargetMS + max(avgChunkDurationMS * 2, avgInterChunkGapMS) + rebufferPenaltyMS
+                lowWaterTargetMS + max(avgChunkDurationMS * 2, avgInterChunkGapMS) + cadenceDeficitMS * 4 + rebufferPenaltyMS
             )
         )
         let chunkGapWarningMS = min(
             Self.maxChunkGapWarningMS,
             max(
                 thresholds.chunkGapWarningMS,
-                seeded.chunkGapWarningMS,
+                chunkGapWarningFloorMS,
                 avgInterChunkGapMS + avgChunkDurationMS + rebufferPenaltyMS
             )
         )
@@ -224,18 +239,36 @@ struct PlaybackThresholdController: Sendable {
             Self.maxScheduleGapWarningMS,
             max(
                 thresholds.scheduleGapWarningMS,
-                seeded.scheduleGapWarningMS,
+                scheduleGapWarningFloorMS,
                 avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8) + max(rebufferPenaltyMS / 2, 12)
             )
         )
 
-        thresholds = PlaybackAdaptiveThresholds(
+        applyFloors(
+            PlaybackAdaptiveThresholds(
+                complexityClass: thresholds.complexityClass,
+                startupBufferTargetMS: startupBufferTargetMS,
+                lowWaterTargetMS: lowWaterTargetMS,
+                resumeBufferTargetMS: resumeBufferTargetMS,
+                chunkGapWarningMS: chunkGapWarningMS,
+                scheduleGapWarningMS: scheduleGapWarningMS
+            )
+        )
+    }
+
+    private mutating func applyFloors(_ thresholds: PlaybackAdaptiveThresholds) {
+        startupBufferFloorMS = max(startupBufferFloorMS, thresholds.startupBufferTargetMS)
+        lowWaterFloorMS = max(lowWaterFloorMS, thresholds.lowWaterTargetMS)
+        resumeBufferFloorMS = max(resumeBufferFloorMS, thresholds.resumeBufferTargetMS)
+        chunkGapWarningFloorMS = max(chunkGapWarningFloorMS, thresholds.chunkGapWarningMS)
+        scheduleGapWarningFloorMS = max(scheduleGapWarningFloorMS, thresholds.scheduleGapWarningMS)
+        self.thresholds = PlaybackAdaptiveThresholds(
             complexityClass: thresholds.complexityClass,
-            startupBufferTargetMS: startupBufferTargetMS,
-            lowWaterTargetMS: lowWaterTargetMS,
-            resumeBufferTargetMS: resumeBufferTargetMS,
-            chunkGapWarningMS: chunkGapWarningMS,
-            scheduleGapWarningMS: scheduleGapWarningMS
+            startupBufferTargetMS: max(thresholds.startupBufferTargetMS, startupBufferFloorMS),
+            lowWaterTargetMS: max(thresholds.lowWaterTargetMS, lowWaterFloorMS),
+            resumeBufferTargetMS: max(thresholds.resumeBufferTargetMS, resumeBufferFloorMS),
+            chunkGapWarningMS: max(thresholds.chunkGapWarningMS, chunkGapWarningFloorMS),
+            scheduleGapWarningMS: max(thresholds.scheduleGapWarningMS, scheduleGapWarningFloorMS)
         )
     }
 
@@ -270,9 +303,9 @@ struct PlaybackThresholdController: Sendable {
         case .extended:
             PlaybackAdaptiveThresholds(
                 complexityClass: .extended,
-                startupBufferTargetMS: 720,
-                lowWaterTargetMS: 320,
-                resumeBufferTargetMS: 720,
+                startupBufferTargetMS: 960,
+                lowWaterTargetMS: 480,
+                resumeBufferTargetMS: 1_120,
                 chunkGapWarningMS: 620,
                 scheduleGapWarningMS: 260
             )
