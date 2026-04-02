@@ -4,6 +4,10 @@ import Testing
 
 @Suite(.serialized)
 struct SpeakSwiftlyE2ETests {
+    private static let testingProfileName = "testing-profile"
+    private static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
+    private static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
+
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
 
@@ -24,7 +28,7 @@ struct SpeakSwiftlyE2ETests {
         let exportURL = sandbox.rootURL.appendingPathComponent("exports/profile.wav")
         try worker.sendJSON(
             """
-            {"id":"req-create","op":"create_profile","profile_name":"e2e-voice","text":"Hello there from SpeakSwiftly end-to-end coverage.","voice_description":"A warm, bright, feminine narrator voice.","output_path":"\(exportURL.path)"}
+            {"id":"req-create","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)","output_path":"\(exportURL.path)"}
             """
         )
 
@@ -46,13 +50,13 @@ struct SpeakSwiftlyE2ETests {
             }
         )
 
-        #expect(success["profile_name"] as? String == "e2e-voice")
-        #expect(success["profile_path"] as? String == sandbox.profileRootURL.appendingPathComponent("e2e-voice").path)
+        #expect(success["profile_name"] as? String == Self.testingProfileName)
+        #expect(success["profile_path"] as? String == sandbox.profileRootURL.appendingPathComponent(Self.testingProfileName).path)
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
-        let storedProfile = try store.loadProfile(named: "e2e-voice")
-        #expect(storedProfile.manifest.sourceText == "Hello there from SpeakSwiftly end-to-end coverage.")
-        #expect(storedProfile.manifest.voiceDescription == "A warm, bright, feminine narrator voice.")
+        let storedProfile = try store.loadProfile(named: Self.testingProfileName)
+        #expect(storedProfile.manifest.sourceText == Self.testingProfileText)
+        #expect(storedProfile.manifest.voiceDescription == Self.testingProfileVoiceDescription)
         #expect(FileManager.default.fileExists(atPath: storedProfile.referenceAudioURL.path))
         #expect(FileManager.default.fileExists(atPath: exportURL.path))
 
@@ -79,7 +83,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-create","op":"create_profile","profile_name":"e2e-live","text":"This is the stored transcript for the live playback path.","voice_description":"A calm, warm, feminine narrator voice."}
+            {"id":"req-create","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
             """
         )
 
@@ -90,7 +94,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live","op":"speak_live","text":"Hello from the real zero point six billion resident model path.","profile_name":"e2e-live"}
+            {"id":"req-live","op":"speak_live","text":"Hello from the real zero point six billion resident model path.","profile_name":"\(Self.testingProfileName)"}
             """
         )
 

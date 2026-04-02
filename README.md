@@ -139,6 +139,8 @@ Opt-in real-model e2e coverage is available for the resident `0.6B` and on-deman
 SPEAKSWIFTLY_E2E=1 swift test
 ```
 
+The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each test still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
