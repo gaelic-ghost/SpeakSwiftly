@@ -341,6 +341,11 @@ Observed result:
 
 ### Set D: aggressive seed plus dynamic drain timeout
 
+Important note:
+
+- Treat this section as historical playback tuning context, not operator guidance to solve user-facing failures by extending client or MCP timeout budgets.
+- If a local MCP consumer times out, the preferred fix is to improve normalization, generation stability, buffering, or drain behavior in the worker path instead of papering over the issue by increasing the caller timeout.
+
 Code values:
 
 - `maxStartupBufferTargetMS: 20000`

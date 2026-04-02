@@ -2,565 +2,221 @@
 
 ## Purpose
 
-This note explains the current `SpeechTextNormalizer` flow in [SpeechTextNormalizer.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift), what each detector and normalization pass does today, where the current implementation is weak, and what follow-up options exist.
+This note describes the current `SpeechTextNormalizer` implementation in [SpeechTextNormalizer.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift) after the functional cleanup pass. The goal of the normalizer is to take text that often makes the local model spiral into bad generations, parse it into recognizable problem shapes, and rewrite only those shapes into more speakable text.
 
-## End-to-end flow
+## Current shape
 
-The current entry point is `SpeechTextNormalizer.normalize(_:)`.
+The normalizer is now one path in and one path out:
 
-The flow is:
+1. `normalize(_:)` canonicalizes line endings and tabs.
+2. It runs a fixed ordered pipeline of pure transformation passes.
+3. It collapses whitespace once at the end and falls back to the original input only if the final result is empty.
 
-1. Normalize line endings and tabs first.
-2. Ask `containsCorrectableText(_:)` whether the text looks like it needs any intervention.
-3. If the answer is yes, run the normalization passes in this exact order:
-   - `normalizeFencedCodeBlocks(_:)`
-   - `normalizeInlineCode(_:)`
-   - `normalizeMarkdownLinks(_:)`
-   - `normalizeFilePaths(_:)`
-   - `normalizeIdentifierTokens(_:)`
-4. After those targeted passes, run `looksCodeHeavy(_:)` again on the transformed text.
-5. If the text still looks code-heavy, run the broad fallback `spokenCode(_:)`.
-6. Collapse whitespace.
-7. Collapse whitespace again in the final return path and fall back to the original input only if the final normalized output is empty.
+The pipeline order is:
 
-Two important consequences of that ordering:
+1. `normalizeFencedCodeBlocks(_:)`
+2. `normalizeInlineCodeSpans(_:)`
+3. `normalizeMarkdownLinks(_:)`
+4. `normalizeFilePaths(_:)`
+5. `normalizeDottedIdentifiers(_:)`
+6. `normalizeSnakeCaseIdentifiers(_:)`
+7. `normalizeCamelCaseIdentifiers(_:)`
+8. `normalizeCodeHeavyLines(_:)`
+9. `normalizeSpiralProneWords(_:)`
+10. `collapseWhitespace(_:)`
 
-- Targeted replacements happen before the broad code fallback, which is good because it gives paths and identifiers a chance to become more speakable first.
-- The broad `looksCodeHeavy(_:)` detector still has the final say, which means a false positive there can push otherwise plain text through `spokenCode(_:)`.
+That ordering is intentional:
 
-## Detection overview
+- block-level code gets normalized before smaller inline shapes
+- explicit structured shapes get normalized before broader code-line fallback
+- repeated-letter cleanup runs late so it can operate on the near-final spoken text
 
-There are really two detection layers today.
+## Framework usage
 
-### `containsCorrectableText(_:)`
+The implementation now relies on two Apple text APIs:
 
-This is the coarse gate that decides whether any normalization should run at all.
+- `NaturalLanguage.NLTokenizer`
+  - Used for word tokenization in `naturalLanguageTokenRanges(in:)` and `naturalLanguageWords(in:)`.
+  - Apple documents `NLTokenizer` as a tokenizer that segments natural language text into semantic units and exposes token ranges through `tokens(for:)` and `enumerateTokens(in:using:)`.
+  - Source: [NLTokenizer](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/naturallanguage/nltokenizer)
+  - Source: [enumerateTokens(in:using:)](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/naturallanguage/nltokenizer/enumeratetokens(in:using:))
+- `RegexBuilder`
+  - Used for the code-marker detector so the broad code signal is expressed with Swift’s regex DSL instead of string regex literals.
+  - Apple documents `RegexBuilder` as a DSL for building regexes for searching and replacing in text.
+  - Source: [RegexBuilder](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/regexbuilder)
 
-It returns `true` when:
+## Pass-by-pass behavior
 
-- the text contains one of these markers:
-  - `` ``` ``
-  - `` ` ``
-  - `[`
-  - `](`
-  - `->`
-  - `=>`
-  - `::`
-  - `?.`
-  - `??`
-- or `looksCodeHeavy(_:)` returns `true`
+### `normalizeFencedCodeBlocks(_:)`
 
-Current issue:
+This pass scans line-by-line for triple-backtick fences, extracts the body, and rewrites it with `spokenCodeBlock(_:)`.
 
-- This gate is intentionally simple, but it is very broad. A string with markdown section headers or a single inline-code span gets routed into the full normalization path even if the rest of the text is ordinary prose.
+Current spoken wrapper:
 
-Alternate approach:
+- `Code sample. ... . End code sample.`
 
-- Replace the current yes-or-no gate with a small scored feature model, then only run heavier passes when the score crosses a threshold.
+This keeps large code blocks from falling through as raw punctuation-heavy text.
 
-### `looksCodeHeavy(_:)`
+### `normalizeInlineCodeSpans(_:)`
 
-This is the stronger detector that currently affects both forensics and the broad fallback pass.
+This pass scans for single-backtick inline spans and replaces each span with `spokenInlineCode(_:)`.
 
-It returns `true` if:
+Current behavior:
 
-- the text contains any obvious marker from this list:
-  - `` ``` ``
-  - `` ` ``
-  - `->`
-  - `=>`
-  - `::`
-  - `&&`
-  - `||`
-  - `==`
-  - `!=`
-  - `{`
-  - `}`
-  - `</`
-  - `/>`
-  - `func `
-  - `let `
-  - `var `
-  - `const `
-  - `class `
-  - `struct `
-  - `enum `
-  - `return `
-- or the ratio of selected code-ish punctuation to letters is at least `0.12`
+- strips the backticks
+- rewrites operators and punctuation through `spokenCode(_:)`
+- keeps the surrounding prose intact
 
-Current issue:
+### `normalizeMarkdownLinks(_:)`
 
-- This detector is currently too eager for sectioned markdown prose. The new conversational forensic probes still logged `looks_code_heavy: true` and landed in the `extended` complexity class even though the code-specific counters were all zero.
+This pass parses basic inline markdown links of the form `[label](destination)`.
 
-Likely cause:
+Current output policy:
 
-- Markdown header structure plus punctuation density appears to be enough to trip the detector even when the content itself is plain prose.
+- labeled links become `label, link destination`
+- unlabeled links fall back to just the destination
 
-Alternate approach:
+### `normalizeFilePaths(_:)`
 
-- Split the current code-heaviness check into separate signals for:
-  - markdown structure
-  - identifier density
-  - operator density
-  - path density
-  - actual code keywords
-- Then require a stronger combination than "section headers plus punctuation."
+This pass rewrites path-like tokens with `spokenPath(_:)`.
 
-## Normalization passes
+Current path behavior:
 
-### 1. `normalizeFencedCodeBlocks(_:)`
+- keeps path segments readable with `NLTokenizer`
+- says separators explicitly:
+  - `/` as `slash`
+  - `\` as `backslash`
+  - `.` as `dot`
+  - `_` as `underscore`
+  - `-` as `dash`
+  - leading `~` as `home`
 
-What it detects:
+The current path rendering intentionally favors stable spoken delimiters over pretty prose because the model behaves better when the structure is explicit.
 
-- Triple-backtick fenced code blocks with an optional language tag.
-- Pattern: `(?s)```(?:[\w.+-]+)?\n?(.*?)````.
+### `normalizeDottedIdentifiers(_:)`
 
-What it does:
+This pass rewrites dot-separated symbol tokens such as `NSApplication.didFinishLaunchingNotification`.
 
-- Extracts the fenced body.
-- Runs `spokenCode(_:)` on the body.
-- Wraps the result in spoken markers:
-  - `"Code sample. ... . End code sample."`
+Current output policy:
 
-Example:
+- preserve identifier order
+- say `dot` explicitly
+- split internal word boundaries into natural spoken words
 
-- Input:
-  - ```` ```swift\nlet greeting = user?.displayName ?? "friend"\n``` ````
-- Output:
-  - `Code sample. let greeting equals user optional chaining display Name nil coalescing "friend". End code sample.`
+### `normalizeSnakeCaseIdentifiers(_:)`
 
-Current issues:
+This pass rewrites `snake_case` tokens.
 
-- The regex is intentionally lightweight and does not handle more complex markdown edge cases.
-- It does not support indented code blocks.
-- It does not distinguish between code fences that should be read literally and code fences that should maybe be skipped or summarized.
+Current output policy:
 
-Potential edge cases:
+- preserve each segment
+- say `underscore` explicitly
 
-- Nested fences or mismatched fences.
-- Four-backtick fences used to embed triple-backtick text.
-- Large multi-paragraph code fences where flattening all newlines into sentence-like pauses may sound unnatural.
+### `normalizeCamelCaseIdentifiers(_:)`
 
-Test coverage:
+This pass rewrites `camelCase` or mixed-case identifier tokens.
 
-- Indirect coverage exists through `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()` in [ModelClientsTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/ModelClientsTests.swift).
-- Indirect e2e coverage exists through the code-heavy forensic probes in [SpeakSwiftlyE2ETests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeakSwiftlyE2ETests.swift).
-- There is no dedicated unit test that asserts the exact transformed output of a fenced code block by itself.
+Current output policy:
 
-Alternate approach:
+- insert word breaks at lower-to-upper transitions
+- keep the original token ordering
 
-- Parse markdown more structurally and preserve block intent explicitly instead of using one regex.
+### `normalizeCodeHeavyLines(_:)`
 
-### 2. `normalizeInlineCode(_:)`
+This is the broad fallback for lines that still look structurally code-like after the more targeted passes.
 
-What it detects:
+Current trigger:
 
-- Single-backtick inline code spans.
-- Pattern: `(?s)`([^`]+)``.
+- the line contains enough punctuation-heavy structure and code markers to satisfy `isLikelyCodeLine(_:)`
 
-What it does:
+Current output:
 
-- Extracts the code body.
-- Runs `spokenCode(_:)`.
-- Replaces the span with the spoken form surrounded by spaces.
+- the whole line runs through `spokenCode(_:)`
 
-Example:
+This keeps the broad fallback local to obviously code-heavy lines instead of flattening the entire request when only one region is noisy.
 
-- Input:
-  - ``Please read `profile?.sampleRate ?? 24000`. ``
-- Output:
-  - `Please read profile optional chaining sample Rate nil coalescing 24000.`
+### `normalizeSpiralProneWords(_:)`
 
-Current issues:
+This pass targets words with repeated letter runs that often cause unstable or runaway speech.
 
-- It only handles the simplest markdown inline-code form.
-- It does not support multi-backtick inline spans.
-- It may flatten punctuation more aggressively than desired for some short technical phrases.
+Current trigger:
 
-Potential edge cases:
+- `containsRepeatedLetterRun(_:)` finds three or more repeated letters in sequence
 
-- Inline spans that intentionally contain backticks.
-- Markdown that uses double-backtick or longer delimiters.
-- Code spans adjacent to punctuation where surrounding spaces change phrasing more than intended.
+Current output:
 
-Test coverage:
+- the word is spelled out character-by-character, for example `q q q w w e e r r t y y`
 
-- Indirect coverage exists in:
-  - `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()`
-  - `speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable()`
-- There is no dedicated unit test that asserts exact inline-code-only output.
+This is intentionally blunt. The goal is not to preserve lexical elegance. The goal is to stop the model from getting trapped in garbage continuations.
 
-Alternate approach:
+## Helper model
 
-- Use a markdown parser or a small token scanner that recognizes inline-code delimiters more faithfully.
+The supporting helpers are deliberately small and local:
 
-### 3. `normalizeMarkdownLinks(_:)`
+- `spokenCode(_:)` handles operator and delimiter speech
+- `spokenPath(_:)` handles path separators and segment readability
+- `spokenIdentifier(_:)` handles dots, underscores, dashes, and internal word breaks
+- `insertWordBreaks(in:)` adds boundaries between lower-uppercase and letter-digit transitions
+- `transformTokens(in:transform:)` applies token-local rewrites without introducing a new abstraction layer
 
-What it detects:
+That shape is intentionally conservative. No extra manager, scorer, protocol, coordinator, or wrapper was added. The normalizer remains one file with straight top-down flow.
 
-- Basic markdown links.
-- Pattern: `\[([^\]]+)\]\(([^)]+)\)`.
+## Detection model
 
-What it does:
+The current detector strategy is intentionally split into narrow shape detectors plus a single broad fallback signal:
 
-- If a label exists, replaces the link with:
-  - `label, link URL`
-- If the label is empty, keeps only the link target.
-
-Example:
-
-- Input:
-  - `[the docs](https://example.com/docs)`
-- Output:
-  - `the docs, link https://example.com/docs`
-
-Current issues:
-
-- The pattern is intentionally simple and will not handle nested parentheses in URLs correctly.
-- It does not distinguish between links that should be spoken as URLs and links that should maybe just speak the label.
-
-Potential edge cases:
-
-- URLs containing parentheses.
-- Reference-style markdown links.
-- Autolinks like `<https://example.com>`, which are not handled here.
-
-Test coverage:
-
-- Indirect forensic feature coverage exists in `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()`.
-- There is no exact output assertion for markdown-link normalization alone.
-
-Alternate approach:
-
-- Add a user-tunable policy for links:
-  - speak only label
-  - speak label plus "link"
-  - speak full URL
-
-### 4. `normalizeFilePaths(_:)`
-
-What it detects:
-
-- Absolute or tilde-prefixed paths.
-- Pattern: `(?<!\w)(~|/)[^\s`),;]+`
-
-What it does:
-
-- Replaces the matched path with `spokenPath(_:)`.
-- `spokenPath(_:)` currently turns:
-  - `~` into `home` when it appears at the start
-  - `/` into `slash`
-  - `\` into `backslash`
-  - `.` into `dot`
-  - `_` into `underscore`
-  - `-` into `dash`
-
-Example:
-
-- Input:
-  - `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift`
-- Output:
-  - `Users slash galew slash Workspace slash SpeakSwiftly slash Sources slash SpeakSwiftly slash SpeechTextNormalizer dot swift`
-
-Current issues:
-
-- It does not handle relative paths like `Sources/SpeakSwiftly`.
-- It can still be a little too literal for long paths, especially when every separator is spoken.
-- It does not currently collapse repeated directory patterns or recognize common filesystem landmarks more naturally.
-
-Potential edge cases:
-
-- URLs that contain slash-heavy paths after markdown-link normalization.
-- Paths followed by punctuation that is intentionally part of the path.
-- Shell globs or escaped spaces.
-
-Test coverage:
-
-- Exact output coverage exists in `speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable()`.
-- Indirect forensic feature coverage exists in `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()`.
-- Indirect e2e coverage exists in the code-heavy segmented probes.
-
-Alternate approach:
-
-- Add path-specific modes such as:
-  - fully literal
-  - condensed directory mode
-  - basename-priority mode
-
-### 5. `normalizeIdentifierTokens(_:)`
-
-What it detects:
-
-- Dotted identifiers first:
-  - pattern: `\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b`
-- Then snake_case identifiers:
-  - pattern: `\b[a-z0-9]+(?:_[a-z0-9]+)+\b`
-- Then camelCase identifiers:
-  - pattern: `\b[a-z]+(?:[A-Z][a-z0-9]+)+\b`
-
-What it does:
-
-- Replaces each match with `spokenIdentifier(_:)`.
-- `spokenIdentifier(_:)` currently turns:
-  - `.` into `dot`
-  - `_` into `underscore`
-  - `-` into `dash`
-  - lower-to-upper boundaries into spaces
-
-Examples:
-
-- Input:
-  - `NSApplication.didFinishLaunchingNotification`
-- Output:
-  - `NSApplication dot did Finish Launching Notification`
-
-- Input:
-  - `camelCaseStuff`
-- Output:
-  - `camel Case Stuff`
-
-- Input:
-  - `snake_case_stuff`
-- Output:
-  - `snake underscore case underscore stuff`
-
-Current issues:
-
-- Dotted identifiers are only partially humanized. `NSApplication` stays fused, which may or may not be desirable.
-- Objective-C selector-like forms with colons are not directly normalized by this pass.
-- Hyphenated identifiers are only handled if another pattern captures them first; there is no dedicated kebab-case detector.
-- The dotted-identifier regex can also catch non-code dotted tokens such as certain hostnames or abbreviations.
-
-Potential edge cases:
-
-- Acronyms like `URLSession.shared`.
-- Mixed-case identifiers with digits.
-- Selector-like Objective-C method names with colons.
-- Domain names that are not code identifiers but still match dotted-token structure closely enough.
-
-Test coverage:
-
-- Exact output coverage exists in `speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable()`.
-- Indirect forensic feature coverage exists in `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()`.
-- Indirect e2e coverage exists in the code-heavy segmented probes.
-
-Alternate approach:
-
-- Replace the regex-only approach with a tokenizer that classifies segments into:
-  - acronym
-  - word
-  - number
-  - separator
-- Then let the spoken form preserve better distinctions like `N S Application` versus `NSApplication`.
-
-### 6. Broad fallback: `spokenCode(_:)`
-
-What it detects:
-
-- This is not a detector by itself. It is the broad fallback used after `looksCodeHeavy(_:)` returns `true` late in the pipeline.
-
-What it does:
-
-- Replaces a fixed set of operators and punctuation with spoken phrases.
-- Inserts spaces at lower-to-upper boundaries.
-- Collapses whitespace.
-
-Examples:
-
-- Input:
-  - `profile?.sampleRate ?? 24000`
-- Output:
-  - `profile optional chaining sample Rate nil coalescing 24000`
-
-- Input:
-  - `user.name == "Gale" && isReady`
-- Output:
-  - `user dot name equals equals "Gale" and is Ready`
-
-Current issues:
-
-- It is intentionally blunt.
-- It can over-normalize plain text if `looksCodeHeavy(_:)` fires too eagerly.
-- It flattens line structure aggressively by turning newlines into sentence-like pauses.
-- Some spoken replacements are mechanically correct but not especially natural.
-
-Potential edge cases:
-
-- Plain markdown prose with headings.
-- Math or symbolic prose that is not actually code.
-- Text where preserving punctuation rhythm matters more than verbalizing every symbol.
-
-Test coverage:
-
-- Indirect coverage exists through:
-  - fenced code normalization
-  - inline code normalization
-  - path and identifier normalization tests where inline code is present
-  - code-heavy e2e probes
-- There is no dedicated exact-output unit test for `spokenCode(_:)` as a standalone function.
-
-Alternate approach:
-
-- Split fallback behavior into multiple narrower modes:
-  - operator-heavy expression mode
-  - structured snippet mode
-  - path-and-identifier mode
-- That would avoid routing all remaining code-ish text through one blunt conversion table.
-
-## Formatting helpers
-
-### `collapseWhitespace(_:)`
-
-What it does:
-
-- Collapses repeated spaces.
-- Converts repeated blank lines into `. `
-- Removes whitespace before punctuation.
-
-Current issues:
-
-- It flattens paragraph structure very aggressively.
-- It can make longer prose sound more uniform than intended.
-- It is one likely reason that normalized text often reports `normalized_paragraph_count: 1` even for strongly sectioned inputs.
-
-Potential edge cases:
-
-- Deliberate pauses or paragraph breaks in prose.
-- Poetry-like or script-like text.
-- Lists where a stronger spoken break than `. ` would be preferable.
-
-Test coverage:
-
-- Only indirect coverage through the higher-level normalization tests.
-
-Alternate approach:
-
-- Preserve stronger structural markers through the normalization pipeline and let the speech side decide whether to turn them into pauses, sentences, or stronger boundaries.
-
-## Forensic-only helpers
-
-These helpers do not directly change the text fed into generation, but they affect what we infer from traces.
-
-### `forensicFeatures(originalText:normalizedText:)`
-
-What it does:
-
-- Computes request-level counters for:
-  - markdown headers
-  - fenced code blocks
-  - inline code spans
+- narrow shape detectors:
+  - fenced code
+  - inline code
   - markdown links
   - file paths
   - dotted identifiers
-  - camelCase tokens
-  - snake_case tokens
-  - Objective-C-ish symbols
-  - repeated-letter weird words
-  - punctuation-heavy lines
-  - `looksCodeHeavy`
+  - snake case
+  - camel case
+  - repeated-letter words
+- broad fallback signal:
+  - `looksCodeHeavy(_:)`
+  - `isLikelyCodeLine(_:)`
 
-Current issue:
+`looksCodeHeavy(_:)` still exists because the forensic payload needs a coarse code-heaviness flag. The difference is that normalization no longer uses a global “all or nothing” gate before doing anything useful.
 
-- It reports useful raw counts, but `looksCodeHeavy` is currently too blunt, so that one feature should not be over-trusted yet.
+## Forensics
 
-Coverage:
+The forensic APIs were preserved:
 
-- Direct unit coverage exists in `speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes()`.
+- `forensicFeatures(originalText:normalizedText:)`
+- `forensicSections(originalText:)`
+- `forensicSectionWindows(originalText:totalDurationMS:totalChunkCount:)`
 
-### `forensicSections(originalText:)` and `forensicSectionWindows(...)`
+The current counters now derive from the same parsing helpers that the normalizer uses, instead of separate regex-only counting paths. That keeps the feature report more aligned with the real transformations.
 
-What they do:
+## Test coverage
 
-- Split the original request into:
-  - markdown-header sections first
-  - paragraph sections second
-  - one full-request fallback section otherwise
-- Weight each section by normalized character count.
-- Estimate section time and chunk windows from final playback duration and chunk count.
+The current tests now include dedicated helper coverage in [SpeechTextNormalizerTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeechTextNormalizerTests.swift):
 
-Current issue:
+- fenced code blocks
+- inline code spans
+- markdown links
+- file paths
+- dotted identifiers
+- snake case identifiers
+- camel case identifiers
+- code-heavy lines
+- spiral-prone words
+- mixed integration cases
 
-- The resulting windows are estimated, not aligned to actual token or audio boundaries.
+Existing integration coverage remains in [ModelClientsTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/ModelClientsTests.swift), and the package-level behavior is still exercised through [SpeakSwiftlyE2ETests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeakSwiftlyE2ETests.swift).
 
-Coverage:
+## Current known limits
 
-- Direct unit coverage exists in `speechTextForensicSectionsAndWindowsTrackSegmentedMarkdownStructure()`.
-- Direct e2e coverage exists through the segmented forensic probes.
+The cleanup made the code much easier to read, but it did not try to solve every markdown or code-parsing edge case.
 
-Alternate approach:
+Current limits:
 
-- If upstream ever exposes token-to-audio alignment or per-span chunk attribution, replace the weighted estimate with true alignment data.
+- fenced code parsing is still triple-backtick oriented and does not attempt full markdown compliance
+- inline code parsing still assumes single backticks
+- markdown links still target the common inline form rather than every markdown link variant
+- repeated-letter detection is heuristic and intentionally aggressive
+- path and identifier classification still operate on local token heuristics instead of a full parser
 
-## Coverage summary
-
-Current direct unit coverage is strongest for:
-
-- forensic feature counting
-- section splitting and section-window estimation
-- path normalization
-- identifier normalization
-
-Current direct unit coverage is weaker or absent for:
-
-- fenced code block exact output
-- inline code exact output
-- markdown link exact output
-- `spokenCode(_:)` exact output
-- `collapseWhitespace(_:)` exact output
-- `containsCorrectableText(_:)` exact behavior
-- `looksCodeHeavy(_:)` edge behavior on markdown-only prose
-
-## Most important current issues
-
-### 1. Markdown-sectioned prose still looks code-heavy
-
-This is the biggest present detector issue.
-
-Evidence:
-
-- The new conversational sectioned forensic probes had:
-  - `file_path_count: 0`
-  - `dotted_identifier_count: 0`
-  - `camel_case_token_count: 0`
-  - `snake_case_token_count: 0`
-  - `objc_symbol_count: 0`
-  - `repeated_letter_run_count: 0`
-- But they still logged:
-  - `looks_code_heavy: true`
-  - `text_complexity_class: "extended"`
-
-Impact:
-
-- Ordinary prose may get more aggressive fallback normalization than intended.
-- Playback policy seeding may be more conservative than warranted for plain speech.
-
-### 2. The broad fallback is still very blunt
-
-`spokenCode(_:)` is useful, but it is a catch-all hammer.
-
-Impact:
-
-- Naturalness can suffer if a false positive routes text into that fallback.
-
-### 3. Structure gets flattened too early
-
-`collapseWhitespace(_:)` turns many structural breaks into sentence-like output.
-
-Impact:
-
-- The spoken rhythm may lose some of the original text's intended shape.
-
-## Recommended next steps
-
-1. Tune `looksCodeHeavy(_:)` so markdown section headers alone do not make plain prose look code-heavy.
-2. Add direct unit tests for:
-   - fenced code output
-   - inline code output
-   - markdown link output
-   - markdown-only prose that should stay non-code-heavy
-3. Consider splitting the broad fallback into smaller fallback modes instead of one monolithic `spokenCode(_:)`.
-4. Add user-tunable normalization preferences once the detectors are a little more trustworthy, especially for:
-   - paths
-   - identifiers
-   - links
-   - how literal or natural code speech should be
+Those tradeoffs are deliberate. The current implementation is meant to be readable, modular, and effective against the actual prompt shapes that have been causing bad speech generations.
