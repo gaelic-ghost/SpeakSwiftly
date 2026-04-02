@@ -22,6 +22,10 @@
 
 - Treat the standalone `SpeakSwiftly` repository as the source of truth for package development, tags, and releases.
 - Treat `../speak-to-user/packages/SpeakSwiftly` as the integration submodule copy, not the primary development home.
+- Treat the local `../speak-to-user` checkout as a clean base checkout only. It must stay on `main`, and it must stay clean.
+- Never change the local branch of the base `../speak-to-user` checkout for feature work, experiments, release bumps, or submodule updates.
+- For any monorepo change, create a new branch in a new `git worktree` and do the work there instead of touching the base `../speak-to-user` checkout.
+- After a monorepo branch is merged, pull or fast-forward the base `../speak-to-user` checkout back to `main` and delete the merged worktree and branch.
 - When `speak-to-user` adopts a new `SpeakSwiftly` version, prefer updating the submodule pointer to a tagged `SpeakSwiftly` release rather than an arbitrary branch tip.
 - Land monorepo submodule bumps through a pull request against the monorepo instead of pushing those pointer updates directly to monorepo `main`.
 - Use tagged releases for the monorepo when publishing coordinated umbrella states that depend on specific submodule versions.
