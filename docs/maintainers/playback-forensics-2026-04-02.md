@@ -194,6 +194,10 @@ Interpretation:
   - the sectioned conversational prose still logged `looks_code_heavy: true`
   - the same prose also landed in `text_complexity_class: "extended"`
   - that likely means the current code-heaviness heuristic is overreacting to markdown section structure rather than actual code-ish content
+- Important clarification:
+  - `looks_code_heavy` is currently a forensic normalizer signal emitted by [SpeechTextNormalizer.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift)
+  - the playback controller's `text_complexity_class` is currently length-only in [PlaybackController.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift)
+  - those two fields should not be read as the same detector or as evidence that code-heaviness is currently feeding threshold seeding
 - The latest cross-family comparison suggests:
   - prose is somewhat better than code-heavy material, but not dramatically better
   - reversing the section order helps both families, which keeps startup-phase sensitivity in the picture

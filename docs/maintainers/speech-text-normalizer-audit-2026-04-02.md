@@ -17,13 +17,14 @@ The pipeline order is:
 1. `normalizeFencedCodeBlocks(_:)`
 2. `normalizeInlineCodeSpans(_:)`
 3. `normalizeMarkdownLinks(_:)`
-4. `normalizeFilePaths(_:)`
-5. `normalizeDottedIdentifiers(_:)`
-6. `normalizeSnakeCaseIdentifiers(_:)`
-7. `normalizeCamelCaseIdentifiers(_:)`
-8. `normalizeCodeHeavyLines(_:)`
-9. `normalizeSpiralProneWords(_:)`
-10. `collapseWhitespace(_:)`
+4. `normalizeURLs(_:)`
+5. `normalizeFilePaths(_:)`
+6. `normalizeDottedIdentifiers(_:)`
+7. `normalizeSnakeCaseIdentifiers(_:)`
+8. `normalizeCamelCaseIdentifiers(_:)`
+9. `normalizeCodeHeavyLines(_:)`
+10. `normalizeSpiralProneWords(_:)`
+11. `collapseWhitespace(_:)`
 
 That ordering is intentional:
 
@@ -75,6 +76,21 @@ Current output policy:
 
 - labeled links become `label, link destination`
 - unlabeled links fall back to just the destination
+- URL destinations are usually rewritten again by the next URL pass, so `https://example.com/docs` becomes `example dot com slash docs` in the full pipeline rather than staying raw.
+
+### `normalizeURLs(_:)`
+
+This pass rewrites standalone URL tokens with `spokenURL(_:)` before the path pass can treat them as ordinary slash-heavy fragments.
+
+Current output policy:
+
+- strips the leading scheme such as `https://`
+- strips a leading `www.`
+- preserves the host and path structure through spoken delimiters such as `dot`, `slash`, `underscore`, and `dash`
+
+Example:
+
+- `https://www.example.com/docs/path_now` becomes `example dot com slash docs slash path underscore now`
 
 ### `normalizeFilePaths(_:)`
 
@@ -154,6 +170,7 @@ This is intentionally blunt. The goal is not to preserve lexical elegance. The g
 The supporting helpers are deliberately small and local:
 
 - `spokenCode(_:)` handles operator and delimiter speech
+- `spokenURL(_:)` strips noisy URL prefixes and then delegates structural speech to `spokenPath(_:)`
 - `spokenPath(_:)` handles path separators and segment readability
 - `spokenIdentifier(_:)` handles dots, underscores, dashes, and internal word breaks
 - `insertWordBreaks(in:)` adds boundaries between lower-uppercase and letter-digit transitions
@@ -169,6 +186,7 @@ The current detector strategy is intentionally split into narrow shape detectors
   - fenced code
   - inline code
   - markdown links
+  - URLs
   - file paths
   - dotted identifiers
   - snake case
@@ -190,6 +208,10 @@ The forensic APIs were preserved:
 
 The current counters now derive from the same parsing helpers that the normalizer uses, instead of separate regex-only counting paths. That keeps the feature report more aligned with the real transformations.
 
+One current gap remains:
+
+- URLs have their own normalization pass, but the forensic payload still does not expose a dedicated URL count. URL-heavy prompts therefore only show up indirectly through normalized text shape and any overlapping punctuation or section signals.
+
 ## Test coverage
 
 The current tests now include dedicated helper coverage in [SpeechTextNormalizerTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeechTextNormalizerTests.swift):
@@ -197,6 +219,7 @@ The current tests now include dedicated helper coverage in [SpeechTextNormalizer
 - fenced code blocks
 - inline code spans
 - markdown links
+- URLs
 - file paths
 - dotted identifiers
 - snake case identifiers
