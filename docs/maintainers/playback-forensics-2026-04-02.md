@@ -59,6 +59,35 @@ Interpretation:
 - The remaining issue now looks more like "the initial and early adaptive policy is still too optimistic for some code-heavy cadences" than "we are losing escalation state mid-run."
 - Boundary smoothing is still a distinct follow-up area, but repeated rebuffer remains the dominant audible defect for these forensic requests.
 
+## 2026-04-02 phase-aware buffering follow-up
+
+Context:
+
+- We kept the existing text length and complexity classes, but added an explicit playback phase model inside the existing controller instead of creating a new subsystem.
+- The controller now distinguishes `warmup`, `steady`, and `recovery` so early playback does not immediately behave like the request has already proven stable cadence.
+
+What changed:
+
+- `warmup` now uses a more conservative seeded posture derived from the existing complexity class.
+- Stable chunk cadence can promote playback from `warmup` into `steady`.
+- A rebuffer or starvation event can move a previously stable request into `recovery`.
+- `recovery` can return to `steady` only after a shorter but still meaningful streak of stable chunk arrivals.
+
+Why this matters:
+
+- Earlier tuning helped preserve raised thresholds, but playback still skipped too often because the controller was still too eager to behave like steady-state early in the request.
+- The phase-aware pass is intended to reduce early skips without throwing away the existing complexity-class prior.
+- The complexity classes still matter as the initial guess; the new phase logic simply stops the controller from trusting the request too early.
+
+Current status:
+
+- Package verification passed after this change with `swift build`, `swift test --filter adaptivePlaybackThresholds`, and `swift test`.
+- New tests now cover:
+  - warmup to steady transition after stable chunk cadence
+  - steady to recovery transition after rebuffer
+  - recovery back to steady after stable cadence returns
+- Audible verification still needs to be judged by ear and by a fresh trace after this phase-aware pass.
+
 Interpretation:
 
 - The major choppiness problem was not purely "the model is bad at this prompt."
