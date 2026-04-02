@@ -195,9 +195,14 @@ private final class JSONLineRecorder: @unchecked Sendable {
 
 private final class WorkerProcess: @unchecked Sendable {
     private enum Environment {
+        static let dyldFrameworkPath = "DYLD_FRAMEWORK_PATH"
         static let profileRoot = "SPEAKSWIFTLY_PROFILE_ROOT"
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
     }
+
+    private static let executableURLResult = Result(catching: {
+        try computeWorkerExecutableURL()
+    })
 
     private let process: Process
     private let stdinPipe: Pipe
@@ -213,33 +218,30 @@ private final class WorkerProcess: @unchecked Sendable {
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        process.executableURL = try Self.workerExecutableURL()
+        let executableURL = try Self.workerExecutableURL()
+        process.executableURL = executableURL
         process.standardInput = stdinPipe
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        process.currentDirectoryURL = executableURL.deletingLastPathComponent()
 
         var environment = ProcessInfo.processInfo.environment
+        environment[Environment.dyldFrameworkPath] = executableURL.deletingLastPathComponent().path
         environment[Environment.profileRoot] = profileRootURL.path
         if silentPlayback {
             environment[Environment.silentPlayback] = "1"
         }
         process.environment = environment
 
-        stdoutTask = Task {
-            do {
-                for try await line in stdoutPipe.fileHandleForReading.bytes.lines {
-                    recorder.appendStdout(line)
-                }
-            } catch {}
-        }
+        stdoutTask = Self.captureLines(
+            from: stdoutPipe.fileHandleForReading,
+            append: recorder.appendStdout(_:)
+        )
 
-        stderrTask = Task {
-            do {
-                for try await line in stderrPipe.fileHandleForReading.bytes.lines {
-                    recorder.appendStderr(line)
-                }
-            } catch {}
-        }
+        stderrTask = Self.captureLines(
+            from: stderrPipe.fileHandleForReading,
+            append: recorder.appendStderr(_:)
+        )
 
         try process.run()
     }
@@ -324,24 +326,108 @@ private final class WorkerProcess: @unchecked Sendable {
         }
     }
 
+    private static func captureLines(
+        from fileHandle: FileHandle,
+        append: @escaping @Sendable (String) -> Void
+    ) -> Task<Void, Never> {
+        Task.detached {
+            var buffer = Data()
+
+            while !Task.isCancelled {
+                let data = fileHandle.availableData
+                guard !data.isEmpty else { break }
+                buffer.append(data)
+
+                while let newlineRange = buffer.firstRange(of: Data([0x0A])) {
+                    let lineData = buffer[..<newlineRange.lowerBound]
+                    if let line = String(data: lineData, encoding: .utf8) {
+                        append(line)
+                    }
+                    buffer.removeSubrange(..<newlineRange.upperBound)
+                }
+            }
+
+            if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
+                append(line)
+            }
+        }
+    }
+
     private static func workerExecutableURL() throws -> URL {
+        try executableURLResult.get()
+    }
+
+    private static func computeWorkerExecutableURL() throws -> URL {
         let packageRootURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let buildRootURL = packageRootURL.appendingPathComponent(".build", isDirectory: true)
+        let derivedDataURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-dd", isDirectory: true)
+        let sourcePackagesURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-spm", isDirectory: true)
 
-        let candidateURLs = try FileManager.default.subpathsOfDirectory(atPath: buildRootURL.path)
-            .filter { $0.hasSuffix("/debug/SpeakSwiftly") || $0 == "debug/SpeakSwiftly" }
-            .map { buildRootURL.appendingPathComponent($0) }
+        try buildWorkerProduct(
+            packageRootURL: packageRootURL,
+            derivedDataURL: derivedDataURL,
+            sourcePackagesURL: sourcePackagesURL
+        )
 
-        if let executableURL = candidateURLs.sorted(by: { $0.path < $1.path }).first {
-            return executableURL
+        let productsURL = derivedDataURL
+            .appendingPathComponent("Build/Products/Debug", isDirectory: true)
+        let executableURL = productsURL.appendingPathComponent("SpeakSwiftly", isDirectory: false)
+        let metallibURL = productsURL
+            .appendingPathComponent("mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib", isDirectory: false)
+
+        guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+            throw WorkerProcessError(
+                "The Xcode-built SpeakSwiftly worker was expected at '\(executableURL.path)', but no executable was found after `xcodebuild` finished."
+            )
         }
 
-        throw WorkerProcessError(
-            "The SpeakSwiftly executable could not be found under '\(buildRootURL.path)'. Run `swift build` before the e2e suite."
-        )
+        guard FileManager.default.fileExists(atPath: metallibURL.path) else {
+            throw WorkerProcessError(
+                "The MLX Metal shader bundle was not found at '\(metallibURL.path)' after `xcodebuild` completed. The worker cannot run real MLX-backed e2e tests without `default.metallib`."
+            )
+        }
+
+        return executableURL
+    }
+
+    private static func buildWorkerProduct(
+        packageRootURL: URL,
+        derivedDataURL: URL,
+        sourcePackagesURL: URL
+    ) throws {
+        let process = Process()
+        let logURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e.log", isDirectory: false)
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        let logHandle = try FileHandle(forWritingTo: logURL)
+        defer { try? logHandle.close() }
+
+        process.currentDirectoryURL = packageRootURL
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.arguments = [
+            "build",
+            "-scheme", "SpeakSwiftly",
+            "-destination", "platform=macOS",
+            "-derivedDataPath", derivedDataURL.path,
+            "-clonedSourcePackagesDirPath", sourcePackagesURL.path,
+        ]
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let outputData = try Data(contentsOf: logURL)
+            let output = String(decoding: outputData, as: UTF8.self)
+            throw WorkerProcessError(
+                "The Xcode-backed SpeakSwiftly build failed with status \(process.terminationStatus). `xcodebuild` output:\n\(output)"
+            )
+        }
     }
 }
 

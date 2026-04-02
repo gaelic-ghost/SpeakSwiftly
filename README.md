@@ -42,12 +42,19 @@ swift build
 
 The executable intentionally leans on the existing `mlx-audio-swift` API surface and keeps its own scope focused on process ownership, queueing, playback, and profile storage.
 
-## Usage
-
-Run the worker and speak JSONL to it over standard input.
+For real MLX-backed runs, use `xcodebuild` instead of relying on the SwiftPM command-line executable. Upstream `mlx-swift` is explicit that command-line SwiftPM does not build the Metal shader bundle, while `xcodebuild` does, and command-line tools need that bundle visible at runtime.
 
 ```bash
-swift run
+xcodebuild build -scheme SpeakSwiftly -destination 'platform=macOS'
+```
+
+## Usage
+
+Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, build with `xcodebuild` and run the product from the Xcode build directory with `DYLD_FRAMEWORK_PATH` pointing at that same products directory.
+
+```bash
+DYLD_FRAMEWORK_PATH="$PWD/.derived/Build/Products/Debug" \
+  "$PWD/.derived/Build/Products/Debug/SpeakSwiftly"
 ```
 
 At startup the worker begins preloading the resident `0.6B` model and emits JSONL status events on `stdout`.
@@ -133,13 +140,27 @@ swift build
 swift test
 ```
 
-Opt-in real-model e2e coverage is available for the resident `0.6B` and on-demand `1.7B` paths:
+Real MLX-backed validation should use an Xcode-built worker product. A reproducible local command is:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test
+xcodebuild build \
+  -scheme SpeakSwiftly \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/SpeakSwiftly-xcodebuild-dd \
+  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
+```
+
+Opt-in real-model e2e coverage is available for the resident `0.6B` and on-demand `1.7B` paths, and the harness now builds and launches that Xcode-backed worker automatically:
+
+```bash
+SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
 The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each test still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
+
+The default shared per-user profile store now also includes a real `testing-profile` created through the worker itself, so downstream apps can reuse the same clone profile outside the isolated e2e sandbox.
+
+If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of an Xcode-built products directory. Rebuild with `xcodebuild`, then run the executable with `DYLD_FRAMEWORK_PATH` pointed at the matching Xcode build products directory.
 
 ## License
 
