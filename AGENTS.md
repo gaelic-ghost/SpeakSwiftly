@@ -18,6 +18,14 @@
   - `swift build`
   - `swift test`
 
+## Repository-Specific Workflow
+
+- Treat the standalone `SpeakSwiftly` repository as the source of truth for package development, tags, and releases.
+- Treat `../speak-to-user/packages/SpeakSwiftly` as the integration submodule copy, not the primary development home.
+- When `speak-to-user` adopts a new `SpeakSwiftly` version, prefer updating the submodule pointer to a tagged `SpeakSwiftly` release rather than an arbitrary branch tip.
+- Land monorepo submodule bumps through a pull request against the monorepo instead of pushing those pointer updates directly to monorepo `main`.
+- Use tagged releases for the monorepo when publishing coordinated umbrella states that depend on specific submodule versions.
+
 ## Swift Coding Preferences
 
 - Prefer the simplest correct Swift that is easiest to read, reason about, and maintain.
@@ -75,6 +83,12 @@
 - Prefer Nick Lockwood's SwiftFormat and/or SwiftLint as baseline Swift formatting and linting tools; at least one should be configured and used in any Swift project.
 - Keep formatting consistent with `swift-format` conventions.
 - Keep linting clean against `swiftlint` with clear, maintainable rule intent.
+- Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
+- Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
+- Keep the shared test profile convention stable unless Gale explicitly changes it:
+  - `profile_name`: `testing-profile`
+  - `voice_description`: `A generic, warm, masculine, slow speaking voice.`
+- Expect generated `*.profraw` coverage artifacts from local test runs and do not commit them.
 
 ## SwiftUI and State Architecture
 
@@ -100,3 +114,6 @@
 - Use `xcodebuild` when validating Apple platform integration details that `swift package` does not cover well (schemes, destinations, SDK-specific behavior, and configuration-specific builds/tests).
 - Keep `xcodebuild` invocations explicit and reproducible (always pass scheme, destination or SDK, and configuration when relevant).
 - Prefer deterministic non-interactive CLI usage in automation/CI for both `swift package` and `xcodebuild`.
+- For this repository specifically, use an Xcode-built worker product for real MLX-backed command-line runs and real-model e2e coverage. Upstream `mlx-swift` does not make the Metal shader bundle available to the plain SwiftPM command-line build.
+- When launching the real worker from the shell, point `DYLD_FRAMEWORK_PATH` at the matching Xcode build products directory so `mlx-swift_Cmlx.bundle` and `default.metallib` are visible at runtime.
+- If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, treat that as a build-and-launch-path problem first, not as evidence that the worker runtime itself is broken.
