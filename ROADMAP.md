@@ -22,6 +22,9 @@
 - [ ] Milestone 4: Integration hardening
 - [ ] Milestone 5: Contract and e2e hardening
 - [ ] Milestone 6: Multi-process profile-store hardening
+- [ ] Milestone 7: Playback and shutdown safety hardening
+- [ ] Milestone 8: Observability and instrumentation
+- [ ] Milestone 9: Live-service operability review
 
 ## Milestone 0: Bootstrap
 
@@ -189,3 +192,70 @@ Exit criteria:
 - [ ] Two local processes can share the default profile store without silent corruption or partially written profiles.
 - [ ] Cross-process profile creation and removal failures are explicit, structured, and recoverable.
 - [ ] The shared-store behavior and override-based isolation path are documented clearly for downstream apps and services.
+
+## Milestone 7: Playback and shutdown safety hardening
+
+Scope:
+
+- [ ] Make stuck playback and drain completion failures visible, bounded, and recoverable.
+- [ ] Make worker shutdown deterministic when requests are in flight.
+- [ ] Keep the current simple single-actor shape without adding unnecessary service layers.
+
+Tickets:
+
+- [ ] Add an explicit timeout or other bounded completion strategy around playback drain after streaming input finishes.
+- [ ] Distinguish generated-audio completion from local-player drain completion in both code paths and diagnostics.
+- [ ] Track the active request task so shutdown can cancel or finish it intentionally instead of orphaning it.
+- [ ] Define and implement the exact terminal behavior for in-flight requests during shutdown, including operator-facing diagnostics.
+- [ ] Add automated coverage for stuck playback-drain, cancelled shutdown, and in-flight request teardown paths.
+
+Exit criteria:
+
+- [ ] A stalled playback callback cannot wedge the worker indefinitely without a clear failure path.
+- [ ] Worker shutdown is deterministic and observable even with active playback or profile-generation work in progress.
+- [ ] The runtime safety behavior is covered by automated tests and readable diagnostics.
+
+## Milestone 8: Observability and instrumentation
+
+Scope:
+
+- [ ] Add grounded operator-facing logs and timing signals so live-service behavior is explainable from stderr alone.
+- [ ] Keep stdout reserved for the JSONL worker contract while making stderr useful for debugging and production support.
+- [ ] Add only the minimum instrumentation needed to understand latency, queueing, and failure modes clearly.
+
+Tickets:
+
+- [ ] Add request lifecycle timing logs for accept, queue, start, first audio chunk, playback finish, terminal success, and terminal failure.
+- [ ] Include request id, operation name, relevant profile name, queue depth, and elapsed time in operator-facing runtime logs.
+- [ ] Add resident-model preload instrumentation for start time, finish time, duration, model repo, and failure classification.
+- [ ] Add playback instrumentation for profile-load time, time to first generated chunk, time from first chunk to drain, and generated chunk or sample counts.
+- [ ] Add profile-store instrumentation for create, load, list, remove, and export with concrete filesystem paths.
+- [ ] Add automated assertions for important stderr diagnostics in the fast test suite.
+
+Exit criteria:
+
+- [ ] A live-service latency complaint can be broken down into warmup, queueing, generation, playback, and filesystem phases from existing logs.
+- [ ] Operator-facing diagnostics contain enough context to identify the request, profile, path, and likely failure point without attaching a debugger.
+- [ ] The JSONL contract remains clean while stderr becomes a trustworthy operational signal.
+
+## Milestone 9: Live-service operability review
+
+Scope:
+
+- [ ] Tighten the worker contract around service ownership and operational inspection for long-lived local deployments.
+- [ ] Make filesystem behavior and service-state inspection predictable for parent processes.
+- [ ] Preserve the current direct architecture and avoid adding wrappers or coordinators unless they are clearly necessary.
+
+Tickets:
+
+- [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
+- [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
+- [ ] Add a lightweight worker `status` operation or equivalent health/introspection surface for resident state, active request id, queue length, profile root, and playback-drain state.
+- [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
+- [ ] Add an explicit qualitative runtime review checklist for future live-service passes so regressions in operability stay visible.
+
+Exit criteria:
+
+- [ ] Parent processes can inspect worker state and reason about service health without log scraping alone.
+- [ ] Path resolution and profile-store behavior are predictable across different launch environments.
+- [ ] The worker stays small and concrete while becoming easier to operate as a long-lived local service.
