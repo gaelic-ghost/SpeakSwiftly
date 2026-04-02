@@ -110,6 +110,26 @@ Interpretation:
 - The remaining pops are likely a separate boundary-quality issue and should be revisited after buffering behavior is stable enough that the two problem classes do not mask each other.
 - The phase-aware pass appears to have reduced early eagerness and materially strengthened queue recovery, but some requests still skip more often than desired even after warmup and recovery improvements.
 - The remaining gap now looks increasingly likely to involve speakability and text-shape effects in addition to buffering policy alone.
+- Section-aware forensic tracing now emits `playback_section_detected` and `playback_section_window` events so we can correlate rebuffers against estimated content windows without pretending we have exact token-to-audio alignment.
+- A forward segmented direct capture on the section-aware worker finished with `9` rebuffers and mapped those rebuffers roughly as:
+  - `Section One`: `3`
+  - `Section Two`: `2`
+  - `Section Three`: `2`
+  - `Section Four`: `1`
+  - `Footer`: `1`
+- A reversed-order segmented direct capture also finished with `9` rebuffers, but startup was materially faster:
+  - `time_to_first_chunk_ms: 358` versus `1548` in the forward-order section-aware run
+  - `time_to_preroll_ready_ms: 1808` versus `3067` in the forward-order section-aware run
+- The reversed-order section-aware run mapped rebuffers roughly as:
+  - `Footer`: `2`
+  - `Section Three`: `2`
+  - `Section Two`: `2`
+  - `Section One`: `2`
+  - one final late rebuffer fell just past the estimated final section window boundary
+- That comparison suggests two things at once:
+  - there is still an "early in the request" instability effect, because reversing the order materially improved startup timing
+  - the harder text shapes still matter throughout the run, because reversing the order did not reduce the total rebuffer count
+- The current best read is that both startup-phase instability and content-shape difficulty are contributing, rather than either one fully explaining the skips by itself.
 
 Operational notes:
 

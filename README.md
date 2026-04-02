@@ -223,6 +223,13 @@ If you want the long forensic playback probe with code fences, file paths, and o
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest
 ```
 
+If you want the section-aware weird-text forensic probes, these opt-in commands exercise the normal and reversed section-order variants with chunk-level trace enabled:
+
+```bash
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithReversedSegmentedWeirdTextRequest
+```
+
 The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each test still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
 
 The default shared per-user profile store now also includes a real `testing-profile` created through the worker itself, so downstream apps can reuse the same clone profile outside the isolated e2e sandbox.
