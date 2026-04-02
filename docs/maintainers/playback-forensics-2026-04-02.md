@@ -130,6 +130,37 @@ Interpretation:
   - there is still an "early in the request" instability effect, because reversing the order materially improved startup timing
   - the harder text shapes still matter throughout the run, because reversing the order did not reduce the total rebuffer count
 - The current best read is that both startup-phase instability and content-shape difficulty are contributing, rather than either one fully explaining the skips by itself.
+- After the path-and-identifier normalization pass, a fresh forward segmented direct capture on the latest build still showed meaningful improvement in startup timing, but rebuffers remained frequent:
+  - `time_to_first_chunk_ms: 491`
+  - `time_to_preroll_ready_ms: 2411`
+  - `rebuffer_event_count: 14`
+  - `rebuffer_total_duration_ms: 18032`
+  - `avg_inter_chunk_gap_ms: 189`
+  - `avg_queued_audio_ms: 1512`
+- That latest forward normalized run mapped rebuffers roughly as:
+  - `Section One`: `4`
+  - `Section Two`: `4`
+  - `Section Three`: `3`
+  - `Section Four`: `1`
+  - `Footer`: `1`
+  - one final late rebuffer fell just past the estimated final section window boundary
+- A fresh reversed-order direct capture on the same normalized build performed better overall:
+  - `time_to_first_chunk_ms: 405`
+  - `time_to_preroll_ready_ms: 2205`
+  - `rebuffer_event_count: 10`
+  - `rebuffer_total_duration_ms: 11041`
+  - `avg_inter_chunk_gap_ms: 189`
+  - `avg_queued_audio_ms: 1259`
+- That latest reversed normalized run mapped rebuffers roughly as:
+  - `Footer`: `2`
+  - `Section Four`: `1`
+  - `Section Three`: `2`
+  - `Section Two`: `3`
+  - `Section One`: `1`
+  - one final late rebuffer fell just past the estimated final section window boundary
+- The latest normalized comparison strengthens the current hypothesis:
+  - ordering still matters, because moving easier material earlier improves startup and lowers total rebuffer time
+  - `Section Two` remains one of the strongest repeat offenders even when moved later, which keeps pointing at identifier-heavy speech normalization as the next high-signal tuning area
 
 Operational notes:
 

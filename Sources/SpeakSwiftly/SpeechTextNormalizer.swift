@@ -47,6 +47,8 @@ struct SpeechTextForensicSectionWindow: Sendable, Equatable {
 }
 
 enum SpeechTextNormalizer {
+    // MARK: Public API
+
     static func normalize(_ text: String) -> String {
         var normalized = text
             .replacingOccurrences(of: "\r\n", with: "\n")
@@ -154,6 +156,8 @@ enum SpeechTextNormalizer {
         return windows
     }
 
+    // MARK: Detection
+
     private static func containsCorrectableText(_ text: String) -> Bool {
         let markers = ["```", "`", "[", "](", "->", "=>", "::", "?.", "??"]
         if markers.contains(where: text.contains) {
@@ -162,6 +166,8 @@ enum SpeechTextNormalizer {
 
         return looksCodeHeavy(text)
     }
+
+    // MARK: Normalization Passes
 
     private static func normalizeFencedCodeBlocks(_ text: String) -> String {
         replacingMatches(
@@ -233,6 +239,8 @@ enum SpeechTextNormalizer {
         }
     }
 
+    // MARK: Forensic Helpers
+
     private static func looksCodeHeavy(_ text: String) -> Bool {
         let obviousMarkers = [
             "```", "`", "->", "=>", "::", "&&", "||", "==", "!=", "{", "}", "</", "/>",
@@ -288,6 +296,8 @@ enum SpeechTextNormalizer {
         let range = NSRange(location: 0, length: (text as NSString).length)
         return regex.numberOfMatches(in: text, range: range)
     }
+
+    // MARK: Speech Conversion
 
     private static func spokenCode(_ text: String) -> String {
         let replacements: [(String, String)] = [
@@ -373,6 +383,8 @@ enum SpeechTextNormalizer {
         return collapseWhitespace(spoken)
     }
 
+    // MARK: Formatting
+
     private static func collapseWhitespace(_ text: String) -> String {
         let collapsedSpaces = text.replacingOccurrences(
             of: #"[ ]{2,}"#,
@@ -392,6 +404,8 @@ enum SpeechTextNormalizer {
             )
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    // MARK: Regex Utilities
 
     private static func replacingMatches(
         in text: String,
@@ -422,6 +436,8 @@ enum SpeechTextNormalizer {
         result += source.substring(with: suffixRange)
         return result
     }
+
+    // MARK: Section Splitting
 
     private struct ForensicSectionCandidate {
         let title: String
