@@ -72,6 +72,48 @@ struct SpeakSwiftlyE2ETests {
 
     Please read this paragraph once and keep a natural tone. The path `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should sound like speech, not code noise.
     """
+    private static let segmentedConversationalPlaybackText = """
+    # Section One
+
+    Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
+
+    ## Section Two
+
+    In this part, talk as if you are explaining a thoughtful idea to one person who is listening closely. Keep the pacing natural, let the phrasing stay connected, and avoid sounding clipped, rushed, or overly dramatic.
+
+    ## Section Three
+
+    Now continue with a calmer reflective paragraph about a quiet afternoon, a cup of tea, a patch of sun on the floor, and the feeling that time has slowed down just enough for the room to seem gentle and easy to inhabit.
+
+    ## Section Four
+
+    Finish the body with another plain spoken paragraph about wrapping up a task, setting the last page in order, and feeling relieved that the long careful effort has finally started to come together in a satisfying way.
+
+    ## Footer
+
+    End this conversational forensic playback probe once, clearly, and without looping.
+    """
+    private static let reversedSegmentedConversationalPlaybackText = """
+    # Footer
+
+    End this conversational forensic playback probe once, clearly, and without looping.
+
+    ## Section Four
+
+    Finish the body with another plain spoken paragraph about wrapping up a task, setting the last page in order, and feeling relieved that the long careful effort has finally started to come together in a satisfying way.
+
+    ## Section Three
+
+    Now continue with a calmer reflective paragraph about a quiet afternoon, a cup of tea, a patch of sun on the floor, and the feeling that time has slowed down just enough for the room to seem gentle and easy to inhabit.
+
+    ## Section Two
+
+    In this part, talk as if you are explaining a thoughtful idea to one person who is listening closely. Keep the pacing natural, let the phrasing stay connected, and avoid sounding clipped, rushed, or overly dramatic.
+
+    ## Section One
+
+    Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
+    """
 
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
@@ -607,6 +649,178 @@ struct SpeakSwiftlyE2ETests {
         } != nil)
         #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
             $0["id"] as? String == "req-live-reversed-segmented"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
+    @Test func forensicSpeakLiveRunsEndToEndWithSegmentedConversationalProseRequest() async throws {
+        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: Self.isPlaybackTraceEnabled
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-conversational","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-conversational"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-conversational","op":"speak_live","text":"\(Self.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-conversational"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == "req-live-conversational",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                    && (details["file_path_count"] as? Int ?? 0) == 0
+                    && (details["dotted_identifier_count"] as? Int ?? 0) == 0
+                    && (details["camel_case_token_count"] as? Int ?? 0) == 0
+                    && (details["snake_case_token_count"] as? Int ?? 0) == 0
+                    && (details["objc_symbol_count"] as? Int ?? 0) == 0
+                    && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
+            }
+        )
+
+        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_section_window",
+                $0["request_id"] as? String == "req-live-conversational",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["section_title"] as? String == "Section Two"
+                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-conversational"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
+    @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest() async throws {
+        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: false,
+            playbackTrace: Self.isPlaybackTraceEnabled
+        )
+        defer { Task { await worker.stop() } }
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-create-reversed-conversational","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
+            """
+        )
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-create-reversed-conversational"
+                && $0["ok"] as? Bool == true
+        } != nil)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-live-reversed-conversational","op":"speak_live","text":"\(Self.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-reversed-conversational"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == "req-live-reversed-conversational",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                    && (details["file_path_count"] as? Int ?? 0) == 0
+                    && (details["dotted_identifier_count"] as? Int ?? 0) == 0
+                    && (details["camel_case_token_count"] as? Int ?? 0) == 0
+                    && (details["snake_case_token_count"] as? Int ?? 0) == 0
+                    && (details["objc_symbol_count"] as? Int ?? 0) == 0
+                    && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
+            }
+        )
+
+        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_section_window",
+                $0["request_id"] as? String == "req-live-reversed-conversational",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["section_title"] as? String == "Footer"
+                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == "req-live-reversed-conversational"
                 && $0["ok"] as? Bool == true
         } != nil)
 

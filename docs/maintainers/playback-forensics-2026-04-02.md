@@ -161,6 +161,44 @@ Interpretation:
 - The latest normalized comparison strengthens the current hypothesis:
   - ordering still matters, because moving easier material earlier improves startup and lowers total rebuffer time
   - `Section Two` remains one of the strongest repeat offenders even when moved later, which keeps pointing at identifier-heavy speech normalization as the next high-signal tuning area
+- We also added matched section-aware conversational prose probes to compare "ordinary" speech against the code-heavy forensic family with the same section-window machinery.
+- The latest forward conversational direct capture finished with:
+  - `time_to_first_chunk_ms: 426`
+  - `time_to_preroll_ready_ms: 2279`
+  - `rebuffer_event_count: 11`
+  - `rebuffer_total_duration_ms: 12410`
+  - `avg_inter_chunk_gap_ms: 193`
+  - `avg_queued_audio_ms: 1325`
+- The latest forward conversational run mapped rebuffers roughly as:
+  - `Section One`: `4`
+  - `Section Two`: `2`
+  - `Section Three`: `2`
+  - `Section Four`: `1`
+  - `Footer`: `1`
+  - one final late rebuffer fell just past the estimated final section window boundary
+- The latest reversed conversational direct capture finished with:
+  - `time_to_first_chunk_ms: 492`
+  - `time_to_preroll_ready_ms: 2346`
+  - `rebuffer_event_count: 9`
+  - `rebuffer_total_duration_ms: 10484`
+  - `avg_inter_chunk_gap_ms: 188`
+  - `avg_queued_audio_ms: 1216`
+- The latest reversed conversational run mapped rebuffers roughly as:
+  - `Footer`: `2`
+  - `Section Four`: `1`
+  - `Section Three`: `2`
+  - `Section Two`: `2`
+  - `Section One`: `1`
+  - one final late rebuffer fell just past the estimated final section window boundary
+- The prose-versus-code comparison is useful but also exposed a detection problem:
+  - the sectioned conversational prose still logged `looks_code_heavy: true`
+  - the same prose also landed in `text_complexity_class: "extended"`
+  - that likely means the current code-heaviness heuristic is overreacting to markdown section structure rather than actual code-ish content
+- The latest cross-family comparison suggests:
+  - prose is somewhat better than code-heavy material, but not dramatically better
+  - reversing the section order helps both families, which keeps startup-phase sensitivity in the picture
+  - identifier-heavy and section-leading content still appear to be meaningful contributors
+  - the current complexity detector probably needs its own tuning pass before prose-versus-code classification can be trusted as a strong signal
 
 Operational notes:
 
