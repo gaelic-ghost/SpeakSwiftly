@@ -411,6 +411,7 @@ actor WorkerRuntime {
         let op = WorkerRequest.speakLive(id: id, text: text, profileName: profileName).opName
         let normalizedText = SpeechTextNormalizer.normalize(text)
         let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
+        let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
 
         await emitProgress(id: id, stage: .loadingProfile)
         let profileLoadStartedAt = dependencies.now()
@@ -489,8 +490,18 @@ actor WorkerRuntime {
                         "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
                     ]
                     .merging(self.textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
+                    .merging(["section_count": .int(textSections.count)], uniquingKeysWith: { _, new in new })
                     .merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
                 )
+                for section in textSections {
+                    await self.logRequestEvent(
+                        "playback_section_detected",
+                        requestID: id,
+                        op: op,
+                        profileName: profileName,
+                        details: self.textSectionDetails(section)
+                    )
+                }
             case .queueDepthLow(let queuedAudioMS):
                 await self.logRequestEvent(
                     "playback_queue_depth_low",
@@ -687,6 +698,7 @@ actor WorkerRuntime {
             details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude)
         }
         details.merge(textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
+        details["section_count"] = .int(textSections.count)
         details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
         await logRequestEvent(
             "playback_finished",
@@ -695,6 +707,22 @@ actor WorkerRuntime {
             profileName: profileName,
             details: details
         )
+
+        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / Double(residentModel.sampleRate) * 1_000).rounded())
+        let sectionWindows = SpeechTextNormalizer.forensicSectionWindows(
+            originalText: text,
+            totalDurationMS: totalDurationMS,
+            totalChunkCount: playbackSummary.chunkCount
+        )
+        for window in sectionWindows {
+            await logRequestEvent(
+                "playback_section_window",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: textSectionWindowDetails(window)
+            )
+        }
     }
 
     private func handleCreateProfile(
@@ -819,6 +847,30 @@ actor WorkerRuntime {
             "punctuation_heavy_line_count": .int(features.punctuationHeavyLineCount),
             "looks_code_heavy": .bool(features.looksCodeHeavy),
         ]
+    }
+
+    private func textSectionDetails(_ section: SpeechTextForensicSection) -> [String: LogValue] {
+        [
+            "section_index": .int(section.index),
+            "section_title": .string(section.title),
+            "section_kind": .string(section.kind.rawValue),
+            "original_character_count": .int(section.originalCharacterCount),
+            "normalized_character_count": .int(section.normalizedCharacterCount),
+            "normalized_character_share": .double(section.normalizedCharacterShare),
+        ]
+    }
+
+    private func textSectionWindowDetails(_ window: SpeechTextForensicSectionWindow) -> [String: LogValue] {
+        textSectionDetails(window.section).merging(
+            [
+                "estimated_start_ms": .int(window.estimatedStartMS),
+                "estimated_end_ms": .int(window.estimatedEndMS),
+                "estimated_duration_ms": .int(window.estimatedDurationMS),
+                "estimated_start_chunk": .int(window.estimatedStartChunk),
+                "estimated_end_chunk": .int(window.estimatedEndChunk),
+            ],
+            uniquingKeysWith: { _, new in new }
+        )
     }
 
     private func residentModelOrThrow() throws -> AnySpeechModel {

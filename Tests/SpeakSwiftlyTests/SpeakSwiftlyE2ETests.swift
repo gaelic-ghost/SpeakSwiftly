@@ -480,6 +480,20 @@ struct SpeakSwiftlyE2ETests {
         let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
         #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
         #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_section_window",
+                $0["request_id"] as? String == "req-live-segmented",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["section_title"] as? String == "Section Two"
+                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+        } != nil)
         #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
             $0["id"] as? String == "req-live-segmented"
                 && $0["ok"] as? Bool == true

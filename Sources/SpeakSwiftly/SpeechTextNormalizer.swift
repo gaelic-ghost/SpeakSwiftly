@@ -22,6 +22,30 @@ struct SpeechTextForensicFeatures: Sendable, Equatable {
     let looksCodeHeavy: Bool
 }
 
+enum SpeechTextForensicSectionKind: String, Sendable, Equatable {
+    case markdownHeader = "markdown_header"
+    case paragraph
+    case fullRequest = "full_request"
+}
+
+struct SpeechTextForensicSection: Sendable, Equatable {
+    let index: Int
+    let title: String
+    let kind: SpeechTextForensicSectionKind
+    let originalCharacterCount: Int
+    let normalizedCharacterCount: Int
+    let normalizedCharacterShare: Double
+}
+
+struct SpeechTextForensicSectionWindow: Sendable, Equatable {
+    let section: SpeechTextForensicSection
+    let estimatedStartMS: Int
+    let estimatedEndMS: Int
+    let estimatedDurationMS: Int
+    let estimatedStartChunk: Int
+    let estimatedEndChunk: Int
+}
+
 enum SpeechTextNormalizer {
     static func normalize(_ text: String) -> String {
         var normalized = text
@@ -65,6 +89,67 @@ enum SpeechTextNormalizer {
             punctuationHeavyLineCount: punctuationHeavyLineCount(in: originalText),
             looksCodeHeavy: looksCodeHeavy(originalText)
         )
+    }
+
+    static func forensicSections(originalText: String) -> [SpeechTextForensicSection] {
+        let sections = splitForensicSections(in: originalText)
+        let weightedCounts = sections.map { max(normalize($0.text).count, 1) }
+        let totalWeightedCount = max(weightedCounts.reduce(0, +), 1)
+
+        let finalizedSections = sections.enumerated().map { index, section in
+            SpeechTextForensicSection(
+                index: index + 1,
+                title: section.title,
+                kind: section.kind,
+                originalCharacterCount: section.text.count,
+                normalizedCharacterCount: weightedCounts[index],
+                normalizedCharacterShare: Double(weightedCounts[index]) / Double(totalWeightedCount)
+            )
+        }
+        return finalizedSections
+    }
+
+    static func forensicSectionWindows(
+        originalText: String,
+        totalDurationMS: Int,
+        totalChunkCount: Int
+    ) -> [SpeechTextForensicSectionWindow] {
+        let sections = forensicSections(originalText: originalText)
+        guard !sections.isEmpty else { return [] }
+
+        var elapsedMS = 0
+        var elapsedChunks = 0
+        let windows = sections.enumerated().map { index, section in
+            let isLastSection = index == sections.count - 1
+            let remainingDurationMS = max(totalDurationMS - elapsedMS, 0)
+            let remainingChunkCount = max(totalChunkCount - elapsedChunks, 0)
+            let durationMS = isLastSection
+                ? remainingDurationMS
+                : min(
+                    remainingDurationMS,
+                    max(Int((Double(totalDurationMS) * section.normalizedCharacterShare).rounded()), 0)
+                )
+            let chunkCount = isLastSection
+                ? remainingChunkCount
+                : min(
+                    remainingChunkCount,
+                    max(Int((Double(totalChunkCount) * section.normalizedCharacterShare).rounded()), 0)
+                )
+
+            let window = SpeechTextForensicSectionWindow(
+                section: section,
+                estimatedStartMS: elapsedMS,
+                estimatedEndMS: elapsedMS + durationMS,
+                estimatedDurationMS: durationMS,
+                estimatedStartChunk: elapsedChunks,
+                estimatedEndChunk: elapsedChunks + chunkCount
+            )
+            elapsedMS += durationMS
+            elapsedChunks += chunkCount
+            return window
+        }
+
+        return windows
     }
 
     private static func containsCorrectableText(_ text: String) -> Bool {
@@ -264,5 +349,99 @@ enum SpeechTextNormalizer {
         let suffixRange = NSRange(location: lastLocation, length: source.length - lastLocation)
         result += source.substring(with: suffixRange)
         return result
+    }
+
+    private struct ForensicSectionCandidate {
+        let title: String
+        let kind: SpeechTextForensicSectionKind
+        let text: String
+    }
+
+    private static func splitForensicSections(in text: String) -> [ForensicSectionCandidate] {
+        let headerSections = splitMarkdownHeaderSections(in: text)
+        if !headerSections.isEmpty {
+            return headerSections
+        }
+
+        let paragraphSections = splitParagraphSections(in: text)
+        if !paragraphSections.isEmpty {
+            return paragraphSections
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return [
+            ForensicSectionCandidate(
+                title: "Full Request",
+                kind: .fullRequest,
+                text: trimmed
+            )
+        ]
+    }
+
+    private static func splitMarkdownHeaderSections(in text: String) -> [ForensicSectionCandidate] {
+        let lines = text.components(separatedBy: .newlines)
+        var sections = [ForensicSectionCandidate]()
+        var currentTitle: String?
+        var currentLines = [String]()
+
+        func flushCurrentSection() {
+            guard let currentTitle else { return }
+            let sectionText = currentLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sectionText.isEmpty else { return }
+            sections.append(
+                ForensicSectionCandidate(
+                    title: currentTitle,
+                    kind: .markdownHeader,
+                    text: sectionText
+                )
+            )
+        }
+
+        for line in lines {
+            if let headerTitle = markdownHeaderTitle(in: line) {
+                flushCurrentSection()
+                currentTitle = headerTitle
+                currentLines = [line]
+            } else if currentTitle != nil {
+                currentLines.append(line)
+            }
+        }
+
+        flushCurrentSection()
+        return sections
+    }
+
+    private static func splitParagraphSections(in text: String) -> [ForensicSectionCandidate] {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return [] }
+
+        return normalized
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .enumerated()
+            .map { index, paragraph in
+                ForensicSectionCandidate(
+                    title: "Paragraph \(index + 1)",
+                    kind: .paragraph,
+                    text: paragraph
+                )
+            }
+    }
+
+    private static func markdownHeaderTitle(in line: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: #"^\s{0,3}#{1,6}\s+(.+?)\s*$"#) else {
+            return nil
+        }
+
+        let source = line as NSString
+        let range = NSRange(location: 0, length: source.length)
+        guard let match = regex.firstMatch(in: line, range: range) else {
+            return nil
+        }
+
+        let title = source.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? nil : title
     }
 }

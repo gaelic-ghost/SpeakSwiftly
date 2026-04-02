@@ -268,6 +268,52 @@ import Testing
     #expect(features.looksCodeHeavy)
 }
 
+@Test func speechTextForensicSectionsAndWindowsTrackSegmentedMarkdownStructure() {
+    let original = """
+    # Section One
+
+    Please read this paragraph once and keep a natural tone.
+
+    ## Section Two
+
+    Read these identifiers carefully: NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
+
+    ## Section Three
+
+    ```objc
+    @property(nonatomic, strong) NSString *displayName;
+    [NSFileManager.defaultManager fileExistsAtPath:@"/tmp/Thing"];
+    ```
+
+    ## Footer
+
+    End this probe clearly and without looping.
+    """
+
+    let sections = SpeechTextNormalizer.forensicSections(originalText: original)
+    #expect(sections.map(\.title) == ["Section One", "Section Two", "Section Three", "Footer"])
+    #expect(sections.allSatisfy { $0.kind == .markdownHeader })
+    #expect(sections.allSatisfy { $0.normalizedCharacterCount > 0 })
+    #expect(abs(sections.map(\.normalizedCharacterShare).reduce(0, +) - 1.0) < 0.0001)
+
+    let windows = SpeechTextNormalizer.forensicSectionWindows(
+        originalText: original,
+        totalDurationMS: 12_000,
+        totalChunkCount: 75
+    )
+    #expect(windows.count == 4)
+    #expect(windows.first?.estimatedStartMS == 0)
+    #expect(windows.first?.estimatedStartChunk == 0)
+    #expect(windows.last?.estimatedEndMS == 12_000)
+    #expect(windows.last?.estimatedEndChunk == 75)
+    #expect(
+        zip(windows, windows.dropFirst()).allSatisfy { lhs, rhs in
+            lhs.estimatedEndMS == rhs.estimatedStartMS
+                && lhs.estimatedEndChunk == rhs.estimatedStartChunk
+        }
+    )
+}
+
 @Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
