@@ -41,7 +41,17 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalizeURLs(text)
 
-        #expect(normalized.contains("https colon slash slash example dot com slash docs"))
+        #expect(normalized.contains("example dot com slash docs"))
+        #expect(!normalized.contains("https"))
+    }
+
+    @Test func urlsOmitLeadingWWW() {
+        let text = "Open https://www.example.com/docs now."
+
+        let normalized = SpeechTextNormalizer.normalizeURLs(text)
+
+        #expect(normalized.contains("example dot com slash docs"))
+        #expect(!normalized.contains("www"))
     }
 
     @Test func filePathsBecomeSpokenPaths() {
@@ -122,7 +132,7 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalize(original)
 
-        #expect(normalized.contains("the docs, link https colon slash slash example dot com slash docs"))
+        #expect(normalized.contains("the docs, link example dot com slash docs"))
         #expect(normalized.contains("Code sample."))
         #expect(normalized.contains("slash tmp slash Thing"))
         #expect(normalized.contains("c h r o m m m a t i c a l l l y"))
@@ -133,7 +143,7 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalize(original)
 
-        #expect(normalized.contains("https colon slash slash example dot com slash docs slash path underscore now"))
+        #expect(normalized.contains("example dot com slash docs slash path underscore now"))
         #expect(normalized.contains("tmp slash Thing"))
     }
 }

@@ -466,12 +466,12 @@ extension SpeechTextNormalizer {
             return spokenPath(text)
         }
 
-        let scheme = String(text[..<schemeSeparator.lowerBound])
-        let remainder = String(text[schemeSeparator.upperBound...])
-        let spokenScheme = spokenSegment(scheme)
-        let spokenRemainder = spokenPath(remainder)
+        var remainder = String(text[schemeSeparator.upperBound...])
+        if remainder.hasPrefix("www.") {
+            remainder.removeFirst(4)
+        }
 
-        return collapseWhitespace("\(spokenScheme) colon slash slash \(spokenRemainder)")
+        return spokenPath(remainder)
     }
 
     static func spokenIdentifier(_ text: String) -> String {
