@@ -36,6 +36,14 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("the docs, link https://example.com/docs"))
     }
 
+    @Test func urlsBecomeSpokenUrls() {
+        let text = "Open https://example.com/docs now."
+
+        let normalized = SpeechTextNormalizer.normalizeURLs(text)
+
+        #expect(normalized.contains("https colon slash slash example dot com slash docs"))
+    }
+
     @Test func filePathsBecomeSpokenPaths() {
         let text = "Path: /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift."
 
@@ -114,9 +122,18 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalize(original)
 
-        #expect(normalized.contains("the docs, link https://example.com/docs"))
+        #expect(normalized.contains("the docs, link https colon slash slash example dot com slash docs"))
         #expect(normalized.contains("Code sample."))
         #expect(normalized.contains("slash tmp slash Thing"))
         #expect(normalized.contains("c h r o m m m a t i c a l l l y"))
+    }
+
+    @Test func normalizeHandlesStandaloneUrlsBeforePathPasses() {
+        let original = "Open https://example.com/docs/path_now before /tmp/Thing."
+
+        let normalized = SpeechTextNormalizer.normalize(original)
+
+        #expect(normalized.contains("https colon slash slash example dot com slash docs slash path underscore now"))
+        #expect(normalized.contains("tmp slash Thing"))
     }
 }

@@ -86,6 +86,7 @@ enum SpeechTextNormalizer {
             normalizeFencedCodeBlocks,
             normalizeInlineCodeSpans,
             normalizeMarkdownLinks,
+            normalizeURLs,
             normalizeFilePaths,
             normalizeDottedIdentifiers,
             normalizeSnakeCaseIdentifiers,
@@ -290,6 +291,13 @@ extension SpeechTextNormalizer {
         return result
     }
 
+    static func normalizeURLs(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            guard isLikelyURL(token) else { return nil }
+            return spokenURL(token)
+        }
+    }
+
     static func normalizeFilePaths(_ text: String) -> String {
         transformTokens(in: text) { token in
             guard isLikelyFilePath(token) else { return nil }
@@ -451,6 +459,19 @@ extension SpeechTextNormalizer {
 
         flushBuffer()
         return collapseWhitespace(segments.joined(separator: " "))
+    }
+
+    static func spokenURL(_ text: String) -> String {
+        guard let schemeSeparator = text.range(of: "://") else {
+            return spokenPath(text)
+        }
+
+        let scheme = String(text[..<schemeSeparator.lowerBound])
+        let remainder = String(text[schemeSeparator.upperBound...])
+        let spokenScheme = spokenSegment(scheme)
+        let spokenRemainder = spokenPath(remainder)
+
+        return collapseWhitespace("\(spokenScheme) colon slash slash \(spokenRemainder)")
     }
 
     static func spokenIdentifier(_ text: String) -> String {
@@ -871,6 +892,13 @@ extension SpeechTextNormalizer {
         return token.hasPrefix("/")
             || token.hasPrefix("~/")
             || (token.contains("/") && !token.contains(" "))
+    }
+
+    static func isLikelyURL(_ token: String) -> Bool {
+        guard let schemeSeparator = token.range(of: "://") else { return false }
+        let scheme = token[..<schemeSeparator.lowerBound]
+        guard !scheme.isEmpty else { return false }
+        return scheme.allSatisfy { $0.isLetter }
     }
 
     static func isLikelyDottedIdentifier(_ token: String) -> Bool {
