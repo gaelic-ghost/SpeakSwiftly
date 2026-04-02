@@ -1,4 +1,6 @@
 import Foundation
+import NaturalLanguage
+import RegexBuilder
 
 // MARK: - Speech Text Normalization
 
@@ -47,49 +49,83 @@ struct SpeechTextForensicSectionWindow: Sendable, Equatable {
 }
 
 enum SpeechTextNormalizer {
+    typealias NormalizationPass = (String) -> String
+
+    private static var codeMarkerRegex: Regex<Substring> {
+        Regex {
+            ChoiceOf {
+                "```"
+                "`"
+                "->"
+                "=>"
+                "::"
+                "?."
+                "??"
+                "&&"
+                "||"
+                "=="
+                "!="
+                "{"
+                "}"
+                "</"
+                "/>"
+                "func "
+                "let "
+                "var "
+                "const "
+                "class "
+                "struct "
+                "enum "
+                "return "
+            }
+        }
+    }
+
+    private static var normalizationPasses: [NormalizationPass] {
+        [
+            normalizeFencedCodeBlocks,
+            normalizeInlineCodeSpans,
+            normalizeMarkdownLinks,
+            normalizeFilePaths,
+            normalizeDottedIdentifiers,
+            normalizeSnakeCaseIdentifiers,
+            normalizeCamelCaseIdentifiers,
+            normalizeCodeHeavyLines,
+            normalizeSpiralProneWords,
+            collapseWhitespace,
+        ]
+    }
+
     // MARK: Public API
 
     static func normalize(_ text: String) -> String {
-        var normalized = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-            .replacingOccurrences(of: "\t", with: " ")
-
-        if containsCorrectableText(normalized) {
-            normalized = normalizeFencedCodeBlocks(normalized)
-            normalized = normalizeInlineCode(normalized)
-            normalized = normalizeMarkdownLinks(normalized)
-            normalized = normalizeFilePaths(normalized)
-            normalized = normalizeIdentifierTokens(normalized)
-
-            if looksCodeHeavy(normalized) {
-                normalized = spokenCode(normalized)
-            }
-
-            normalized = collapseWhitespace(normalized)
+        let normalized = normalizationPasses.reduce(canonicalize(text)) { partial, pass in
+            pass(partial)
         }
-
         let finalized = collapseWhitespace(normalized)
         return finalized.isEmpty ? text : finalized
     }
 
     static func forensicFeatures(originalText: String, normalizedText: String) -> SpeechTextForensicFeatures {
-        SpeechTextForensicFeatures(
+        let tokens = candidateTokens(in: originalText)
+
+        return SpeechTextForensicFeatures(
             originalCharacterCount: originalText.count,
             normalizedCharacterCount: normalizedText.count,
             normalizedCharacterDelta: normalizedText.count - originalText.count,
             originalParagraphCount: paragraphCount(in: originalText),
             normalizedParagraphCount: paragraphCount(in: normalizedText),
-            markdownHeaderCount: regexMatchCount(in: originalText, pattern: #"(?m)^\s{0,3}#{1,6}\s+\S.*$"#),
-            fencedCodeBlockCount: regexMatchCount(in: originalText, pattern: #"```"#) / 2,
-            inlineCodeSpanCount: regexMatchCount(in: originalText, pattern: #"`[^`\n]+`"#),
-            markdownLinkCount: regexMatchCount(in: originalText, pattern: #"\[[^\]]+\]\([^)]+\)"#),
-            filePathCount: regexMatchCount(in: originalText, pattern: #"(?<!\w)(?:~|/)[^\s`),;]+"#),
-            dottedIdentifierCount: regexMatchCount(in: originalText, pattern: #"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"#),
-            camelCaseTokenCount: regexMatchCount(in: originalText, pattern: #"\b[a-z]+(?:[A-Z][a-z0-9]+)+\b"#),
-            snakeCaseTokenCount: regexMatchCount(in: originalText, pattern: #"\b[a-z0-9]+(?:_[a-z0-9]+)+\b"#),
-            objcSymbolCount: regexMatchCount(in: originalText, pattern: #"\b[A-Z]{2,}[A-Za-z0-9]*(?::[A-Za-z0-9]+)+\b|\bNS[A-Z][A-Za-z0-9]+\b"#),
-            repeatedLetterRunCount: regexMatchCount(in: originalText, pattern: #"(?i)\b\w*([a-z])\1{2,}\w*\b"#),
+            markdownHeaderCount: originalText.split(separator: "\n", omittingEmptySubsequences: false)
+                .count(where: { markdownHeaderTitle(in: String($0)) != nil }),
+            fencedCodeBlockCount: fencedCodeBlockBodies(in: originalText).count,
+            inlineCodeSpanCount: inlineCodeBodies(in: originalText).count,
+            markdownLinkCount: markdownLinks(in: originalText).count,
+            filePathCount: filePathFragments(in: originalText).count,
+            dottedIdentifierCount: tokens.count(where: isLikelyDottedIdentifier),
+            camelCaseTokenCount: tokens.count(where: isLikelyCamelCaseIdentifier),
+            snakeCaseTokenCount: tokens.count(where: isLikelySnakeCaseIdentifier),
+            objcSymbolCount: tokens.count(where: isLikelyObjectiveCSymbol),
+            repeatedLetterRunCount: tokens.count(where: containsRepeatedLetterRun),
             punctuationHeavyLineCount: punctuationHeavyLineCount(in: originalText),
             looksCodeHeavy: looksCodeHeavy(originalText)
         )
@@ -100,7 +136,7 @@ enum SpeechTextNormalizer {
         let weightedCounts = sections.map { max(normalize($0.text).count, 1) }
         let totalWeightedCount = max(weightedCounts.reduce(0, +), 1)
 
-        let finalizedSections = sections.enumerated().map { index, section in
+        return sections.enumerated().map { index, section in
             SpeechTextForensicSection(
                 index: index + 1,
                 title: section.title,
@@ -110,7 +146,6 @@ enum SpeechTextNormalizer {
                 normalizedCharacterShare: Double(weightedCounts[index]) / Double(totalWeightedCount)
             )
         }
-        return finalizedSections
     }
 
     static func forensicSectionWindows(
@@ -123,7 +158,8 @@ enum SpeechTextNormalizer {
 
         var elapsedMS = 0
         var elapsedChunks = 0
-        let windows = sections.enumerated().map { index, section in
+
+        return sections.enumerated().map { index, section in
             let isLastSection = index == sections.count - 1
             let remainingDurationMS = max(totalDurationMS - elapsedMS, 0)
             let remainingChunkCount = max(totalChunkCount - elapsedChunks, 0)
@@ -148,158 +184,195 @@ enum SpeechTextNormalizer {
                 estimatedStartChunk: elapsedChunks,
                 estimatedEndChunk: elapsedChunks + chunkCount
             )
+
             elapsedMS += durationMS
             elapsedChunks += chunkCount
             return window
         }
+    }
+}
 
-        return windows
+// MARK: - Normalization Passes
+
+extension SpeechTextNormalizer {
+    static func normalizeFencedCodeBlocks(_ text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard !lines.isEmpty else { return text }
+
+        var output: [String] = []
+        var bufferedCode: [String] = []
+        var insideFence = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                if insideFence {
+                    output.append(spokenCodeBlock(bufferedCode.joined(separator: "\n")))
+                    bufferedCode.removeAll(keepingCapacity: true)
+                }
+                insideFence.toggle()
+                continue
+            }
+
+            if insideFence {
+                bufferedCode.append(line)
+            } else {
+                output.append(line)
+            }
+        }
+
+        if insideFence, !bufferedCode.isEmpty {
+            output.append(spokenCodeBlock(bufferedCode.joined(separator: "\n")))
+        }
+
+        return output.joined(separator: "\n")
     }
 
-    // MARK: Detection
+    static func normalizeInlineCodeSpans(_ text: String) -> String {
+        let bodies = inlineCodeBodies(in: text)
+        guard !bodies.isEmpty else { return text }
 
-    private static func containsCorrectableText(_ text: String) -> Bool {
-        let markers = ["```", "`", "[", "](", "->", "=>", "::", "?.", "??"]
-        if markers.contains(where: text.contains) {
+        var result = ""
+        var index = text.startIndex
+        var bodyIterator = bodies.makeIterator()
+        var nextBody = bodyIterator.next()
+
+        while index < text.endIndex {
+            guard text[index] == "`", let expectedBody = nextBody else {
+                result.append(text[index])
+                index = text.index(after: index)
+                continue
+            }
+
+            let contentStart = text.index(after: index)
+            guard let closing = text[contentStart...].firstIndex(of: "`") else {
+                result.append(text[index])
+                index = text.index(after: index)
+                continue
+            }
+
+            let body = String(text[contentStart..<closing])
+            if body == expectedBody {
+                result += spokenInlineCode(body)
+                index = text.index(after: closing)
+                nextBody = bodyIterator.next()
+            } else {
+                result.append(text[index])
+                index = text.index(after: index)
+            }
+        }
+
+        return result
+    }
+
+    static func normalizeMarkdownLinks(_ text: String) -> String {
+        let links = markdownLinks(in: text)
+        guard !links.isEmpty else { return text }
+
+        var result = ""
+        var cursor = text.startIndex
+
+        for link in links {
+            result += text[cursor..<link.fullRange.lowerBound]
+            let label = link.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let destination = link.destination.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if label.isEmpty {
+                result += " \(destination) "
+            } else {
+                result += " \(label), link \(destination) "
+            }
+
+            cursor = link.fullRange.upperBound
+        }
+
+        result += text[cursor...]
+        return result
+    }
+
+    static func normalizeFilePaths(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            guard isLikelyFilePath(token) else { return nil }
+            return spokenPath(token)
+        }
+    }
+
+    static func normalizeDottedIdentifiers(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            guard isLikelyDottedIdentifier(token) else { return nil }
+            return spokenIdentifier(token)
+        }
+    }
+
+    static func normalizeSnakeCaseIdentifiers(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            guard isLikelySnakeCaseIdentifier(token) else { return nil }
+            return spokenIdentifier(token)
+        }
+    }
+
+    static func normalizeCamelCaseIdentifiers(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            guard isLikelyCamelCaseIdentifier(token) else { return nil }
+            return spokenIdentifier(token)
+        }
+    }
+
+    static func normalizeCodeHeavyLines(_ text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        return lines.map { line in
+            isLikelyCodeLine(line) ? spokenCode(line) : line
+        }.joined(separator: "\n")
+    }
+
+    static func normalizeSpiralProneWords(_ text: String) -> String {
+        let tokens = naturalLanguageTokenRanges(in: text)
+        guard !tokens.isEmpty else { return text }
+
+        var result = ""
+        var cursor = text.startIndex
+
+        for range in tokens {
+            result += text[cursor..<range.lowerBound]
+            let token = String(text[range])
+            result += containsRepeatedLetterRun(token) ? spelledOut(token) : token
+            cursor = range.upperBound
+        }
+
+        result += text[cursor...]
+        return result
+    }
+}
+
+// MARK: - Detection
+
+extension SpeechTextNormalizer {
+    static func looksCodeHeavy(_ text: String) -> Bool {
+        if text.firstMatch(of: codeMarkerRegex) != nil {
             return true
         }
 
-        return looksCodeHeavy(text)
+        let punctuationCount = text.filter { "{}[]()<>/\\=_*#|~:;".contains($0) }.count
+        let letterCount = text.filter(\.isLetter).count
+        guard letterCount > 0 else { return punctuationCount > 0 }
+        return Double(punctuationCount) / Double(letterCount) >= 0.12
     }
 
-    // MARK: Normalization Passes
-
-    private static func normalizeFencedCodeBlocks(_ text: String) -> String {
-        replacingMatches(
-            in: text,
-            pattern: #"(?s)```(?:[\w.+-]+)?\n?(.*?)```"#
-        ) { match, source in
-            let body = source.substring(with: match.range(at: 1))
-            let spoken = spokenCode(body)
-            return spoken.isEmpty ? " Code sample. " : " Code sample. \(spoken). End code sample. "
-        }
-    }
-
-    private static func normalizeInlineCode(_ text: String) -> String {
-        replacingMatches(
-            in: text,
-            pattern: #"(?s)`([^`]+)`"#
-        ) { match, source in
-            let body = source.substring(with: match.range(at: 1))
-            let spoken = spokenCode(body)
-            return spoken.isEmpty ? " code " : " \(spoken) "
-        }
-    }
-
-    private static func normalizeMarkdownLinks(_ text: String) -> String {
-        replacingMatches(
-            in: text,
-            pattern: #"\[([^\]]+)\]\(([^)]+)\)"#
-        ) { match, source in
-            let label = source.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            let link = source.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if label.isEmpty { return " \(link) " }
-            return " \(label), link \(link) "
-        }
-    }
-
-    private static func normalizeFilePaths(_ text: String) -> String {
-        replacingMatches(
-            in: text,
-            pattern: #"(?<!\w)(~|/)[^\s`),;]+"#
-        ) { match, source in
-            let path = source.substring(with: match.range(at: 0))
-            return " \(spokenPath(path)) "
-        }
-    }
-
-    private static func normalizeIdentifierTokens(_ text: String) -> String {
-        let dottedNormalized = replacingMatches(
-            in: text,
-            pattern: #"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b"#
-        ) { match, source in
-            let token = source.substring(with: match.range(at: 0))
-            return " \(spokenIdentifier(token)) "
-        }
-
-        let snakeNormalized = replacingMatches(
-            in: dottedNormalized,
-            pattern: #"\b[a-z0-9]+(?:_[a-z0-9]+)+\b"#
-        ) { match, source in
-            let token = source.substring(with: match.range(at: 0))
-            return " \(spokenIdentifier(token)) "
-        }
-
-        return replacingMatches(
-            in: snakeNormalized,
-            pattern: #"\b[a-z]+(?:[A-Z][a-z0-9]+)+\b"#
-        ) { match, source in
-            let token = source.substring(with: match.range(at: 0))
-            return " \(spokenIdentifier(token)) "
-        }
-    }
-
-    // MARK: Forensic Helpers
-
-    private static func looksCodeHeavy(_ text: String) -> Bool {
-        let obviousMarkers = [
-            "```", "`", "->", "=>", "::", "&&", "||", "==", "!=", "{", "}", "</", "/>",
-            "func ", "let ", "var ", "const ", "class ", "struct ", "enum ", "return "
-        ]
-        if obviousMarkers.contains(where: text.contains) {
-            return true
-        }
-
-        let codeCharacters = text.filter { "{}[]()<>/\\=_*#|~:;".contains($0) }.count
-        let letterCharacters = text.filter(\.isLetter).count
-        guard letterCharacters > 0 else { return codeCharacters > 0 }
-        return Double(codeCharacters) / Double(letterCharacters) >= 0.12
-    }
-
-    private static func paragraphCount(in text: String) -> Int {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return 0 }
-        let normalizedBreaks = trimmed.replacingOccurrences(
-            of: #"\n\s*\n"#,
-            with: "\n\n",
-            options: .regularExpression
-        )
-        return normalizedBreaks.components(separatedBy: "\n\n").count
-    }
-
-    private static func punctuationHeavyLineCount(in text: String) -> Int {
+    static func punctuationHeavyLineCount(in text: String) -> Int {
         text
             .split(separator: "\n", omittingEmptySubsequences: true)
-            .reduce(into: 0) { count, rawLine in
-                let line = String(rawLine)
-                let punctuation = line.filter { "{}[]()<>/\\=_*#|~:;.`-".contains($0) }.count
-                let letters = line.filter(\.isLetter).count
-                let containsStructuredCodeMarker =
-                    line.contains("@property")
-                    || line.contains("[")
-                    || line.contains("]")
-                    || line.contains("://")
-                    || line.contains("/")
-                    || line.contains("::")
-                    || line.contains("->")
-                    || line.contains("?.")
-                    || line.contains("??")
-
-                if punctuation >= 6 && (punctuation * 2 >= max(letters, 4) || containsStructuredCodeMarker) {
+            .reduce(into: 0) { count, line in
+                if isLikelyCodeLine(String(line)) {
                     count += 1
                 }
             }
     }
+}
 
-    private static func regexMatchCount(in text: String, pattern: String) -> Int {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return 0 }
-        let range = NSRange(location: 0, length: (text as NSString).length)
-        return regex.numberOfMatches(in: text, range: range)
-    }
+// MARK: - Speech Conversion
 
-    // MARK: Speech Conversion
-
-    private static func spokenCode(_ text: String) -> String {
+extension SpeechTextNormalizer {
+    static func spokenCode(_ text: String) -> String {
         let replacements: [(String, String)] = [
             ("\n", ". "),
             ("->", " returns "),
@@ -332,71 +405,122 @@ enum SpeechTextNormalizer {
             ("=", " equals "),
         ]
 
-        var spoken = text
-        for (source, replacement) in replacements {
-            spoken = spoken.replacingOccurrences(of: source, with: replacement)
+        let spoken = replacements.reduce(text) { partial, replacement in
+            partial.replacingOccurrences(of: replacement.0, with: replacement.1)
         }
 
-        spoken = replacingMatches(
-            in: spoken,
-            pattern: #"([a-z0-9])([A-Z])"#
-        ) { match, source in
-            let lhs = source.substring(with: match.range(at: 1))
-            let rhs = source.substring(with: match.range(at: 2))
-            return "\(lhs) \(rhs)"
-        }
-
-        return collapseWhitespace(spoken)
+        return collapseWhitespace(insertWordBreaks(in: spoken))
     }
 
-    private static func spokenPath(_ text: String) -> String {
-        var spoken = text
-        if spoken.hasPrefix("~") {
-            spoken = spoken.replacingOccurrences(of: "~", with: "home", options: [], range: spoken.startIndex..<spoken.index(after: spoken.startIndex))
+    static func spokenPath(_ text: String) -> String {
+        var segments: [String] = []
+        var buffer = ""
+
+        func flushBuffer() {
+            guard !buffer.isEmpty else { return }
+            segments.append(spokenSegment(buffer))
+            buffer.removeAll(keepingCapacity: true)
         }
 
-        spoken = spoken
-            .replacingOccurrences(of: "/", with: " slash ")
-            .replacingOccurrences(of: "\\", with: " backslash ")
-            .replacingOccurrences(of: ".", with: " dot ")
-            .replacingOccurrences(of: "_", with: " underscore ")
-            .replacingOccurrences(of: "-", with: " dash ")
-
-        return collapseWhitespace(spoken)
-    }
-
-    private static func spokenIdentifier(_ text: String) -> String {
-        var spoken = text
-            .replacingOccurrences(of: ".", with: " dot ")
-            .replacingOccurrences(of: "_", with: " underscore ")
-            .replacingOccurrences(of: "-", with: " dash ")
-
-        spoken = replacingMatches(
-            in: spoken,
-            pattern: #"([a-z0-9])([A-Z])"#
-        ) { match, source in
-            let lhs = source.substring(with: match.range(at: 1))
-            let rhs = source.substring(with: match.range(at: 2))
-            return "\(lhs) \(rhs)"
+        for character in text {
+            switch character {
+            case "~":
+                flushBuffer()
+                segments.append("home")
+            case "/":
+                flushBuffer()
+                if !segments.isEmpty {
+                    segments.append("slash")
+                }
+            case "\\":
+                flushBuffer()
+                segments.append("backslash")
+            case ".":
+                flushBuffer()
+                segments.append("dot")
+            case "_":
+                flushBuffer()
+                segments.append("underscore")
+            case "-":
+                flushBuffer()
+                segments.append("dash")
+            default:
+                buffer.append(character)
+            }
         }
 
-        return collapseWhitespace(spoken)
+        flushBuffer()
+        return collapseWhitespace(segments.joined(separator: " "))
     }
 
-    // MARK: Formatting
+    static func spokenIdentifier(_ text: String) -> String {
+        var parts: [String] = []
+        var buffer = ""
 
-    private static func collapseWhitespace(_ text: String) -> String {
-        let collapsedSpaces = text.replacingOccurrences(
-            of: #"[ ]{2,}"#,
-            with: " ",
-            options: .regularExpression
-        )
-        let collapsedLines = collapsedSpaces.replacingOccurrences(
-            of: #"\n{2,}"#,
-            with: ". ",
-            options: .regularExpression
-        )
-        return collapsedLines
+        func flushBuffer() {
+            guard !buffer.isEmpty else { return }
+            parts.append(spokenSegment(buffer))
+            buffer.removeAll(keepingCapacity: true)
+        }
+
+        for character in text {
+            switch character {
+            case ".":
+                flushBuffer()
+                parts.append("dot")
+            case "_":
+                flushBuffer()
+                parts.append("underscore")
+            case "-":
+                flushBuffer()
+                parts.append("dash")
+            default:
+                buffer.append(character)
+            }
+        }
+
+        flushBuffer()
+        return collapseWhitespace(parts.joined(separator: " "))
+    }
+}
+
+// MARK: - Formatting
+
+extension SpeechTextNormalizer {
+    static func canonicalize(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+
+    static func collapseWhitespace(_ text: String) -> String {
+        let lines = text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in
+                line.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            }
+
+        var rebuilt = ""
+        var blankLineCount = 0
+
+        for line in lines {
+            if line.isEmpty {
+                blankLineCount += 1
+                continue
+            }
+
+            if blankLineCount > 0, !rebuilt.isEmpty {
+                rebuilt += ". "
+            } else if !rebuilt.isEmpty, !rebuilt.hasSuffix(" ") {
+                rebuilt += " "
+            }
+
+            rebuilt += line
+            blankLineCount = 0
+        }
+
+        return rebuilt
             .replacingOccurrences(
                 of: #"\s+([,.;:?!])"#,
                 with: "$1",
@@ -404,41 +528,11 @@ enum SpeechTextNormalizer {
             )
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
 
-    // MARK: Regex Utilities
+// MARK: - Section Splitting
 
-    private static func replacingMatches(
-        in text: String,
-        pattern: String,
-        options: NSRegularExpression.Options = [],
-        transform: (_ match: NSTextCheckingResult, _ source: NSString) -> String
-    ) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
-            return text
-        }
-
-        let source = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: source.length))
-        guard !matches.isEmpty else { return text }
-
-        var result = ""
-        var lastLocation = 0
-
-        for match in matches {
-            let matchRange = match.range
-            let prefixRange = NSRange(location: lastLocation, length: matchRange.location - lastLocation)
-            result += source.substring(with: prefixRange)
-            result += transform(match, source)
-            lastLocation = matchRange.location + matchRange.length
-        }
-
-        let suffixRange = NSRange(location: lastLocation, length: source.length - lastLocation)
-        result += source.substring(with: suffixRange)
-        return result
-    }
-
-    // MARK: Section Splitting
-
+extension SpeechTextNormalizer {
     private struct ForensicSectionCandidate {
         let title: String
         let kind: SpeechTextForensicSectionKind
@@ -458,6 +552,7 @@ enum SpeechTextNormalizer {
 
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
+
         return [
             ForensicSectionCandidate(
                 title: "Full Request",
@@ -469,9 +564,9 @@ enum SpeechTextNormalizer {
 
     private static func splitMarkdownHeaderSections(in text: String) -> [ForensicSectionCandidate] {
         let lines = text.components(separatedBy: .newlines)
-        var sections = [ForensicSectionCandidate]()
+        var sections: [ForensicSectionCandidate] = []
         var currentTitle: String?
-        var currentLines = [String]()
+        var currentLines: [String] = []
 
         func flushCurrentSection() {
             guard let currentTitle else { return }
@@ -487,9 +582,9 @@ enum SpeechTextNormalizer {
         }
 
         for line in lines {
-            if let headerTitle = markdownHeaderTitle(in: line) {
+            if let title = markdownHeaderTitle(in: line) {
                 flushCurrentSection()
-                currentTitle = headerTitle
+                currentTitle = title
                 currentLines = [line]
             } else if currentTitle != nil {
                 currentLines.append(line)
@@ -501,10 +596,10 @@ enum SpeechTextNormalizer {
     }
 
     private static func splitParagraphSections(in text: String) -> [ForensicSectionCandidate] {
-        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalized.isEmpty else { return [] }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
 
-        return normalized
+        return trimmed
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -518,18 +613,413 @@ enum SpeechTextNormalizer {
             }
     }
 
-    private static func markdownHeaderTitle(in line: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: #"^\s{0,3}#{1,6}\s+(.+?)\s*$"#) else {
-            return nil
-        }
+    static func markdownHeaderTitle(in line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.first == "#" else { return nil }
 
-        let source = line as NSString
-        let range = NSRange(location: 0, length: source.length)
-        guard let match = regex.firstMatch(in: line, range: range) else {
-            return nil
-        }
-
-        let title = source.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = trimmed.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces)
         return title.isEmpty ? nil : title
     }
+}
+
+// MARK: - Parsing Utilities
+
+extension SpeechTextNormalizer {
+    private struct MarkdownLinkMatch {
+        let fullRange: Range<String.Index>
+        let label: String
+        let destination: String
+    }
+
+    static func fencedCodeBlockBodies(in text: String) -> [String] {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var bodies: [String] = []
+        var buffer: [String] = []
+        var insideFence = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                if insideFence {
+                    bodies.append(buffer.joined(separator: "\n"))
+                    buffer.removeAll(keepingCapacity: true)
+                }
+                insideFence.toggle()
+                continue
+            }
+
+            if insideFence {
+                buffer.append(line)
+            }
+        }
+
+        if insideFence, !buffer.isEmpty {
+            bodies.append(buffer.joined(separator: "\n"))
+        }
+
+        return bodies
+    }
+
+    static func inlineCodeBodies(in text: String) -> [String] {
+        var bodies: [String] = []
+        var index = text.startIndex
+
+        while index < text.endIndex {
+            guard text[index] == "`" else {
+                index = text.index(after: index)
+                continue
+            }
+
+            let contentStart = text.index(after: index)
+            guard let closing = text[contentStart...].firstIndex(of: "`") else {
+                break
+            }
+
+            bodies.append(String(text[contentStart..<closing]))
+            index = text.index(after: closing)
+        }
+
+        return bodies
+    }
+
+    private static func markdownLinks(in text: String) -> [MarkdownLinkMatch] {
+        var matches: [MarkdownLinkMatch] = []
+        var cursor = text.startIndex
+
+        while cursor < text.endIndex {
+            guard let labelStart = text[cursor...].firstIndex(of: "[") else { break }
+            guard let labelEnd = text[labelStart...].firstRange(of: "](")?.lowerBound else {
+                cursor = text.index(after: labelStart)
+                continue
+            }
+
+            let destinationStart = text.index(labelEnd, offsetBy: 2)
+            guard let destinationEnd = text[destinationStart...].firstIndex(of: ")") else {
+                cursor = text.index(after: labelStart)
+                continue
+            }
+
+            let fullRange = labelStart..<text.index(after: destinationEnd)
+            matches.append(
+                MarkdownLinkMatch(
+                    fullRange: fullRange,
+                    label: String(text[text.index(after: labelStart)..<labelEnd]),
+                    destination: String(text[destinationStart..<destinationEnd])
+                )
+            )
+            cursor = fullRange.upperBound
+        }
+
+        return matches
+    }
+
+    static func candidateTokens(in text: String) -> [String] {
+        text
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map(trimmedCandidateToken)
+            .filter { !$0.isEmpty }
+    }
+
+    static func filePathFragments(in text: String) -> [String] {
+        var fragments: [String] = []
+        var index = text.startIndex
+
+        while index < text.endIndex {
+            let character = text[index]
+            let startsTildePath =
+                character == "~"
+                && text.index(after: index) < text.endIndex
+                && text[text.index(after: index)] == "/"
+
+            guard character == "/" || startsTildePath else {
+                index = text.index(after: index)
+                continue
+            }
+
+            let start = index
+            var end = index
+
+            while end < text.endIndex {
+                let current = text[end]
+                if current.isWhitespace || "`),;\"[]{}".contains(current) {
+                    break
+                }
+                end = text.index(after: end)
+            }
+
+            let fragment = String(text[start..<end])
+            if isLikelyFilePath(fragment) {
+                fragments.append(fragment)
+            }
+
+            index = end
+        }
+
+        return fragments
+    }
+
+    static func naturalLanguageTokenRanges(in text: String) -> [Range<String.Index>] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+        return tokenizer.tokens(for: text.startIndex..<text.endIndex)
+    }
+
+    static func naturalLanguageWords(in text: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+        return tokenizer
+            .tokens(for: text.startIndex..<text.endIndex)
+            .map { String(text[$0]) }
+    }
+}
+
+// MARK: - Small Helpers
+
+extension SpeechTextNormalizer {
+    static func paragraphCount(in text: String) -> Int {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+
+        return trimmed
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+    }
+
+    static func transformTokens(in text: String, transform: (String) -> String?) -> String {
+        var result = ""
+        var index = text.startIndex
+
+        while index < text.endIndex {
+            guard !text[index].isWhitespace else {
+                result.append(text[index])
+                index = text.index(after: index)
+                continue
+            }
+
+            let start = index
+            while index < text.endIndex, !text[index].isWhitespace {
+                index = text.index(after: index)
+            }
+
+            let rawToken = String(text[start..<index])
+            result += transformedToken(rawToken, transform: transform)
+        }
+
+        return result
+    }
+
+    static func transformedToken(_ rawToken: String, transform: (String) -> String?) -> String {
+        let punctuation = CharacterSet(charactersIn: "\"'()[]{}<>.,;:!?")
+        var start = rawToken.startIndex
+        var end = rawToken.endIndex
+
+        while start < end,
+              rawToken[start].unicodeScalars.allSatisfy({ punctuation.contains($0) })
+        {
+            start = rawToken.index(after: start)
+        }
+
+        while end > start {
+            let beforeEnd = rawToken.index(before: end)
+            guard rawToken[beforeEnd].unicodeScalars.allSatisfy({ punctuation.contains($0) }) else {
+                break
+            }
+            end = beforeEnd
+        }
+
+        let prefix = rawToken[..<start]
+        let core = String(rawToken[start..<end])
+        let suffix = rawToken[end...]
+
+        guard !core.isEmpty, let replacement = transform(core) else {
+            return rawToken
+        }
+
+        return "\(prefix)\(replacement)\(suffix)"
+    }
+
+    static func trimmedCandidateToken(_ token: String) -> String {
+        let punctuation = CharacterSet(charactersIn: "\"'()[]{}<>.,;:!?")
+        var start = token.startIndex
+        var end = token.endIndex
+
+        while start < end,
+              token[start].unicodeScalars.allSatisfy({ punctuation.contains($0) })
+        {
+            start = token.index(after: start)
+        }
+
+        while end > start {
+            let beforeEnd = token.index(before: end)
+            guard token[beforeEnd].unicodeScalars.allSatisfy({ punctuation.contains($0) }) else {
+                break
+            }
+            end = beforeEnd
+        }
+
+        return String(token[start..<end])
+    }
+
+    static func isLikelyFilePath(_ token: String) -> Bool {
+        guard !token.isEmpty else { return false }
+        guard !token.contains("://") else { return false }
+        guard !token.contains("@") else { return false }
+
+        return token.hasPrefix("/")
+            || token.hasPrefix("~/")
+            || (token.contains("/") && !token.contains(" "))
+    }
+
+    static func isLikelyDottedIdentifier(_ token: String) -> Bool {
+        guard token.contains(".") else { return false }
+        guard !isLikelyFilePath(token) else { return false }
+        guard !token.contains("://") else { return false }
+
+        let parts = token.split(separator: ".").map(String.init)
+        guard parts.count >= 2 else { return false }
+        return parts.allSatisfy(isIdentifierLike)
+    }
+
+    static func isLikelySnakeCaseIdentifier(_ token: String) -> Bool {
+        guard token.contains("_") else { return false }
+        let parts = token.split(separator: "_").map(String.init)
+        guard parts.count >= 2 else { return false }
+        return parts.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isAlphaNumeric) }
+    }
+
+    static func isLikelyCamelCaseIdentifier(_ token: String) -> Bool {
+        guard !token.contains("."),
+              !token.contains("_"),
+              !token.contains("-"),
+              !token.contains("/") else {
+            return false
+        }
+
+        return hasLowerToUpperTransition(token)
+    }
+
+    static func isLikelyObjectiveCSymbol(_ token: String) -> Bool {
+        if token.hasPrefix("NS"), token.dropFirst(2).first?.isUppercase == true {
+            return true
+        }
+
+        guard token.contains(":") else { return false }
+        return token.split(separator: ":").allSatisfy { part in
+            !part.isEmpty && part.allSatisfy(\.isAlphaNumeric)
+        }
+    }
+
+    static func isIdentifierLike(_ token: String) -> Bool {
+        !token.isEmpty && token.allSatisfy { $0.isAlphaNumeric || $0 == "_" }
+    }
+
+    static func hasLowerToUpperTransition(_ text: String) -> Bool {
+        var previous: Character?
+
+        for character in text {
+            defer { previous = character }
+            guard let previous else { continue }
+            if previous.isLowercase, character.isUppercase {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    static func containsRepeatedLetterRun(_ text: String) -> Bool {
+        var previous: Character?
+        var runLength = 1
+
+        for character in text.lowercased() {
+            guard character.isLetter else {
+                previous = nil
+                runLength = 1
+                continue
+            }
+
+            if previous == character {
+                runLength += 1
+                if runLength >= 3 {
+                    return true
+                }
+            } else {
+                previous = character
+                runLength = 1
+            }
+        }
+
+        return false
+    }
+
+    static func spelledOut(_ text: String) -> String {
+        text.map { String($0) }.joined(separator: " ")
+    }
+
+    static func spokenCodeBlock(_ body: String) -> String {
+        let spoken = spokenCode(body)
+        return spoken.isEmpty ? "Code sample." : "Code sample. \(spoken). End code sample."
+    }
+
+    static func spokenInlineCode(_ body: String) -> String {
+        let spoken = spokenCode(body)
+        return spoken.isEmpty ? " code " : " \(spoken) "
+    }
+
+    static func spokenSegment(_ text: String) -> String {
+        let broken = insertWordBreaks(in: text)
+        let words = naturalLanguageWords(in: broken)
+        if words.isEmpty {
+            return broken
+        }
+        return words.joined(separator: " ")
+    }
+
+    static func insertWordBreaks(in text: String) -> String {
+        guard !text.isEmpty else { return text }
+
+        var output = ""
+        var previous: Character?
+
+        for character in text {
+            defer { previous = character }
+
+            guard let previous else {
+                output.append(character)
+                continue
+            }
+
+            let needsBreak =
+                (previous.isLowercase && character.isUppercase)
+                || (previous.isLetter && character.isNumber)
+                || (previous.isNumber && character.isLetter)
+
+            if needsBreak, output.last != " " {
+                output.append(" ")
+            }
+
+            output.append(character)
+        }
+
+        return output
+    }
+
+    static func isLikelyCodeLine(_ line: String) -> Bool {
+        let punctuation = line.filter { "{}[]()<>/\\=_*#|~:;.`-".contains($0) }.count
+        let letters = line.filter(\.isLetter).count
+        let hasStructuredMarker =
+            line.firstMatch(of: codeMarkerRegex) != nil
+            || line.contains("[")
+            || line.contains("]")
+            || line.contains("@property")
+
+        return punctuation >= 6 && (punctuation * 2 >= max(letters, 4) || hasStructuredMarker)
+    }
+}
+
+private extension Character {
+    var isAlphaNumeric: Bool { isLetter || isNumber }
 }

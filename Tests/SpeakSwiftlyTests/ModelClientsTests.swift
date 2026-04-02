@@ -335,7 +335,7 @@ import Testing
 
     let normalized = SpeechTextNormalizer.normalize(original)
 
-    #expect(normalized.contains("Users slash galew slash Workspace slash SpeakSwiftly"))
+    #expect(normalized.contains("Users slash galew slash Workspace slash Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
     #expect(normalized.contains("camel Case Stuff"))
     #expect(normalized.contains("snake underscore case underscore stuff"))
