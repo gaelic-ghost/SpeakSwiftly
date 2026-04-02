@@ -3,6 +3,52 @@ import Foundation
 import Testing
 @testable import SpeakSwiftly
 
+@Test func adaptivePlaybackThresholdsSeedFromTextComplexityClasses() {
+    let compact = PlaybackThresholdController(text: "Hello there.").thresholds
+    let balanced = PlaybackThresholdController(
+        text: "Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift and explain why optionals like user?.displayName matter."
+    ).thresholds
+    let extended = PlaybackThresholdController(
+        text: """
+        Please read this markdown block and path dump carefully.
+        ```swift
+        let greeting = user?.displayName ?? "friend"
+        let path = "/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift"
+        let fallback = settings["voice_profile"] ?? defaults["voice_profile"]
+        print(greeting, path, fallback)
+        ```
+        Also compare /tmp/speakswiftly-forensic-capture-run2/stderr.jsonl with ~/Library/Logs/speak-to-user-mcp/v0.3.1/stderr.log and spell out qqqwweerrtyy carefully.
+        """
+    ).thresholds
+
+    #expect(compact.complexityClass == .compact)
+    #expect(balanced.complexityClass == .balanced)
+    #expect(extended.complexityClass == .extended)
+    #expect(compact.startupBufferTargetMS < balanced.startupBufferTargetMS)
+    #expect(balanced.startupBufferTargetMS < extended.startupBufferTargetMS)
+    #expect(compact.resumeBufferTargetMS < balanced.resumeBufferTargetMS)
+    #expect(balanced.resumeBufferTargetMS < extended.resumeBufferTargetMS)
+}
+
+@Test func adaptivePlaybackThresholdsRaiseTargetsForSlowCadenceAndStarvation() {
+    var controller = PlaybackThresholdController(text: "Hello there.")
+    let seeded = controller.thresholds
+
+    for _ in 0..<4 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 315)
+    }
+    let adapted = controller.thresholds
+    controller.recordStarvation()
+    let starved = controller.thresholds
+
+    #expect(adapted.startupBufferTargetMS > seeded.startupBufferTargetMS)
+    #expect(adapted.lowWaterTargetMS > seeded.lowWaterTargetMS)
+    #expect(adapted.resumeBufferTargetMS > seeded.resumeBufferTargetMS)
+    #expect(starved.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(starved.startupBufferTargetMS >= starved.resumeBufferTargetMS)
+    #expect(starved.lowWaterTargetMS >= adapted.lowWaterTargetMS)
+}
+
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()

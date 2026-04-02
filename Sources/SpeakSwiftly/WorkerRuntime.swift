@@ -450,7 +450,11 @@ actor WorkerRuntime {
             streamingInterval: PlaybackConfiguration.residentStreamingInterval
         )
 
-        let playbackSummary = try await playbackController.play(sampleRate: Double(residentModel.sampleRate), stream: stream) { event in
+        let playbackSummary = try await playbackController.play(
+            sampleRate: Double(residentModel.sampleRate),
+            text: normalizedText,
+            stream: stream
+        ) { event in
             switch event {
             case .firstChunk:
                 await self.emitProgress(id: id, stage: .bufferingAudio)
@@ -460,7 +464,7 @@ actor WorkerRuntime {
                     op: op,
                     profileName: profileName
                 )
-            case .prerollReady(let startupBufferedAudioMS):
+            case .prerollReady(let startupBufferedAudioMS, let thresholds):
                 await self.emitProgress(id: id, stage: .prerollReady)
                 await self.logRequestEvent(
                     "playback_preroll_ready",
@@ -468,7 +472,8 @@ actor WorkerRuntime {
                     op: op,
                     profileName: profileName,
                     details: [
-                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
                         "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
                     ]
                 )
@@ -478,7 +483,8 @@ actor WorkerRuntime {
                     op: op,
                     profileName: profileName,
                     details: [
-                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
                         "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
                     ].merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
                 )
@@ -531,25 +537,29 @@ actor WorkerRuntime {
                         "window_ms": .int(windowMS),
                     ]
                 )
-            case .rebufferStarted(let queuedAudioMS):
+            case .rebufferStarted(let queuedAudioMS, let thresholds):
                 await self.logRequestEvent(
                     "playback_rebuffer_started",
                     requestID: id,
                     op: op,
                     profileName: profileName,
                     details: [
-                        "low_water_target_ms": .int(PlaybackMetricsConfiguration.lowWaterTargetMS),
+                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                        "low_water_target_ms": .int(thresholds.lowWaterTargetMS),
+                        "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
                         "queued_audio_ms": .int(queuedAudioMS),
                     ]
                 )
-            case .rebufferResumed(let bufferedAudioMS):
+            case .rebufferResumed(let bufferedAudioMS, let thresholds):
                 await self.logRequestEvent(
                     "playback_rebuffer_resumed",
                     requestID: id,
                     op: op,
                     profileName: profileName,
                     details: [
-                        "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
+                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
+                        "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
                         "buffered_audio_ms": .int(bufferedAudioMS),
                     ]
                 )
@@ -613,13 +623,15 @@ actor WorkerRuntime {
 
         await emitProgress(id: id, stage: .playbackFinished)
         var details: [String: LogValue] = [
+            "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
             "chunk_count": .int(playbackSummary.chunkCount),
             "sample_count": .int(playbackSummary.sampleCount),
             "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
-            "startup_buffer_target_ms": .int(PlaybackMetricsConfiguration.startupBufferTargetMS),
-            "low_water_target_ms": .int(PlaybackMetricsConfiguration.lowWaterTargetMS),
-            "chunk_gap_warning_threshold_ms": .int(PlaybackMetricsConfiguration.chunkGapWarningMS),
-            "schedule_gap_warning_threshold_ms": .int(PlaybackMetricsConfiguration.scheduleGapWarningMS),
+            "startup_buffer_target_ms": .int(playbackSummary.thresholds.startupBufferTargetMS),
+            "low_water_target_ms": .int(playbackSummary.thresholds.lowWaterTargetMS),
+            "resume_buffer_target_ms": .int(playbackSummary.thresholds.resumeBufferTargetMS),
+            "chunk_gap_warning_threshold_ms": .int(playbackSummary.thresholds.chunkGapWarningMS),
+            "schedule_gap_warning_threshold_ms": .int(playbackSummary.thresholds.scheduleGapWarningMS),
             "rebuffer_event_count": .int(playbackSummary.rebufferEventCount),
             "rebuffer_total_duration_ms": .int(playbackSummary.rebufferTotalDurationMS),
             "longest_rebuffer_duration_ms": .int(playbackSummary.longestRebufferDurationMS),

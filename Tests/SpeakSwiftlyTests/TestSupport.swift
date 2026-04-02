@@ -139,8 +139,9 @@ final class PlaybackSpy: @unchecked Sendable {
                 lock.withLock { prepareCount += 1 }
                 return prepareCount == 1
             },
-            play: { [self] _, stream, onEvent in
+            play: { [self] _, text, stream, onEvent in
                 lock.withLock { playCount += 1 }
+                let thresholds = PlaybackThresholdController(text: text).thresholds
 
                 var emittedFirstChunk = false
                 var emittedPrerollReady = false
@@ -205,11 +206,11 @@ final class PlaybackSpy: @unchecked Sendable {
                         await onEvent(.firstChunk)
                     }
 
-                    if !emittedPrerollReady, bufferedAudioMS() >= PlaybackMetricsConfiguration.startupBufferTargetMS {
+                    if !emittedPrerollReady, bufferedAudioMS() >= thresholds.startupBufferTargetMS {
                         emittedPrerollReady = true
                         startupBufferedAudioMS = bufferedAudioMS()
                         minQueuedAudioMS = startupBufferedAudioMS
-                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
                     }
                 }
 
@@ -217,7 +218,7 @@ final class PlaybackSpy: @unchecked Sendable {
                     emittedPrerollReady = true
                     startupBufferedAudioMS = bufferedAudioMS()
                     minQueuedAudioMS = startupBufferedAudioMS
-                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0))
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
                 }
 
                 switch behavior {
@@ -228,8 +229,8 @@ final class PlaybackSpy: @unchecked Sendable {
                 case .sleep(let duration):
                     try await Task.sleep(for: duration)
                 case .emitLowQueueThenStarve:
-                    await onEvent(.rebufferStarted(queuedAudioMS: 120))
-                    await onEvent(.rebufferResumed(bufferedAudioMS: 320))
+                    await onEvent(.rebufferStarted(queuedAudioMS: 120, thresholds: thresholds))
+                    await onEvent(.rebufferResumed(bufferedAudioMS: 320, thresholds: thresholds))
                     rebufferEventCount = 1
                     rebufferTotalDurationMS = 90
                     longestRebufferDurationMS = 90
@@ -245,8 +246,8 @@ final class PlaybackSpy: @unchecked Sendable {
                 case .emitObservabilityBurst:
                     await onEvent(.chunkGapWarning(gapMS: 520, chunkIndex: 2))
                     await onEvent(.scheduleGapWarning(gapMS: 210, bufferIndex: 2, queuedAudioMS: 140))
-                    await onEvent(.rebufferStarted(queuedAudioMS: 90))
-                    await onEvent(.rebufferResumed(bufferedAudioMS: 340))
+                    await onEvent(.rebufferStarted(queuedAudioMS: 90, thresholds: thresholds))
+                    await onEvent(.rebufferResumed(bufferedAudioMS: 340, thresholds: thresholds))
                     await onEvent(.rebufferThrashWarning(rebufferEventCount: 3, windowMS: 2_000))
                     await onEvent(
                         .bufferShapeSummary(
@@ -306,6 +307,7 @@ final class PlaybackSpy: @unchecked Sendable {
                 }
 
                 return PlaybackSummary(
+                    thresholds: thresholds,
                     chunkCount: chunkCount,
                     sampleCount: sampleCount,
                     startupBufferedAudioMS: startupBufferedAudioMS,
