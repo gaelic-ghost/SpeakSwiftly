@@ -1,4 +1,5 @@
 @preconcurrency import AVFoundation
+import CoreAudio
 import Darwin
 import Foundation
 @preconcurrency import MLX
@@ -20,6 +21,8 @@ enum PlaybackEvent: Sendable {
     case chunkGapWarning(gapMS: Int, chunkIndex: Int)
     case scheduleGapWarning(gapMS: Int, bufferIndex: Int, queuedAudioMS: Int)
     case rebufferThrashWarning(rebufferEventCount: Int, windowMS: Int)
+    case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
+    case engineConfigurationChanged(engineIsRunning: Bool)
     case bufferShapeSummary(
         maxBoundaryDiscontinuity: Double,
         maxLeadingAbsAmplitude: Double,
@@ -770,6 +773,8 @@ final class PlaybackController {
     private enum PlaybackConfiguration {
         static let minimumDrainTimeout: Duration = .seconds(5)
         static let drainTimeoutPaddingMS = 3_000
+        static let drainProgressCheckIntervalMS = 500
+        static let drainProgressStallTimeoutMS = 8_000
         static let lowQueueThresholdMS = 100
         static let channels: AVAudioChannelCount = 1
 
@@ -785,9 +790,23 @@ final class PlaybackController {
     private var engineSampleRate: Double?
     private var nextRequestID: UInt64 = 0
     private let traceEnabled: Bool
+    private var engineConfigurationObserver: NSObjectProtocol?
+    private var defaultOutputDeviceAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    private var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
+    private var activeRequestState: RequestPlaybackState?
+    private var activeEventSink: (@Sendable (PlaybackEvent) async -> Void)?
+    private var activeRuntimeFailure: WorkerError?
+    private var lastObservedOutputDeviceDescription: String?
 
     init(traceEnabled: Bool = false) {
         self.traceEnabled = traceEnabled
+        lastObservedOutputDeviceDescription = currentDefaultOutputDeviceDescription()
+        installEngineConfigurationObserver()
+        installDefaultOutputDeviceObserver()
     }
 
     func prepare(sampleRate: Double) throws -> Bool {
@@ -817,6 +836,14 @@ final class PlaybackController {
         let requestID = nextRequestID
         nextRequestID += 1
         let state = RequestPlaybackState(requestID: requestID, text: text)
+        activeRequestState = state
+        activeEventSink = onEvent
+        activeRuntimeFailure = nil
+        defer {
+            activeRequestState = nil
+            activeEventSink = nil
+            activeRuntimeFailure = nil
+        }
         var emittedFirstChunk = false
         var emittedPrerollReady = false
         var startedPlayback = false
@@ -858,7 +885,8 @@ final class PlaybackController {
             lastSample: Float,
             fadeInApplied: Bool,
             chunkIndex: Int
-        ) async {
+        ) async throws {
+            try throwIfActivePlaybackInterrupted()
             let queuedAudioBeforeMS = state.queuedAudioMS(sampleRate: sampleRate)
             let scheduledAt = Date()
             let scheduleGapMS: Int?
@@ -1028,6 +1056,7 @@ final class PlaybackController {
 
         do {
             for try await chunk in stream {
+                try throwIfActivePlaybackInterrupted()
                 guard !chunk.isEmpty else { continue }
                 let now = Date()
                 let chunkDurationMS = Int((Double(chunk.count) / sampleRate * 1_000).rounded())
@@ -1076,7 +1105,7 @@ final class PlaybackController {
                     lastPreparedTrailingSample = buffer.lastSample
                     let frameCount = buffer.frameCount
                     if startedPlayback {
-                        await scheduleForPlayback(
+                        try await scheduleForPlayback(
                             buffer.buffer,
                             frameCount: frameCount,
                             firstSample: buffer.firstSample,
@@ -1123,7 +1152,7 @@ final class PlaybackController {
                     startupBufferedAudioMS = bufferedAudioMS()
 
                     for pending in pendingBuffers {
-                        await scheduleForPlayback(
+                        try await scheduleForPlayback(
                             pending.buffer,
                             frameCount: pending.frameCount,
                             firstSample: pending.firstSample,
@@ -1147,7 +1176,7 @@ final class PlaybackController {
                 startupBufferedAudioMS = bufferedAudioMS()
 
                 for pending in pendingBuffers {
-                    await scheduleForPlayback(
+                    try await scheduleForPlayback(
                         pending.buffer,
                         frameCount: pending.frameCount,
                         firstSample: pending.firstSample,
@@ -1181,6 +1210,7 @@ final class PlaybackController {
                 await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: state.thresholdsController.thresholds))
             }
 
+            try throwIfActivePlaybackInterrupted()
             try await waitForPlaybackDrain(
                 state: state,
                 sampleRate: sampleRate
@@ -1288,6 +1318,39 @@ final class PlaybackController {
                     message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(drainTimeout.components.seconds) seconds."
                 )
             }
+            group.addTask {
+                var lastPlayedBackCallbackCount = await MainActor.run {
+                    state.playedBackCallbackCount
+                }
+                var lastProgressAt = Date()
+
+                while true {
+                    try await Task.sleep(for: .milliseconds(PlaybackConfiguration.drainProgressCheckIntervalMS))
+                    let snapshot = await MainActor.run {
+                        (
+                            playedBackCallbackCount: state.playedBackCallbackCount,
+                            queuedAudioMS: state.queuedAudioMS(sampleRate: sampleRate)
+                        )
+                    }
+
+                    if snapshot.queuedAudioMS == 0 {
+                        return
+                    }
+                    if snapshot.playedBackCallbackCount != lastPlayedBackCallbackCount {
+                        lastPlayedBackCallbackCount = snapshot.playedBackCallbackCount
+                        lastProgressAt = Date()
+                        continue
+                    }
+
+                    let stalledForMS = Int((Date().timeIntervalSince(lastProgressAt) * 1_000).rounded())
+                    if stalledForMS >= PlaybackConfiguration.drainProgressStallTimeoutMS {
+                        throw WorkerError(
+                            code: .audioPlaybackTimeout,
+                            message: "Live playback stalled after generated audio finished because the local audio player stopped reporting drain progress for \(PlaybackConfiguration.drainProgressStallTimeoutMS / 1_000) seconds while \(snapshot.queuedAudioMS) ms of audio remained queued."
+                        )
+                    }
+                }
+            }
 
             _ = try await group.next()
             group.cancelAll()
@@ -1327,6 +1390,131 @@ final class PlaybackController {
         playerNode?.stop()
         playerNode?.reset()
         playerNode?.play()
+    }
+
+    private func installEngineConfigurationObserver() {
+        engineConfigurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard let engine = self.audioEngine else { return }
+
+                let engineIsRunning = engine.isRunning
+                if let activeEventSink {
+                    await activeEventSink(.engineConfigurationChanged(engineIsRunning: engineIsRunning))
+                }
+
+                interruptActivePlayback(
+                    with: WorkerError(
+                        code: .audioPlaybackFailed,
+                        message: "Live playback stopped because macOS reported an AVAudioEngine configuration change during an active SpeakSwiftly request. The engine was running: \(engineIsRunning ? "yes" : "no"). The current request is being failed immediately so queued work can continue."
+                    )
+                )
+            }
+        }
+    }
+
+    private func installDefaultOutputDeviceObserver() {
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.handleDefaultOutputDeviceChange()
+            }
+        }
+        defaultOutputDeviceListener = listener
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &defaultOutputDeviceAddress,
+            DispatchQueue.main,
+            listener
+        )
+    }
+
+    private func handleDefaultOutputDeviceChange() {
+        let previousDevice = lastObservedOutputDeviceDescription
+        let currentDevice = currentDefaultOutputDeviceDescription()
+        guard previousDevice != currentDevice else { return }
+        lastObservedOutputDeviceDescription = currentDevice
+
+        if let activeEventSink {
+            Task {
+                await activeEventSink(
+                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice)
+                )
+            }
+        }
+
+        interruptActivePlayback(
+            with: WorkerError(
+                code: .audioPlaybackFailed,
+                message: "Live playback stopped because macOS switched the default output device from '\(previousDevice ?? "unknown output device")' to '\(currentDevice ?? "unknown output device")' during an active SpeakSwiftly request. The current request is being failed immediately so queued work can continue."
+            )
+        )
+    }
+
+    private func interruptActivePlayback(with error: WorkerError) {
+        guard activeRequestState != nil else { return }
+        guard activeRuntimeFailure == nil else { return }
+
+        activeRuntimeFailure = error
+        stop()
+        activeRequestState?.drainContinuation?.resume(throwing: error)
+        activeRequestState?.drainContinuation = nil
+    }
+
+    private func throwIfActivePlaybackInterrupted() throws {
+        if let activeRuntimeFailure {
+            throw activeRuntimeFailure
+        }
+    }
+
+    private func currentDefaultOutputDeviceDescription() -> String? {
+        var deviceID = AudioObjectID(kAudioObjectUnknown)
+        var dataSize = UInt32(MemoryLayout<AudioObjectID>.size)
+        var deviceAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let deviceStatus = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &deviceAddress,
+            0,
+            nil,
+            &dataSize,
+            &deviceID
+        )
+
+        guard deviceStatus == noErr, deviceID != AudioObjectID(kAudioObjectUnknown) else {
+            return nil
+        }
+
+        var deviceName: Unmanaged<CFString>?
+        var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var nameAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let nameStatus = AudioObjectGetPropertyData(
+            deviceID,
+            &nameAddress,
+            0,
+            nil,
+            &nameSize,
+            &deviceName
+        )
+
+        if let deviceName, nameStatus == noErr {
+            let name = deviceName.takeUnretainedValue() as String
+            if !name.isEmpty {
+                return "\(name) [\(deviceID)]"
+            }
+        }
+
+        return "AudioObjectID \(deviceID)"
     }
 
     private func makePCMBuffer(

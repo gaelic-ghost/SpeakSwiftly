@@ -834,6 +834,29 @@ public actor WorkerRuntime {
                         "window_ms": .int(windowMS),
                     ]
                 )
+            case .outputDeviceChanged(let previousDevice, let currentDevice):
+                var details = [String: LogValue]()
+                if let previousDevice {
+                    details["previous_device"] = .string(previousDevice)
+                }
+                if let currentDevice {
+                    details["current_device"] = .string(currentDevice)
+                }
+                await self.logRequestEvent(
+                    "playback_output_device_changed",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: details
+                )
+            case .engineConfigurationChanged(let engineIsRunning):
+                await self.logRequestEvent(
+                    "playback_engine_configuration_changed",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: ["engine_is_running": .bool(engineIsRunning)]
+                )
             case .rebufferStarted(let queuedAudioMS, let thresholds):
                 await self.logRequestEvent(
                     "playback_rebuffer_started",
