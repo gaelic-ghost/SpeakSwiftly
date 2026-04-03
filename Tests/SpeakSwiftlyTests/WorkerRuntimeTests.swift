@@ -316,6 +316,69 @@ import Testing
     } == 1)
 }
 
+@Test func libraryCreateListAndRemoveHelpersSubmitWorkerProtocolRequests() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.createProfile(
+        profileName: "bright-guide",
+        text: "Hello there",
+        voiceDescription: "Warm and bright",
+        outputPath: nil,
+        id: "req-create"
+    )
+    #expect(createID == "req-create")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-create"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "bright-guide"
+        }
+    })
+
+    let listID = await runtime.listProfiles(id: "req-list")
+    #expect(listID == "req-list")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-list",
+                $0["ok"] as? Bool == true,
+                let profiles = $0["profiles"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return profiles.contains { $0["profile_name"] as? String == "bright-guide" }
+        }
+    })
+
+    let removeID = await runtime.removeProfile(profileName: "bright-guide", id: "req-remove")
+    #expect(removeID == "req-remove")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-remove"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "bright-guide"
+        }
+    })
+}
+
 @Test func corruptListProfilesManifestBecomesFilesystemFailureResponse() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

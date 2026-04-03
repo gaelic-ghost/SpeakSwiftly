@@ -12,7 +12,31 @@ import SpeakSwiftlyCore
     let backgroundSubmit: @Sendable (WorkerRuntime, String, String, String) async -> String = { runtime, text, profileName, id in
         await runtime.speakLiveBackground(text: text, profileName: profileName, id: id)
     }
+    let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> String = {
+        runtime,
+        profileName,
+        text,
+        voiceDescription,
+        outputPath,
+        id in
+        await runtime.createProfile(
+            profileName: profileName,
+            text: text,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath,
+            id: id
+        )
+    }
+    let listProfiles: @Sendable (WorkerRuntime, String) async -> String = { runtime, id in
+        await runtime.listProfiles(id: id)
+    }
+    let removeProfile: @Sendable (WorkerRuntime, String, String) async -> String = { runtime, profileName, id in
+        await runtime.removeProfile(profileName: profileName, id: id)
+    }
 
     _ = liveSubmit
     _ = backgroundSubmit
+    _ = createProfile
+    _ = listProfiles
+    _ = removeProfile
 }

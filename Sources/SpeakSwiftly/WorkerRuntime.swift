@@ -49,12 +49,16 @@ public actor WorkerRuntime {
         let op: String
         let text: String?
         let profileName: String?
+        let voiceDescription: String?
+        let outputPath: String?
 
         enum CodingKeys: String, CodingKey {
             case id
             case op
             case text
             case profileName = "profile_name"
+            case voiceDescription = "voice_description"
+            case outputPath = "output_path"
         }
     }
 
@@ -327,6 +331,47 @@ public actor WorkerRuntime {
             id: id,
             op: "speak_live_background",
             text: text,
+            profileName: profileName
+        )
+        return id
+    }
+
+    @discardableResult
+    public func createProfile(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> String {
+        await submitRequest(
+            id: id,
+            op: "create_profile",
+            text: text,
+            profileName: profileName,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath
+        )
+        return id
+    }
+
+    @discardableResult
+    public func listProfiles(id: String = UUID().uuidString) async -> String {
+        await submitRequest(
+            id: id,
+            op: "list_profiles"
+        )
+        return id
+    }
+
+    @discardableResult
+    public func removeProfile(
+        profileName: String,
+        id: String = UUID().uuidString
+    ) async -> String {
+        await submitRequest(
+            id: id,
+            op: "remove_profile",
             profileName: profileName
         )
         return id
@@ -1104,12 +1149,21 @@ public actor WorkerRuntime {
         }
     }
 
-    private func submitRequest(id: String, op: String, text: String, profileName: String) async {
+    private func submitRequest(
+        id: String,
+        op: String,
+        text: String? = nil,
+        profileName: String? = nil,
+        voiceDescription: String? = nil,
+        outputPath: String? = nil
+    ) async {
         let request = OutgoingWorkerRequest(
             id: id,
             op: op,
             text: text,
-            profileName: profileName
+            profileName: profileName,
+            voiceDescription: voiceDescription,
+            outputPath: outputPath
         )
 
         do {

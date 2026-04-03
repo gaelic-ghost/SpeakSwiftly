@@ -17,6 +17,8 @@ A thin Swift worker executable for long-lived local speech generation around `ml
 
 SpeakSwiftly is a small Swift Package Manager executable intended to be launched and owned by another process, such as a macOS app or a Python service.
 
+The package also ships a reusable library product, `SpeakSwiftlyCore`, with parity for the worker's operation surface. Library consumers can either submit raw JSONL lines through `WorkerRuntime.accept(line:)` or call the direct helpers on `WorkerRuntime` for `speak_live`, `speak_live_background`, `create_profile`, `list_profiles`, and `remove_profile`.
+
 ### Motivation
 
 The point of this package is to keep the MLX and Apple-runtime concerns in one small Swift worker without forcing a larger app or service to reimplement `mlx-audio-swift` behavior. The worker should stay intentionally thin. Extra wrappers, managers, bridges, coordinators, or protocol layers would be very easy to over-add here and would risk overcomplicating a tool that is meant to be a boring process boundary.
