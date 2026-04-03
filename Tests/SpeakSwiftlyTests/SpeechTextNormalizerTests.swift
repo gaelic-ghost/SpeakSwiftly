@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SpeakSwiftly
+@testable import SpeakSwiftlyCore
 
 struct SpeechTextNormalizerTests {
     @Test func fencedCodeBlocksBecomeSpokenCodeSamples() {

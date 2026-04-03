@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SpeakSwiftly
+@testable import SpeakSwiftlyCore
 
 @Suite(.serialized)
 struct SpeakSwiftlyE2ETests {
@@ -171,7 +171,7 @@ struct SpeakSwiftlyE2ETests {
         try await worker.waitForExit(timeout: .seconds(30))
     }
 
-    @Test func speakLiveRunsEndToEndWithStoredProfileAndSilentPlayback() async throws {
+    @Test func libraryConsumerExecutableRunsEndToEndWithStoredProfileAndSilentPlayback() async throws {
         guard Self.isE2EEnabled else { return }
 
         let sandbox = try E2ESandbox()

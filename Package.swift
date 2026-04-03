@@ -10,8 +10,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "SpeakSwiftlyLibrary",
-            targets: ["SpeakSwiftly"]
+            name: "SpeakSwiftlyCore",
+            targets: ["SpeakSwiftlyCore"]
         ),
         .executable(
             name: "SpeakSwiftly",
@@ -23,19 +23,20 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "SpeakSwiftly",
+            name: "SpeakSwiftlyCore",
             dependencies: [
             .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
             .product(name: "MLXAudioCore", package: "mlx-audio-swift")
-            ]
+            ],
+            path: "Sources/SpeakSwiftly"
         ),
         .executableTarget(
             name: "SpeakSwiftlyCLI",
-            dependencies: ["SpeakSwiftly"]
+            dependencies: ["SpeakSwiftlyCore"]
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
-            dependencies: [ "SpeakSwiftly" ]
+            dependencies: [ "SpeakSwiftlyCore" ]
         ),
     ]
 )

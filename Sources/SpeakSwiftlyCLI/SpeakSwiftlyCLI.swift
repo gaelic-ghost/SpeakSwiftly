@@ -1,5 +1,5 @@
 import Foundation
-import SpeakSwiftly
+import SpeakSwiftlyCore
 
 // MARK: - Entry Point
 

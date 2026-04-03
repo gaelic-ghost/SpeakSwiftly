@@ -1,5 +1,5 @@
 import Testing
-import SpeakSwiftly
+import SpeakSwiftlyCore
 
 @Test func publicLibrarySurfaceConstructsLiveRuntime() async {
     _ = await SpeakSwiftly.makeLiveRuntime()

@@ -1,7 +1,7 @@
 import Foundation
 @preconcurrency import MLX
 import Testing
-@testable import SpeakSwiftly
+@testable import SpeakSwiftlyCore
 
 private extension NSLock {
     func withLock<T>(_ body: () throws -> T) rethrows -> T {
