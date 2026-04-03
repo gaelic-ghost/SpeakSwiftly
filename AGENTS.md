@@ -47,6 +47,10 @@
 
 ## Types and Architecture
 
+- Before adding a new layer, abstraction, wrapper, manager, bridge, coordinator, repository, store, helper type, service, dependency, or package, explicitly explain which real near-term use cases it unlocks here in `SpeakSwiftly`, which current pain, duplication, or design limitation it removes, and which simpler extension path was considered first.
+- Do not change this repository's core architecture casually or silently. If the design starts needing a new queue, subsystem, storage model, ownership boundary, or other architectural pivot, stop and make that pivot explicit to Gale before implementing it, or as soon as the need becomes clear.
+- When future scope is already visible and the current model will not compose cleanly, prefer strengthening the core primitives on purpose over shipping narrow stopgaps that are likely to block momentum soon after something starts working.
+- Distinguish durable building-block changes from local implementation details and conscious stopgaps. Name which one you are proposing whenever an architectural discussion starts to widen.
 - Prefer concrete, straightforward types and data flow that keep the code easy to follow.
 - Use `struct`, `enum`, `class`, `actor`, and protocols only when each one is the clearest fit for the actual problem.
 - Mark classes as `final` by default.
@@ -59,6 +63,7 @@
 - Use enums as namespaces only when they genuinely reduce clutter instead of adding indirection.
 - Keep code modular and cohesive without fragmenting simple logic across unnecessary files or types.
 - Prefer pure Swift solutions where practical.
+- Carry the global architecture guidance into this repository's Swift work too: prefer durable model changes and explicit pivots over speculative layering or short-lived stopgaps when the next real use cases are already visible.
 
 ## Concurrency and Language Mode
 
