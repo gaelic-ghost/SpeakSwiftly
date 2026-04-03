@@ -33,6 +33,15 @@ import SpeakSwiftlyCore
     let removeProfile: @Sendable (WorkerRuntime, String, String) async -> String = { runtime, profileName, id in
         await runtime.removeProfile(profileName: profileName, id: id)
     }
+    let listQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
+        await runtime.listQueue()
+    }
+    let clearQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
+        await runtime.clearQueue()
+    }
+    let cancelRequest: @Sendable (WorkerRuntime, String) async -> String = { runtime, id in
+        await runtime.cancelRequest(with: id)
+    }
     let statusEvents: @Sendable (WorkerRuntime) async -> AsyncStream<WorkerStatusEvent> = { runtime in
         await runtime.statusEvents()
     }
@@ -45,6 +54,9 @@ import SpeakSwiftlyCore
     _ = createProfile
     _ = listProfiles
     _ = removeProfile
+    _ = listQueue
+    _ = clearQueue
+    _ = cancelRequest
     _ = statusEvents
     _ = submit
 }

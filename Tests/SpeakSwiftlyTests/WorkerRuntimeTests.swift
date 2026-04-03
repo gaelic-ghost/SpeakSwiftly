@@ -357,6 +357,330 @@ import Testing
     } == 1)
 }
 
+@Test func listQueueReturnsActiveAndQueuedRequestsWithoutWaitingForActivePlayback() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-queued-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-queued-2","op":"remove_profile","profile_name":"default-femme"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-queued-1"
+                && $0["event"] as? String == "queued"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-queued-2"
+                && $0["event"] as? String == "queued"
+        }
+    })
+
+    let listID = await runtime.listQueue(id: "req-list-queue")
+    #expect(listID == "req-list-queue")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-list-queue",
+                $0["ok"] as? Bool == true,
+                let active = $0["active_request"] as? [String: Any],
+                let queue = $0["queue"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return active["id"] as? String == "req-active"
+                && queue.count == 2
+                && queue[0]["id"] as? String == "req-queued-1"
+                && queue[0]["queue_position"] as? Int == 1
+                && queue[1]["id"] as? String == "req-queued-2"
+                && queue[1]["queue_position"] as? Int == 2
+        }
+    })
+
+    await playbackDrain.open()
+}
+
+@Test func clearQueueFailsQueuedRequestsAndLeavesActivePlaybackRunning() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let queuedHandle = await runtime.submit(.listProfiles(id: "req-queued"))
+    var iterator = queuedHandle.events.makeAsyncIterator()
+    let queued = try await iterator.next()
+    #expect(
+        queued == .queued(
+            WorkerQueuedEvent(
+                id: "req-queued",
+                reason: .waitingForActiveRequest,
+                queuePosition: 1
+            )
+        )
+    )
+
+    let clearID = await runtime.clearQueue(id: "req-clear")
+    #expect(clearID == "req-clear")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-clear"
+                && $0["ok"] as? Bool == true
+                && $0["cleared_count"] as? Int == 1
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-queued"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+
+    do {
+        while let _ = try await iterator.next() {}
+        Issue.record("The queued request stream should have thrown after clearQueue removed it.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-active"
+            && $0["ok"] as? Bool == false
+    })
+
+    await playbackDrain.open()
+}
+
+@Test func cancelRequestCanCancelActivePlaybackImmediately() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    let activeHandle = await runtime.submit(
+        .speakLive(id: "req-active", text: "Hello there", profileName: "default-femme")
+    )
+    var activeIterator = activeHandle.events.makeAsyncIterator()
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    while let event = try await activeIterator.next() {
+        if case .progress(let progress) = event, progress.stage == .prerollReady {
+            break
+        }
+    }
+
+    let cancelID = await runtime.cancelRequest(with: "req-active", requestID: "req-cancel")
+    #expect(cancelID == "req-cancel")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-cancel"
+                && $0["ok"] as? Bool == true
+                && $0["cancelled_request_id"] as? String == "req-active"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(playback.stopCount >= 1)
+
+    do {
+        while let _ = try await activeIterator.next() {}
+        Issue.record("The active request stream should have thrown after cancelRequest cancelled it.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
+    await playbackDrain.open()
+}
+
+@Test func cancelRequestCanCancelQueuedWorkImmediately() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let queuedHandle = await runtime.submit(.listProfiles(id: "req-queued"))
+    var iterator = queuedHandle.events.makeAsyncIterator()
+    let queued = try await iterator.next()
+    #expect(
+        queued == .queued(
+            WorkerQueuedEvent(
+                id: "req-queued",
+                reason: .waitingForActiveRequest,
+                queuePosition: 1
+            )
+        )
+    )
+
+    let cancelID = await runtime.cancelRequest(with: "req-queued", requestID: "req-cancel")
+    #expect(cancelID == "req-cancel")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-cancel"
+                && $0["ok"] as? Bool == true
+                && $0["cancelled_request_id"] as? String == "req-queued"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-queued"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+
+    do {
+        while let _ = try await iterator.next() {}
+        Issue.record("The queued request stream should have thrown after cancelRequest removed it.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
+    await playbackDrain.open()
+}
+
 @Test func libraryCreateListAndRemoveHelpersSubmitWorkerProtocolRequests() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

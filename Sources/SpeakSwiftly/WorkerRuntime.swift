@@ -35,12 +35,29 @@ public actor WorkerRuntime {
         let profileName: String?
         let profilePath: String?
         let profiles: [ProfileSummary]?
+        let activeRequest: ActiveWorkerRequestSummary?
+        let queue: [QueuedWorkerRequestSummary]?
+        let clearedCount: Int?
+        let cancelledRequestID: String?
 
-        init(id: String, profileName: String? = nil, profilePath: String? = nil, profiles: [ProfileSummary]? = nil) {
+        init(
+            id: String,
+            profileName: String? = nil,
+            profilePath: String? = nil,
+            profiles: [ProfileSummary]? = nil,
+            activeRequest: ActiveWorkerRequestSummary? = nil,
+            queue: [QueuedWorkerRequestSummary]? = nil,
+            clearedCount: Int? = nil,
+            cancelledRequestID: String? = nil
+        ) {
             self.id = id
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
+            self.activeRequest = activeRequest
+            self.queue = queue
+            self.clearedCount = clearedCount
+            self.cancelledRequestID = cancelledRequestID
         }
     }
 
@@ -49,6 +66,7 @@ public actor WorkerRuntime {
         let op: String
         let text: String?
         let profileName: String?
+        let requestID: String?
         let voiceDescription: String?
         let outputPath: String?
 
@@ -57,6 +75,7 @@ public actor WorkerRuntime {
             case op
             case text
             case profileName = "profile_name"
+            case requestID = "request_id"
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
         }
@@ -305,6 +324,30 @@ public actor WorkerRuntime {
             return
         }
 
+        if request.isImmediateControlOperation {
+            requestAcceptedAt[request.id] = dependencies.now()
+            await logRequestEvent(
+                "request_accepted",
+                requestID: request.id,
+                op: request.opName,
+                profileName: request.profileName,
+                queueDepth: queue.count
+            )
+            await emitStarted(for: request)
+            yieldRequestEvent(.started(WorkerStartedEvent(id: request.id, op: request.opName)), for: request.id)
+            await logRequestEvent(
+                "request_started",
+                requestID: request.id,
+                op: request.opName,
+                profileName: request.profileName,
+                queueDepth: queue.count
+            )
+            Task {
+                await self.processImmediateControlRequest(request)
+            }
+            return
+        }
+
         if case .failed(let error) = residentState {
             failRequestStream(for: request.id, error: error)
             requestAcceptedAt.removeValue(forKey: request.id)
@@ -417,6 +460,34 @@ public actor WorkerRuntime {
             profileName: profileName
         )
         return id
+    }
+
+    @discardableResult
+    public func listQueue(id requestID: String = UUID().uuidString) async -> String {
+        await submitRequest(
+            id: requestID,
+            op: "list_queue"
+        )
+        return requestID
+    }
+
+    @discardableResult
+    public func clearQueue(id requestID: String = UUID().uuidString) async -> String {
+        await submitRequest(
+            id: requestID,
+            op: "clear_queue"
+        )
+        return requestID
+    }
+
+    @discardableResult
+    public func cancelRequest(with id: String, requestID: String = UUID().uuidString) async -> String {
+        await submitRequest(
+            id: requestID,
+            op: "cancel_request",
+            requestID: id
+        )
+        return requestID
     }
 
     public func shutdown() async {
@@ -537,6 +608,14 @@ public actor WorkerRuntime {
                     ]
                 )
                 result = .success(WorkerSuccessPayload(id: id, profileName: profileName))
+
+            case .listQueue, .clearQueue, .cancelRequest:
+                result = .failure(
+                    WorkerError(
+                        code: .internalError,
+                        message: "Control request '\(request.id)' was routed through the serialized work queue unexpectedly. This indicates a runtime bug in SpeakSwiftly."
+                    )
+                )
             }
         } catch is CancellationError {
             result = .failure(cancellationError(for: request.id))
@@ -552,6 +631,62 @@ public actor WorkerRuntime {
         }
 
         await finishActiveRequest(token: token, request: request, result: result)
+    }
+
+    private func processImmediateControlRequest(_ request: WorkerRequest) async {
+        let result: Result<WorkerSuccessPayload, WorkerError>
+
+        do {
+            switch request {
+            case .listQueue(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        activeRequest: activeRequestSummary(),
+                        queue: queuedRequestSummaries()
+                    )
+                )
+
+            case .clearQueue(let id):
+                let clearedCount = await clearQueuedRequests(
+                    cancelledByRequestID: id,
+                    reason: "queued work was cleared from the SpeakSwiftly queue"
+                )
+                result = .success(WorkerSuccessPayload(id: id, clearedCount: clearedCount))
+
+            case .cancelRequest(let id, let targetRequestID):
+                let cancelledRequestID = try await cancelRequestNow(
+                    targetRequestID,
+                    cancelledByRequestID: id
+                )
+                result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))
+
+            case .speakLive,
+                 .speakLiveBackground,
+                 .createProfile,
+                 .listProfiles,
+                 .removeProfile:
+                result = .failure(
+                    WorkerError(
+                        code: .internalError,
+                        message: "Non-control request '\(request.id)' was routed through the immediate control path unexpectedly. This indicates a runtime bug in SpeakSwiftly."
+                    )
+                )
+            }
+        } catch is CancellationError {
+            result = .failure(cancellationError(for: request.id))
+        } catch let workerError as WorkerError {
+            result = .failure(workerError)
+        } catch {
+            result = .failure(
+                WorkerError(
+                    code: .internalError,
+                    message: "Control request '\(request.id)' failed due to an unexpected internal error. \(error.localizedDescription)"
+                )
+            )
+        }
+
+        await finishImmediateRequest(request: request, result: result)
     }
 
     private func handleSpeakLive(id: String, op: String, text: String, profileName: String) async throws {
@@ -1089,12 +1224,94 @@ public actor WorkerRuntime {
         }
     }
 
+    private func clearQueuedRequests(cancelledByRequestID: String, reason: String) async -> Int {
+        let queuedRequests = queue
+        queue.removeAll()
+
+        let cancellation = WorkerError(
+            code: .requestCancelled,
+            message: "Request '\(cancelledByRequestID)' cancelled this work because \(reason)."
+        )
+
+        for entry in queuedRequests {
+            failRequestStream(for: entry.request.id, error: cancellation)
+            requestAcceptedAt.removeValue(forKey: entry.request.id)
+            await logError(
+                cancellation.message,
+                requestID: entry.request.id,
+                details: ["failure_code": .string(cancellation.code.rawValue)]
+            )
+            await emitFailure(id: entry.request.id, error: cancellation)
+        }
+
+        return queuedRequests.count
+    }
+
+    private func cancelRequestNow(_ targetRequestID: String, cancelledByRequestID: String) async throws -> String {
+        if let activeRequest, activeRequest.request.id == targetRequestID {
+            self.activeRequest = nil
+            activeRequest.task.cancel()
+            requestAcceptedAt.removeValue(forKey: targetRequestID)
+
+            let cancellation = WorkerError(
+                code: .requestCancelled,
+                message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)'."
+            )
+
+            failRequestStream(for: targetRequestID, error: cancellation)
+            await logError(
+                cancellation.message,
+                requestID: targetRequestID,
+                details: ["failure_code": .string(cancellation.code.rawValue)]
+            )
+            await emitFailure(id: targetRequestID, error: cancellation)
+            await playbackController.stop()
+            try? await startNextRequestIfPossible()
+            return targetRequestID
+        }
+
+        if let queueIndex = queue.firstIndex(where: { $0.request.id == targetRequestID }) {
+            let entry = queue.remove(at: queueIndex)
+            requestAcceptedAt.removeValue(forKey: targetRequestID)
+
+            let cancellation = WorkerError(
+                code: .requestCancelled,
+                message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)' before it started."
+            )
+
+            failRequestStream(for: targetRequestID, error: cancellation)
+            await logError(
+                cancellation.message,
+                requestID: targetRequestID,
+                details: ["failure_code": .string(cancellation.code.rawValue)]
+            )
+            await emitFailure(id: entry.request.id, error: cancellation)
+            return targetRequestID
+        }
+
+        throw WorkerError(
+            code: .requestNotFound,
+            message: "Control request '\(cancelledByRequestID)' could not find request '\(targetRequestID)' in the active or queued SpeakSwiftly work set."
+        )
+    }
+
     private func finishActiveRequest(token: UUID, request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         guard activeRequest?.token == token else { return }
 
         activeRequest = nil
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
+        await completeRequest(request: request, result: result)
 
+        guard !isShuttingDown else { return }
+        try? await startNextRequestIfPossible()
+    }
+
+    private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
+        defer { requestAcceptedAt.removeValue(forKey: request.id) }
+        await completeRequest(request: request, result: result)
+    }
+
+    private func completeRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         switch result {
         case .success(let payload):
             await logRequestEvent(
@@ -1107,7 +1324,11 @@ public actor WorkerRuntime {
                 id: payload.id,
                 profileName: payload.profileName,
                 profilePath: payload.profilePath,
-                profiles: payload.profiles
+                profiles: payload.profiles,
+                activeRequest: payload.activeRequest,
+                queue: payload.queue,
+                clearedCount: payload.clearedCount,
+                cancelledRequestID: payload.cancelledRequestID
             )
             yieldRequestEvent(.completed(success), for: request.id)
             finishRequestStream(for: request.id)
@@ -1120,9 +1341,6 @@ public actor WorkerRuntime {
             await logError(error.message, requestID: request.id, details: ["failure_code": .string(error.code.rawValue)])
             await emitFailure(id: request.id, error: error)
         }
-
-        guard !isShuttingDown else { return }
-        try? await startNextRequestIfPossible()
     }
 
     private func cancellationError(for id: String) -> WorkerError {
@@ -1173,6 +1391,26 @@ public actor WorkerRuntime {
         return playbackRequests + nonPlaybackRequests
     }
 
+    private func activeRequestSummary() -> ActiveWorkerRequestSummary? {
+        guard let activeRequest else { return nil }
+        return ActiveWorkerRequestSummary(
+            id: activeRequest.request.id,
+            op: activeRequest.request.opName,
+            profileName: activeRequest.request.profileName
+        )
+    }
+
+    private func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
+        orderedWaitingQueue().enumerated().map { offset, entry in
+            QueuedWorkerRequestSummary(
+                id: entry.request.id,
+                op: entry.request.opName,
+                profileName: entry.request.profileName,
+                queuePosition: offset + 1
+            )
+        }
+    }
+
     private func emitStarted(for request: WorkerRequest) async {
         await emit(WorkerStartedEvent(id: request.id, op: request.opName))
     }
@@ -1211,6 +1449,7 @@ public actor WorkerRuntime {
         op: String,
         text: String? = nil,
         profileName: String? = nil,
+        requestID: String? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil
     ) async {
@@ -1219,6 +1458,7 @@ public actor WorkerRuntime {
             op: op,
             text: text,
             profileName: profileName,
+            requestID: requestID,
             voiceDescription: voiceDescription,
             outputPath: outputPath
         )
@@ -1257,6 +1497,12 @@ public actor WorkerRuntime {
             await submitRequest(id: id, op: request.opName)
         case .removeProfile(let id, let profileName):
             await submitRequest(id: id, op: request.opName, profileName: profileName)
+        case .listQueue(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .clearQueue(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .cancelRequest(let id, let requestID):
+            await submitRequest(id: id, op: request.opName, requestID: requestID)
         }
     }
 

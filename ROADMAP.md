@@ -29,7 +29,9 @@
 - [ ] Milestone 11: Queue inspection and clear endpoint
 - [ ] Milestone 12: Custom normalization replacements
 - [ ] Milestone 13: Swift package distribution
-- [ ] Milestone 14: `mlx-audio-swift` upgrade review
+- [ ] Milestone 14: Contract naming and terminology alignment
+- [ ] Milestone 15: Package structure and breakout planning
+- [ ] Milestone 16: `mlx-audio-swift` upgrade review
 
 ## Milestone 0: Bootstrap
 
@@ -260,7 +262,7 @@ Tickets:
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
 
-## Milestone 14: `mlx-audio-swift` upgrade review
+## Milestone 16: `mlx-audio-swift` upgrade review
 
 Scope:
 
@@ -389,6 +391,50 @@ Exit criteria:
 - [ ] A downstream Swift package can adopt `SpeakSwiftlyCore` through a documented supported distribution path without relying on repo-local adjacency assumptions.
 - [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
 - [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
+
+## Milestone 14: Contract naming and terminology alignment
+
+Scope:
+
+- [ ] Decide distinct, durable naming conventions for the stdio JSONL contract and the Swift library surface.
+- [ ] Choose one consistent terminology set for queueing, playback, control, and lifecycle states.
+- [ ] Keep the naming pass concrete and shim-free unless Gale explicitly approves a compatibility layer.
+
+Tickets:
+
+- [ ] Audit the current stdio/JSONL operation names, event names, and response fields for consistency.
+- [ ] Audit the current Swift library entry points and request-handle naming for consistency with the worker contract.
+- [ ] Decide and document the final terminology for queue entries, active requests, playback sessions, and control operations.
+- [ ] Identify any naming mismatches that should be corrected before the package surface is treated as stable.
+- [ ] Document the chosen naming rules without flattening the existing document structure.
+
+Exit criteria:
+
+- [ ] The project has one documented naming policy for stdio/JSONL and one documented naming policy for the Swift library surface.
+- [ ] Queueing, playback, and control terms are used consistently across code, docs, tests, and operator-facing logs.
+- [ ] Any remaining naming mismatches are either fixed or explicitly tracked as conscious follow-up work.
+
+## Milestone 15: Package structure and breakout planning
+
+Scope:
+
+- [ ] Decide the intended final folder and file structure for the package as the future scope solidifies.
+- [ ] Chart likely future breakouts without prematurely forcing them into extra targets, wrappers, or coordinators.
+- [ ] Keep the structure plan grounded in the real package surface instead of speculative framework architecture.
+
+Tickets:
+
+- [ ] Audit the current `Sources/` and `Tests/` layout against the scope that is already implemented.
+- [ ] Decide which current files should remain co-located and which future responsibilities are likely to deserve breakouts later.
+- [ ] Map likely future breakouts for playback, worker protocol, profile store, and library-facing surfaces based on the future scope Gale is finalizing.
+- [ ] Document the intended package structure and the decision boundaries for future extraction work.
+- [ ] Identify any near-term structural cleanup that would reduce duplication without adding new layers.
+
+Exit criteria:
+
+- [ ] The package has a documented target file and folder structure that matches the intended scope.
+- [ ] Future breakout boundaries are charted clearly enough to guide later cleanup without forcing premature fragmentation now.
+- [ ] The structure plan explicitly avoids unnecessary layers and keeps data flow straight.
 
 ## Current Review Findings To Address
 

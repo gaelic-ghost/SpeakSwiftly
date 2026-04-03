@@ -44,6 +44,21 @@ import Testing
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))
 }
 
+@Test func decodesListQueueRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_queue"}"#)
+    #expect(request == .listQueue(id: "req-5"))
+}
+
+@Test func decodesClearQueueRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-6","op":"clear_queue"}"#)
+    #expect(request == .clearQueue(id: "req-6"))
+}
+
+@Test func decodesCancelRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-7","op":"cancel_request","request_id":"req-target"}"#)
+    #expect(request == .cancelRequest(id: "req-7", requestID: "req-target"))
+}
+
 @Test func rejectsMalformedJSON() throws {
     #expect(throws: WorkerError.self) {
         try WorkerRequest.decode(from: #"{"id":"req-1","op":"speak_live""#)
@@ -104,12 +119,20 @@ import Testing
             id: "req-1",
             profileName: "default-femme",
             profilePath: "/tmp/default-femme",
-            profiles: nil
+            profiles: nil,
+            activeRequest: ActiveWorkerRequestSummary(id: "req-active", op: "speak_live", profileName: "default-femme"),
+            queue: [QueuedWorkerRequestSummary(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
+            clearedCount: 2,
+            cancelledRequestID: "req-queued"
         )
     )
     #expect(success["ok"] as? Bool == true)
     #expect(success["profile_name"] as? String == "default-femme")
     #expect(success["profile_path"] as? String == "/tmp/default-femme")
+    #expect((success["active_request"] as? [String: Any])?["id"] as? String == "req-active")
+    #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
+    #expect(success["cleared_count"] as? Int == 2)
+    #expect(success["cancelled_request_id"] as? String == "req-queued")
 
     let failure = try jsonObject(
         WorkerFailureResponse(

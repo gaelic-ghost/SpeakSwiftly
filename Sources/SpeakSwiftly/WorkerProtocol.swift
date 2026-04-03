@@ -7,6 +7,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let op: String?
     let text: String?
     let profileName: String?
+    let requestID: String?
     let voiceDescription: String?
     let outputPath: String?
 
@@ -15,6 +16,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case op
         case text
         case profileName = "profile_name"
+        case requestID = "request_id"
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
     }
@@ -26,6 +28,9 @@ public enum WorkerRequest: Sendable, Equatable {
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
+    case listQueue(id: String)
+    case clearQueue(id: String)
+    case cancelRequest(id: String, requestID: String)
 
     public var id: String {
         switch self {
@@ -33,7 +38,10 @@ public enum WorkerRequest: Sendable, Equatable {
              .speakLiveBackground(let id, _, _),
              .createProfile(let id, _, _, _, _),
              .listProfiles(let id),
-             .removeProfile(let id, _):
+             .removeProfile(let id, _),
+             .listQueue(let id),
+             .clearQueue(let id),
+             .cancelRequest(let id, _):
             id
         }
     }
@@ -50,6 +58,12 @@ public enum WorkerRequest: Sendable, Equatable {
             "list_profiles"
         case .removeProfile:
             "remove_profile"
+        case .listQueue:
+            "list_queue"
+        case .clearQueue:
+            "clear_queue"
+        case .cancelRequest:
+            "cancel_request"
         }
     }
 
@@ -69,6 +83,15 @@ public enum WorkerRequest: Sendable, Equatable {
         return false
     }
 
+    public var isImmediateControlOperation: Bool {
+        switch self {
+        case .listQueue, .clearQueue, .cancelRequest:
+            return true
+        default:
+            return false
+        }
+    }
+
     public var profileName: String? {
         switch self {
         case .speakLive(_, _, let profileName),
@@ -76,7 +99,7 @@ public enum WorkerRequest: Sendable, Equatable {
              .createProfile(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
-        case .listProfiles:
+        case .listProfiles, .listQueue, .clearQueue, .cancelRequest:
             nil
         }
     }
@@ -123,6 +146,16 @@ public enum WorkerRequest: Sendable, Equatable {
         case "remove_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
+
+        case "list_queue":
+            return .listQueue(id: id)
+
+        case "clear_queue":
+            return .clearQueue(id: id)
+
+        case "cancel_request":
+            let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
+            return .cancelRequest(id: id, requestID: requestID)
 
         default:
             throw WorkerError(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")
@@ -226,6 +259,10 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
     public let profileName: String?
     public let profilePath: String?
     public let profiles: [ProfileSummary]?
+    public let activeRequest: ActiveWorkerRequestSummary?
+    public let queue: [QueuedWorkerRequestSummary]?
+    public let clearedCount: Int?
+    public let cancelledRequestID: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -233,18 +270,69 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
         case profileName = "profile_name"
         case profilePath = "profile_path"
         case profiles
+        case activeRequest = "active_request"
+        case queue
+        case clearedCount = "cleared_count"
+        case cancelledRequestID = "cancelled_request_id"
     }
 
     public init(
         id: String,
         profileName: String? = nil,
         profilePath: String? = nil,
-        profiles: [ProfileSummary]? = nil
+        profiles: [ProfileSummary]? = nil,
+        activeRequest: ActiveWorkerRequestSummary? = nil,
+        queue: [QueuedWorkerRequestSummary]? = nil,
+        clearedCount: Int? = nil,
+        cancelledRequestID: String? = nil
     ) {
         self.id = id
         self.profileName = profileName
         self.profilePath = profilePath
         self.profiles = profiles
+        self.activeRequest = activeRequest
+        self.queue = queue
+        self.clearedCount = clearedCount
+        self.cancelledRequestID = cancelledRequestID
+    }
+}
+
+public struct ActiveWorkerRequestSummary: Codable, Sendable, Equatable {
+    public let id: String
+    public let op: String
+    public let profileName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case op
+        case profileName = "profile_name"
+    }
+
+    public init(id: String, op: String, profileName: String?) {
+        self.id = id
+        self.op = op
+        self.profileName = profileName
+    }
+}
+
+public struct QueuedWorkerRequestSummary: Codable, Sendable, Equatable {
+    public let id: String
+    public let op: String
+    public let profileName: String?
+    public let queuePosition: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case op
+        case profileName = "profile_name"
+        case queuePosition = "queue_position"
+    }
+
+    public init(id: String, op: String, profileName: String?, queuePosition: Int) {
+        self.id = id
+        self.op = op
+        self.profileName = profileName
+        self.queuePosition = queuePosition
     }
 }
 
@@ -276,6 +364,7 @@ public enum WorkerErrorCode: String, Codable, Sendable {
     case workerShuttingDown = "worker_shutting_down"
     case audioPlaybackTimeout = "audio_playback_timeout"
     case audioPlaybackFailed = "audio_playback_failed"
+    case requestNotFound = "request_not_found"
     case filesystemError = "filesystem_error"
     case internalError = "internal_error"
 }
