@@ -27,6 +27,7 @@
 - [ ] Milestone 9: Live-service operability review
 - [ ] Milestone 10: Playback control surface
 - [ ] Milestone 11: Queue inspection and clear endpoint
+- [ ] Milestone 12: Custom normalization replacements
 
 ## Milestone 0: Bootstrap
 
@@ -317,6 +318,31 @@ Exit criteria:
 - [ ] A parent process can inspect waiting work and intentionally clear queued requests through a documented worker operation and the equivalent typed library path.
 - [ ] Cleared requests terminate with explicit structured output that identifies queue removal rather than a generic runtime failure.
 - [ ] Queue operations remain small, readable, and bounded instead of becoming a sprawling control layer.
+
+## Milestone 12: Custom normalization replacements
+
+Scope:
+
+- [ ] Add a first-class custom replacement surface for speech-text normalization.
+- [ ] Let worker owners inspect, add, remove, and clear replacement rules without hard-coding all normalization behavior into the executable.
+- [ ] Keep the normalization system concrete and readable instead of turning it into an over-abstracted plugin or rule-engine layer.
+
+Tickets:
+
+- [ ] Define the smallest useful replacement-rule shape, likely simple exact-match and phrase-replacement entries before considering broader pattern support.
+- [ ] Decide and document rule precedence between built-in normalization passes and custom replacement rules so downstream callers can predict the final spoken text.
+- [ ] Add worker operations for listing normalization replacements, adding or updating a replacement, removing a replacement, and clearing all custom replacements.
+- [ ] Add typed `SpeakSwiftlyCore` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
+- [ ] Decide whether replacement rules are process-local, profile-store-local, or shared per-user state, and document the persistence boundary explicitly.
+- [ ] Emit structured success and failure output for replacement-rule mutations so callers can distinguish validation failures, duplicate-key behavior, and filesystem errors.
+- [ ] Add automated coverage for replacement listing, add/update, remove, clear, and precedence behavior against the built-in normalization pipeline.
+- [ ] Document the normalization-replacement semantics and examples in the README once the contract exists.
+
+Exit criteria:
+
+- [ ] A parent process can inspect and manage custom normalization replacements through documented worker operations and the equivalent typed library path.
+- [ ] Replacement behavior is predictable, test-covered, and explicit about precedence and persistence.
+- [ ] The normalization surface stays thin and understandable instead of growing into a generic rules framework.
 
 ## Current Review Findings To Address
 
