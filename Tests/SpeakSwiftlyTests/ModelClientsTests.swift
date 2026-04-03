@@ -337,7 +337,7 @@ import Testing
     #expect(normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
     #expect(normalized.contains("camel Case Stuff"))
-    #expect(normalized.contains("snake underscore case underscore stuff"))
+    #expect(normalized.contains("snake case stuff"))
     #expect(normalized.contains("profile optional chaining sample Rate nil coalescing 24000"))
 }
 

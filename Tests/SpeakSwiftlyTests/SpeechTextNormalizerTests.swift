@@ -102,7 +102,8 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalizeSnakeCaseIdentifiers(text)
 
-        #expect(normalized.contains("snake underscore case underscore stuff"))
+        #expect(normalized.contains("snake case stuff"))
+        #expect(!normalized.contains("underscore"))
     }
 
     @Test func camelCaseIdentifiersBecomeSpokenIdentifiers() {
@@ -141,7 +142,7 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
         #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
         #expect(normalized.contains("camel Case Stuff"))
-        #expect(normalized.contains("snake underscore case underscore stuff"))
+        #expect(normalized.contains("snake case stuff"))
         #expect(normalized.contains("profile optional chaining sample Rate nil coalescing 24000"))
     }
 
@@ -169,7 +170,18 @@ struct SpeechTextNormalizerTests {
 
         let normalized = SpeechTextNormalizer.normalize(original)
 
-        #expect(normalized.contains("example dot com slash docs slash path underscore now"))
+        #expect(normalized.contains("example dot com slash docs slash path now"))
         #expect(normalized.contains("tmp slash Thing"))
+    }
+
+    @Test func repeatedUnderscoresCollapseToSpeechSafeSpacing() {
+        let original = "Read snake___case and /tmp/path___now once."
+
+        let normalized = SpeechTextNormalizer.normalize(original)
+
+        #expect(normalized.contains("snake case"))
+        #expect(normalized.contains("tmp slash path now"))
+        #expect(!normalized.contains("underscore"))
+        #expect(!normalized.contains("___"))
     }
 }
