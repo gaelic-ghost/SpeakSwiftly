@@ -33,10 +33,18 @@ import SpeakSwiftlyCore
     let removeProfile: @Sendable (WorkerRuntime, String, String) async -> String = { runtime, profileName, id in
         await runtime.removeProfile(profileName: profileName, id: id)
     }
+    let statusEvents: @Sendable (WorkerRuntime) async -> AsyncStream<WorkerStatusEvent> = { runtime in
+        await runtime.statusEvents()
+    }
+    let submit: @Sendable (WorkerRuntime, WorkerRequest) async -> WorkerRequestHandle = { runtime, request in
+        await runtime.submit(request)
+    }
 
     _ = liveSubmit
     _ = backgroundSubmit
     _ = createProfile
     _ = listProfiles
     _ = removeProfile
+    _ = statusEvents
+    _ = submit
 }

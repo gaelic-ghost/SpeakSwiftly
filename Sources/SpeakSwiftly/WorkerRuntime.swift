@@ -125,6 +125,8 @@ public actor WorkerRuntime {
     private var isShuttingDown = false
     private var preloadTask: Task<Void, Never>?
     private var requestAcceptedAt = [String: Date]()
+    private var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
+    private var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, Error>.Continuation]()
 
     init(
         dependencies: WorkerDependencies,
@@ -155,6 +157,24 @@ public actor WorkerRuntime {
             profileStore: profileStore,
             playbackController: playbackController
         )
+    }
+
+    public func statusEvents() -> AsyncStream<WorkerStatusEvent> {
+        let subscriptionID = UUID()
+        return AsyncStream { continuation in
+            statusContinuations[subscriptionID] = continuation
+            continuation.onTermination = { _ in
+                Task {
+                    await self.removeStatusContinuation(subscriptionID)
+                }
+            }
+        }
+    }
+
+    public func submit(_ request: WorkerRequest) async -> WorkerRequestHandle {
+        let handle = makeRequestHandle(for: request)
+        await submitRequest(request)
+        return handle
     }
 
     public func start() {
@@ -285,6 +305,7 @@ public actor WorkerRuntime {
         queue.append(entry)
         if let queuedEvent = makeQueuedEvent(for: entry) {
             await emit(queuedEvent)
+            yieldRequestEvent(.queued(queuedEvent), for: request.id)
             await logRequestEvent(
                 "request_queued",
                 requestID: request.id,
@@ -294,6 +315,8 @@ public actor WorkerRuntime {
             )
         }
         if request.acknowledgesEnqueueImmediately {
+            let acknowledgement = WorkerSuccessResponse(id: request.id)
+            yieldRequestEvent(.acknowledged(acknowledgement), for: request.id)
             await logRequestEvent(
                 "request_enqueue_acknowledged",
                 requestID: request.id,
@@ -301,7 +324,7 @@ public actor WorkerRuntime {
                 profileName: request.profileName,
                 queueDepth: queue.count
             )
-            await emitSuccess(id: request.id, profileName: nil, profilePath: nil, profiles: nil)
+            await emit(acknowledgement)
         }
         try? await startNextRequestIfPossible()
     }
@@ -419,6 +442,7 @@ public actor WorkerRuntime {
 
         let entry = queue.remove(at: index)
         await emitStarted(for: entry.request)
+        yieldRequestEvent(.started(WorkerStartedEvent(id: entry.request.id, op: entry.request.opName)), for: entry.request.id)
         await logRequestEvent(
             "request_started",
             requestID: entry.request.id,
@@ -1054,16 +1078,20 @@ public actor WorkerRuntime {
                 op: nil,
                 profileName: payload.profileName
             )
+            let success = WorkerSuccessResponse(
+                id: payload.id,
+                profileName: payload.profileName,
+                profilePath: payload.profilePath,
+                profiles: payload.profiles
+            )
+            yieldRequestEvent(.completed(success), for: request.id)
+            finishRequestStream(for: request.id)
             if !request.acknowledgesEnqueueImmediately {
-                await emitSuccess(
-                    id: payload.id,
-                    profileName: payload.profileName,
-                    profilePath: payload.profilePath,
-                    profiles: payload.profiles
-                )
+                await emit(success)
             }
 
         case .failure(let error):
+            failRequestStream(for: request.id, error: error)
             await logError(error.message, requestID: request.id, details: ["failure_code": .string(error.code.rawValue)])
             await emitFailure(id: request.id, error: error)
         }
@@ -1125,11 +1153,15 @@ public actor WorkerRuntime {
     }
 
     private func emitProgress(id: String, stage: WorkerProgressStage) async {
-        await emit(WorkerProgressEvent(id: id, stage: stage))
+        let progress = WorkerProgressEvent(id: id, stage: stage)
+        await emit(progress)
+        yieldRequestEvent(.progress(progress), for: id)
     }
 
     private func emitStatus(_ stage: WorkerStatusStage) async {
-        await emit(WorkerStatusEvent(stage: stage))
+        let status = WorkerStatusEvent(stage: stage)
+        await emit(status)
+        broadcastStatus(status)
     }
 
     private func emitSuccess(id: String, profileName: String?, profilePath: String?, profiles: [ProfileSummary]?) async {
@@ -1179,6 +1211,72 @@ public actor WorkerRuntime {
                 )
             )
         }
+    }
+
+    private func submitRequest(_ request: WorkerRequest) async {
+        switch request {
+        case .speakLive(let id, let text, let profileName):
+            await submitRequest(id: id, op: request.opName, text: text, profileName: profileName)
+        case .speakLiveBackground(let id, let text, let profileName):
+            await submitRequest(id: id, op: request.opName, text: text, profileName: profileName)
+        case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                text: text,
+                profileName: profileName,
+                voiceDescription: voiceDescription,
+                outputPath: outputPath
+            )
+        case .listProfiles(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .removeProfile(let id, let profileName):
+            await submitRequest(id: id, op: request.opName, profileName: profileName)
+        }
+    }
+
+    private func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
+        let requestID = request.id
+        let events = AsyncThrowingStream<WorkerRequestStreamEvent, Error> { continuation in
+            requestContinuations[requestID] = continuation
+            continuation.onTermination = { _ in
+                Task {
+                    await self.removeRequestContinuation(for: requestID)
+                }
+            }
+        }
+
+        return WorkerRequestHandle(id: requestID, request: request, events: events)
+    }
+
+    private func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {
+        requestContinuations[requestID]?.yield(event)
+    }
+
+    private func finishRequestStream(for requestID: String) {
+        requestContinuations[requestID]?.finish()
+        requestContinuations.removeValue(forKey: requestID)
+    }
+
+    private func failRequestStream(for requestID: String, error: WorkerError) {
+        requestContinuations[requestID]?.finish(
+            throwing: WorkerError(code: error.code, message: error.message)
+        )
+        requestContinuations.removeValue(forKey: requestID)
+    }
+
+    private func broadcastStatus(_ status: WorkerStatusEvent) {
+        for continuation in statusContinuations.values {
+            continuation.yield(status)
+        }
+    }
+
+    private func removeStatusContinuation(_ id: UUID) {
+        statusContinuations.removeValue(forKey: id)
+    }
+
+    private func removeRequestContinuation(for requestID: String) {
+        requestContinuations.removeValue(forKey: requestID)
     }
 
     private func logError(

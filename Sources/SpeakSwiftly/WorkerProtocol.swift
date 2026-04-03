@@ -20,14 +20,14 @@ struct RawWorkerRequest: Decodable, Sendable {
     }
 }
 
-enum WorkerRequest: Sendable, Equatable {
+public enum WorkerRequest: Sendable, Equatable {
     case speakLive(id: String, text: String, profileName: String)
     case speakLiveBackground(id: String, text: String, profileName: String)
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
 
-    var id: String {
+    public var id: String {
         switch self {
         case .speakLive(let id, _, _),
              .speakLiveBackground(let id, _, _),
@@ -38,7 +38,7 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    var opName: String {
+    public var opName: String {
         switch self {
         case .speakLive:
             "speak_live"
@@ -53,7 +53,7 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    var isPlayback: Bool {
+    public var isPlayback: Bool {
         switch self {
         case .speakLive, .speakLiveBackground:
             return true
@@ -62,14 +62,14 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    var acknowledgesEnqueueImmediately: Bool {
+    public var acknowledgesEnqueueImmediately: Bool {
         if case .speakLiveBackground = self {
             return true
         }
         return false
     }
 
-    var profileName: String? {
+    public var profileName: String? {
         switch self {
         case .speakLive(_, _, let profileName),
              .speakLiveBackground(_, _, let profileName),
@@ -81,7 +81,7 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
+    public static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
         let data = Data(line.utf8)
         let raw: RawWorkerRequest
 
@@ -139,19 +139,19 @@ enum WorkerRequest: Sendable, Equatable {
 
 // MARK: - Response Envelope
 
-enum WorkerStatusStage: String, Codable, Sendable {
+public enum WorkerStatusStage: String, Codable, Sendable {
     case warmingResidentModel = "warming_resident_model"
     case residentModelReady = "resident_model_ready"
     case residentModelFailed = "resident_model_failed"
 }
 
-enum WorkerRequestEventName: String, Codable, Sendable {
+public enum WorkerRequestEventName: String, Codable, Sendable {
     case queued
     case started
     case progress
 }
 
-enum WorkerProgressStage: String, Codable, Sendable {
+public enum WorkerProgressStage: String, Codable, Sendable {
     case loadingProfile = "loading_profile"
     case startingPlayback = "starting_playback"
     case bufferingAudio = "buffering_audio"
@@ -164,21 +164,25 @@ enum WorkerProgressStage: String, Codable, Sendable {
     case removingProfile = "removing_profile"
 }
 
-enum WorkerQueuedReason: String, Codable, Sendable {
+public enum WorkerQueuedReason: String, Codable, Sendable {
     case waitingForResidentModel = "waiting_for_resident_model"
     case waitingForActiveRequest = "waiting_for_active_request"
 }
 
-struct WorkerStatusEvent: Encodable, Sendable {
-    let event = "worker_status"
-    let stage: WorkerStatusStage
+public struct WorkerStatusEvent: Encodable, Sendable, Equatable {
+    public let event = "worker_status"
+    public let stage: WorkerStatusStage
+
+    public init(stage: WorkerStatusStage) {
+        self.stage = stage
+    }
 }
 
-struct WorkerQueuedEvent: Encodable, Sendable {
-    let id: String
-    let event = WorkerRequestEventName.queued
-    let reason: WorkerQueuedReason
-    let queuePosition: Int
+public struct WorkerQueuedEvent: Encodable, Sendable, Equatable {
+    public let id: String
+    public let event = WorkerRequestEventName.queued
+    public let reason: WorkerQueuedReason
+    public let queuePosition: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -186,26 +190,42 @@ struct WorkerQueuedEvent: Encodable, Sendable {
         case reason
         case queuePosition = "queue_position"
     }
+
+    public init(id: String, reason: WorkerQueuedReason, queuePosition: Int) {
+        self.id = id
+        self.reason = reason
+        self.queuePosition = queuePosition
+    }
 }
 
-struct WorkerStartedEvent: Encodable, Sendable {
-    let id: String
-    let event = WorkerRequestEventName.started
-    let op: String
+public struct WorkerStartedEvent: Encodable, Sendable, Equatable {
+    public let id: String
+    public let event = WorkerRequestEventName.started
+    public let op: String
+
+    public init(id: String, op: String) {
+        self.id = id
+        self.op = op
+    }
 }
 
-struct WorkerProgressEvent: Encodable, Sendable {
-    let id: String
-    let event = WorkerRequestEventName.progress
-    let stage: WorkerProgressStage
+public struct WorkerProgressEvent: Encodable, Sendable, Equatable {
+    public let id: String
+    public let event = WorkerRequestEventName.progress
+    public let stage: WorkerProgressStage
+
+    public init(id: String, stage: WorkerProgressStage) {
+        self.id = id
+        self.stage = stage
+    }
 }
 
-struct WorkerSuccessResponse: Encodable, Sendable {
-    let id: String
-    let ok = true
-    let profileName: String?
-    let profilePath: String?
-    let profiles: [ProfileSummary]?
+public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
+    public let id: String
+    public let ok = true
+    public let profileName: String?
+    public let profilePath: String?
+    public let profiles: [ProfileSummary]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -214,18 +234,36 @@ struct WorkerSuccessResponse: Encodable, Sendable {
         case profilePath = "profile_path"
         case profiles
     }
+
+    public init(
+        id: String,
+        profileName: String? = nil,
+        profilePath: String? = nil,
+        profiles: [ProfileSummary]? = nil
+    ) {
+        self.id = id
+        self.profileName = profileName
+        self.profilePath = profilePath
+        self.profiles = profiles
+    }
 }
 
-struct WorkerFailureResponse: Encodable, Sendable {
-    let id: String
-    let ok = false
-    let code: WorkerErrorCode
-    let message: String
+public struct WorkerFailureResponse: Encodable, Sendable, Equatable {
+    public let id: String
+    public let ok = false
+    public let code: WorkerErrorCode
+    public let message: String
+
+    public init(id: String, code: WorkerErrorCode, message: String) {
+        self.id = id
+        self.code = code
+        self.message = message
+    }
 }
 
 // MARK: - Errors
 
-enum WorkerErrorCode: String, Codable, Sendable {
+public enum WorkerErrorCode: String, Codable, Sendable {
     case invalidJSON = "invalid_json"
     case invalidRequest = "invalid_request"
     case unknownOperation = "unknown_operation"
@@ -242,9 +280,14 @@ enum WorkerErrorCode: String, Codable, Sendable {
     case internalError = "internal_error"
 }
 
-struct WorkerError: Error, Sendable {
-    let code: WorkerErrorCode
-    let message: String
+public struct WorkerError: Error, Sendable, Equatable {
+    public let code: WorkerErrorCode
+    public let message: String
+
+    public init(code: WorkerErrorCode, message: String) {
+        self.code = code
+        self.message = message
+    }
 }
 
 // MARK: - Helpers

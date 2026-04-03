@@ -13,17 +13,29 @@ struct ProfileManifest: Codable, Sendable, Equatable {
     let sampleRate: Int
 }
 
-struct ProfileSummary: Codable, Sendable, Equatable {
-    let profileName: String
-    let createdAt: Date
-    let voiceDescription: String
-    let sourceText: String
+public struct ProfileSummary: Codable, Sendable, Equatable {
+    public let profileName: String
+    public let createdAt: Date
+    public let voiceDescription: String
+    public let sourceText: String
 
     enum CodingKeys: String, CodingKey {
         case profileName = "profile_name"
         case createdAt = "created_at"
         case voiceDescription = "voice_description"
         case sourceText = "source_text"
+    }
+
+    public init(
+        profileName: String,
+        createdAt: Date,
+        voiceDescription: String,
+        sourceText: String
+    ) {
+        self.profileName = profileName
+        self.createdAt = createdAt
+        self.voiceDescription = voiceDescription
+        self.sourceText = sourceText
     }
 }
 

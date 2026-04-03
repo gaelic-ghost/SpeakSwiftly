@@ -379,6 +379,140 @@ import Testing
     })
 }
 
+@Test func typedStatusAndRequestStreamsExposeWorkerOutputForLibraryConsumers() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    let statuses = await runtime.statusEvents()
+    var statusIterator = statuses.makeAsyncIterator()
+
+    await runtime.start()
+
+    let firstStatus = await statusIterator.next()
+    let secondStatus = await statusIterator.next()
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady))
+
+    let handle = await runtime.submit(
+        .listProfiles(id: "req-stream")
+    )
+    var iterator = handle.events.makeAsyncIterator()
+    let createdAt = try store.loadProfile(named: "default-femme").manifest.createdAt
+
+    let started = try await iterator.next()
+    let completed = try await iterator.next()
+    let terminal = try await iterator.next()
+
+    #expect(started == .started(WorkerStartedEvent(id: "req-stream", op: "list_profiles")))
+    #expect(
+        completed == .completed(
+            WorkerSuccessResponse(
+                id: "req-stream",
+                profiles: [
+                    ProfileSummary(
+                        profileName: "default-femme",
+                        createdAt: createdAt,
+                        voiceDescription: "Warm and bright.",
+                        sourceText: "Reference transcript"
+                    )
+                ]
+            )
+        )
+    )
+    #expect(terminal == nil)
+}
+
+@Test func typedRequestStreamKeepsBackgroundAcknowledgementAndLaterCompletionSeparate() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let handle = await runtime.submit(
+        .speakLiveBackground(id: "req-stream-bg", text: "Hi there", profileName: "default-femme")
+    )
+    var iterator = handle.events.makeAsyncIterator()
+
+    let queued = try await iterator.next()
+    let acknowledged = try await iterator.next()
+
+    #expect(
+        queued == .queued(
+            WorkerQueuedEvent(
+                id: "req-stream-bg",
+                reason: .waitingForActiveRequest,
+                queuePosition: 1
+            )
+        )
+    )
+    #expect(acknowledged == .acknowledged(WorkerSuccessResponse(id: "req-stream-bg")))
+
+    await playbackDrain.open()
+
+    var sawCompletion = false
+    while let event = try await iterator.next() {
+        if case .completed(WorkerSuccessResponse(id: "req-stream-bg", profileName: nil, profilePath: nil, profiles: nil)) = event {
+            sawCompletion = true
+            break
+        }
+    }
+
+    #expect(sawCompletion)
+}
+
 @Test func corruptListProfilesManifestBecomesFilesystemFailureResponse() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
