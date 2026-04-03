@@ -25,6 +25,8 @@
 - [x] Milestone 7: Playback and shutdown safety hardening
 - [x] Milestone 8: Observability and instrumentation
 - [ ] Milestone 9: Live-service operability review
+- [ ] Milestone 10: Playback control surface
+- [ ] Milestone 11: Queue inspection and clear endpoint
 
 ## Milestone 0: Bootstrap
 
@@ -269,6 +271,52 @@ Exit criteria:
 - [ ] Path resolution and profile-store behavior are predictable across different launch environments.
 - [ ] The standalone release workflow clearly describes which adjacent local consumers are updated automatically and which still require explicit follow-up.
 - [ ] The worker stays small and concrete while becoming easier to operate as a long-lived local service.
+
+## Milestone 10: Playback control surface
+
+Scope:
+
+- [ ] Add a small, explicit playback-control surface for long-lived worker owners.
+- [ ] Make active-playback interruption and lifecycle observation predictable from both the executable and `SpeakSwiftlyCore`.
+- [ ] Preserve the current thin worker shape instead of turning playback control into a manager or coordinator layer.
+
+Tickets:
+
+- [ ] Define the minimum control operations that are actually worth owning, likely around `stop_playback` first, with pause and resume only if the local audio stack can support them reliably.
+- [ ] Define typed `SpeakSwiftlyCore` API parity for playback control requests and events instead of forcing library callers back through ad-hoc JSONL handling.
+- [ ] Decide and document whether a stop request only interrupts the active request or can also affect queued playback requests.
+- [ ] Emit structured lifecycle output for control acceptance, playback interruption, and terminal request state so parent processes can reason about what happened without guessing.
+- [ ] Add automated coverage for active `speak_live` interruption, background-playback interruption, and no-op control requests when nothing is currently playing.
+- [ ] Document the control semantics clearly in the README once the contract is real.
+
+Exit criteria:
+
+- [ ] A parent process can intentionally interrupt active playback through a documented worker operation and the equivalent typed library path.
+- [ ] Control requests have clear, structured success and failure semantics instead of ambiguous side effects.
+- [ ] The playback-control design stays narrow and concrete rather than growing extra wrapper layers.
+
+## Milestone 11: Queue inspection and clear endpoint
+
+Scope:
+
+- [ ] Add a first-class queue inspection and queue-clearing surface for worker owners.
+- [ ] Make queued-request state visible without forcing downstream apps to scrape logs or reconstruct queue state from partial event history.
+- [ ] Keep queue operations explicit and bounded so the worker does not grow into an unnecessary job-management subsystem.
+
+Tickets:
+
+- [ ] Add a lightweight queue-inspection operation that reports the active request id, queued request ids, queue length, and enough operation metadata for an owner process to explain what is waiting.
+- [ ] Add an explicit `clear_queue` operation that removes waiting requests without interrupting the currently active request unless a separate control request says otherwise.
+- [ ] Define how cleared requests surface terminal failure or cancellation output so callers can distinguish queue removal from playback or generation failure.
+- [ ] Add typed `SpeakSwiftlyCore` parity for queue inspection and clearing instead of exposing those behaviors only through raw JSONL.
+- [ ] Add automated coverage for clearing an empty queue, clearing multiple waiting requests, and clearing while active playback continues.
+- [ ] Document the queue-inspection and queue-clearing semantics in the README once the contract exists.
+
+Exit criteria:
+
+- [ ] A parent process can inspect waiting work and intentionally clear queued requests through a documented worker operation and the equivalent typed library path.
+- [ ] Cleared requests terminate with explicit structured output that identifies queue removal rather than a generic runtime failure.
+- [ ] Queue operations remain small, readable, and bounded instead of becoming a sprawling control layer.
 
 ## Current Review Findings To Address
 
