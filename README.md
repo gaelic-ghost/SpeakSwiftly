@@ -255,4 +255,4 @@ If a real worker run fails with a message about `default.metallib` or `mlx-swift
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
