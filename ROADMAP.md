@@ -262,6 +262,7 @@ Tickets:
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
+- [ ] Investigate automatic audio-route and output-device change handling for live playback, including headphones, AirPods, and macOS default-output switches, and decide whether `SpeakSwiftly` should observe route-change or hardware-change notifications and rebuild or retarget the playback engine when those changes occur.
 
 ## Milestone 16: `mlx-audio-swift` upgrade review
 
