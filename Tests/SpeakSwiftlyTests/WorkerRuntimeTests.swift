@@ -105,6 +105,47 @@ import Testing
     })
 }
 
+@Test func typedRequestStreamFailsWhenQueuedRequestDiesDuringResidentModelPreloadFailure() async throws {
+    let output = OutputRecorder()
+    let preloadGate = AsyncGate()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: {
+            await preloadGate.wait()
+            throw WorkerError(
+                code: .modelGenerationFailed,
+                message: "Resident model preload failed while loading test-resident. The local test intentionally forced this failure."
+            )
+        }
+    )
+
+    let handle = await runtime.submit(.listProfiles(id: "req-preload-stream-fail"))
+    var iterator = handle.events.makeAsyncIterator()
+
+    await runtime.start()
+
+    let queued = try await iterator.next()
+    #expect(
+        queued == .queued(
+            WorkerQueuedEvent(
+                id: "req-preload-stream-fail",
+                reason: .waitingForResidentModel,
+                queuePosition: 1
+            )
+        )
+    )
+
+    await preloadGate.open()
+
+    do {
+        while let _ = try await iterator.next() {}
+        Issue.record("The typed request stream should have thrown when resident model preload failed.")
+    } catch let error as WorkerError {
+        #expect(error.code == .modelGenerationFailed)
+    }
+}
+
 @Test func waitingRequestsReportPriorityQueuePositions() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
@@ -939,6 +980,83 @@ import Testing
             && $0["ok"] as? Bool == false
             && $0["code"] as? String == "audio_playback_timeout"
     })
+}
+
+@Test func shutdownFailsTypedRequestStreamsForActiveAndQueuedRequests() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeHandle = await runtime.submit(
+        .speakLive(id: "req-active-shutdown-stream", text: "Hello there", profileName: "default-femme")
+    )
+    var activeIterator = activeHandle.events.makeAsyncIterator()
+
+    let activeStarted = try await activeIterator.next()
+    #expect(
+        activeStarted == .started(
+            WorkerStartedEvent(id: "req-active-shutdown-stream", op: "speak_live")
+        )
+    )
+
+    let queuedHandle = await runtime.submit(
+        .listProfiles(id: "req-queued-shutdown-stream")
+    )
+    var queuedIterator = queuedHandle.events.makeAsyncIterator()
+
+    let queuedEvent = try await queuedIterator.next()
+    #expect(
+        queuedEvent == .queued(
+            WorkerQueuedEvent(
+                id: "req-queued-shutdown-stream",
+                reason: .waitingForActiveRequest,
+                queuePosition: 1
+            )
+        )
+    )
+
+    await runtime.shutdown()
+
+    do {
+        while let _ = try await activeIterator.next() {}
+        Issue.record("The active typed request stream should have thrown during shutdown.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
+    do {
+        while let _ = try await queuedIterator.next() {}
+        Issue.record("The queued typed request stream should have thrown during shutdown.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
 }
 
 @Test func shutdownRejectsNewRequests() async throws {

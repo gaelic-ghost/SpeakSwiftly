@@ -272,28 +272,42 @@ public actor WorkerRuntime {
             request = try WorkerRequest.decode(from: line)
         } catch let workerError as WorkerError {
             let id = bestEffortID(from: line)
+            failRequestStream(for: id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: id)
             await emitFailure(id: id, error: workerError)
             return
         } catch {
+            let id = bestEffortID(from: line)
+            let workerError = WorkerError(
+                code: .internalError,
+                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)"
+            )
+            failRequestStream(for: id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: id)
             await emitFailure(
-                id: bestEffortID(from: line),
-                error: WorkerError(code: .internalError, message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)")
+                id: id,
+                error: workerError
             )
             return
         }
 
         if isShuttingDown {
+            let workerError = WorkerError(
+                code: .workerShuttingDown,
+                message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down."
+            )
+            failRequestStream(for: request.id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(
                 id: request.id,
-                error: WorkerError(
-                    code: .workerShuttingDown,
-                    message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down."
-                )
+                error: workerError
             )
             return
         }
 
         if case .failed(let error) = residentState {
+            failRequestStream(for: request.id, error: error)
+            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(id: request.id, error: error)
             return
         }
@@ -419,6 +433,8 @@ public actor WorkerRuntime {
         if let activeRequest {
             self.activeRequest = nil
             activeRequest.task.cancel()
+            failRequestStream(for: activeRequest.request.id, error: cancellationError)
+            requestAcceptedAt.removeValue(forKey: activeRequest.request.id)
             await emitFailure(id: activeRequest.request.id, error: cancellationError)
         }
 
@@ -1067,6 +1083,8 @@ public actor WorkerRuntime {
         queue.removeAll()
 
         for entry in queuedRequests {
+            failRequestStream(for: entry.request.id, error: error)
+            requestAcceptedAt.removeValue(forKey: entry.request.id)
             await emitFailure(id: entry.request.id, error: error)
         }
     }

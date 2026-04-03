@@ -29,6 +29,7 @@
 - [ ] Milestone 11: Queue inspection and clear endpoint
 - [ ] Milestone 12: Custom normalization replacements
 - [ ] Milestone 13: Swift package distribution
+- [ ] Milestone 14: `mlx-audio-swift` upgrade review
 
 ## Milestone 0: Bootstrap
 
@@ -258,6 +259,27 @@ Tickets:
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
+
+## Milestone 14: `mlx-audio-swift` upgrade review
+
+Scope:
+
+- [ ] Review a newer `mlx-audio-swift` release or revision soon and decide whether `SpeakSwiftly` should adopt it.
+- [ ] Keep the worker thin and direct while making dependency drift easier to reason about.
+- [ ] Avoid wrapper-heavy “compatibility” architecture unless a real upstream API break makes it necessary.
+
+Tickets:
+
+- [ ] Compare the currently pinned `mlx-audio-swift` revision with the latest available tagged release or stable candidate.
+- [ ] Review upstream changes to Qwen3 TTS defaults, generation controls, streaming behavior, and model-loading expectations for any impact on `SpeakSwiftly`.
+- [ ] Re-run the resident playback, profile-generation, and typed-library integration checks against a candidate upgrade in an isolated branch.
+- [ ] Record any concrete reasons to upgrade, defer, or stay pinned, including behavior changes that affect playback stability or generation length.
+- [ ] If the upgrade is adopted, pin to an explicit stable revision or release instead of a moving branch tip.
+
+Exit criteria:
+
+- [ ] The repository documents whether a newer `mlx-audio-swift` should be adopted and why.
+- [ ] Dependency policy around `mlx-audio-swift` is explicit enough that future playback or generation regressions are easier to trace.
 - [ ] Add a lightweight worker `status` operation or equivalent health/introspection surface for resident state, active request id, queue length, profile root, and playback-drain state.
 - [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
 - [ ] Add an explicit qualitative runtime review checklist for future live-service passes so regressions in operability stay visible.
