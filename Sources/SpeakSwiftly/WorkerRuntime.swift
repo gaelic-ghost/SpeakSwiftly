@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Worker Runtime
 
-actor WorkerRuntime {
+public actor WorkerRuntime {
     private enum Environment {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
@@ -120,7 +120,7 @@ actor WorkerRuntime {
         logEncoder.outputFormatting = [.sortedKeys]
     }
 
-    static func live() async -> WorkerRuntime {
+    public static func live() async -> WorkerRuntime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
         let profileStore = ProfileStore(
@@ -139,7 +139,7 @@ actor WorkerRuntime {
         )
     }
 
-    func start() {
+    public func start() {
         preloadTask = Task {
             let preloadStartedAt = dependencies.now()
             await emitStatus(.warmingResidentModel)
@@ -222,7 +222,7 @@ actor WorkerRuntime {
         }
     }
 
-    func accept(line: String) async {
+    public func accept(line: String) async {
         let request: WorkerRequest
 
         do {
@@ -278,7 +278,7 @@ actor WorkerRuntime {
         try? await startNextRequestIfPossible()
     }
 
-    func shutdown() async {
+    public func shutdown() async {
         guard !isShuttingDown else { return }
 
         isShuttingDown = true
