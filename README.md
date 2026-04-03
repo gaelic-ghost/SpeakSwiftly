@@ -130,6 +130,7 @@ Current live-playback behavior is:
 
 - `speak_live` loads the stored profile and reference audio first.
 - The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
+- The resident and profile-generation paths now pass explicit local generation parameters instead of relying on whatever default values the current `mlx-audio-swift` dependency tip happens to expose, which helps keep short utterances from drifting back into runaway generation behavior.
 - The local `AVAudioEngine` and `AVAudioPlayerNode` are prepared as part of resident-model warmup and then reused across requests instead of being recreated for each utterance.
 - Real playback uses adaptive duration-based thresholds instead of the older fixed chunk gate. Compact requests seed around `360 ms` of startup audio, balanced requests around `520 ms`, and extended requests much higher, with later cadence and rebuffer signals able to raise those targets further during playback.
 - Requests emit `buffering_audio` when the first non-empty chunk arrives and `preroll_ready` when the startup buffer has been satisfied and audio has been scheduled into the hot player path.

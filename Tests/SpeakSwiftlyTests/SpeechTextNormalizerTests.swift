@@ -79,6 +79,16 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("gale mini slash Workspace slash Speak Swiftly"))
     }
 
+    @Test func standaloneGaleAliasesBecomeSpokenNames() {
+        let text = "Please ask galew, galem, and Galew again."
+
+        let normalized = SpeechTextNormalizer.normalizeStandaloneGaleAliases(text)
+
+        #expect(normalized.contains("gale wumbo"))
+        #expect(normalized.contains("gale mini"))
+        #expect(normalized.contains("gale wumbo"))
+    }
+
     @Test func dottedIdentifiersBecomeSpokenIdentifiers() {
         let text = "Read NSApplication.didFinishLaunchingNotification once."
 

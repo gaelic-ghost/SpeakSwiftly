@@ -580,6 +580,7 @@ public actor WorkerRuntime {
             refAudio: refAudio,
             refText: profile.manifest.sourceText,
             language: "English",
+            generationParameters: GenerationPolicy.residentParameters(for: normalizedText),
             streamingInterval: PlaybackConfiguration.residentStreamingInterval
         )
 
@@ -893,7 +894,8 @@ public actor WorkerRuntime {
             voice: voiceDescription,
             refAudio: nil,
             refText: nil,
-            language: "English"
+            language: "English",
+            generationParameters: GenerationPolicy.profileParameters(for: text)
         )
         await logRequestEvent(
             "profile_audio_generated",

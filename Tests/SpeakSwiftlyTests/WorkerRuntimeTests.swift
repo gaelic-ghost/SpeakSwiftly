@@ -440,6 +440,57 @@ import Testing
     #expect(terminal == nil)
 }
 
+@Test func speakLiveUsesStableResidentGenerationParameters() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let recorder = ResidentModelRecorder()
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel(recorder: recorder) }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLive(
+        text: "Hello there, galew.",
+        profileName: "default-femme",
+        id: "req-generation-params"
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-generation-params"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    #expect(recorder.lastText == "Hello there, gale wumbo.")
+    #expect(recorder.lastGenerationParameters?.maxTokens == 56)
+    #expect(recorder.lastGenerationParameters?.temperature == 0.9)
+    #expect(recorder.lastGenerationParameters?.topP == 1.0)
+    #expect(recorder.lastGenerationParameters?.repetitionPenalty == 1.05)
+}
+
 @Test func lateStatusSubscribersReceiveCurrentReadySnapshot() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
@@ -924,11 +975,11 @@ import Testing
         profileModelLoader: {
             AnySpeechModel(
                 sampleRate: 24_000,
-                generate: { _, _, _, _, _ in
+                generate: { _, _, _, _, _, _ in
                     try await Task.sleep(for: .seconds(30))
                     return [0.1, 0.2, 0.3]
                 },
-                generateSamplesStream: { _, _, _, _, _, _ in
+                generateSamplesStream: { _, _, _, _, _, _, _ in
                     AsyncThrowingStream { continuation in
                         continuation.finish()
                     }

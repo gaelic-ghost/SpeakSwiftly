@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import MLX
 import MLXAudioTTS
+@preconcurrency import MLXLMCommon
 
 // MARK: - Model Client
 
@@ -19,7 +20,8 @@ final class AnySpeechModel: @unchecked Sendable {
         _ voice: String?,
         _ refAudio: MLXArray?,
         _ refText: String?,
-        _ language: String?
+        _ language: String?,
+        _ generationParameters: GenerateParameters
     ) async throws -> [Float]
     private let generateSamplesStreamImpl: @Sendable (
         _ text: String,
@@ -27,6 +29,7 @@ final class AnySpeechModel: @unchecked Sendable {
         _ refAudio: MLXArray?,
         _ refText: String?,
         _ language: String?,
+        _ generationParameters: GenerateParameters,
         _ streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error>
 
@@ -41,7 +44,8 @@ final class AnySpeechModel: @unchecked Sendable {
             _ voice: String?,
             _ refAudio: MLXArray?,
             _ refText: String?,
-            _ language: String?
+            _ language: String?,
+            _ generationParameters: GenerateParameters
         ) async throws -> [Float],
         generateSamplesStream: @escaping @Sendable (
             _ text: String,
@@ -49,6 +53,7 @@ final class AnySpeechModel: @unchecked Sendable {
             _ refAudio: MLXArray?,
             _ refText: String?,
             _ language: String?,
+            _ generationParameters: GenerateParameters,
             _ streamingInterval: Double
         ) -> AsyncThrowingStream<[Float], Error>
     ) {
@@ -62,24 +67,24 @@ final class AnySpeechModel: @unchecked Sendable {
 
         self.init(
             sampleRate: box.model.sampleRate,
-            generate: { text, voice, refAudio, refText, language in
+            generate: { text, voice, refAudio, refText, language, generationParameters in
                 try await box.model.generate(
                     text: text,
                     voice: voice,
                     refAudio: refAudio,
                     refText: refText,
                     language: language,
-                    generationParameters: nil
+                    generationParameters: generationParameters
                 ).asArray(Float.self)
             },
-            generateSamplesStream: { text, voice, refAudio, refText, language, streamingInterval in
+            generateSamplesStream: { text, voice, refAudio, refText, language, generationParameters, streamingInterval in
                 box.model.generateSamplesStream(
                     text: text,
                     voice: voice,
                     refAudio: refAudio,
                     refText: refText,
                     language: language,
-                    generationParameters: nil,
+                    generationParameters: generationParameters,
                     streamingInterval: streamingInterval
                 )
             }
@@ -91,9 +96,10 @@ final class AnySpeechModel: @unchecked Sendable {
         voice: String?,
         refAudio: MLXArray?,
         refText: String?,
-        language: String?
+        language: String?,
+        generationParameters: GenerateParameters
     ) async throws -> [Float] {
-        try await generateImpl(text, voice, refAudio, refText, language)
+        try await generateImpl(text, voice, refAudio, refText, language, generationParameters)
     }
 
     func generateSamplesStream(
@@ -102,9 +108,47 @@ final class AnySpeechModel: @unchecked Sendable {
         refAudio: MLXArray?,
         refText: String?,
         language: String?,
+        generationParameters: GenerateParameters,
         streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
-        generateSamplesStreamImpl(text, voice, refAudio, refText, language, streamingInterval)
+        generateSamplesStreamImpl(text, voice, refAudio, refText, language, generationParameters, streamingInterval)
+    }
+}
+
+enum GenerationPolicy {
+    private static let residentTemperature: Float = 0.9
+    private static let residentTopP: Float = 1.0
+    private static let residentRepetitionPenalty: Float = 1.05
+    private static let profileTemperature: Float = 0.9
+    private static let profileTopP: Float = 1.0
+    private static let profileRepetitionPenalty: Float = 1.05
+
+    static func residentParameters(for text: String) -> GenerateParameters {
+        GenerateParameters(
+            maxTokens: residentMaxTokens(for: text),
+            temperature: residentTemperature,
+            topP: residentTopP,
+            repetitionPenalty: residentRepetitionPenalty
+        )
+    }
+
+    static func profileParameters(for text: String) -> GenerateParameters {
+        GenerateParameters(
+            maxTokens: profileMaxTokens(for: text),
+            temperature: profileTemperature,
+            topP: profileTopP,
+            repetitionPenalty: profileRepetitionPenalty
+        )
+    }
+
+    private static func residentMaxTokens(for text: String) -> Int {
+        let wordCount = max(SpeechTextNormalizer.naturalLanguageWords(in: text).count, 1)
+        return min(2_048, max(56, wordCount * 8))
+    }
+
+    private static func profileMaxTokens(for text: String) -> Int {
+        let wordCount = max(SpeechTextNormalizer.naturalLanguageWords(in: text).count, 1)
+        return min(3_072, max(96, wordCount * 10))
     }
 }
 

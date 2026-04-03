@@ -86,6 +86,7 @@ enum SpeechTextNormalizer {
             normalizeInlineCodeSpans,
             normalizeMarkdownLinks,
             normalizeURLs,
+            normalizeStandaloneGaleAliases,
             normalizeFilePaths,
             normalizeDottedIdentifiers,
             normalizeSnakeCaseIdentifiers,
@@ -293,6 +294,12 @@ extension SpeechTextNormalizer {
         transformTokens(in: text) { token in
             guard isLikelyURL(token) else { return nil }
             return spokenURL(token)
+        }
+    }
+
+    static func normalizeStandaloneGaleAliases(_ text: String) -> String {
+        transformTokens(in: text) { token in
+            standaloneGaleAlias(for: token)
         }
     }
 
@@ -887,6 +894,17 @@ extension SpeechTextNormalizer {
         }
 
         return nil
+    }
+
+    private static func standaloneGaleAlias(for token: String) -> String? {
+        switch token.lowercased() {
+        case "galew":
+            "gale wumbo"
+        case "galem":
+            "gale mini"
+        default:
+            nil
+        }
     }
 
     static func isLikelyFilePath(_ token: String) -> Bool {

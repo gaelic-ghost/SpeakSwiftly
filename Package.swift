@@ -19,14 +19,17 @@ let package = Package(
         ),
     ],
     dependencies: [
-    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", branch: "main")    
+        .package(
+            url: "https://github.com/Blaizzy/mlx-audio-swift.git",
+            revision: "2fd41458059e2d80403436167d5263f585d120d4"
+        )
     ],
     targets: [
         .target(
             name: "SpeakSwiftlyCore",
             dependencies: [
-            .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
-            .product(name: "MLXAudioCore", package: "mlx-audio-swift")
+                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioCore", package: "mlx-audio-swift")
             ],
             path: "Sources/SpeakSwiftly"
         ),
@@ -36,7 +39,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
-            dependencies: [ "SpeakSwiftlyCore" ]
+            dependencies: ["SpeakSwiftlyCore"]
         ),
     ]
 )

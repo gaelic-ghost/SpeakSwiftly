@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import MLX
+@preconcurrency import MLXLMCommon
 import Testing
 @testable import SpeakSwiftlyCore
 
@@ -347,12 +348,19 @@ final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var lastRefText: String?
     private(set) var lastRefAudioWasProvided = false
     private(set) var audioLoadCallCount = 0
+    private(set) var lastGenerationParameters: GenerateParameters?
 
-    func record(text: String, refAudioWasProvided: Bool, refText: String?) {
+    func record(
+        text: String,
+        refAudioWasProvided: Bool,
+        refText: String?,
+        generationParameters: GenerateParameters
+    ) {
         lock.withLock {
             lastText = text
             lastRefAudioWasProvided = refAudioWasProvided
             lastRefText = refText
+            lastGenerationParameters = generationParameters
         }
     }
 
@@ -366,11 +374,16 @@ final class ResidentModelRecorder: @unchecked Sendable {
 func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
     AnySpeechModel(
         sampleRate: 24_000,
-        generate: { _, _, _, _, _ in
+        generate: { _, _, _, _, _, _ in
             [0.1, 0.2]
         },
-        generateSamplesStream: { text, _, refAudio, refText, _, _ in
-            recorder?.record(text: text, refAudioWasProvided: refAudio != nil, refText: refText)
+        generateSamplesStream: { text, _, refAudio, refText, _, generationParameters, _ in
+            recorder?.record(
+                text: text,
+                refAudioWasProvided: refAudio != nil,
+                refText: refText,
+                generationParameters: generationParameters
+            )
 
             return AsyncThrowingStream { continuation in
                 for chunkIndex in 0..<chunkCount {
@@ -386,13 +399,13 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
 func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -> AnySpeechModel {
     AnySpeechModel(
         sampleRate: 24_000,
-        generate: { _, _, _, _, _ in
+        generate: { _, _, _, _, _, _ in
             if let waitBeforeGenerate {
                 await waitBeforeGenerate()
             }
             return [0.1, 0.2, 0.3]
         },
-        generateSamplesStream: { _, _, _, _, _, _ in
+        generateSamplesStream: { _, _, _, _, _, _, _ in
             AsyncThrowingStream { continuation in
                 continuation.finish()
             }
