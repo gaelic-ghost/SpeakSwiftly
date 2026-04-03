@@ -163,6 +163,9 @@ public actor WorkerRuntime {
         let subscriptionID = UUID()
         return AsyncStream { continuation in
             statusContinuations[subscriptionID] = continuation
+            if let status = currentStatusSnapshot() {
+                continuation.yield(status)
+            }
             continuation.onTermination = { _ in
                 Task {
                     await self.removeStatusContinuation(subscriptionID)
@@ -178,6 +181,8 @@ public actor WorkerRuntime {
     }
 
     public func start() {
+        guard preloadTask == nil else { return }
+
         preloadTask = Task {
             let preloadStartedAt = dependencies.now()
             await emitStatus(.warmingResidentModel)
@@ -1268,6 +1273,18 @@ public actor WorkerRuntime {
     private func broadcastStatus(_ status: WorkerStatusEvent) {
         for continuation in statusContinuations.values {
             continuation.yield(status)
+        }
+    }
+
+    private func currentStatusSnapshot() -> WorkerStatusEvent? {
+        switch residentState {
+        case .warming:
+            guard preloadTask != nil else { return nil }
+            return WorkerStatusEvent(stage: .warmingResidentModel)
+        case .ready:
+            return WorkerStatusEvent(stage: .residentModelReady)
+        case .failed:
+            return WorkerStatusEvent(stage: .residentModelFailed)
         }
     }
 

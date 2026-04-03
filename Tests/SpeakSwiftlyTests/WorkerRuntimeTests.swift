@@ -440,6 +440,78 @@ import Testing
     #expect(terminal == nil)
 }
 
+@Test func lateStatusSubscribersReceiveCurrentReadySnapshot() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let statuses = await runtime.statusEvents()
+    var iterator = statuses.makeAsyncIterator()
+
+    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady))
+}
+
+@Test func startIsIdempotentForLibraryConsumers() async throws {
+    actor LoadCounter {
+        private(set) var count = 0
+
+        func increment() {
+            count += 1
+        }
+
+        func value() -> Int {
+            count
+        }
+    }
+
+    let output = OutputRecorder()
+    let loadCounter = LoadCounter()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: {
+            await loadCounter.increment()
+            return makeResidentModel()
+        }
+    )
+
+    let statuses = await runtime.statusEvents()
+    var iterator = statuses.makeAsyncIterator()
+
+    await runtime.start()
+    await runtime.start()
+
+    let firstStatus = await iterator.next()
+    let secondStatus = await iterator.next()
+
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady))
+    #expect(await loadCounter.value() == 1)
+    #expect(
+        output.countJSONObjects {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "warming_resident_model"
+        } == 1
+    )
+    #expect(
+        output.countJSONObjects {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } == 1
+    )
+}
+
 @Test func typedRequestStreamKeepsBackgroundAcknowledgementAndLaterCompletionSeparate() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
