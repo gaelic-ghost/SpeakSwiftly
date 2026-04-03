@@ -28,6 +28,7 @@
 - [ ] Milestone 10: Playback control surface
 - [ ] Milestone 11: Queue inspection and clear endpoint
 - [ ] Milestone 12: Custom normalization replacements
+- [ ] Milestone 13: Swift package distribution
 
 ## Milestone 0: Bootstrap
 
@@ -343,6 +344,29 @@ Exit criteria:
 - [ ] A parent process can inspect and manage custom normalization replacements through documented worker operations and the equivalent typed library path.
 - [ ] Replacement behavior is predictable, test-covered, and explicit about precedence and persistence.
 - [ ] The normalization surface stays thin and understandable instead of growing into a generic rules framework.
+
+## Milestone 13: Swift package distribution
+
+Scope:
+
+- [ ] Make `SpeakSwiftly` straightforward to consume as a real distributed Swift package instead of only as an adjacent local checkout.
+- [ ] Clarify what public API and semver guarantees the package actually intends to support for downstream apps and services.
+- [ ] Keep distribution work grounded in the existing package surface instead of adding unnecessary packaging layers or wrapper targets.
+
+Tickets:
+
+- [ ] Audit the `SpeakSwiftlyCore` public API for the minimum supported downstream surface before advertising broader package distribution.
+- [ ] Document SwiftPM dependency examples for both the library product and the executable product in the README.
+- [ ] Add a package-consumer verification path that exercises dependency resolution from a clean external package instead of relying only on sibling-checkout integration.
+- [ ] Decide whether package-registry publication is in scope or whether Git-based SwiftPM distribution is the intended first supported path.
+- [ ] Tighten release notes and release-checklist language so package consumers can tell when a change is semver-safe versus when migration work is required.
+- [ ] Document any remaining Xcode-built runtime caveats clearly so distributed package consumers understand where SwiftPM alone is sufficient and where it is not.
+
+Exit criteria:
+
+- [ ] A downstream Swift package can adopt `SpeakSwiftlyCore` through a documented supported distribution path without relying on repo-local adjacency assumptions.
+- [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
+- [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
 
 ## Current Review Findings To Address
 
