@@ -32,6 +32,7 @@
 - [ ] Milestone 14: Contract naming and terminology alignment
 - [ ] Milestone 15: Package structure and breakout planning
 - [ ] Milestone 16: `mlx-audio-swift` upgrade review
+- [ ] Milestone 17: Notification-linked priority playback
 
 ## Milestone 0: Bootstrap
 
@@ -435,6 +436,32 @@ Exit criteria:
 - [ ] The package has a documented target file and folder structure that matches the intended scope.
 - [ ] Future breakout boundaries are charted clearly enough to guide later cleanup without forcing premature fragmentation now.
 - [ ] The structure plan explicitly avoids unnecessary layers and keeps data flow straight.
+
+## Milestone 17: Notification-linked priority playback
+
+Scope:
+
+- [ ] Decide how callers can submit ordinary speech work plus separate notification-linked priority playback work without making the worker contract confusing.
+- [ ] Review whether the existing request queue can absorb this feature cleanly or whether a distinct playback queue is truly necessary.
+- [ ] Keep the design thin and concrete instead of introducing a new queue, manager, coordinator, or job subsystem unless the simpler extension path clearly fails.
+
+Tickets:
+
+- [ ] Define the minimum useful notification-linked job shape, including a normal speech job, a priority notification job, and a pre-generated straight-to-playback variant if that path is still justified after contract review.
+- [ ] Decide whether priority playback should be modeled as new request kinds inside the existing queueing model or whether a separate playback queue is truly required.
+- [ ] Document how priority jobs interact with active playback, waiting requests, pause or resume state, and future queue inspection or cancellation controls.
+- [ ] Define whether Notification Center ownership lives inside `SpeakSwiftly`, in a parent process, or behind a narrow optional integration boundary.
+- [ ] If notification clicks can trigger playback, define the stable identifier and persistence boundary for the associated speech job.
+- [ ] Decide how pre-generated audio is stored, referenced, expired, and played back without duplicating the normal playback path unnecessarily.
+- [ ] Add typed Swift library parity for submitting, inspecting, and triggering notification-linked priority jobs if this feature lands in the package surface.
+- [ ] Add automated coverage for ordinary queued playback plus injected priority work, notification-linked playback triggering, and no-op behavior when referenced jobs are missing or already consumed.
+- [ ] Document the final queueing and notification semantics clearly once the contract exists.
+
+Exit criteria:
+
+- [ ] The project has one explicit design for notification-linked priority playback and job triggering, with queue semantics that are documented and testable.
+- [ ] The design makes clear whether the existing request queue was extended or a distinct playback queue was justified after review.
+- [ ] The implementation path avoids unnecessary new layers and keeps playback, generation, and notification ownership easy to reason about.
 
 ## Current Review Findings To Address
 
