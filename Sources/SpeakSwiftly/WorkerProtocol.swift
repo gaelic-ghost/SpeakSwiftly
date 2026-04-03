@@ -22,6 +22,7 @@ struct RawWorkerRequest: Decodable, Sendable {
 
 enum WorkerRequest: Sendable, Equatable {
     case speakLive(id: String, text: String, profileName: String)
+    case speakLiveBackground(id: String, text: String, profileName: String)
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
@@ -29,6 +30,7 @@ enum WorkerRequest: Sendable, Equatable {
     var id: String {
         switch self {
         case .speakLive(let id, _, _),
+             .speakLiveBackground(let id, _, _),
              .createProfile(let id, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _):
@@ -40,6 +42,8 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .speakLive:
             "speak_live"
+        case .speakLiveBackground:
+            "speak_live_background"
         case .createProfile:
             "create_profile"
         case .listProfiles:
@@ -50,7 +54,16 @@ enum WorkerRequest: Sendable, Equatable {
     }
 
     var isPlayback: Bool {
-        if case .speakLive = self {
+        switch self {
+        case .speakLive, .speakLiveBackground:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var acknowledgesEnqueueImmediately: Bool {
+        if case .speakLiveBackground = self {
             return true
         }
         return false
@@ -59,6 +72,7 @@ enum WorkerRequest: Sendable, Equatable {
     var profileName: String? {
         switch self {
         case .speakLive(_, _, let profileName),
+             .speakLiveBackground(_, _, let profileName),
              .createProfile(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
@@ -90,6 +104,11 @@ enum WorkerRequest: Sendable, Equatable {
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .speakLive(id: id, text: text, profileName: profileName)
+
+        case "speak_live_background":
+            let text = try requireNonEmpty(raw.text, field: "text", id: id)
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            return .speakLiveBackground(id: id, text: text, profileName: profileName)
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)

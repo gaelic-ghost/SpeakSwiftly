@@ -44,6 +44,20 @@ public actor WorkerRuntime {
         }
     }
 
+    private struct OutgoingWorkerRequest: Encodable {
+        let id: String
+        let op: String
+        let text: String?
+        let profileName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case op
+            case text
+            case profileName = "profile_name"
+        }
+    }
+
     private enum LogLevel: String, Encodable {
         case info
         case error
@@ -275,7 +289,47 @@ public actor WorkerRuntime {
                 queueDepth: queue.count
             )
         }
+        if request.acknowledgesEnqueueImmediately {
+            await logRequestEvent(
+                "request_enqueue_acknowledged",
+                requestID: request.id,
+                op: request.opName,
+                profileName: request.profileName,
+                queueDepth: queue.count
+            )
+            await emitSuccess(id: request.id, profileName: nil, profilePath: nil, profiles: nil)
+        }
         try? await startNextRequestIfPossible()
+    }
+
+    @discardableResult
+    public func speakLive(
+        text: String,
+        profileName: String,
+        id: String = UUID().uuidString
+    ) async -> String {
+        await submitRequest(
+            id: id,
+            op: "speak_live",
+            text: text,
+            profileName: profileName
+        )
+        return id
+    }
+
+    @discardableResult
+    public func speakLiveBackground(
+        text: String,
+        profileName: String,
+        id: String = UUID().uuidString
+    ) async -> String {
+        await submitRequest(
+            id: id,
+            op: "speak_live_background",
+            text: text,
+            profileName: profileName
+        )
+        return id
     }
 
     public func shutdown() async {
@@ -340,7 +394,11 @@ public actor WorkerRuntime {
         do {
             switch request {
             case .speakLive(let id, let text, let profileName):
-                try await handleSpeakLive(id: id, text: text, profileName: profileName)
+                try await handleSpeakLive(id: id, op: request.opName, text: text, profileName: profileName)
+                result = .success(WorkerSuccessPayload(id: id))
+
+            case .speakLiveBackground(let id, let text, let profileName):
+                try await handleSpeakLive(id: id, op: request.opName, text: text, profileName: profileName)
                 result = .success(WorkerSuccessPayload(id: id))
 
             case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
@@ -403,12 +461,11 @@ public actor WorkerRuntime {
             )
         }
 
-        await finishActiveRequest(token: token, requestID: request.id, result: result)
+        await finishActiveRequest(token: token, request: request, result: result)
     }
 
-    private func handleSpeakLive(id: String, text: String, profileName: String) async throws {
+    private func handleSpeakLive(id: String, op: String, text: String, profileName: String) async throws {
         let residentModel = try residentModelOrThrow()
-        let op = WorkerRequest.speakLive(id: id, text: text, profileName: profileName).opName
         let normalizedText = SpeechTextNormalizer.normalize(text)
         let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
         let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
@@ -938,11 +995,11 @@ public actor WorkerRuntime {
         }
     }
 
-    private func finishActiveRequest(token: UUID, requestID: String, result: Result<WorkerSuccessPayload, WorkerError>) async {
+    private func finishActiveRequest(token: UUID, request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         guard activeRequest?.token == token else { return }
 
         activeRequest = nil
-        defer { requestAcceptedAt.removeValue(forKey: requestID) }
+        defer { requestAcceptedAt.removeValue(forKey: request.id) }
 
         switch result {
         case .success(let payload):
@@ -952,16 +1009,18 @@ public actor WorkerRuntime {
                 op: nil,
                 profileName: payload.profileName
             )
-            await emitSuccess(
-                id: payload.id,
-                profileName: payload.profileName,
-                profilePath: payload.profilePath,
-                profiles: payload.profiles
-            )
+            if !request.acknowledgesEnqueueImmediately {
+                await emitSuccess(
+                    id: payload.id,
+                    profileName: payload.profileName,
+                    profilePath: payload.profilePath,
+                    profiles: payload.profiles
+                )
+            }
 
         case .failure(let error):
-            await logError(error.message, requestID: requestID, details: ["failure_code": .string(error.code.rawValue)])
-            await emitFailure(id: requestID, error: error)
+            await logError(error.message, requestID: request.id, details: ["failure_code": .string(error.code.rawValue)])
+            await emitFailure(id: request.id, error: error)
         }
 
         guard !isShuttingDown else { return }
@@ -1042,6 +1101,29 @@ public actor WorkerRuntime {
             try dependencies.writeStdout(data)
         } catch {
             await logError("SpeakSwiftly could not write a JSONL event to stdout. \(error.localizedDescription)")
+        }
+    }
+
+    private func submitRequest(id: String, op: String, text: String, profileName: String) async {
+        let request = OutgoingWorkerRequest(
+            id: id,
+            op: op,
+            text: text,
+            profileName: profileName
+        )
+
+        do {
+            let data = try encoder.encode(request)
+            let line = String(decoding: data, as: UTF8.self)
+            await accept(line: line)
+        } catch {
+            await emitFailure(
+                id: id,
+                error: WorkerError(
+                    code: .internalError,
+                    message: "SpeakSwiftly could not encode the outgoing '\(op)' request before queueing it. \(error.localizedDescription)"
+                )
+            )
         }
     }
 

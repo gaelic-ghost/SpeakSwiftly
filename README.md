@@ -77,6 +77,7 @@ Example request shapes:
 
 ```json
 {"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1b","op":"speak_live_background","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
@@ -87,9 +88,11 @@ Example response and event shapes:
 ```json
 {"event":"worker_status","stage":"warming_resident_model"}
 {"id":"req-1","event":"queued","reason":"waiting_for_resident_model","queue_position":1}
+{"id":"req-1b","ok":true}
 {"id":"req-2","event":"queued","reason":"waiting_for_active_request","queue_position":2}
 {"event":"worker_status","stage":"resident_model_ready"}
 {"id":"req-1","event":"started","op":"speak_live"}
+{"id":"req-1b","event":"started","op":"speak_live_background"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
@@ -101,9 +104,12 @@ Example response and event shapes:
 
 Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting `speak_live` requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
 
+`speak_live_background` uses the same playback path as `speak_live`, but it acknowledges success as soon as the request has been accepted into the worker queue. That gives an owner process a queue-and-return path without changing the blocking semantics of `speak_live`. The background request still emits the usual `started` and `progress` events later, and it can still emit a later failure response if playback breaks after the enqueue acknowledgment.
+
 Current operation families are:
 
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
+- Queue-and-return live playback via `speak_live_background` for callers that want enqueue acknowledgment instead of waiting for playback completion.
 - On-demand `1.7B` VoiceDesign profile creation.
 - Immutable profile storage, selection, listing, and removal.
 - Playback-prioritized request handling with preload-aware queue status.

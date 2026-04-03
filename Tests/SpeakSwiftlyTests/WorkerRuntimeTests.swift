@@ -161,6 +161,161 @@ import Testing
     await profileGate.open()
 }
 
+@Test func speakLiveBackgroundAcknowledgesQueueBeforePlaybackStartsAndOnlySucceedsOnce() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeID = await runtime.speakLive(
+        text: "Hello there",
+        profileName: "default-femme",
+        id: "req-1"
+    )
+    #expect(activeID == "req-1")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let backgroundID = await runtime.speakLiveBackground(
+        text: "Hi there",
+        profileName: "default-femme",
+        id: "req-2"
+    )
+    #expect(backgroundID == "req-2")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-2"
+            && $0["event"] as? String == "started"
+    })
+
+    await playbackDrain.open()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "speak_live_background"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+    #expect(output.countJSONObjects {
+        $0["id"] as? String == "req-2"
+            && $0["ok"] as? Bool == true
+    } == 1)
+}
+
+@Test func speakLiveBackgroundCanFailAfterEnqueueAcknowledgement() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(
+            behavior: .throw(
+                WorkerError(
+                    code: .audioPlaybackFailed,
+                    message: "Background playback failed in the test playback controller after the request had already been accepted."
+                )
+            )
+        ),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speakLiveBackground(
+        text: "Hello there",
+        profileName: "default-femme",
+        id: "req-fail"
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-fail"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-fail"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "audio_playback_failed"
+        }
+    })
+    #expect(output.countJSONObjects {
+        $0["id"] as? String == "req-fail"
+            && $0["ok"] as? Bool == true
+    } == 1)
+}
+
 @Test func corruptListProfilesManifestBecomesFilesystemFailureResponse() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

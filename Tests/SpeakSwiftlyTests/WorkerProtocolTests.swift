@@ -10,6 +10,14 @@ import Testing
     #expect(request == .speakLive(id: "req-1", text: "Hello", profileName: "default-femme"))
 }
 
+@Test func decodesSpeakLiveBackgroundRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-1b","op":"speak_live_background","text":"Hello","profile_name":"default-femme"}"#
+    )
+
+    #expect(request == .speakLiveBackground(id: "req-1b", text: "Hello", profileName: "default-femme"))
+}
+
 @Test func decodesCreateProfileRequest() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello","voice_description":"Warm and bright","output_path":"./voice.wav"}"#
