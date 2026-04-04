@@ -502,6 +502,9 @@ final class AnyPlaybackController: @unchecked Sendable {
         _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
     ) async throws -> PlaybackSummary
     private let stopImpl: @Sendable () async -> Void
+    private let pauseImpl: @Sendable () async -> PlaybackState
+    private let resumeImpl: @Sendable () async -> PlaybackState
+    private let stateImpl: @Sendable () async -> PlaybackState
 
     init(
         prepare: @escaping @Sendable (_ sampleRate: Double) async throws -> Bool,
@@ -511,11 +514,17 @@ final class AnyPlaybackController: @unchecked Sendable {
             _ stream: AsyncThrowingStream<[Float], Error>,
             _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
         ) async throws -> PlaybackSummary,
-        stop: @escaping @Sendable () async -> Void
+        stop: @escaping @Sendable () async -> Void,
+        pause: @escaping @Sendable () async -> PlaybackState,
+        resume: @escaping @Sendable () async -> PlaybackState,
+        state: @escaping @Sendable () async -> PlaybackState
     ) {
         prepareImpl = prepare
         playImpl = play
         stopImpl = stop
+        pauseImpl = pause
+        resumeImpl = resume
+        stateImpl = state
     }
 
     convenience init(_ controller: PlaybackController) {
@@ -533,6 +542,15 @@ final class AnyPlaybackController: @unchecked Sendable {
             },
             stop: {
                 await controller.stop()
+            },
+            pause: {
+                await controller.pause()
+            },
+            resume: {
+                await controller.resume()
+            },
+            state: {
+                await controller.state()
             }
         )
     }
@@ -698,7 +716,10 @@ final class AnyPlaybackController: @unchecked Sendable {
                     fadeInChunkCount: fadeInChunkCount
                 )
             },
-            stop: {}
+            stop: {},
+            pause: { .idle },
+            resume: { .idle },
+            state: { .idle }
         )
     }
 
@@ -717,6 +738,18 @@ final class AnyPlaybackController: @unchecked Sendable {
 
     func stop() async {
         await stopImpl()
+    }
+
+    func pause() async -> PlaybackState {
+        await pauseImpl()
+    }
+
+    func resume() async -> PlaybackState {
+        await resumeImpl()
+    }
+
+    func state() async -> PlaybackState {
+        await stateImpl()
     }
 }
 
@@ -801,6 +834,8 @@ final class PlaybackController {
     private var activeEventSink: (@Sendable (PlaybackEvent) async -> Void)?
     private var activeRuntimeFailure: WorkerError?
     private var lastObservedOutputDeviceDescription: String?
+    private var playbackState: PlaybackState = .idle
+    private var isPlaybackPausedManually = false
 
     init(traceEnabled: Bool = false) {
         self.traceEnabled = traceEnabled
@@ -839,10 +874,13 @@ final class PlaybackController {
         activeRequestState = state
         activeEventSink = onEvent
         activeRuntimeFailure = nil
+        playbackState = .idle
         defer {
             activeRequestState = nil
             activeEventSink = nil
             activeRuntimeFailure = nil
+            playbackState = .idle
+            isPlaybackPausedManually = false
         }
         var emittedFirstChunk = false
         var emittedPrerollReady = false
@@ -1035,7 +1073,9 @@ final class PlaybackController {
                     if state.isRebuffering,
                        (currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS || state.generationFinished)
                     {
-                        self.playerNode?.play()
+                        if !self.isPlaybackPausedManually {
+                            self.playerNode?.play()
+                        }
                         state.isRebuffering = false
                         if let rebufferStartedAt = state.rebufferStartedAt {
                             let durationMS = milliseconds(since: rebufferStartedAt)
@@ -1116,7 +1156,9 @@ final class PlaybackController {
                         if state.isRebuffering {
                             let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
                             if currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS {
-                                playerNode?.play()
+                                if !isPlaybackPausedManually {
+                                    playerNode?.play()
+                                }
                                 state.isRebuffering = false
                                 if let rebufferStartedAt = state.rebufferStartedAt {
                                     let durationMS = milliseconds(since: rebufferStartedAt)
@@ -1167,6 +1209,9 @@ final class PlaybackController {
                     startedPlayback = true
                     emittedPrerollReady = true
                     timeToPrerollReadyMS = milliseconds(since: startedAt)
+                    if !isPlaybackPausedManually {
+                        playbackState = .playing
+                    }
                     await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: state.thresholdsController.thresholds))
                 }
             }
@@ -1191,7 +1236,9 @@ final class PlaybackController {
                 startedPlayback = true
                 if state.isRebuffering {
                     let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
-                    playerNode?.play()
+                    if !isPlaybackPausedManually {
+                        playerNode?.play()
+                    }
                     state.isRebuffering = false
                     if let rebufferStartedAt = state.rebufferStartedAt {
                         let durationMS = milliseconds(since: rebufferStartedAt)
@@ -1200,6 +1247,9 @@ final class PlaybackController {
                         state.rebufferStartedAt = nil
                     }
                     await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
+                }
+                if !isPlaybackPausedManually {
+                    playbackState = .playing
                 }
             }
 
@@ -1287,6 +1337,42 @@ final class PlaybackController {
         audioEngine = nil
         streamingFormat = nil
         engineSampleRate = nil
+        playbackState = .idle
+        isPlaybackPausedManually = false
+    }
+
+    func pause() -> PlaybackState {
+        guard activeRequestState != nil else {
+            playbackState = .idle
+            return playbackState
+        }
+
+        playerNode?.pause()
+        isPlaybackPausedManually = true
+        playbackState = .paused
+        return playbackState
+    }
+
+    func resume() -> PlaybackState {
+        guard let activeRequestState else {
+            playbackState = .idle
+            return playbackState
+        }
+
+        isPlaybackPausedManually = false
+        let queuedAudioMS = activeRequestState.queuedAudioMS(sampleRate: engineSampleRate ?? 24_000)
+        if !activeRequestState.isRebuffering
+            || queuedAudioMS >= activeRequestState.thresholdsController.thresholds.resumeBufferTargetMS
+            || activeRequestState.generationFinished
+        {
+            playerNode?.play()
+        }
+        playbackState = .playing
+        return playbackState
+    }
+
+    func state() -> PlaybackState {
+        playbackState
     }
 
     private func waitForPlaybackDrain(
@@ -1329,12 +1415,17 @@ final class PlaybackController {
                     let snapshot = await MainActor.run {
                         (
                             playedBackCallbackCount: state.playedBackCallbackCount,
-                            queuedAudioMS: state.queuedAudioMS(sampleRate: sampleRate)
+                            queuedAudioMS: state.queuedAudioMS(sampleRate: sampleRate),
+                            isPausedManually: self.isPlaybackPausedManually
                         )
                     }
 
                     if snapshot.queuedAudioMS == 0 {
                         return
+                    }
+                    if snapshot.isPausedManually {
+                        lastProgressAt = Date()
+                        continue
                     }
                     if snapshot.playedBackCallbackCount != lastPlayedBackCallbackCount {
                         lastPlayedBackCallbackCount = snapshot.playedBackCallbackCount

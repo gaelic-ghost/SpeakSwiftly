@@ -23,23 +23,23 @@ struct RawWorkerRequest: Decodable, Sendable {
 }
 
 public enum WorkerRequest: Sendable, Equatable {
-    case speakLive(id: String, text: String, profileName: String)
-    case speakLiveBackground(id: String, text: String, profileName: String)
+    case queueSpeech(id: String, text: String, profileName: String, jobType: SpeechJobType)
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
-    case listQueue(id: String)
+    case listQueue(id: String, queueType: WorkerQueueType)
+    case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String)
     case cancelRequest(id: String, requestID: String)
 
     public var id: String {
         switch self {
-        case .speakLive(let id, _, _),
-             .speakLiveBackground(let id, _, _),
+        case .queueSpeech(let id, _, _, _),
              .createProfile(let id, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
-             .listQueue(let id),
+             .listQueue(let id, _),
+             .playback(let id, _),
              .clearQueue(let id),
              .cancelRequest(let id, _):
             id
@@ -48,18 +48,24 @@ public enum WorkerRequest: Sendable, Equatable {
 
     public var opName: String {
         switch self {
-        case .speakLive:
-            "speak_live"
-        case .speakLiveBackground:
-            "speak_live_background"
+        case .queueSpeech(_, _, _, .live):
+            "queue_speech_live"
         case .createProfile:
             "create_profile"
         case .listProfiles:
             "list_profiles"
         case .removeProfile:
             "remove_profile"
-        case .listQueue:
-            "list_queue"
+        case .listQueue(_, .generation):
+            "list_queue_generation"
+        case .listQueue(_, .playback):
+            "list_queue_playback"
+        case .playback(_, .pause):
+            "playback_pause"
+        case .playback(_, .resume):
+            "playback_resume"
+        case .playback(_, .state):
+            "playback_state"
         case .clearQueue:
             "clear_queue"
         case .cancelRequest:
@@ -67,9 +73,9 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public var isPlayback: Bool {
+    public var isSpeechRequest: Bool {
         switch self {
-        case .speakLive, .speakLiveBackground:
+        case .queueSpeech:
             return true
         default:
             return false
@@ -77,7 +83,7 @@ public enum WorkerRequest: Sendable, Equatable {
     }
 
     public var acknowledgesEnqueueImmediately: Bool {
-        if case .speakLiveBackground = self {
+        if case .queueSpeech = self {
             return true
         }
         return false
@@ -85,7 +91,7 @@ public enum WorkerRequest: Sendable, Equatable {
 
     public var isImmediateControlOperation: Bool {
         switch self {
-        case .listQueue, .clearQueue, .cancelRequest:
+        case .listQueue, .playback, .clearQueue, .cancelRequest:
             return true
         default:
             return false
@@ -94,12 +100,11 @@ public enum WorkerRequest: Sendable, Equatable {
 
     public var profileName: String? {
         switch self {
-        case .speakLive(_, _, let profileName),
-             .speakLiveBackground(_, _, let profileName),
+        case .queueSpeech(_, _, let profileName, _),
              .createProfile(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
-        case .listProfiles, .listQueue, .clearQueue, .cancelRequest:
+        case .listProfiles, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
     }
@@ -123,15 +128,10 @@ public enum WorkerRequest: Sendable, Equatable {
         }
 
         switch op {
-        case "speak_live":
+        case "queue_speech_live":
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            return .speakLive(id: id, text: text, profileName: profileName)
-
-        case "speak_live_background":
-            let text = try requireNonEmpty(raw.text, field: "text", id: id)
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            return .speakLiveBackground(id: id, text: text, profileName: profileName)
+            return .queueSpeech(id: id, text: text, profileName: profileName, jobType: .live)
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
@@ -147,8 +147,20 @@ public enum WorkerRequest: Sendable, Equatable {
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
 
-        case "list_queue":
-            return .listQueue(id: id)
+        case "list_queue_generation":
+            return .listQueue(id: id, queueType: .generation)
+
+        case "list_queue_playback":
+            return .listQueue(id: id, queueType: .playback)
+
+        case "playback_pause":
+            return .playback(id: id, action: .pause)
+
+        case "playback_resume":
+            return .playback(id: id, action: .resume)
+
+        case "playback_state":
+            return .playback(id: id, action: .state)
 
         case "clear_queue":
             return .clearQueue(id: id)
@@ -261,6 +273,7 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
     public let profiles: [ProfileSummary]?
     public let activeRequest: ActiveWorkerRequestSummary?
     public let queue: [QueuedWorkerRequestSummary]?
+    public let playbackState: PlaybackStateSummary?
     public let clearedCount: Int?
     public let cancelledRequestID: String?
 
@@ -272,6 +285,7 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
         case profiles
         case activeRequest = "active_request"
         case queue
+        case playbackState = "playback_state"
         case clearedCount = "cleared_count"
         case cancelledRequestID = "cancelled_request_id"
     }
@@ -283,6 +297,7 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
         profiles: [ProfileSummary]? = nil,
         activeRequest: ActiveWorkerRequestSummary? = nil,
         queue: [QueuedWorkerRequestSummary]? = nil,
+        playbackState: PlaybackStateSummary? = nil,
         clearedCount: Int? = nil,
         cancelledRequestID: String? = nil
     ) {
@@ -292,8 +307,24 @@ public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
         self.profiles = profiles
         self.activeRequest = activeRequest
         self.queue = queue
+        self.playbackState = playbackState
         self.clearedCount = clearedCount
         self.cancelledRequestID = cancelledRequestID
+    }
+}
+
+public struct PlaybackStateSummary: Codable, Sendable, Equatable {
+    public let state: PlaybackState
+    public let activeRequest: ActiveWorkerRequestSummary?
+
+    enum CodingKeys: String, CodingKey {
+        case state
+        case activeRequest = "active_request"
+    }
+
+    public init(state: PlaybackState, activeRequest: ActiveWorkerRequestSummary?) {
+        self.state = state
+        self.activeRequest = activeRequest
     }
 }
 

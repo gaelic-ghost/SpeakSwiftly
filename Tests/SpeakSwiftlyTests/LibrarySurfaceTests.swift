@@ -6,11 +6,8 @@ import SpeakSwiftlyCore
 }
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let liveSubmit: @Sendable (WorkerRuntime, String, String, String) async -> String = { runtime, text, profileName, id in
-        await runtime.speakLive(text: text, profileName: profileName, id: id)
-    }
-    let backgroundSubmit: @Sendable (WorkerRuntime, String, String, String) async -> String = { runtime, text, profileName, id in
-        await runtime.speakLiveBackground(text: text, profileName: profileName, id: id)
+    let queueSpeech: @Sendable (WorkerRuntime, String, String, String) async -> String = { runtime, text, profileName, id in
+        await runtime.queueSpeech(text: text, profileName: profileName, as: .live, id: id)
     }
     let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> String = {
         runtime,
@@ -33,8 +30,14 @@ import SpeakSwiftlyCore
     let removeProfile: @Sendable (WorkerRuntime, String, String) async -> String = { runtime, profileName, id in
         await runtime.removeProfile(profileName: profileName, id: id)
     }
-    let listQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
-        await runtime.listQueue()
+    let listGenerationQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
+        await runtime.listQueue(.generation)
+    }
+    let listPlaybackQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
+        await runtime.listQueue(.playback)
+    }
+    let playbackPause: @Sendable (WorkerRuntime) async -> String = { runtime in
+        await runtime.playback(.pause)
     }
     let clearQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
         await runtime.clearQueue()
@@ -49,12 +52,13 @@ import SpeakSwiftlyCore
         await runtime.submit(request)
     }
 
-    _ = liveSubmit
-    _ = backgroundSubmit
+    _ = queueSpeech
     _ = createProfile
     _ = listProfiles
     _ = removeProfile
-    _ = listQueue
+    _ = listGenerationQueue
+    _ = listPlaybackQueue
+    _ = playbackPause
     _ = clearQueue
     _ = cancelRequest
     _ = statusEvents

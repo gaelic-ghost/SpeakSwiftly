@@ -337,7 +337,10 @@ final class PlaybackSpy: @unchecked Sendable {
             },
             stop: { [self] in
                 lock.withLock { stopCount += 1 }
-            }
+            },
+            pause: { .paused },
+            resume: { .playing },
+            state: { .idle }
         )
     }
 }

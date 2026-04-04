@@ -201,14 +201,14 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
         #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
             $0["id"] as? String == "req-live"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "speak_live"
+                && $0["op"] as? String == "queue_speech_live"
         } != nil)
         #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
             $0["id"] as? String == "req-live"
@@ -274,7 +274,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-real","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-real","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -384,7 +384,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-trace","op":"speak_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-trace","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -439,7 +439,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-forensic","op":"speak_live","text":"\(Self.forensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-forensic","op":"queue_speech_live","text":"\(Self.forensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -516,7 +516,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-segmented","op":"speak_live","text":"\(Self.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-segmented","op":"queue_speech_live","text":"\(Self.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -603,7 +603,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-reversed-segmented","op":"speak_live","text":"\(Self.reversedSegmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(Self.reversedSegmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -690,7 +690,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-conversational","op":"speak_live","text":"\(Self.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-conversational","op":"queue_speech_live","text":"\(Self.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 
@@ -776,7 +776,7 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-reversed-conversational","op":"speak_live","text":"\(Self.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
+            {"id":"req-live-reversed-conversational","op":"queue_speech_live","text":"\(Self.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
             """
         )
 

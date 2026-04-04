@@ -201,7 +201,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -216,20 +216,23 @@ import Testing
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
-    #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-1"
-            && $0["ok"] as? Bool == true
-    })
-
     await playbackDrain.open()
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
-                && $0["ok"] as? Bool == true
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"speak_live","text":"Hello again","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hello again","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -379,7 +382,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -432,7 +435,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -505,7 +508,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -577,7 +580,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Longer playback diagnostics check","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Longer playback diagnostics check","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -660,12 +663,13 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
-                && $0["ok"] as? Bool == true
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
 
@@ -709,16 +713,11 @@ import Testing
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"speak_live","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
+        {"id":"req-1","op":"queue_speech_live","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
         """#
     )
 
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-1"
-                && $0["ok"] as? Bool == true
-        }
-    })
+    #expect(await waitUntil { residentRecorder.lastText != nil })
 
     let normalized = try #require(residentRecorder.lastText)
     #expect(!normalized.contains("```"))

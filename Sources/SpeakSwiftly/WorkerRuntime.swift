@@ -25,11 +25,6 @@ public actor WorkerRuntime {
         let task: Task<Void, Never>
     }
 
-    private struct QueueEntry: Sendable, Equatable {
-        let token = UUID()
-        let request: WorkerRequest
-    }
-
     private struct WorkerSuccessPayload: Sendable {
         let id: String
         let profileName: String?
@@ -37,6 +32,7 @@ public actor WorkerRuntime {
         let profiles: [ProfileSummary]?
         let activeRequest: ActiveWorkerRequestSummary?
         let queue: [QueuedWorkerRequestSummary]?
+        let playbackState: PlaybackStateSummary?
         let clearedCount: Int?
         let cancelledRequestID: String?
 
@@ -47,6 +43,7 @@ public actor WorkerRuntime {
             profiles: [ProfileSummary]? = nil,
             activeRequest: ActiveWorkerRequestSummary? = nil,
             queue: [QueuedWorkerRequestSummary]? = nil,
+            playbackState: PlaybackStateSummary? = nil,
             clearedCount: Int? = nil,
             cancelledRequestID: String? = nil
         ) {
@@ -56,9 +53,57 @@ public actor WorkerRuntime {
             self.profiles = profiles
             self.activeRequest = activeRequest
             self.queue = queue
+            self.playbackState = playbackState
             self.clearedCount = clearedCount
             self.cancelledRequestID = cancelledRequestID
         }
+    }
+
+    private enum GenerationCompletionDisposition: Sendable {
+        case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
+        case requestStillPendingPlayback(String)
+    }
+
+    private final class SpeechJobState: @unchecked Sendable {
+        let requestID: String
+        let op: String
+        let text: String
+        let normalizedText: String
+        let profileName: String
+        let textFeatures: SpeechTextForensicFeatures
+        let textSections: [SpeechTextForensicSection]
+        let stream: AsyncThrowingStream<[Float], Error>
+        let continuation: AsyncThrowingStream<[Float], Error>.Continuation
+        var sampleRate: Double?
+        var generationTask: Task<Void, Never>?
+        var playbackTask: Task<Void, Never>?
+
+        init(
+            requestID: String,
+            op: String,
+            text: String,
+            normalizedText: String,
+            profileName: String,
+            textFeatures: SpeechTextForensicFeatures,
+            textSections: [SpeechTextForensicSection],
+            stream: AsyncThrowingStream<[Float], Error>,
+            continuation: AsyncThrowingStream<[Float], Error>.Continuation
+        ) {
+            self.requestID = requestID
+            self.op = op
+            self.text = text
+            self.normalizedText = normalizedText
+            self.profileName = profileName
+            self.textFeatures = textFeatures
+            self.textSections = textSections
+            self.stream = stream
+            self.continuation = continuation
+        }
+    }
+
+    private struct ActivePlayback: Sendable {
+        let requestID: String
+        let task: Task<Void, Never>
     }
 
     private struct OutgoingWorkerRequest: Encodable {
@@ -136,16 +181,20 @@ public actor WorkerRuntime {
     private let logEncoder = JSONEncoder()
     private let profileStore: ProfileStore
     private let playbackController: AnyPlaybackController
+    private let generationController = GenerationController()
     private let logTimestampFormatter = ISO8601DateFormatter()
+    private let maxAcceptedSpeechJobs = 8
 
     private var residentState: ResidentState = .warming
-    private var queue = [QueueEntry]()
-    private var activeRequest: ActiveRequest?
     private var isShuttingDown = false
     private var preloadTask: Task<Void, Never>?
     private var requestAcceptedAt = [String: Date]()
     private var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
     private var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, Error>.Continuation]()
+    private var activeGeneration: ActiveRequest?
+    private var activePlayback: ActivePlayback?
+    private var speechJobs = [String: SpeechJobState]()
+    private var playbackQueue = [String]()
 
     init(
         dependencies: WorkerDependencies,
@@ -235,7 +284,8 @@ public actor WorkerRuntime {
                         ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
                     )
                 }
-                try await startNextRequestIfPossible()
+                try await startNextGenerationIfPossible()
+                await startNextPlaybackIfPossible()
             } catch is CancellationError {
                 guard !isShuttingDown else { return }
 
@@ -331,7 +381,7 @@ public actor WorkerRuntime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: queue.count
+                queueDepth: await generationQueueDepth()
             )
             await emitStarted(for: request)
             yieldRequestEvent(.started(WorkerStartedEvent(id: request.id, op: request.opName)), for: request.id)
@@ -340,7 +390,7 @@ public actor WorkerRuntime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: queue.count
+                queueDepth: await generationQueueDepth()
             )
             Task {
                 await self.processImmediateControlRequest(request)
@@ -355,17 +405,32 @@ public actor WorkerRuntime {
             return
         }
 
-        let entry = QueueEntry(request: request)
+        if request.isSpeechRequest, speechJobs.count >= maxAcceptedSpeechJobs {
+            let workerError = WorkerError(
+                code: .invalidRequest,
+                message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more."
+            )
+            failRequestStream(for: request.id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: request.id)
+            await emitFailure(id: request.id, error: workerError)
+            return
+        }
+
+        let job = await generationController.enqueue(request)
         requestAcceptedAt[request.id] = dependencies.now()
         await logRequestEvent(
             "request_accepted",
             requestID: request.id,
             op: request.opName,
             profileName: request.profileName,
-            queueDepth: queue.count
+            queueDepth: await generationQueueDepth()
         )
-        queue.append(entry)
-        if let queuedEvent = makeQueuedEvent(for: entry) {
+        if request.isSpeechRequest {
+            let speechJob = makeSpeechJobState(for: request)
+            speechJobs[request.id] = speechJob
+            playbackQueue.append(request.id)
+        }
+        if let queuedEvent = await makeQueuedEvent(for: job) {
             await emit(queuedEvent)
             yieldRequestEvent(.queued(queuedEvent), for: request.id)
             await logRequestEvent(
@@ -373,7 +438,7 @@ public actor WorkerRuntime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: queue.count
+                queueDepth: await generationQueueDepth()
             )
         }
         if request.acknowledgesEnqueueImmediately {
@@ -384,37 +449,24 @@ public actor WorkerRuntime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: queue.count
+                queueDepth: await generationQueueDepth()
             )
             await emit(acknowledgement)
         }
-        try? await startNextRequestIfPossible()
+        try? await startNextGenerationIfPossible()
+        await startNextPlaybackIfPossible()
     }
 
     @discardableResult
-    public func speakLive(
+    public func queueSpeech(
         text: String,
         profileName: String,
+        as jobType: SpeechJobType,
         id: String = UUID().uuidString
     ) async -> String {
         await submitRequest(
             id: id,
-            op: "speak_live",
-            text: text,
-            profileName: profileName
-        )
-        return id
-    }
-
-    @discardableResult
-    public func speakLiveBackground(
-        text: String,
-        profileName: String,
-        id: String = UUID().uuidString
-    ) async -> String {
-        await submitRequest(
-            id: id,
-            op: "speak_live_background",
+            op: WorkerRequest.queueSpeech(id: id, text: text, profileName: profileName, jobType: jobType).opName,
             text: text,
             profileName: profileName
         )
@@ -463,10 +515,19 @@ public actor WorkerRuntime {
     }
 
     @discardableResult
-    public func listQueue(id requestID: String = UUID().uuidString) async -> String {
+    public func listQueue(_ queueType: WorkerQueueType, id requestID: String = UUID().uuidString) async -> String {
         await submitRequest(
             id: requestID,
-            op: "list_queue"
+            op: WorkerRequest.listQueue(id: requestID, queueType: queueType).opName
+        )
+        return requestID
+    }
+
+    @discardableResult
+    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> String {
+        await submitRequest(
+            id: requestID,
+            op: WorkerRequest.playback(id: requestID, action: action).opName
         )
         return requestID
     }
@@ -501,24 +562,29 @@ public actor WorkerRuntime {
             message: "The request was cancelled because the SpeakSwiftly worker is shutting down."
         )
 
-        if let activeRequest {
-            self.activeRequest = nil
-            activeRequest.task.cancel()
-            failRequestStream(for: activeRequest.request.id, error: cancellationError)
-            requestAcceptedAt.removeValue(forKey: activeRequest.request.id)
-            await emitFailure(id: activeRequest.request.id, error: cancellationError)
+        if let activeGeneration {
+            self.activeGeneration = nil
+            activeGeneration.task.cancel()
+            failRequestStream(for: activeGeneration.request.id, error: cancellationError)
+            requestAcceptedAt.removeValue(forKey: activeGeneration.request.id)
+            await emitFailure(id: activeGeneration.request.id, error: cancellationError)
+        }
+
+        if let activePlayback {
+            self.activePlayback = nil
+            activePlayback.task.cancel()
         }
 
         await failQueuedRequests(with: cancellationError)
+        await failWaitingPlaybackRequests(with: cancellationError)
         await playbackController.stop()
-        await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(queue.count)])
+        await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(await generationQueueDepth())])
     }
 
     // MARK: - Processing
 
-    private func startNextRequestIfPossible() async throws {
+    private func startNextGenerationIfPossible() async throws {
         guard !isShuttingDown else { return }
-        guard activeRequest == nil else { return }
 
         switch residentState {
         case .warming:
@@ -530,37 +596,35 @@ public actor WorkerRuntime {
             break
         }
 
-        guard let index = nextQueueIndex() else { return }
+        guard let job = await generationController.beginNextIfPossible(residentReady: true) else { return }
 
-        let entry = queue.remove(at: index)
-        await emitStarted(for: entry.request)
-        yieldRequestEvent(.started(WorkerStartedEvent(id: entry.request.id, op: entry.request.opName)), for: entry.request.id)
+        await emitStarted(for: job.request)
+        yieldRequestEvent(.started(WorkerStartedEvent(id: job.request.id, op: job.request.opName)), for: job.request.id)
         await logRequestEvent(
             "request_started",
-            requestID: entry.request.id,
-            op: entry.request.opName,
-            profileName: entry.request.profileName,
-            queueDepth: queue.count
+            requestID: job.request.id,
+            op: job.request.opName,
+            profileName: job.request.profileName,
+            queueDepth: await generationQueueDepth()
         )
 
         let task = Task {
-            await self.process(entry.request, token: entry.token)
+            await self.processGeneration(job.request, token: job.token)
         }
-        activeRequest = ActiveRequest(token: entry.token, request: entry.request, task: task)
+        activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
+        if case .queueSpeech(let id, _, _, _) = job.request {
+            speechJobs[id]?.generationTask = task
+        }
     }
 
-    private func process(_ request: WorkerRequest, token: UUID) async {
-        let result: Result<WorkerSuccessPayload, WorkerError>
+    private func processGeneration(_ request: WorkerRequest, token: UUID) async {
+        let disposition: GenerationCompletionDisposition
 
         do {
             switch request {
-            case .speakLive(let id, let text, let profileName):
-                try await handleSpeakLive(id: id, op: request.opName, text: text, profileName: profileName)
-                result = .success(WorkerSuccessPayload(id: id))
-
-            case .speakLiveBackground(let id, let text, let profileName):
-                try await handleSpeakLive(id: id, op: request.opName, text: text, profileName: profileName)
-                result = .success(WorkerSuccessPayload(id: id))
+            case .queueSpeech(let id, let text, let profileName, .live):
+                try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
+                disposition = .requestStillPendingPlayback(id)
 
             case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
                 let storedProfile = try await handleCreateProfile(
@@ -570,13 +634,13 @@ public actor WorkerRuntime {
                     voiceDescription: voiceDescription,
                     outputPath: outputPath
                 )
-                result = .success(
+                disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
                         profileName: storedProfile.manifest.profileName,
                         profilePath: storedProfile.directoryURL.path
                     )
-                )
+                ))
 
             case .listProfiles(let id):
                 let listStartedAt = dependencies.now()
@@ -591,7 +655,7 @@ public actor WorkerRuntime {
                         "duration_ms": .int(elapsedMS(since: listStartedAt)),
                     ]
                 )
-                result = .success(WorkerSuccessPayload(id: id, profiles: profiles))
+                disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id, profiles: profiles)))
 
             case .removeProfile(let id, let profileName):
                 await emitProgress(id: id, stage: .removingProfile)
@@ -607,30 +671,28 @@ public actor WorkerRuntime {
                         "duration_ms": .int(elapsedMS(since: removeStartedAt)),
                     ]
                 )
-                result = .success(WorkerSuccessPayload(id: id, profileName: profileName))
+                disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id, profileName: profileName)))
 
-            case .listQueue, .clearQueue, .cancelRequest:
-                result = .failure(
+            case .listQueue, .playback, .clearQueue, .cancelRequest:
+                disposition = .requestCompleted(.failure(
                     WorkerError(
                         code: .internalError,
                         message: "Control request '\(request.id)' was routed through the serialized work queue unexpectedly. This indicates a runtime bug in SpeakSwiftly."
                     )
-                )
+                ))
             }
         } catch is CancellationError {
-            result = .failure(cancellationError(for: request.id))
+            disposition = .requestCompleted(.failure(cancellationError(for: request.id)))
         } catch let workerError as WorkerError {
-            result = .failure(workerError)
+            disposition = .requestCompleted(.failure(workerError))
         } catch {
-            result = .failure(
-                WorkerError(
+            disposition = .requestCompleted(.failure(WorkerError(
                     code: .internalError,
                     message: "Request '\(request.id)' failed due to an unexpected internal error. \(error.localizedDescription)"
-                )
-            )
+                )))
         }
 
-        await finishActiveRequest(token: token, request: request, result: result)
+        await finishActiveGeneration(token: token, request: request, disposition: disposition)
     }
 
     private func processImmediateControlRequest(_ request: WorkerRequest) async {
@@ -638,12 +700,24 @@ public actor WorkerRuntime {
 
         do {
             switch request {
-            case .listQueue(let id):
+            case .listQueue(let id, let queueType):
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        activeRequest: activeRequestSummary(),
-                        queue: queuedRequestSummaries()
+                        activeRequest: await queueSummaryActiveRequest(for: queueType),
+                        queue: await queuedRequestSummaries(for: queueType)
+                    )
+                )
+
+            case .playback(let id, let action):
+                let playbackState = await handlePlaybackControl(action)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        playbackState: PlaybackStateSummary(
+                            state: playbackState,
+                            activeRequest: playbackActiveRequestSummary()
+                        )
                     )
                 )
 
@@ -661,8 +735,7 @@ public actor WorkerRuntime {
                 )
                 result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))
 
-            case .speakLive,
-                 .speakLiveBackground,
+            case .queueSpeech,
                  .createProfile,
                  .listProfiles,
                  .removeProfile:
@@ -689,11 +762,15 @@ public actor WorkerRuntime {
         await finishImmediateRequest(request: request, result: result)
     }
 
-    private func handleSpeakLive(id: String, op: String, text: String, profileName: String) async throws {
+    private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
         let residentModel = try residentModelOrThrow()
-        let normalizedText = SpeechTextNormalizer.normalize(text)
-        let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
-        let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
+        guard let speechJob = speechJobs[id] else {
+            throw WorkerError(
+                code: .internalError,
+                message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug."
+            )
+        }
+        speechJob.sampleRate = Double(residentModel.sampleRate)
 
         await emitProgress(id: id, stage: .loadingProfile)
         let profileLoadStartedAt = dependencies.now()
@@ -726,307 +803,32 @@ public actor WorkerRuntime {
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentModel.generateSamplesStream(
-            text: normalizedText,
+            text: speechJob.normalizedText,
             voice: nil,
             refAudio: refAudio,
             refText: profile.manifest.sourceText,
             language: "English",
-            generationParameters: GenerationPolicy.residentParameters(for: normalizedText),
+            generationParameters: GenerationPolicy.residentParameters(for: speechJob.normalizedText),
             streamingInterval: PlaybackConfiguration.residentStreamingInterval
         )
 
-        let playbackSummary = try await playbackController.play(
-            sampleRate: Double(residentModel.sampleRate),
-            text: normalizedText,
-            stream: stream
-        ) { event in
-            switch event {
-            case .firstChunk:
-                await self.emitProgress(id: id, stage: .bufferingAudio)
-                await self.logRequestEvent(
-                    "playback_first_chunk",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName
-                )
-            case .prerollReady(let startupBufferedAudioMS, let thresholds):
-                await self.emitProgress(id: id, stage: .prerollReady)
-                await self.logRequestEvent(
-                    "playback_preroll_ready",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
-                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
-                        "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
-                    ]
-                )
-                await self.logRequestEvent(
-                    "playback_started",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
-                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
-                        "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
-                    ]
-                    .merging(self.textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
-                    .merging(["section_count": .int(textSections.count)], uniquingKeysWith: { _, new in new })
-                    .merging(self.memoryDetails(), uniquingKeysWith: { _, new in new })
-                )
-                for section in textSections {
-                    await self.logRequestEvent(
-                        "playback_section_detected",
-                        requestID: id,
-                        op: op,
-                        profileName: profileName,
-                        details: self.textSectionDetails(section)
-                    )
-                }
-            case .queueDepthLow(let queuedAudioMS):
-                await self.logRequestEvent(
-                    "playback_queue_depth_low",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: ["queued_audio_ms": .int(queuedAudioMS)]
-                )
-            case .chunkGapWarning(let gapMS, let chunkIndex):
-                await self.logRequestEvent(
-                    "playback_chunk_gap_warning",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "gap_ms": .int(gapMS),
-                        "chunk_index": .int(chunkIndex),
-                    ]
-                )
-            case .scheduleGapWarning(let gapMS, let bufferIndex, let queuedAudioMS):
-                await self.logRequestEvent(
-                    "playback_schedule_gap_warning",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "gap_ms": .int(gapMS),
-                        "buffer_index": .int(bufferIndex),
-                        "queued_audio_ms": .int(queuedAudioMS),
-                    ]
-                )
-            case .starved:
-                await self.logRequestEvent(
-                    "playback_starved",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName
-                )
-            case .rebufferThrashWarning(let rebufferEventCount, let windowMS):
-                await self.logRequestEvent(
-                    "playback_rebuffer_thrash_warning",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "rebuffer_event_count": .int(rebufferEventCount),
-                        "window_ms": .int(windowMS),
-                    ]
-                )
-            case .outputDeviceChanged(let previousDevice, let currentDevice):
-                var details = [String: LogValue]()
-                if let previousDevice {
-                    details["previous_device"] = .string(previousDevice)
-                }
-                if let currentDevice {
-                    details["current_device"] = .string(currentDevice)
-                }
-                await self.logRequestEvent(
-                    "playback_output_device_changed",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: details
-                )
-            case .engineConfigurationChanged(let engineIsRunning):
-                await self.logRequestEvent(
-                    "playback_engine_configuration_changed",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: ["engine_is_running": .bool(engineIsRunning)]
-                )
-            case .rebufferStarted(let queuedAudioMS, let thresholds):
-                await self.logRequestEvent(
-                    "playback_rebuffer_started",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
-                        "low_water_target_ms": .int(thresholds.lowWaterTargetMS),
-                        "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
-                        "queued_audio_ms": .int(queuedAudioMS),
-                    ]
-                )
-            case .rebufferResumed(let bufferedAudioMS, let thresholds):
-                await self.logRequestEvent(
-                    "playback_rebuffer_resumed",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "text_complexity_class": .string(thresholds.complexityClass.rawValue),
-                        "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
-                        "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
-                        "buffered_audio_ms": .int(bufferedAudioMS),
-                    ]
-                )
-            case .bufferShapeSummary(
-                let maxBoundaryDiscontinuity,
-                let maxLeadingAbsAmplitude,
-                let maxTrailingAbsAmplitude,
-                let fadeInChunkCount
-            ):
-                await self.logRequestEvent(
-                    "playback_buffer_shape_summary",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: [
-                        "max_boundary_discontinuity": .double(maxBoundaryDiscontinuity),
-                        "max_leading_abs_amplitude": .double(maxLeadingAbsAmplitude),
-                        "max_trailing_abs_amplitude": .double(maxTrailingAbsAmplitude),
-                        "fade_in_chunk_count": .int(fadeInChunkCount),
-                    ]
-                )
-            case .trace(let trace):
-                var details = [String: LogValue]()
-                if let chunkIndex = trace.chunkIndex {
-                    details["chunk_index"] = .int(chunkIndex)
-                }
-                if let bufferIndex = trace.bufferIndex {
-                    details["buffer_index"] = .int(bufferIndex)
-                }
-                if let sampleCount = trace.sampleCount {
-                    details["sample_count"] = .int(sampleCount)
-                }
-                if let durationMS = trace.durationMS {
-                    details["duration_ms"] = .int(durationMS)
-                }
-                if let queuedAudioBeforeMS = trace.queuedAudioBeforeMS {
-                    details["queued_audio_before_ms"] = .int(queuedAudioBeforeMS)
-                }
-                if let queuedAudioAfterMS = trace.queuedAudioAfterMS {
-                    details["queued_audio_after_ms"] = .int(queuedAudioAfterMS)
-                }
-                if let gapMS = trace.gapMS {
-                    details["gap_ms"] = .int(gapMS)
-                }
-                if let isRebuffering = trace.isRebuffering {
-                    details["is_rebuffering"] = .bool(isRebuffering)
-                }
-                if let fadeInApplied = trace.fadeInApplied {
-                    details["fade_in_applied"] = .bool(fadeInApplied)
-                }
-                await self.logRequestEvent(
-                    "playback_trace_\(trace.name)",
-                    requestID: id,
-                    op: op,
-                    profileName: profileName,
-                    details: details
-                )
+        do {
+            for try await chunk in stream {
+                try Task.checkCancellation()
+                speechJob.continuation.yield(chunk)
             }
-        }
-        try Task.checkCancellation()
-
-        await emitProgress(id: id, stage: .playbackFinished)
-        var details: [String: LogValue] = [
-            "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
-            "chunk_count": .int(playbackSummary.chunkCount),
-            "sample_count": .int(playbackSummary.sampleCount),
-            "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
-            "startup_buffer_target_ms": .int(playbackSummary.thresholds.startupBufferTargetMS),
-            "low_water_target_ms": .int(playbackSummary.thresholds.lowWaterTargetMS),
-            "resume_buffer_target_ms": .int(playbackSummary.thresholds.resumeBufferTargetMS),
-            "chunk_gap_warning_threshold_ms": .int(playbackSummary.thresholds.chunkGapWarningMS),
-            "schedule_gap_warning_threshold_ms": .int(playbackSummary.thresholds.scheduleGapWarningMS),
-            "rebuffer_event_count": .int(playbackSummary.rebufferEventCount),
-            "rebuffer_total_duration_ms": .int(playbackSummary.rebufferTotalDurationMS),
-            "longest_rebuffer_duration_ms": .int(playbackSummary.longestRebufferDurationMS),
-            "starvation_event_count": .int(playbackSummary.starvationEventCount),
-            "queue_depth_sample_count": .int(playbackSummary.queueDepthSampleCount),
-            "schedule_callback_count": .int(playbackSummary.scheduleCallbackCount),
-            "played_back_callback_count": .int(playbackSummary.playedBackCallbackCount),
-            "fade_in_chunk_count": .int(playbackSummary.fadeInChunkCount),
-        ]
-        if let startupBufferedAudioMS = playbackSummary.startupBufferedAudioMS {
-            details["startup_buffered_audio_ms"] = .int(startupBufferedAudioMS)
-        }
-        if let timeToFirstChunkMS = playbackSummary.timeToFirstChunkMS {
-            details["time_to_first_chunk_ms"] = .int(timeToFirstChunkMS)
-        }
-        if let timeToPrerollReadyMS = playbackSummary.timeToPrerollReadyMS {
-            details["time_to_preroll_ready_ms"] = .int(timeToPrerollReadyMS)
-        }
-        if let timeFromPrerollReadyToDrainMS = playbackSummary.timeFromPrerollReadyToDrainMS {
-            details["time_from_preroll_ready_to_drain_ms"] = .int(timeFromPrerollReadyToDrainMS)
-        }
-        if let minQueuedAudioMS = playbackSummary.minQueuedAudioMS {
-            details["min_queued_audio_ms"] = .int(minQueuedAudioMS)
-        }
-        if let maxQueuedAudioMS = playbackSummary.maxQueuedAudioMS {
-            details["max_queued_audio_ms"] = .int(maxQueuedAudioMS)
-        }
-        if let avgQueuedAudioMS = playbackSummary.avgQueuedAudioMS {
-            details["avg_queued_audio_ms"] = .int(avgQueuedAudioMS)
-        }
-        if let maxInterChunkGapMS = playbackSummary.maxInterChunkGapMS {
-            details["max_inter_chunk_gap_ms"] = .int(maxInterChunkGapMS)
-        }
-        if let avgInterChunkGapMS = playbackSummary.avgInterChunkGapMS {
-            details["avg_inter_chunk_gap_ms"] = .int(avgInterChunkGapMS)
-        }
-        if let maxScheduleGapMS = playbackSummary.maxScheduleGapMS {
-            details["max_schedule_gap_ms"] = .int(maxScheduleGapMS)
-        }
-        if let avgScheduleGapMS = playbackSummary.avgScheduleGapMS {
-            details["avg_schedule_gap_ms"] = .int(avgScheduleGapMS)
-        }
-        if let maxBoundaryDiscontinuity = playbackSummary.maxBoundaryDiscontinuity {
-            details["max_boundary_discontinuity"] = .double(maxBoundaryDiscontinuity)
-        }
-        if let maxLeadingAbsAmplitude = playbackSummary.maxLeadingAbsAmplitude {
-            details["max_leading_abs_amplitude"] = .double(maxLeadingAbsAmplitude)
-        }
-        if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude {
-            details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude)
-        }
-        details.merge(textFeatureDetails(textFeatures), uniquingKeysWith: { _, new in new })
-        details["section_count"] = .int(textSections.count)
-        details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
-        await logRequestEvent(
-            "playback_finished",
-            requestID: id,
-            op: op,
-            profileName: profileName,
-            details: details
-        )
-
-        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / Double(residentModel.sampleRate) * 1_000).rounded())
-        let sectionWindows = SpeechTextNormalizer.forensicSectionWindows(
-            originalText: text,
-            totalDurationMS: totalDurationMS,
-            totalChunkCount: playbackSummary.chunkCount
-        )
-        for window in sectionWindows {
-            await logRequestEvent(
-                "playback_section_window",
-                requestID: id,
-                op: op,
-                profileName: profileName,
-                details: textSectionWindowDetails(window)
+            speechJob.continuation.finish()
+        } catch {
+            speechJob.continuation.finish(throwing: error)
+            if let workerError = error as? WorkerError {
+                throw workerError
+            }
+            if error is CancellationError {
+                throw CancellationError()
+            }
+            throw WorkerError(
+                code: .modelGenerationFailed,
+                message: "Live speech generation failed while streaming audio for request '\(id)'. \(error.localizedDescription)"
             )
         }
     }
@@ -1197,90 +999,128 @@ public actor WorkerRuntime {
         }
     }
 
-    private func nextQueueIndex() -> Int? {
-        let prioritizedIndices = queue.indices
-            .filter { queue[$0].request.isPlayback }
-            + queue.indices.filter { !queue[$0].request.isPlayback }
-
-        for index in prioritizedIndices where !isBlockedByProfileCreation(queue[index]) {
-            return index
-        }
-
-        return nil
-    }
-
-    private func isBlockedByProfileCreation(_ entry: QueueEntry) -> Bool {
-        guard case .speakLive(_, _, let profileName) = entry.request else {
-            return false
-        }
-
-        if let activeRequest,
-           case .createProfile(_, let activeProfileName, _, _, _) = activeRequest.request,
-           activeProfileName == profileName
-        {
-            return true
-        }
-
-        for queuedEntry in queue {
-            if queuedEntry.token == entry.token {
-                break
-            }
-
-            if case .createProfile(_, let queuedProfileName, _, _, _) = queuedEntry.request,
-               queuedProfileName == profileName
-            {
-                return true
-            }
-        }
-
-        return false
-    }
-
     private func failQueuedRequests(with error: WorkerError) async {
-        let queuedRequests = queue
-        queue.removeAll()
+        let queuedJobs = await generationController.clearQueued()
 
-        for entry in queuedRequests {
-            failRequestStream(for: entry.request.id, error: error)
-            requestAcceptedAt.removeValue(forKey: entry.request.id)
-            await emitFailure(id: entry.request.id, error: error)
+        for job in queuedJobs {
+            if job.request.isSpeechRequest {
+                _ = removeSpeechJob(requestID: job.request.id)
+                removePlaybackJob(requestID: job.request.id)
+            }
+            failRequestStream(for: job.request.id, error: error)
+            requestAcceptedAt.removeValue(forKey: job.request.id)
+            await emitFailure(id: job.request.id, error: error)
         }
     }
 
     private func clearQueuedRequests(cancelledByRequestID: String, reason: String) async -> Int {
-        let queuedRequests = queue
-        queue.removeAll()
+        let queuedJobs = await generationController.clearQueued()
+        let protectedRequestIDs = Set([activeGeneration?.request.id, activePlayback?.requestID].compactMap { $0 })
+        let waitingPlaybackRequestIDs = playbackQueue.filter { !protectedRequestIDs.contains($0) }
 
         let cancellation = WorkerError(
             code: .requestCancelled,
             message: "Request '\(cancelledByRequestID)' cancelled this work because \(reason)."
         )
 
-        for entry in queuedRequests {
-            failRequestStream(for: entry.request.id, error: cancellation)
-            requestAcceptedAt.removeValue(forKey: entry.request.id)
+        for job in queuedJobs {
+            if job.request.isSpeechRequest {
+                _ = removeSpeechJob(requestID: job.request.id)
+                removePlaybackJob(requestID: job.request.id)
+            }
+            failRequestStream(for: job.request.id, error: cancellation)
+            requestAcceptedAt.removeValue(forKey: job.request.id)
             await logError(
                 cancellation.message,
-                requestID: entry.request.id,
+                requestID: job.request.id,
                 details: ["failure_code": .string(cancellation.code.rawValue)]
             )
-            await emitFailure(id: entry.request.id, error: cancellation)
+            await emitFailure(id: job.request.id, error: cancellation)
         }
 
-        return queuedRequests.count
+        for requestID in waitingPlaybackRequestIDs {
+            guard let speechJob = removeSpeechJob(requestID: requestID) else { continue }
+            speechJob.generationTask?.cancel()
+            speechJob.playbackTask?.cancel()
+            speechJob.continuation.finish(throwing: cancellation)
+            removePlaybackJob(requestID: requestID)
+            requestAcceptedAt.removeValue(forKey: requestID)
+            let request = WorkerRequest.queueSpeech(
+                id: requestID,
+                text: speechJob.text,
+                profileName: speechJob.profileName,
+                jobType: .live
+            )
+            await logError(
+                cancellation.message,
+                requestID: requestID,
+                details: ["failure_code": .string(cancellation.code.rawValue)]
+            )
+            await completeRequest(request: request, result: .failure(cancellation))
+        }
+
+        return queuedJobs.count + waitingPlaybackRequestIDs.count
+    }
+
+    private func failWaitingPlaybackRequests(with error: WorkerError) async {
+        let protectedRequestIDs = Set([activeGeneration?.request.id, activePlayback?.requestID].compactMap { $0 })
+        let waitingPlaybackRequestIDs = playbackQueue.filter { !protectedRequestIDs.contains($0) }
+
+        for requestID in waitingPlaybackRequestIDs {
+            guard let speechJob = removeSpeechJob(requestID: requestID) else { continue }
+            speechJob.generationTask?.cancel()
+            speechJob.playbackTask?.cancel()
+            speechJob.continuation.finish(throwing: error)
+            removePlaybackJob(requestID: requestID)
+            requestAcceptedAt.removeValue(forKey: requestID)
+            let request = WorkerRequest.queueSpeech(
+                id: requestID,
+                text: speechJob.text,
+                profileName: speechJob.profileName,
+                jobType: .live
+            )
+            await completeRequest(request: request, result: .failure(error))
+        }
     }
 
     private func cancelRequestNow(_ targetRequestID: String, cancelledByRequestID: String) async throws -> String {
-        if let activeRequest, activeRequest.request.id == targetRequestID {
-            self.activeRequest = nil
-            activeRequest.task.cancel()
+        let cancellation = WorkerError(
+            code: .requestCancelled,
+            message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)'."
+        )
+
+        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID)
+        if let cancelledGenerationTarget {
+            switch cancelledGenerationTarget {
+            case .active:
+                activeGeneration?.task.cancel()
+                activeGeneration = nil
+            case .queued:
+                break
+            }
+        }
+
+        if let speechJob = speechJobs[targetRequestID] {
+            speechJob.generationTask?.cancel()
+            speechJob.playbackTask?.cancel()
+            speechJob.continuation.finish(throwing: cancellation)
+            if activePlayback?.requestID == targetRequestID {
+                activePlayback = nil
+                await playbackController.stop()
+            } else {
+                removePlaybackJob(requestID: targetRequestID)
+            }
+            await completeSpeechRequestIfNeeded(id: targetRequestID, result: .failure(cancellation))
+            try? await startNextGenerationIfPossible()
+            await startNextPlaybackIfPossible()
+            return targetRequestID
+        }
+
+        switch cancelledGenerationTarget {
+        case .active:
+            activeGeneration?.task.cancel()
+            activeGeneration = nil
             requestAcceptedAt.removeValue(forKey: targetRequestID)
-
-            let cancellation = WorkerError(
-                code: .requestCancelled,
-                message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)'."
-            )
-
             failRequestStream(for: targetRequestID, error: cancellation)
             await logError(
                 cancellation.message,
@@ -1288,28 +1128,20 @@ public actor WorkerRuntime {
                 details: ["failure_code": .string(cancellation.code.rawValue)]
             )
             await emitFailure(id: targetRequestID, error: cancellation)
-            await playbackController.stop()
-            try? await startNextRequestIfPossible()
+            try? await startNextGenerationIfPossible()
             return targetRequestID
-        }
-
-        if let queueIndex = queue.firstIndex(where: { $0.request.id == targetRequestID }) {
-            let entry = queue.remove(at: queueIndex)
+        case .queued(let job):
             requestAcceptedAt.removeValue(forKey: targetRequestID)
-
-            let cancellation = WorkerError(
-                code: .requestCancelled,
-                message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)' before it started."
-            )
-
             failRequestStream(for: targetRequestID, error: cancellation)
             await logError(
                 cancellation.message,
                 requestID: targetRequestID,
                 details: ["failure_code": .string(cancellation.code.rawValue)]
             )
-            await emitFailure(id: entry.request.id, error: cancellation)
+            await emitFailure(id: job.request.id, error: cancellation)
             return targetRequestID
+        case nil:
+            break
         }
 
         throw WorkerError(
@@ -1318,15 +1150,22 @@ public actor WorkerRuntime {
         )
     }
 
-    private func finishActiveRequest(token: UUID, request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
-        guard activeRequest?.token == token else { return }
+    private func finishActiveGeneration(token: UUID, request: WorkerRequest, disposition: GenerationCompletionDisposition) async {
+        guard activeGeneration?.token == token else { return }
 
-        activeRequest = nil
+        activeGeneration = nil
+        await generationController.finishActive(token: token)
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
-        await completeRequest(request: request, result: result)
+        switch disposition {
+        case .requestCompleted(let result):
+            await completeRequest(request: request, result: result)
+        case .requestStillPendingPlayback:
+            break
+        }
 
         guard !isShuttingDown else { return }
-        try? await startNextRequestIfPossible()
+        try? await startNextGenerationIfPossible()
+        await startNextPlaybackIfPossible()
     }
 
     private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
@@ -1350,6 +1189,7 @@ public actor WorkerRuntime {
                 profiles: payload.profiles,
                 activeRequest: payload.activeRequest,
                 queue: payload.queue,
+                playbackState: payload.playbackState,
                 clearedCount: payload.clearedCount,
                 cancelledRequestID: payload.cancelledRequestID
             )
@@ -1382,7 +1222,7 @@ public actor WorkerRuntime {
 
     // MARK: - Emission
 
-    private func makeQueuedEvent(for entry: QueueEntry) -> WorkerQueuedEvent? {
+    private func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
         let reason: WorkerQueuedReason
         switch residentState {
         case .warming:
@@ -1390,48 +1230,75 @@ public actor WorkerRuntime {
         case .failed:
             return nil
         case .ready:
-            guard activeRequest != nil else { return nil }
+            guard await generationController.activeJob() != nil else { return nil }
             reason = .waitingForActiveRequest
         }
 
-        let queuePosition = waitingQueuePosition(for: entry)
-        return WorkerQueuedEvent(id: entry.request.id, reason: reason, queuePosition: queuePosition)
+        let queuePosition = await generationController.waitingPosition(
+            for: job.token,
+            residentReady: isResidentReady
+        ) ?? 1
+        return WorkerQueuedEvent(id: job.request.id, reason: reason, queuePosition: queuePosition)
     }
 
-    private func waitingQueuePosition(for entry: QueueEntry) -> Int {
-        let orderedQueue = orderedWaitingQueue()
-
-        guard let index = orderedQueue.firstIndex(of: entry) else {
-            return 1
+    private var isResidentReady: Bool {
+        if case .ready = residentState {
+            return true
         }
-
-        return index + 1
+        return false
     }
 
-    private func orderedWaitingQueue() -> [QueueEntry] {
-        let playbackRequests = queue.filter(\.request.isPlayback)
-        let nonPlaybackRequests = queue.filter { !$0.request.isPlayback }
-        return playbackRequests + nonPlaybackRequests
-    }
-
-    private func activeRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let activeRequest else { return nil }
+    private func generationActiveRequestSummary() -> ActiveWorkerRequestSummary? {
+        guard let activeGeneration else { return nil }
         return ActiveWorkerRequestSummary(
-            id: activeRequest.request.id,
-            op: activeRequest.request.opName,
-            profileName: activeRequest.request.profileName
+            id: activeGeneration.request.id,
+            op: activeGeneration.request.opName,
+            profileName: activeGeneration.request.profileName
         )
     }
 
-    private func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
-        orderedWaitingQueue().enumerated().map { offset, entry in
-            QueuedWorkerRequestSummary(
-                id: entry.request.id,
-                op: entry.request.opName,
-                profileName: entry.request.profileName,
-                queuePosition: offset + 1
-            )
+    private func playbackActiveRequestSummary() -> ActiveWorkerRequestSummary? {
+        guard let requestID = activePlayback?.requestID, let speechJob = speechJobs[requestID] else { return nil }
+        return ActiveWorkerRequestSummary(id: requestID, op: speechJob.op, profileName: speechJob.profileName)
+    }
+
+    private func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
+        switch queueType {
+        case .generation:
+            let jobs = await generationController.queuedJobsOrdered()
+            return jobs.enumerated().map { offset, job in
+                QueuedWorkerRequestSummary(
+                    id: job.request.id,
+                    op: job.request.opName,
+                    profileName: job.request.profileName,
+                    queuePosition: offset + 1
+                )
+            }
+        case .playback:
+            let waitingPlaybackQueue = playbackQueue.filter { $0 != activePlayback?.requestID }
+            return waitingPlaybackQueue.enumerated().compactMap { offset, requestID in
+                guard let speechJob = speechJobs[requestID] else { return nil }
+                return QueuedWorkerRequestSummary(
+                    id: requestID,
+                    op: speechJob.op,
+                    profileName: speechJob.profileName,
+                    queuePosition: offset + 1
+                )
+            }
         }
+    }
+
+    private func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
+        switch queueType {
+        case .generation:
+            return generationActiveRequestSummary()
+        case .playback:
+            return playbackActiveRequestSummary()
+        }
+    }
+
+    private func generationQueueDepth() async -> Int {
+        (await generationController.queuedJobsOrdered()).count
     }
 
     private func emitStarted(for request: WorkerRequest) async {
@@ -1448,10 +1315,6 @@ public actor WorkerRuntime {
         let status = WorkerStatusEvent(stage: stage)
         await emit(status)
         broadcastStatus(status)
-    }
-
-    private func emitSuccess(id: String, profileName: String?, profilePath: String?, profiles: [ProfileSummary]?) async {
-        await emit(WorkerSuccessResponse(id: id, profileName: profileName, profilePath: profilePath, profiles: profiles))
     }
 
     private func emitFailure(id: String, error: WorkerError) async {
@@ -1503,9 +1366,7 @@ public actor WorkerRuntime {
 
     private func submitRequest(_ request: WorkerRequest) async {
         switch request {
-        case .speakLive(let id, let text, let profileName):
-            await submitRequest(id: id, op: request.opName, text: text, profileName: profileName)
-        case .speakLiveBackground(let id, let text, let profileName):
+        case .queueSpeech(let id, let text, let profileName, _):
             await submitRequest(id: id, op: request.opName, text: text, profileName: profileName)
         case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
             await submitRequest(
@@ -1520,12 +1381,340 @@ public actor WorkerRuntime {
             await submitRequest(id: id, op: request.opName)
         case .removeProfile(let id, let profileName):
             await submitRequest(id: id, op: request.opName, profileName: profileName)
-        case .listQueue(let id):
+        case .listQueue(let id, _):
+            await submitRequest(id: id, op: request.opName)
+        case .playback(let id, _):
             await submitRequest(id: id, op: request.opName)
         case .clearQueue(let id):
             await submitRequest(id: id, op: request.opName)
         case .cancelRequest(let id, let requestID):
             await submitRequest(id: id, op: request.opName, requestID: requestID)
+        }
+    }
+
+    private func makeSpeechJobState(for request: WorkerRequest) -> SpeechJobState {
+        let requestID = request.id
+        let op = request.opName
+        let text = switch request {
+        case .queueSpeech(_, let text, _, _):
+            text
+        default:
+            ""
+        }
+        let profileName = request.profileName ?? "unknown-profile"
+        let normalizedText = SpeechTextNormalizer.normalize(text)
+        let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
+        let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
+        var continuation: AsyncThrowingStream<[Float], Error>.Continuation?
+        let stream = AsyncThrowingStream<[Float], Error> { continuation = $0 }
+
+        return SpeechJobState(
+            requestID: requestID,
+            op: op,
+            text: text,
+            normalizedText: normalizedText,
+            profileName: profileName,
+            textFeatures: textFeatures,
+            textSections: textSections,
+            stream: stream,
+            continuation: continuation!
+        )
+    }
+
+    private func removeSpeechJob(requestID: String) -> SpeechJobState? {
+        speechJobs.removeValue(forKey: requestID)
+    }
+
+    private func removePlaybackJob(requestID: String) {
+        playbackQueue.removeAll { $0 == requestID }
+    }
+
+    private func handlePlaybackControl(_ action: PlaybackAction) async -> PlaybackState {
+        switch action {
+        case .pause:
+            return await playbackController.pause()
+        case .resume:
+            return await playbackController.resume()
+        case .state:
+            return await playbackController.state()
+        }
+    }
+
+    private func startNextPlaybackIfPossible() async {
+        guard !isShuttingDown else { return }
+        guard activePlayback == nil else { return }
+        guard let requestID = playbackQueue.first, let speechJob = speechJobs[requestID] else { return }
+        guard let sampleRate = speechJob.sampleRate else { return }
+
+        let task = Task {
+            await self.processPlayback(for: speechJob, sampleRate: sampleRate)
+        }
+        activePlayback = ActivePlayback(requestID: requestID, task: task)
+        speechJob.playbackTask = task
+    }
+
+    private func processPlayback(for speechJob: SpeechJobState, sampleRate: Double) async {
+        let requestID = speechJob.requestID
+        let result: Result<WorkerSuccessPayload, WorkerError>
+
+        do {
+            let playbackSummary = try await playbackController.play(
+                sampleRate: sampleRate,
+                text: speechJob.normalizedText,
+                stream: speechJob.stream
+            ) { event in
+                await self.handlePlaybackEvent(event, for: speechJob)
+            }
+            await emitProgress(id: requestID, stage: .playbackFinished)
+            await logPlaybackFinished(for: speechJob, playbackSummary: playbackSummary, sampleRate: sampleRate)
+            result = .success(WorkerSuccessPayload(id: requestID))
+        } catch is CancellationError {
+            result = .failure(cancellationError(for: requestID))
+        } catch let workerError as WorkerError {
+            result = .failure(workerError)
+        } catch {
+            result = .failure(
+                WorkerError(
+                    code: .audioPlaybackFailed,
+                    message: "Live playback failed for request '\(requestID)' due to an unexpected internal error. \(error.localizedDescription)"
+                )
+            )
+        }
+
+        await finishPlayback(requestID: requestID, result: result)
+    }
+
+    private func finishPlayback(requestID: String, result: Result<WorkerSuccessPayload, WorkerError>) async {
+        guard activePlayback?.requestID == requestID else { return }
+        activePlayback = nil
+        removePlaybackJob(requestID: requestID)
+        if let speechJob = speechJobs[requestID] {
+            speechJob.playbackTask = nil
+        }
+        await completeSpeechRequestIfNeeded(id: requestID, result: result)
+        await startNextPlaybackIfPossible()
+    }
+
+    private func completeSpeechRequestIfNeeded(id: String, result: Result<WorkerSuccessPayload, WorkerError>) async {
+        guard let speechJob = removeSpeechJob(requestID: id) else { return }
+        speechJob.generationTask = nil
+        speechJob.playbackTask = nil
+        requestAcceptedAt.removeValue(forKey: id)
+        let request = WorkerRequest.queueSpeech(
+            id: id,
+            text: speechJob.text,
+            profileName: speechJob.profileName,
+            jobType: .live
+        )
+        await completeRequest(request: request, result: result)
+    }
+
+    private func handlePlaybackEvent(_ event: PlaybackEvent, for speechJob: SpeechJobState) async {
+        let id = speechJob.requestID
+        let op = speechJob.op
+        let profileName = speechJob.profileName
+
+        switch event {
+        case .firstChunk:
+            await emitProgress(id: id, stage: .bufferingAudio)
+            await logRequestEvent("playback_first_chunk", requestID: id, op: op, profileName: profileName)
+        case .prerollReady(let startupBufferedAudioMS, let thresholds):
+            await emitProgress(id: id, stage: .prerollReady)
+            await logRequestEvent(
+                "playback_preroll_ready",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                    "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
+                    "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
+                ]
+            )
+            await logRequestEvent(
+                "playback_started",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                    "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
+                    "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
+                ]
+                .merging(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
+                .merging(["section_count": .int(speechJob.textSections.count)], uniquingKeysWith: { _, new in new })
+                .merging(memoryDetails(), uniquingKeysWith: { _, new in new })
+            )
+            for section in speechJob.textSections {
+                await logRequestEvent(
+                    "playback_section_detected",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: textSectionDetails(section)
+                )
+            }
+        case .queueDepthLow(let queuedAudioMS):
+            await logRequestEvent("playback_queue_depth_low", requestID: id, op: op, profileName: profileName, details: ["queued_audio_ms": .int(queuedAudioMS)])
+        case .chunkGapWarning(let gapMS, let chunkIndex):
+            await logRequestEvent(
+                "playback_chunk_gap_warning",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: ["gap_ms": .int(gapMS), "chunk_index": .int(chunkIndex)]
+            )
+        case .scheduleGapWarning(let gapMS, let bufferIndex, let queuedAudioMS):
+            await logRequestEvent(
+                "playback_schedule_gap_warning",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: ["gap_ms": .int(gapMS), "buffer_index": .int(bufferIndex), "queued_audio_ms": .int(queuedAudioMS)]
+            )
+        case .starved:
+            await logRequestEvent("playback_starved", requestID: id, op: op, profileName: profileName)
+        case .rebufferThrashWarning(let rebufferEventCount, let windowMS):
+            await logRequestEvent(
+                "playback_rebuffer_thrash_warning",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: ["rebuffer_event_count": .int(rebufferEventCount), "window_ms": .int(windowMS)]
+            )
+        case .outputDeviceChanged(let previousDevice, let currentDevice):
+            var details = [String: LogValue]()
+            if let previousDevice {
+                details["previous_device"] = .string(previousDevice)
+            }
+            if let currentDevice {
+                details["current_device"] = .string(currentDevice)
+            }
+            await logRequestEvent("playback_output_device_changed", requestID: id, op: op, profileName: profileName, details: details)
+        case .engineConfigurationChanged(let engineIsRunning):
+            await logRequestEvent(
+                "playback_engine_configuration_changed",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: ["engine_is_running": .bool(engineIsRunning)]
+            )
+        case .rebufferStarted(let queuedAudioMS, let thresholds):
+            await logRequestEvent(
+                "playback_rebuffer_started",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                    "low_water_target_ms": .int(thresholds.lowWaterTargetMS),
+                    "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
+                    "queued_audio_ms": .int(queuedAudioMS),
+                ]
+            )
+        case .rebufferResumed(let bufferedAudioMS, let thresholds):
+            await logRequestEvent(
+                "playback_rebuffer_resumed",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "text_complexity_class": .string(thresholds.complexityClass.rawValue),
+                    "startup_buffer_target_ms": .int(thresholds.startupBufferTargetMS),
+                    "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
+                    "buffered_audio_ms": .int(bufferedAudioMS),
+                ]
+            )
+        case .bufferShapeSummary(let maxBoundaryDiscontinuity, let maxLeadingAbsAmplitude, let maxTrailingAbsAmplitude, let fadeInChunkCount):
+            await logRequestEvent(
+                "playback_buffer_shape_summary",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "max_boundary_discontinuity": .double(maxBoundaryDiscontinuity),
+                    "max_leading_abs_amplitude": .double(maxLeadingAbsAmplitude),
+                    "max_trailing_abs_amplitude": .double(maxTrailingAbsAmplitude),
+                    "fade_in_chunk_count": .int(fadeInChunkCount),
+                ]
+            )
+        case .trace(let trace):
+            var details = [String: LogValue]()
+            if let chunkIndex = trace.chunkIndex { details["chunk_index"] = .int(chunkIndex) }
+            if let bufferIndex = trace.bufferIndex { details["buffer_index"] = .int(bufferIndex) }
+            if let sampleCount = trace.sampleCount { details["sample_count"] = .int(sampleCount) }
+            if let durationMS = trace.durationMS { details["duration_ms"] = .int(durationMS) }
+            if let queuedAudioBeforeMS = trace.queuedAudioBeforeMS { details["queued_audio_before_ms"] = .int(queuedAudioBeforeMS) }
+            if let queuedAudioAfterMS = trace.queuedAudioAfterMS { details["queued_audio_after_ms"] = .int(queuedAudioAfterMS) }
+            if let gapMS = trace.gapMS { details["gap_ms"] = .int(gapMS) }
+            if let isRebuffering = trace.isRebuffering { details["is_rebuffering"] = .bool(isRebuffering) }
+            if let fadeInApplied = trace.fadeInApplied { details["fade_in_applied"] = .bool(fadeInApplied) }
+            await logRequestEvent("playback_trace_\(trace.name)", requestID: id, op: op, profileName: profileName, details: details)
+        }
+    }
+
+    private func logPlaybackFinished(
+        for speechJob: SpeechJobState,
+        playbackSummary: PlaybackSummary,
+        sampleRate: Double
+    ) async {
+        let id = speechJob.requestID
+        let op = speechJob.op
+        let profileName = speechJob.profileName
+
+        var details: [String: LogValue] = [
+            "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
+            "chunk_count": .int(playbackSummary.chunkCount),
+            "sample_count": .int(playbackSummary.sampleCount),
+            "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
+            "startup_buffer_target_ms": .int(playbackSummary.thresholds.startupBufferTargetMS),
+            "low_water_target_ms": .int(playbackSummary.thresholds.lowWaterTargetMS),
+            "resume_buffer_target_ms": .int(playbackSummary.thresholds.resumeBufferTargetMS),
+            "chunk_gap_warning_threshold_ms": .int(playbackSummary.thresholds.chunkGapWarningMS),
+            "schedule_gap_warning_threshold_ms": .int(playbackSummary.thresholds.scheduleGapWarningMS),
+            "rebuffer_event_count": .int(playbackSummary.rebufferEventCount),
+            "rebuffer_total_duration_ms": .int(playbackSummary.rebufferTotalDurationMS),
+            "longest_rebuffer_duration_ms": .int(playbackSummary.longestRebufferDurationMS),
+            "starvation_event_count": .int(playbackSummary.starvationEventCount),
+            "queue_depth_sample_count": .int(playbackSummary.queueDepthSampleCount),
+            "schedule_callback_count": .int(playbackSummary.scheduleCallbackCount),
+            "played_back_callback_count": .int(playbackSummary.playedBackCallbackCount),
+            "fade_in_chunk_count": .int(playbackSummary.fadeInChunkCount),
+        ]
+
+        if let startupBufferedAudioMS = playbackSummary.startupBufferedAudioMS { details["startup_buffered_audio_ms"] = .int(startupBufferedAudioMS) }
+        if let timeToFirstChunkMS = playbackSummary.timeToFirstChunkMS { details["time_to_first_chunk_ms"] = .int(timeToFirstChunkMS) }
+        if let timeToPrerollReadyMS = playbackSummary.timeToPrerollReadyMS { details["time_to_preroll_ready_ms"] = .int(timeToPrerollReadyMS) }
+        if let timeFromPrerollReadyToDrainMS = playbackSummary.timeFromPrerollReadyToDrainMS { details["time_from_preroll_ready_to_drain_ms"] = .int(timeFromPrerollReadyToDrainMS) }
+        if let minQueuedAudioMS = playbackSummary.minQueuedAudioMS { details["min_queued_audio_ms"] = .int(minQueuedAudioMS) }
+        if let maxQueuedAudioMS = playbackSummary.maxQueuedAudioMS { details["max_queued_audio_ms"] = .int(maxQueuedAudioMS) }
+        if let avgQueuedAudioMS = playbackSummary.avgQueuedAudioMS { details["avg_queued_audio_ms"] = .int(avgQueuedAudioMS) }
+        if let maxInterChunkGapMS = playbackSummary.maxInterChunkGapMS { details["max_inter_chunk_gap_ms"] = .int(maxInterChunkGapMS) }
+        if let avgInterChunkGapMS = playbackSummary.avgInterChunkGapMS { details["avg_inter_chunk_gap_ms"] = .int(avgInterChunkGapMS) }
+        if let maxScheduleGapMS = playbackSummary.maxScheduleGapMS { details["max_schedule_gap_ms"] = .int(maxScheduleGapMS) }
+        if let avgScheduleGapMS = playbackSummary.avgScheduleGapMS { details["avg_schedule_gap_ms"] = .int(avgScheduleGapMS) }
+        if let maxBoundaryDiscontinuity = playbackSummary.maxBoundaryDiscontinuity { details["max_boundary_discontinuity"] = .double(maxBoundaryDiscontinuity) }
+        if let maxLeadingAbsAmplitude = playbackSummary.maxLeadingAbsAmplitude { details["max_leading_abs_amplitude"] = .double(maxLeadingAbsAmplitude) }
+        if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude { details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude) }
+        details.merge(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
+        details["section_count"] = .int(speechJob.textSections.count)
+        details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
+        await logRequestEvent("playback_finished", requestID: id, op: op, profileName: profileName, details: details)
+
+        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
+        let sectionWindows = SpeechTextNormalizer.forensicSectionWindows(
+            originalText: speechJob.text,
+            totalDurationMS: totalDurationMS,
+            totalChunkCount: playbackSummary.chunkCount
+        )
+        for window in sectionWindows {
+            await logRequestEvent(
+                "playback_section_window",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: textSectionWindowDetails(window)
+            )
         }
     }
 

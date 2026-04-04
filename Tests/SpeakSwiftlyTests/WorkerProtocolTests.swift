@@ -5,17 +5,9 @@ import Testing
 // MARK: - Request Decoding
 
 @Test func decodesSpeakLiveRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"speak_live","text":"Hello","profile_name":"default-femme"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme"}"#)
 
-    #expect(request == .speakLive(id: "req-1", text: "Hello", profileName: "default-femme"))
-}
-
-@Test func decodesSpeakLiveBackgroundRequest() throws {
-    let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1b","op":"speak_live_background","text":"Hello","profile_name":"default-femme"}"#
-    )
-
-    #expect(request == .speakLiveBackground(id: "req-1b", text: "Hello", profileName: "default-femme"))
+    #expect(request == .queueSpeech(id: "req-1", text: "Hello", profileName: "default-femme", jobType: .live))
 }
 
 @Test func decodesCreateProfileRequest() throws {
@@ -45,8 +37,18 @@ import Testing
 }
 
 @Test func decodesListQueueRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_queue"}"#)
-    #expect(request == .listQueue(id: "req-5"))
+    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_queue_generation"}"#)
+    #expect(request == .listQueue(id: "req-5", queueType: .generation))
+}
+
+@Test func decodesPlaybackQueueRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-5b","op":"list_queue_playback"}"#)
+    #expect(request == .listQueue(id: "req-5b", queueType: .playback))
+}
+
+@Test func decodesPlaybackPauseRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-pause","op":"playback_pause"}"#)
+    #expect(request == .playback(id: "req-pause", action: .pause))
 }
 
 @Test func decodesClearQueueRequest() throws {
@@ -61,7 +63,7 @@ import Testing
 
 @Test func rejectsMalformedJSON() throws {
     #expect(throws: WorkerError.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"speak_live""#)
+        try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live""#)
     }
 }
 
@@ -73,7 +75,7 @@ import Testing
 
 @Test func rejectsMissingRequiredFields() throws {
     #expect(throws: WorkerError.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"speak_live","text":"   ","profile_name":"default-femme"}"#)
+        try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"   ","profile_name":"default-femme"}"#)
     }
 }
 
@@ -102,9 +104,9 @@ import Testing
     #expect(queued["reason"] as? String == "waiting_for_resident_model")
     #expect(queued["queue_position"] as? Int == 2)
 
-    let started = try jsonObject(WorkerStartedEvent(id: "req-1", op: "speak_live"))
+    let started = try jsonObject(WorkerStartedEvent(id: "req-1", op: "queue_speech_live"))
     #expect(started["event"] as? String == "started")
-    #expect(started["op"] as? String == "speak_live")
+    #expect(started["op"] as? String == "queue_speech_live")
 
     let progress = try jsonObject(WorkerProgressEvent(id: "req-1", stage: .bufferingAudio))
     #expect(progress["event"] as? String == "progress")
@@ -120,7 +122,7 @@ import Testing
             profileName: "default-femme",
             profilePath: "/tmp/default-femme",
             profiles: nil,
-            activeRequest: ActiveWorkerRequestSummary(id: "req-active", op: "speak_live", profileName: "default-femme"),
+            activeRequest: ActiveWorkerRequestSummary(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
             queue: [QueuedWorkerRequestSummary(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
             clearedCount: 2,
             cancelledRequestID: "req-queued"

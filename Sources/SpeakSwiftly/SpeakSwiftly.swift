@@ -2,6 +2,27 @@ import Foundation
 
 // MARK: - Public Library Streams
 
+public enum SpeechJobType: Sendable, Equatable {
+    case live
+}
+
+public enum WorkerQueueType: Sendable, Equatable {
+    case generation
+    case playback
+}
+
+public enum PlaybackAction: Sendable, Equatable {
+    case pause
+    case resume
+    case state
+}
+
+public enum PlaybackState: String, Codable, Sendable, Equatable {
+    case idle
+    case playing
+    case paused
+}
+
 public enum WorkerRequestStreamEvent: Sendable, Equatable {
     case queued(WorkerQueuedEvent)
     case acknowledged(WorkerSuccessResponse)

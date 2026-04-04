@@ -180,7 +180,7 @@ import Testing
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"speak_live","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -234,9 +234,10 @@ import Testing
         }
     })
 
-    let activeID = await runtime.speakLive(
+    let activeID = await runtime.queueSpeech(
         text: "Hello there",
         profileName: "default-femme",
+        as: .live,
         id: "req-1"
     )
     #expect(activeID == "req-1")
@@ -248,9 +249,10 @@ import Testing
         }
     })
 
-    let backgroundID = await runtime.speakLiveBackground(
+    let backgroundID = await runtime.queueSpeech(
         text: "Hi there",
         profileName: "default-femme",
+        as: .live,
         id: "req-2"
     )
     #expect(backgroundID == "req-2")
@@ -258,30 +260,24 @@ import Testing
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
-                && $0["event"] as? String == "queued"
-                && $0["reason"] as? String == "waiting_for_active_request"
-        }
-    })
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-2"
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-2"
-            && $0["event"] as? String == "started"
-    })
-
-    await playbackDrain.open()
-
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "speak_live_background"
+                && $0["op"] as? String == "queue_speech_live"
         }
     })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-2"
+            && $0["event"] as? String == "progress"
+            && $0["stage"] as? String == "playback_finished"
+    })
+
+    await playbackDrain.open()
+
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -332,9 +328,10 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLiveBackground(
+    _ = await runtime.queueSpeech(
         text: "Hello there",
         profileName: "default-femme",
+        as: .live,
         id: "req-fail"
     )
 
@@ -389,7 +386,7 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    _ = await runtime.queueSpeech(text: "Hello there", profileName: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -398,23 +395,16 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-queued-1","op":"list_profiles"}"#)
-    await runtime.accept(line: #"{"id":"req-queued-2","op":"remove_profile","profile_name":"default-femme"}"#)
-
+    _ = await runtime.queueSpeech(text: "Hi there", profileName: "default-femme", as: .live, id: "req-queued-1")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-queued-1"
-                && $0["event"] as? String == "queued"
-        }
-    })
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-queued-2"
-                && $0["event"] as? String == "queued"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_live"
         }
     })
 
-    let listID = await runtime.listQueue(id: "req-list-queue")
+    let listID = await runtime.listQueue(.playback, id: "req-list-queue")
     #expect(listID == "req-list-queue")
 
     #expect(await waitUntil {
@@ -429,39 +419,28 @@ import Testing
             }
 
             return active["id"] as? String == "req-active"
-                && queue.count == 2
+                && queue.count == 1
                 && queue[0]["id"] as? String == "req-queued-1"
                 && queue[0]["queue_position"] as? Int == 1
-                && queue[1]["id"] as? String == "req-queued-2"
-                && queue[1]["queue_position"] as? Int == 2
         }
     })
 
     await playbackDrain.open()
 }
 
-@Test func clearQueueFailsQueuedRequestsAndLeavesActivePlaybackRunning() async throws {
+@Test func clearQueueFailsQueuedRequestsWhenGenerationQueueHasWaitingWork() async throws {
     let output = OutputRecorder()
-    let playbackDrain = AsyncGate()
-    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
-    let storeRoot = makeTempDirectoryURL()
-    defer { try? FileManager.default.removeItem(at: storeRoot) }
-
-    let store = try makeProfileStore(rootURL: storeRoot)
-    _ = try store.createProfile(
-        profileName: "default-femme",
-        modelRepo: "test-model",
-        voiceDescription: "Warm and bright.",
-        sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
-    )
+    let profileGate = AsyncGate()
 
     let runtime = try await makeRuntime(
-        rootURL: storeRoot,
         output: output,
-        playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
     )
 
     await runtime.start()
@@ -472,12 +451,16 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    _ = await runtime.createProfile(
+        profileName: "bright-guide",
+        text: "Hello there",
+        voiceDescription: "Warm and bright",
+        id: "req-active"
+    )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
+                && $0["event"] as? String == "started"
         }
     })
 
@@ -523,8 +506,7 @@ import Testing
         $0["id"] as? String == "req-active"
             && $0["ok"] as? Bool == false
     })
-
-    await playbackDrain.open()
+    await profileGate.open()
 }
 
 @Test func cancelRequestCanCancelActivePlaybackImmediately() async throws {
@@ -552,7 +534,7 @@ import Testing
     )
 
     let activeHandle = await runtime.submit(
-        .speakLive(id: "req-active", text: "Hello there", profileName: "default-femme")
+        .queueSpeech(id: "req-active", text: "Hello there", profileName: "default-femme", jobType: .live)
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 
@@ -601,26 +583,17 @@ import Testing
 
 @Test func cancelRequestCanCancelQueuedWorkImmediately() async throws {
     let output = OutputRecorder()
-    let playbackDrain = AsyncGate()
-    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
-    let storeRoot = makeTempDirectoryURL()
-    defer { try? FileManager.default.removeItem(at: storeRoot) }
-
-    let store = try makeProfileStore(rootURL: storeRoot)
-    _ = try store.createProfile(
-        profileName: "default-femme",
-        modelRepo: "test-model",
-        voiceDescription: "Warm and bright.",
-        sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
-    )
+    let profileGate = AsyncGate()
 
     let runtime = try await makeRuntime(
-        rootURL: storeRoot,
         output: output,
-        playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
     )
 
     await runtime.start()
@@ -631,12 +604,16 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    _ = await runtime.createProfile(
+        profileName: "bright-guide",
+        text: "Hello there",
+        voiceDescription: "Warm and bright",
+        id: "req-active"
+    )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
+                && $0["event"] as? String == "started"
         }
     })
 
@@ -677,8 +654,7 @@ import Testing
     } catch let error as WorkerError {
         #expect(error.code == .requestCancelled)
     }
-
-    await playbackDrain.open()
+    await profileGate.open()
 }
 
 @Test func libraryCreateListAndRemoveHelpersSubmitWorkerProtocolRequests() async throws {
@@ -836,16 +812,18 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLive(
+    _ = await runtime.queueSpeech(
         text: "Hello there, galew.",
         profileName: "default-femme",
+        as: .live,
         id: "req-generation-params"
     )
 
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-generation-params"
-                && $0["ok"] as? Bool == true
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
 
@@ -960,7 +938,7 @@ import Testing
         }
     })
 
-    _ = await runtime.speakLive(text: "Hello there", profileName: "default-femme", id: "req-active")
+    _ = await runtime.queueSpeech(text: "Hello there", profileName: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -970,23 +948,15 @@ import Testing
     })
 
     let handle = await runtime.submit(
-        .speakLiveBackground(id: "req-stream-bg", text: "Hi there", profileName: "default-femme")
+        .queueSpeech(id: "req-stream-bg", text: "Hi there", profileName: "default-femme", jobType: .live)
     )
     var iterator = handle.events.makeAsyncIterator()
 
-    let queued = try await iterator.next()
     let acknowledged = try await iterator.next()
+    let started = try await iterator.next()
 
-    #expect(
-        queued == .queued(
-            WorkerQueuedEvent(
-                id: "req-stream-bg",
-                reason: .waitingForActiveRequest,
-                queuePosition: 1
-            )
-        )
-    )
     #expect(acknowledged == .acknowledged(WorkerSuccessResponse(id: "req-stream-bg")))
+    #expect(started == .started(WorkerStartedEvent(id: "req-stream-bg", op: "queue_speech_live")))
 
     await playbackDrain.open()
 
@@ -1092,7 +1062,7 @@ import Testing
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"remove_profile","profile_name":"remove-me"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"speak_live","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
 
     await profileGate.open()
 
@@ -1100,7 +1070,7 @@ import Testing
         output.containsJSONObject {
             $0["id"] as? String == "req-3"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "speak_live"
+                && $0["op"] as? String == "queue_speech_live"
         }
     })
     #expect(await waitUntil {
@@ -1112,7 +1082,7 @@ import Testing
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_profile", "req-3:speak_live", "req-2:remove_profile"])
+    #expect(startedOps == ["req-1:create_profile", "req-3:queue_speech_live", "req-2:remove_profile"])
 }
 
 @Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {
@@ -1149,7 +1119,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"speak_live","text":"Hi there","profile_name":"brand-new"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hi there","profile_name":"brand-new"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"list_profiles"}"#)
 
     await profileGate.open()
@@ -1158,7 +1128,7 @@ import Testing
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "speak_live"
+                && $0["op"] as? String == "queue_speech_live"
         }
     })
     #expect(await waitUntil {
@@ -1169,7 +1139,7 @@ import Testing
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_profile", "req-2:speak_live", "req-3:list_profiles"])
+    #expect(startedOps == ["req-1:create_profile", "req-2:queue_speech_live", "req-3:list_profiles"])
 }
 
 @Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
@@ -1203,7 +1173,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -1219,11 +1189,18 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hello again","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
-                && $0["event"] as? String == "queued"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_live"
         }
     })
 
@@ -1281,7 +1258,7 @@ import Testing
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -1339,14 +1316,14 @@ import Testing
     })
 
     let activeHandle = await runtime.submit(
-        .speakLive(id: "req-active-shutdown-stream", text: "Hello there", profileName: "default-femme")
+        .queueSpeech(id: "req-active-shutdown-stream", text: "Hello there", profileName: "default-femme", jobType: .live)
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 
     let activeStarted = try await activeIterator.next()
     #expect(
-        activeStarted == .started(
-            WorkerStartedEvent(id: "req-active-shutdown-stream", op: "speak_live")
+        activeStarted == .acknowledged(
+            WorkerSuccessResponse(id: "req-active-shutdown-stream")
         )
     )
 
@@ -1356,15 +1333,7 @@ import Testing
     var queuedIterator = queuedHandle.events.makeAsyncIterator()
 
     let queuedEvent = try await queuedIterator.next()
-    #expect(
-        queuedEvent == .queued(
-            WorkerQueuedEvent(
-                id: "req-queued-shutdown-stream",
-                reason: .waitingForActiveRequest,
-                queuePosition: 1
-            )
-        )
-    )
+    #expect(queuedEvent == .started(WorkerStartedEvent(id: "req-queued-shutdown-stream", op: "list_profiles")))
 
     await runtime.shutdown()
 
