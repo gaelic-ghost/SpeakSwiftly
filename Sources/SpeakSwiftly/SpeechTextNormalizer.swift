@@ -49,6 +49,7 @@ struct SpeechTextForensicSectionWindow: Sendable, Equatable {
 
 enum SpeechTextNormalizer {
 	typealias NormalizationPass = (String) -> String
+	typealias ContextualNormalizationPass = (String, SpeechNormalizationContext?) -> String
 
 	private static var codeMarkerRegex: Regex<Substring> {
 		Regex {
@@ -80,29 +81,29 @@ enum SpeechTextNormalizer {
 		}
 	}
 
-	private static var normalizationPasses: [NormalizationPass] {
+	private static var normalizationPasses: [ContextualNormalizationPass] {
 		[
-			normalizeFencedCodeBlocks,
-			normalizeInlineCodeSpans,
-			normalizeMarkdownLinks,
-			normalizeURLs,
-			normalizeStandaloneGaleAliases,
+			{ text, _ in normalizeFencedCodeBlocks(text) },
+			{ text, _ in normalizeInlineCodeSpans(text) },
+			{ text, _ in normalizeMarkdownLinks(text) },
+			{ text, _ in normalizeURLs(text) },
+			{ text, _ in normalizeStandaloneGaleAliases(text) },
 			normalizeFilePaths,
-			normalizeDottedIdentifiers,
-			normalizeSnakeCaseIdentifiers,
-			normalizeDashedIdentifiers,
-			normalizeCamelCaseIdentifiers,
-			normalizeCodeHeavyLines,
-			normalizeSpiralProneWords,
-			collapseWhitespace,
+			{ text, _ in normalizeDottedIdentifiers(text) },
+			{ text, _ in normalizeSnakeCaseIdentifiers(text) },
+			{ text, _ in normalizeDashedIdentifiers(text) },
+			{ text, _ in normalizeCamelCaseIdentifiers(text) },
+			{ text, _ in normalizeCodeHeavyLines(text) },
+			{ text, _ in normalizeSpiralProneWords(text) },
+			{ text, _ in collapseWhitespace(text) },
 		]
 	}
 
 	// MARK: Public API
 
-	static func normalize(_ text: String) -> String {
+	static func normalize(_ text: String, context: SpeechNormalizationContext? = nil) -> String {
 		let normalized = normalizationPasses.reduce(canonicalize(text)) { partial, pass in
-			pass(partial)
+			pass(partial, context)
 		}
 		let finalized = collapseWhitespace(normalized)
 		return finalized.isEmpty ? text : finalized
@@ -314,10 +315,10 @@ extension SpeechTextNormalizer {
 		}
 	}
 
-	static func normalizeFilePaths(_ text: String) -> String {
+	static func normalizeFilePaths(_ text: String, context: SpeechNormalizationContext? = nil) -> String {
 		transformTokens(in: text) { token in
 			guard isLikelyFilePath(token) else { return nil }
-			return spokenPath(token)
+			return spokenPath(token, context: context)
 		}
 	}
 
@@ -418,14 +419,17 @@ extension SpeechTextNormalizer {
 		return collapseWhitespace(insertWordBreaks(in: spoken))
 	}
 
-	static func spokenPath(_ text: String) -> String {
+	static func spokenPath(_ text: String, context: SpeechNormalizationContext? = nil) -> String {
+		let contextualPath = contextualizedPath(text, context: context)
 		var segments: [String] = []
 		var buffer = ""
-		var remainder = text[...]
+		var remainder = contextualPath.path[...]
 
-		if let alias = aliasedPathPrefix(in: text) {
+		if let spokenContextPrefix = contextualPath.spokenContextPrefix {
+			segments.append(spokenContextPrefix)
+		} else if let alias = aliasedPathPrefix(in: contextualPath.path) {
 			segments.append(alias.spokenName)
-			remainder = text[alias.range.upperBound...]
+			remainder = contextualPath.path[alias.range.upperBound...]
 		}
 
 		func flushBuffer() {
@@ -814,6 +818,11 @@ extension SpeechTextNormalizer {
 // MARK: - Small Helpers
 
 extension SpeechTextNormalizer {
+	private struct ContextualizedPath {
+		let path: String
+		let spokenContextPrefix: String?
+	}
+
 	static func paragraphCount(in text: String) -> Int {
 		let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !trimmed.isEmpty else { return 0 }
@@ -932,6 +941,56 @@ extension SpeechTextNormalizer {
 		default:
 			nil
 		}
+	}
+
+	private static func contextualizedPath(
+		_ path: String,
+		context: SpeechNormalizationContext?
+	) -> ContextualizedPath {
+		guard path.hasPrefix("/") else {
+			return ContextualizedPath(path: path, spokenContextPrefix: nil)
+		}
+
+		let standardizedPath = NSString(string: path).standardizingPath
+
+		if let cwd = context?.cwd,
+			let relativePath = relativePath(from: cwd, to: standardizedPath)
+		{
+			let spokenContextPrefix = relativePath.isEmpty ? "current directory" : "current directory slash"
+			return ContextualizedPath(path: relativePath, spokenContextPrefix: spokenContextPrefix)
+		}
+
+		if let repoRoot = context?.repoRoot,
+			let relativePath = relativePath(from: repoRoot, to: standardizedPath)
+		{
+			let spokenContextPrefix = relativePath.isEmpty ? "repo root" : "repo root slash"
+			return ContextualizedPath(path: relativePath, spokenContextPrefix: spokenContextPrefix)
+		}
+
+		return ContextualizedPath(path: standardizedPath, spokenContextPrefix: nil)
+	}
+
+	private static func relativePath(from basePath: String, to path: String) -> String? {
+		let standardizedBasePath = NSString(string: basePath).standardizingPath
+
+		guard standardizedPathBoundaryMatches(path, prefix: standardizedBasePath) else {
+			return nil
+		}
+
+		guard path.count > standardizedBasePath.count else {
+			return ""
+		}
+
+		let relativeStart = path.index(path.startIndex, offsetBy: standardizedBasePath.count + 1)
+		return String(path[relativeStart...])
+	}
+
+	private static func standardizedPathBoundaryMatches(_ path: String, prefix: String) -> Bool {
+		guard path.hasPrefix(prefix) else { return false }
+		guard path.count > prefix.count else { return true }
+
+		let boundaryIndex = path.index(path.startIndex, offsetBy: prefix.count)
+		return path[boundaryIndex] == "/"
 	}
 
 	static func isLikelyFilePath(_ token: String) -> Bool {

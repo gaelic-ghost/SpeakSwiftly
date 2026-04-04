@@ -94,7 +94,7 @@ actor GenerationController {
     }
 
     private func isBlockedByProfileCreation(_ job: Job) -> Bool {
-        guard case .queueSpeech(_, _, let profileName, _) = job.request else {
+        guard case .queueSpeech(_, _, let profileName, _, _) = job.request else {
             return false
         }
 

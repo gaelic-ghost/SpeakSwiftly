@@ -6,11 +6,33 @@ import SpeakSwiftlyCore
 }
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let queueSpeech: @Sendable (WorkerRuntime, String, String, String) async -> String = { runtime, text, profileName, id in
-        await runtime.queueSpeech(text: text, profileName: profileName, as: .live, id: id)
+    let queueSpeech: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> String = {
+        runtime,
+        text,
+        profileName,
+        normalizationContext,
+        id in
+        await runtime.queueSpeech(
+            text: text,
+            profileName: profileName,
+            as: .live,
+            normalizationContext: normalizationContext,
+            id: id
+        )
     }
-    let queueSpeechHandle: @Sendable (WorkerRuntime, String, String, String) async -> WorkerRequestHandle = { runtime, text, profileName, id in
-        await runtime.queueSpeechHandle(text: text, profileName: profileName, as: .live, id: id)
+    let queueSpeechHandle: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> WorkerRequestHandle = {
+        runtime,
+        text,
+        profileName,
+        normalizationContext,
+        id in
+        await runtime.queueSpeechHandle(
+            text: text,
+            profileName: profileName,
+            as: .live,
+            normalizationContext: normalizationContext,
+            id: id
+        )
     }
     let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> String = {
         runtime,

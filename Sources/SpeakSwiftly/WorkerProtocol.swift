@@ -7,6 +7,8 @@ struct RawWorkerRequest: Decodable, Sendable {
     let op: String?
     let text: String?
     let profileName: String?
+    let cwd: String?
+    let repoRoot: String?
     let requestID: String?
     let voiceDescription: String?
     let outputPath: String?
@@ -16,6 +18,8 @@ struct RawWorkerRequest: Decodable, Sendable {
         case op
         case text
         case profileName = "profile_name"
+        case cwd
+        case repoRoot = "repo_root"
         case requestID = "request_id"
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
@@ -23,7 +27,13 @@ struct RawWorkerRequest: Decodable, Sendable {
 }
 
 enum WorkerRequest: Sendable, Equatable {
-    case queueSpeech(id: String, text: String, profileName: String, jobType: SpeechJobType)
+    case queueSpeech(
+        id: String,
+        text: String,
+        profileName: String,
+        jobType: SpeechJobType,
+        normalizationContext: SpeechNormalizationContext?
+    )
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
@@ -34,7 +44,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var id: String {
         switch self {
-        case .queueSpeech(let id, _, _, _),
+        case .queueSpeech(let id, _, _, _, _),
              .createProfile(let id, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
@@ -48,7 +58,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var opName: String {
         switch self {
-        case .queueSpeech(_, _, _, .live):
+        case .queueSpeech(_, _, _, .live, _):
             "queue_speech_live"
         case .createProfile:
             "create_profile"
@@ -100,11 +110,20 @@ enum WorkerRequest: Sendable, Equatable {
 
     var profileName: String? {
         switch self {
-        case .queueSpeech(_, _, let profileName, _),
+        case .queueSpeech(_, _, let profileName, _, _),
              .createProfile(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
         case .listProfiles, .listQueue, .playback, .clearQueue, .cancelRequest:
+            nil
+        }
+    }
+
+    var normalizationContext: SpeechNormalizationContext? {
+        switch self {
+        case .queueSpeech(_, _, _, _, let normalizationContext):
+            normalizationContext
+        case .createProfile, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
     }
@@ -131,7 +150,17 @@ enum WorkerRequest: Sendable, Equatable {
         case "queue_speech_live":
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            return .queueSpeech(id: id, text: text, profileName: profileName, jobType: .live)
+            let normalizationContext = SpeechNormalizationContext(
+                cwd: raw.cwd,
+                repoRoot: raw.repoRoot
+            ).nilIfEmpty
+            return .queueSpeech(
+                id: id,
+                text: text,
+                profileName: profileName,
+                jobType: .live,
+                normalizationContext: normalizationContext
+            )
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
@@ -415,5 +444,11 @@ public struct WorkerError: Error, Sendable, Equatable {
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
+    }
+}
+
+private extension SpeechNormalizationContext {
+    var nilIfEmpty: SpeechNormalizationContext? {
+        cwd == nil && repoRoot == nil ? nil : self
     }
 }

@@ -7,7 +7,34 @@ import Testing
 @Test func decodesSpeakLiveRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme"}"#)
 
-    #expect(request == .queueSpeech(id: "req-1", text: "Hello", profileName: "default-femme", jobType: .live))
+    #expect(
+        request == .queueSpeech(
+            id: "req-1",
+            text: "Hello",
+            profileName: "default-femme",
+            jobType: .live,
+            normalizationContext: nil
+        )
+    )
+}
+
+@Test func decodesSpeakLiveRequestWithNormalizationContext() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-1",
+            text: "Hello",
+            profileName: "default-femme",
+            jobType: .live,
+            normalizationContext: SpeechNormalizationContext(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
+            )
+        )
+    )
 }
 
 @Test func decodesCreateProfileRequest() throws {

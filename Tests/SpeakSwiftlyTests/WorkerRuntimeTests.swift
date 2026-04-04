@@ -534,7 +534,13 @@ import Testing
     )
 
     let activeHandle = await runtime.submit(
-        .queueSpeech(id: "req-active", text: "Hello there", profileName: "default-femme", jobType: .live)
+        .queueSpeech(
+            id: "req-active",
+            text: "Hello there",
+            profileName: "default-femme",
+            jobType: .live,
+            normalizationContext: nil
+        )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 
@@ -948,7 +954,13 @@ import Testing
     })
 
     let handle = await runtime.submit(
-        .queueSpeech(id: "req-stream-bg", text: "Hi there", profileName: "default-femme", jobType: .live)
+        .queueSpeech(
+            id: "req-stream-bg",
+            text: "Hi there",
+            profileName: "default-femme",
+            jobType: .live,
+            normalizationContext: nil
+        )
     )
     var iterator = handle.events.makeAsyncIterator()
 
@@ -1316,7 +1328,13 @@ import Testing
     })
 
     let activeHandle = await runtime.submit(
-        .queueSpeech(id: "req-active-shutdown-stream", text: "Hello there", profileName: "default-femme", jobType: .live)
+        .queueSpeech(
+            id: "req-active-shutdown-stream",
+            text: "Hello there",
+            profileName: "default-femme",
+            jobType: .live,
+            normalizationContext: nil
+        )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 

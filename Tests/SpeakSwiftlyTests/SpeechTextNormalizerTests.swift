@@ -88,6 +88,37 @@ struct SpeechTextNormalizerTests {
         #expect(!normalized.contains("dash"))
     }
 
+    @Test func filePathsInsideCurrentDirectoryOmitTheAbsolutePrefix() {
+        let text = "Path: /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift."
+
+        let normalized = SpeechTextNormalizer.normalizeFilePaths(
+            text,
+            context: SpeechNormalizationContext(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
+            )
+        )
+
+        #expect(normalized.contains("current directory slash Sources slash Speak Swiftly"))
+        #expect(normalized.contains("Speech Text Normalizer dot swift"))
+        #expect(!normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
+    }
+
+    @Test func filePathsInsideRepoRootButOutsideCurrentDirectoryKeepRepoRootContext() {
+        let text = "Path: /Users/galew/Workspace/SpeakSwiftly/README.md."
+
+        let normalized = SpeechTextNormalizer.normalizeFilePaths(
+            text,
+            context: SpeechNormalizationContext(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
+            )
+        )
+
+        #expect(normalized.contains("repo root slash README dot md"))
+        #expect(!normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
+    }
+
     @Test func standaloneGaleAliasesBecomeSpokenNames() {
         let text = "Please ask galew, galem, and Galew again."
 
@@ -210,5 +241,22 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("tmp slash path now"))
         #expect(!normalized.contains("dash"))
         #expect(!normalized.contains("---"))
+    }
+
+    @Test func normalizeUsesContextAwareFilePathShortening() {
+        let original = """
+        Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift.
+        """
+
+        let normalized = SpeechTextNormalizer.normalize(
+            original,
+            context: SpeechNormalizationContext(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
+            )
+        )
+
+        #expect(normalized.contains("current directory slash Sources slash Speak Swiftly"))
+        #expect(!normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
     }
 }

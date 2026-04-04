@@ -70,6 +70,7 @@ public actor WorkerRuntime {
         let text: String
         let normalizedText: String
         let profileName: String
+        let normalizationContext: SpeechNormalizationContext?
         let textFeatures: SpeechTextForensicFeatures
         let textSections: [SpeechTextForensicSection]
         let stream: AsyncThrowingStream<[Float], Error>
@@ -84,6 +85,7 @@ public actor WorkerRuntime {
             text: String,
             normalizedText: String,
             profileName: String,
+            normalizationContext: SpeechNormalizationContext?,
             textFeatures: SpeechTextForensicFeatures,
             textSections: [SpeechTextForensicSection],
             stream: AsyncThrowingStream<[Float], Error>,
@@ -94,6 +96,7 @@ public actor WorkerRuntime {
             self.text = text
             self.normalizedText = normalizedText
             self.profileName = profileName
+            self.normalizationContext = normalizationContext
             self.textFeatures = textFeatures
             self.textSections = textSections
             self.stream = stream
@@ -111,6 +114,8 @@ public actor WorkerRuntime {
         let op: String
         let text: String?
         let profileName: String?
+        let cwd: String?
+        let repoRoot: String?
         let requestID: String?
         let voiceDescription: String?
         let outputPath: String?
@@ -120,6 +125,8 @@ public actor WorkerRuntime {
             case op
             case text
             case profileName = "profile_name"
+            case cwd
+            case repoRoot = "repo_root"
             case requestID = "request_id"
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
@@ -462,9 +469,16 @@ public actor WorkerRuntime {
         text: String,
         profileName: String,
         as jobType: SpeechJobType,
+        normalizationContext: SpeechNormalizationContext? = nil,
         id: String = UUID().uuidString
     ) async -> String {
-        let handle = await queueSpeechHandle(text: text, profileName: profileName, as: jobType, id: id)
+        let handle = await queueSpeechHandle(
+            text: text,
+            profileName: profileName,
+            as: jobType,
+            normalizationContext: normalizationContext,
+            id: id
+        )
         return handle.id
     }
 
@@ -472,9 +486,18 @@ public actor WorkerRuntime {
         text: String,
         profileName: String,
         as jobType: SpeechJobType,
+        normalizationContext: SpeechNormalizationContext? = nil,
         id: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
-        await submit(.queueSpeech(id: id, text: text, profileName: profileName, jobType: jobType))
+        await submit(
+            .queueSpeech(
+                id: id,
+                text: text,
+                profileName: profileName,
+                jobType: jobType,
+                normalizationContext: normalizationContext
+            )
+        )
     }
 
     @discardableResult
@@ -649,7 +672,7 @@ public actor WorkerRuntime {
             await self.processGeneration(job.request, token: job.token)
         }
         activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
-        if case .queueSpeech(let id, _, _, _) = job.request {
+        if case .queueSpeech(let id, _, _, _, _) = job.request {
             speechJobs[id]?.generationTask = task
         }
     }
@@ -659,7 +682,7 @@ public actor WorkerRuntime {
 
         do {
             switch request {
-            case .queueSpeech(let id, let text, let profileName, .live):
+            case .queueSpeech(let id, let text, let profileName, .live, _):
                 try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                 disposition = .requestStillPendingPlayback(id)
 
@@ -1086,7 +1109,8 @@ public actor WorkerRuntime {
                 id: requestID,
                 text: speechJob.text,
                 profileName: speechJob.profileName,
-                jobType: .live
+                jobType: .live,
+                normalizationContext: speechJob.normalizationContext
             )
             await logError(
                 cancellation.message,
@@ -1114,7 +1138,8 @@ public actor WorkerRuntime {
                 id: requestID,
                 text: speechJob.text,
                 profileName: speechJob.profileName,
-                jobType: .live
+                jobType: .live,
+                normalizationContext: speechJob.normalizationContext
             )
             await completeRequest(request: request, result: .failure(error))
         }
@@ -1372,6 +1397,7 @@ public actor WorkerRuntime {
         op: String,
         text: String? = nil,
         profileName: String? = nil,
+        normalizationContext: SpeechNormalizationContext? = nil,
         requestID: String? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil
@@ -1381,6 +1407,8 @@ public actor WorkerRuntime {
             op: op,
             text: text,
             profileName: profileName,
+            cwd: normalizationContext?.cwd,
+            repoRoot: normalizationContext?.repoRoot,
             requestID: requestID,
             voiceDescription: voiceDescription,
             outputPath: outputPath
@@ -1403,8 +1431,14 @@ public actor WorkerRuntime {
 
     private func submitRequest(_ request: WorkerRequest) async {
         switch request {
-        case .queueSpeech(let id, let text, let profileName, _):
-            await submitRequest(id: id, op: request.opName, text: text, profileName: profileName)
+        case .queueSpeech(let id, let text, let profileName, _, let normalizationContext):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                text: text,
+                profileName: profileName,
+                normalizationContext: normalizationContext
+            )
         case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
             await submitRequest(
                 id: id,
@@ -1433,13 +1467,14 @@ public actor WorkerRuntime {
         let requestID = request.id
         let op = request.opName
         let text = switch request {
-        case .queueSpeech(_, let text, _, _):
+        case .queueSpeech(_, let text, _, _, _):
             text
         default:
             ""
         }
         let profileName = request.profileName ?? "unknown-profile"
-        let normalizedText = SpeechTextNormalizer.normalize(text)
+        let normalizationContext = request.normalizationContext
+        let normalizedText = SpeechTextNormalizer.normalize(text, context: normalizationContext)
         let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
         let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
         var continuation: AsyncThrowingStream<[Float], Error>.Continuation?
@@ -1451,6 +1486,7 @@ public actor WorkerRuntime {
             text: text,
             normalizedText: normalizedText,
             profileName: profileName,
+            normalizationContext: normalizationContext,
             textFeatures: textFeatures,
             textSections: textSections,
             stream: stream,
@@ -1541,7 +1577,8 @@ public actor WorkerRuntime {
             id: id,
             text: speechJob.text,
             profileName: speechJob.profileName,
-            jobType: .live
+            jobType: .live,
+            normalizationContext: speechJob.normalizationContext
         )
         await completeRequest(request: request, result: result)
     }
