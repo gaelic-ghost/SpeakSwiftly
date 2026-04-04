@@ -265,13 +265,12 @@ struct SpeechTextNormalizerTests {
         let original = "Please say chrommmaticallly once."
         let profile = TextNormalizationProfile(
             id: "custom",
-            displayName: "Custom",
-            replacementRules: [
+            name: "Custom",
+            replacements: [
                 TextReplacementRule(
-                    match: "chrommmaticallly",
-                    replacement: "chromatically",
-                    matchMode: .exactPhrase,
-                    phase: .beforeBuiltIns
+                    "chrommmaticallly",
+                    with: "chromatically",
+                    in: .beforeNormalization
                 )
             ]
         )
@@ -286,14 +285,13 @@ struct SpeechTextNormalizerTests {
         let original = "Read snake_case_stuff once."
         let profile = TextNormalizationProfile(
             id: "postbuilt",
-            displayName: "Postbuilt",
-            replacementRules: [
+            name: "Postbuilt",
+            replacements: [
                 TextReplacementRule(
-                    match: "snake case stuff",
-                    replacement: "settings token",
-                    matchMode: .exactPhrase,
-                    phase: .afterBuiltIns,
-                    inputKinds: [.plainText]
+                    "snake case stuff",
+                    with: "settings token",
+                    in: .afterNormalization,
+                    for: [.plain]
                 )
             ]
         )
@@ -301,7 +299,7 @@ struct SpeechTextNormalizerTests {
         let normalized = SpeechTextNormalizer.normalize(
             original,
             profile: profile,
-            inputKind: .plainText
+            inputKind: .plain
         )
 
         #expect(normalized.contains("settings token"))

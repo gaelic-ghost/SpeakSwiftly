@@ -107,13 +107,13 @@ enum SpeechTextNormalizer {
 		_ text: String,
 		context: SpeechNormalizationContext? = nil,
 		profile: TextNormalizationProfile = .default,
-		inputKind: TextInputKind = .plainText
+		inputKind: TextInputKind = .plain
 	) -> String {
 		let seeded = applyReplacementRules(
 			canonicalize(text),
 			profile: profile,
 			inputKind: inputKind,
-			phase: .beforeBuiltIns
+			phase: .beforeNormalization
 		)
 		let normalized = normalizationPasses.reduce(seeded) { partial, pass in
 			pass(partial, context, profile, inputKind)
@@ -123,7 +123,7 @@ enum SpeechTextNormalizer {
 				normalized,
 				profile: profile,
 				inputKind: inputKind,
-				phase: .afterBuiltIns
+				phase: .afterNormalization
 			)
 		)
 		return finalized.isEmpty ? text : finalized
@@ -339,7 +339,7 @@ extension SpeechTextNormalizer {
 		_ text: String,
 		context: SpeechNormalizationContext? = nil,
 		profile _: TextNormalizationProfile = .default,
-		inputKind _: TextInputKind = .plainText
+		inputKind _: TextInputKind = .plain
 	) -> String {
 		transformTokens(in: text) { token in
 			guard isLikelyFilePath(token) else { return nil }
@@ -889,25 +889,25 @@ extension SpeechTextNormalizer {
 		inputKind: TextInputKind,
 		phase: TextReplacementRule.Phase
 	) -> String {
-		profile.replacementRules(for: phase, inputKind: inputKind).reduce(text) { partial, rule in
+		profile.replacements(for: phase, in: inputKind).reduce(text) { partial, rule in
 			applyReplacementRule(rule, to: partial)
 		}
 	}
 
 	private static func applyReplacementRule(_ rule: TextReplacementRule, to text: String) -> String {
-		guard !rule.match.isEmpty else { return text }
+		guard !rule.text.isEmpty else { return text }
 
-		switch rule.matchMode {
-		case .exactPhrase:
+		switch rule.match {
+		case .phrase:
 			return text.replacingOccurrences(
-				of: rule.match,
+				of: rule.text,
 				with: rule.replacement,
-				options: rule.caseSensitive ? [] : [.caseInsensitive]
+				options: rule.isCaseSensitive ? [] : [.caseInsensitive]
 			)
 
-		case .wholeToken:
+		case .token:
 			return transformTokens(in: text) { token in
-				tokenMatches(rule.match, token: token, caseSensitive: rule.caseSensitive) ? rule.replacement : nil
+				tokenMatches(rule.text, token: token, caseSensitive: rule.isCaseSensitive) ? rule.replacement : nil
 			}
 		}
 	}

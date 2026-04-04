@@ -1,64 +1,64 @@
 import Testing
 import TextForSpeechCore
 
-@Test func textNormalizationRuntimeReturnsStableSnapshotsForLaterJobs() {
+@Test func textForSpeechRuntimeReturnsStableSnapshotsForLaterJobs() {
     let initialProfile = TextNormalizationProfile(
         id: "default",
-        displayName: "Default",
-        replacementRules: [
-            TextReplacementRule(match: "foo", replacement: "bar")
+        name: "Default",
+        replacements: [
+            TextReplacementRule("foo", with: "bar")
         ]
     )
-    let runtime = TextNormalizationRuntime(currentProfile: initialProfile)
+    let runtime = TextForSpeechRuntime(profile: initialProfile)
 
     let firstSnapshot = runtime.snapshot()
-    runtime.replaceCurrentProfile(
-        with: TextNormalizationProfile(
+    runtime.use(
+        TextNormalizationProfile(
             id: "default",
-            displayName: "Updated",
-            replacementRules: [
-                TextReplacementRule(match: "foo", replacement: "baz")
+            name: "Updated",
+            replacements: [
+                TextReplacementRule("foo", with: "baz")
             ]
         )
     )
     let secondSnapshot = runtime.snapshot()
 
-    #expect(firstSnapshot.displayName == "Default")
-    #expect(firstSnapshot.replacementRules.first?.replacement == "bar")
-    #expect(secondSnapshot.displayName == "Updated")
-    #expect(secondSnapshot.replacementRules.first?.replacement == "baz")
+    #expect(firstSnapshot.name == "Default")
+    #expect(firstSnapshot.replacements.first?.replacement == "bar")
+    #expect(secondSnapshot.name == "Updated")
+    #expect(secondSnapshot.replacements.first?.replacement == "baz")
 }
 
-@Test func textNormalizationProfileFiltersRulesByPhaseAndInputKind() {
+@Test func textForSpeechProfileFiltersReplacementsByPhaseAndKind() {
     let profile = TextNormalizationProfile(
-        replacementRules: [
+        replacements: [
             TextReplacementRule(
+                "Thing",
+                with: "Swift thing",
                 id: "swift",
-                match: "Thing",
-                replacement: "Swift thing",
-                phase: .beforeBuiltIns,
-                inputKinds: [.swiftSource]
+                in: .beforeNormalization,
+                for: [.swift]
             ),
             TextReplacementRule(
+                "Thing",
+                with: "Any source thing",
                 id: "source",
-                match: "Thing",
-                replacement: "Any source thing",
-                phase: .beforeBuiltIns,
-                inputKinds: [.sourceCode],
+                in: .beforeNormalization,
+                for: [.source],
                 priority: 10
             ),
             TextReplacementRule(
+                "Thing",
+                with: "Final thing",
                 id: "final",
-                match: "Thing",
-                replacement: "Final thing",
-                phase: .afterBuiltIns
+                in: .afterNormalization
             )
         ]
     )
 
-    let beforeBuiltIns = profile.replacementRules(for: .beforeBuiltIns, inputKind: .swiftSource)
-    let afterBuiltIns = profile.replacementRules(for: .afterBuiltIns, inputKind: .swiftSource)
+    let beforeNormalization = profile.replacements(for: .beforeNormalization, in: .swift)
+    let afterNormalization = profile.replacements(for: .afterNormalization, in: .swift)
 
-    #expect(beforeBuiltIns.map(\.id) == ["source", "swift"])
-    #expect(afterBuiltIns.map(\.id) == ["final"])
+    #expect(beforeNormalization.map(\.id) == ["source", "swift"])
+    #expect(afterNormalization.map(\.id) == ["final"])
 }
