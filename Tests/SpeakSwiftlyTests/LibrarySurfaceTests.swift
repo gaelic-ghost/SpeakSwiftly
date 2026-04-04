@@ -7,7 +7,7 @@ import TextForSpeechCore
 }
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let speak: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> WorkerRequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, SpeechNormalizationContext?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         text,
         profileName,
@@ -21,7 +21,7 @@ import TextForSpeechCore
             id: id
         )
     }
-    let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> WorkerRequestHandle = {
+    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         profileName,
         text,
@@ -36,28 +36,28 @@ import TextForSpeechCore
             id: id
         )
     }
-    let profiles: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
+    let profiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, id in
         await runtime.profiles(id: id)
     }
-    let removeProfile: @Sendable (WorkerRuntime, String, String) async -> WorkerRequestHandle = { runtime, profileName, id in
+    let removeProfile: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, profileName, id in
         await runtime.removeProfile(named: profileName, id: id)
     }
-    let generationQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+    let generationQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.generation)
     }
-    let playbackQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+    let playbackQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.playback)
     }
-    let playbackPause: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+    let playbackPause: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.playback(.pause)
     }
-    let clearQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+    let clearQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.clearQueue()
     }
-    let cancelRequest: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
+    let cancelRequest: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, id in
         await runtime.cancelRequest(id)
     }
-    let statusEvents: @Sendable (WorkerRuntime) async -> AsyncStream<WorkerStatusEvent> = { runtime in
+    let statusEvents: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.StatusEvent> = { runtime in
         await runtime.statusEvents()
     }
 
@@ -74,11 +74,11 @@ import TextForSpeechCore
 }
 
 @Test func publicWorkerRequestHandleExposesStableMetadata() {
-    let operationName: KeyPath<WorkerRequestHandle, String> = \.operationName
-    let profileName: KeyPath<WorkerRequestHandle, String?> = \.profileName
-    let events: KeyPath<WorkerRequestHandle, AsyncThrowingStream<WorkerRequestStreamEvent, Error>> = \.events
+    let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation
+    let profileName: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.profileName
+    let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
 
-    _ = operationName
+    _ = operation
     _ = profileName
     _ = events
 }

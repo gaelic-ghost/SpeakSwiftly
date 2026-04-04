@@ -90,19 +90,19 @@ import TextForSpeechCore
 }
 
 @Test func rejectsMalformedJSON() throws {
-    #expect(throws: WorkerError.self) {
+    #expect(throws: SpeakSwiftly.Error.self) {
         try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live""#)
     }
 }
 
 @Test func rejectsUnknownOperation() throws {
-    #expect(throws: WorkerError.self) {
+    #expect(throws: SpeakSwiftly.Error.self) {
         try WorkerRequest.decode(from: #"{"id":"req-1","op":"dance"}"#)
     }
 }
 
 @Test func rejectsMissingRequiredFields() throws {
-    #expect(throws: WorkerError.self) {
+    #expect(throws: SpeakSwiftly.Error.self) {
         try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"   ","profile_name":"default-femme"}"#)
     }
 }
@@ -113,7 +113,7 @@ import TextForSpeechCore
 
     let store = ProfileStore(rootURL: tempRoot)
 
-    #expect(throws: WorkerError.self) {
+    #expect(throws: SpeakSwiftly.Error.self) {
         try store.validateProfileName("Bad Name")
     }
 }
@@ -122,7 +122,7 @@ import TextForSpeechCore
 
 @Test func encodesWorkerEnvelopesWithExpectedKeys() throws {
     let queued = try jsonObject(
-        WorkerQueuedEvent(
+        SpeakSwiftly.QueuedEvent(
             id: "req-1",
             reason: .waitingForResidentModel,
             queuePosition: 2
@@ -132,26 +132,26 @@ import TextForSpeechCore
     #expect(queued["reason"] as? String == "waiting_for_resident_model")
     #expect(queued["queue_position"] as? Int == 2)
 
-    let started = try jsonObject(WorkerStartedEvent(id: "req-1", op: "queue_speech_live"))
+    let started = try jsonObject(SpeakSwiftly.StartedEvent(id: "req-1", op: "queue_speech_live"))
     #expect(started["event"] as? String == "started")
     #expect(started["op"] as? String == "queue_speech_live")
 
-    let progress = try jsonObject(WorkerProgressEvent(id: "req-1", stage: .bufferingAudio))
+    let progress = try jsonObject(SpeakSwiftly.ProgressEvent(id: "req-1", stage: .bufferingAudio))
     #expect(progress["event"] as? String == "progress")
     #expect(progress["stage"] as? String == "buffering_audio")
 
-    let prerollReady = try jsonObject(WorkerProgressEvent(id: "req-1", stage: .prerollReady))
+    let prerollReady = try jsonObject(SpeakSwiftly.ProgressEvent(id: "req-1", stage: .prerollReady))
     #expect(prerollReady["event"] as? String == "progress")
     #expect(prerollReady["stage"] as? String == "preroll_ready")
 
     let success = try jsonObject(
-        WorkerSuccessResponse(
+        SpeakSwiftly.Success(
             id: "req-1",
             profileName: "default-femme",
             profilePath: "/tmp/default-femme",
             profiles: nil,
-            activeRequest: ActiveWorkerRequestSummary(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
-            queue: [QueuedWorkerRequestSummary(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
+            activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+            queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
             clearedCount: 2,
             cancelledRequestID: "req-queued"
         )
@@ -165,7 +165,7 @@ import TextForSpeechCore
     #expect(success["cancelled_request_id"] as? String == "req-queued")
 
     let failure = try jsonObject(
-        WorkerFailureResponse(
+        SpeakSwiftly.Failure(
             id: "req-1",
             code: .audioPlaybackTimeout,
             message: "Profile 'ghost' was not found in the SpeakSwiftly profile store."

@@ -214,229 +214,229 @@ enum WorkerRequest: Sendable, Equatable {
 
 // MARK: - Response Envelope
 
-public enum WorkerStatusStage: String, Codable, Sendable {
-    case warmingResidentModel = "warming_resident_model"
-    case residentModelReady = "resident_model_ready"
-    case residentModelFailed = "resident_model_failed"
-}
-
-public enum WorkerRequestEventName: String, Codable, Sendable {
-    case queued
-    case started
-    case progress
-}
-
-public enum WorkerProgressStage: String, Codable, Sendable {
-    case loadingProfile = "loading_profile"
-    case startingPlayback = "starting_playback"
-    case bufferingAudio = "buffering_audio"
-    case prerollReady = "preroll_ready"
-    case playbackFinished = "playback_finished"
-    case loadingProfileModel = "loading_profile_model"
-    case generatingProfileAudio = "generating_profile_audio"
-    case writingProfileAssets = "writing_profile_assets"
-    case exportingProfileAudio = "exporting_profile_audio"
-    case removingProfile = "removing_profile"
-}
-
-public enum WorkerQueuedReason: String, Codable, Sendable {
-    case waitingForResidentModel = "waiting_for_resident_model"
-    case waitingForActiveRequest = "waiting_for_active_request"
-}
-
-public struct WorkerStatusEvent: Encodable, Sendable, Equatable {
-    public let event = "worker_status"
-    public let stage: WorkerStatusStage
-
-    public init(stage: WorkerStatusStage) {
-        self.stage = stage
-    }
-}
-
-public struct WorkerQueuedEvent: Encodable, Sendable, Equatable {
-    public let id: String
-    public let event = WorkerRequestEventName.queued
-    public let reason: WorkerQueuedReason
-    public let queuePosition: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case event
-        case reason
-        case queuePosition = "queue_position"
+public extension SpeakSwiftly {
+    enum StatusStage: String, Codable, Sendable {
+        case warmingResidentModel = "warming_resident_model"
+        case residentModelReady = "resident_model_ready"
+        case residentModelFailed = "resident_model_failed"
     }
 
-    public init(id: String, reason: WorkerQueuedReason, queuePosition: Int) {
-        self.id = id
-        self.reason = reason
-        self.queuePosition = queuePosition
-    }
-}
-
-public struct WorkerStartedEvent: Encodable, Sendable, Equatable {
-    public let id: String
-    public let event = WorkerRequestEventName.started
-    public let op: String
-
-    public init(id: String, op: String) {
-        self.id = id
-        self.op = op
-    }
-}
-
-public struct WorkerProgressEvent: Encodable, Sendable, Equatable {
-    public let id: String
-    public let event = WorkerRequestEventName.progress
-    public let stage: WorkerProgressStage
-
-    public init(id: String, stage: WorkerProgressStage) {
-        self.id = id
-        self.stage = stage
-    }
-}
-
-public struct WorkerSuccessResponse: Encodable, Sendable, Equatable {
-    public let id: String
-    public let ok = true
-    public let profileName: String?
-    public let profilePath: String?
-    public let profiles: [ProfileSummary]?
-    public let activeRequest: ActiveWorkerRequestSummary?
-    public let queue: [QueuedWorkerRequestSummary]?
-    public let playbackState: PlaybackStateSummary?
-    public let clearedCount: Int?
-    public let cancelledRequestID: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case ok
-        case profileName = "profile_name"
-        case profilePath = "profile_path"
-        case profiles
-        case activeRequest = "active_request"
-        case queue
-        case playbackState = "playback_state"
-        case clearedCount = "cleared_count"
-        case cancelledRequestID = "cancelled_request_id"
+    enum RequestEventName: String, Codable, Sendable {
+        case queued
+        case started
+        case progress
     }
 
-    public init(
-        id: String,
-        profileName: String? = nil,
-        profilePath: String? = nil,
-        profiles: [ProfileSummary]? = nil,
-        activeRequest: ActiveWorkerRequestSummary? = nil,
-        queue: [QueuedWorkerRequestSummary]? = nil,
-        playbackState: PlaybackStateSummary? = nil,
-        clearedCount: Int? = nil,
-        cancelledRequestID: String? = nil
-    ) {
-        self.id = id
-        self.profileName = profileName
-        self.profilePath = profilePath
-        self.profiles = profiles
-        self.activeRequest = activeRequest
-        self.queue = queue
-        self.playbackState = playbackState
-        self.clearedCount = clearedCount
-        self.cancelledRequestID = cancelledRequestID
-    }
-}
-
-public struct PlaybackStateSummary: Codable, Sendable, Equatable {
-    public let state: PlaybackState
-    public let activeRequest: ActiveWorkerRequestSummary?
-
-    enum CodingKeys: String, CodingKey {
-        case state
-        case activeRequest = "active_request"
+    enum ProgressStage: String, Codable, Sendable {
+        case loadingProfile = "loading_profile"
+        case startingPlayback = "starting_playback"
+        case bufferingAudio = "buffering_audio"
+        case prerollReady = "preroll_ready"
+        case playbackFinished = "playback_finished"
+        case loadingProfileModel = "loading_profile_model"
+        case generatingProfileAudio = "generating_profile_audio"
+        case writingProfileAssets = "writing_profile_assets"
+        case exportingProfileAudio = "exporting_profile_audio"
+        case removingProfile = "removing_profile"
     }
 
-    public init(state: PlaybackState, activeRequest: ActiveWorkerRequestSummary?) {
-        self.state = state
-        self.activeRequest = activeRequest
-    }
-}
-
-public struct ActiveWorkerRequestSummary: Codable, Sendable, Equatable {
-    public let id: String
-    public let op: String
-    public let profileName: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case op
-        case profileName = "profile_name"
+    enum QueuedReason: String, Codable, Sendable {
+        case waitingForResidentModel = "waiting_for_resident_model"
+        case waitingForActiveRequest = "waiting_for_active_request"
     }
 
-    public init(id: String, op: String, profileName: String?) {
-        self.id = id
-        self.op = op
-        self.profileName = profileName
-    }
-}
+    struct StatusEvent: Encodable, Sendable, Equatable {
+        public let event = "worker_status"
+        public let stage: StatusStage
 
-public struct QueuedWorkerRequestSummary: Codable, Sendable, Equatable {
-    public let id: String
-    public let op: String
-    public let profileName: String?
-    public let queuePosition: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case op
-        case profileName = "profile_name"
-        case queuePosition = "queue_position"
+        public init(stage: StatusStage) {
+            self.stage = stage
+        }
     }
 
-    public init(id: String, op: String, profileName: String?, queuePosition: Int) {
-        self.id = id
-        self.op = op
-        self.profileName = profileName
-        self.queuePosition = queuePosition
+    struct QueuedEvent: Encodable, Sendable, Equatable {
+        public let id: String
+        public let event = RequestEventName.queued
+        public let reason: QueuedReason
+        public let queuePosition: Int
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case event
+            case reason
+            case queuePosition = "queue_position"
+        }
+
+        public init(id: String, reason: QueuedReason, queuePosition: Int) {
+            self.id = id
+            self.reason = reason
+            self.queuePosition = queuePosition
+        }
     }
-}
 
-public struct WorkerFailureResponse: Encodable, Sendable, Equatable {
-    public let id: String
-    public let ok = false
-    public let code: WorkerErrorCode
-    public let message: String
+    struct StartedEvent: Encodable, Sendable, Equatable {
+        public let id: String
+        public let event = RequestEventName.started
+        public let op: String
 
-    public init(id: String, code: WorkerErrorCode, message: String) {
-        self.id = id
-        self.code = code
-        self.message = message
+        public init(id: String, op: String) {
+            self.id = id
+            self.op = op
+        }
     }
-}
 
-// MARK: - Errors
+    struct ProgressEvent: Encodable, Sendable, Equatable {
+        public let id: String
+        public let event = RequestEventName.progress
+        public let stage: ProgressStage
 
-public enum WorkerErrorCode: String, Codable, Sendable {
-    case invalidJSON = "invalid_json"
-    case invalidRequest = "invalid_request"
-    case unknownOperation = "unknown_operation"
-    case profileNotFound = "profile_not_found"
-    case profileAlreadyExists = "profile_already_exists"
-    case invalidProfileName = "invalid_profile_name"
-    case modelLoading = "model_loading"
-    case modelGenerationFailed = "model_generation_failed"
-    case requestCancelled = "request_cancelled"
-    case workerShuttingDown = "worker_shutting_down"
-    case audioPlaybackTimeout = "audio_playback_timeout"
-    case audioPlaybackFailed = "audio_playback_failed"
-    case requestNotFound = "request_not_found"
-    case filesystemError = "filesystem_error"
-    case internalError = "internal_error"
-}
+        public init(id: String, stage: ProgressStage) {
+            self.id = id
+            self.stage = stage
+        }
+    }
 
-public struct WorkerError: Error, Sendable, Equatable {
-    public let code: WorkerErrorCode
-    public let message: String
+    struct Success: Encodable, Sendable, Equatable {
+        public let id: String
+        public let ok = true
+        public let profileName: String?
+        public let profilePath: String?
+        public let profiles: [ProfileSummary]?
+        public let activeRequest: ActiveRequest?
+        public let queue: [QueuedRequest]?
+        public let playbackState: PlaybackStateSnapshot?
+        public let clearedCount: Int?
+        public let cancelledRequestID: String?
 
-    public init(code: WorkerErrorCode, message: String) {
-        self.code = code
-        self.message = message
+        enum CodingKeys: String, CodingKey {
+            case id
+            case ok
+            case profileName = "profile_name"
+            case profilePath = "profile_path"
+            case profiles
+            case activeRequest = "active_request"
+            case queue
+            case playbackState = "playback_state"
+            case clearedCount = "cleared_count"
+            case cancelledRequestID = "cancelled_request_id"
+        }
+
+        public init(
+            id: String,
+            profileName: String? = nil,
+            profilePath: String? = nil,
+            profiles: [ProfileSummary]? = nil,
+            activeRequest: ActiveRequest? = nil,
+            queue: [QueuedRequest]? = nil,
+            playbackState: PlaybackStateSnapshot? = nil,
+            clearedCount: Int? = nil,
+            cancelledRequestID: String? = nil
+        ) {
+            self.id = id
+            self.profileName = profileName
+            self.profilePath = profilePath
+            self.profiles = profiles
+            self.activeRequest = activeRequest
+            self.queue = queue
+            self.playbackState = playbackState
+            self.clearedCount = clearedCount
+            self.cancelledRequestID = cancelledRequestID
+        }
+    }
+
+    struct PlaybackStateSnapshot: Codable, Sendable, Equatable {
+        public let state: PlaybackState
+        public let activeRequest: ActiveRequest?
+
+        enum CodingKeys: String, CodingKey {
+            case state
+            case activeRequest = "active_request"
+        }
+
+        public init(state: PlaybackState, activeRequest: ActiveRequest?) {
+            self.state = state
+            self.activeRequest = activeRequest
+        }
+    }
+
+    struct ActiveRequest: Codable, Sendable, Equatable {
+        public let id: String
+        public let op: String
+        public let profileName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case op
+            case profileName = "profile_name"
+        }
+
+        public init(id: String, op: String, profileName: String?) {
+            self.id = id
+            self.op = op
+            self.profileName = profileName
+        }
+    }
+
+    struct QueuedRequest: Codable, Sendable, Equatable {
+        public let id: String
+        public let op: String
+        public let profileName: String?
+        public let queuePosition: Int
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case op
+            case profileName = "profile_name"
+            case queuePosition = "queue_position"
+        }
+
+        public init(id: String, op: String, profileName: String?, queuePosition: Int) {
+            self.id = id
+            self.op = op
+            self.profileName = profileName
+            self.queuePosition = queuePosition
+        }
+    }
+
+    struct Failure: Encodable, Sendable, Equatable {
+        public let id: String
+        public let ok = false
+        public let code: ErrorCode
+        public let message: String
+
+        public init(id: String, code: ErrorCode, message: String) {
+            self.id = id
+            self.code = code
+            self.message = message
+        }
+    }
+
+    enum ErrorCode: String, Codable, Sendable {
+        case invalidJSON = "invalid_json"
+        case invalidRequest = "invalid_request"
+        case unknownOperation = "unknown_operation"
+        case profileNotFound = "profile_not_found"
+        case profileAlreadyExists = "profile_already_exists"
+        case invalidProfileName = "invalid_profile_name"
+        case modelLoading = "model_loading"
+        case modelGenerationFailed = "model_generation_failed"
+        case requestCancelled = "request_cancelled"
+        case workerShuttingDown = "worker_shutting_down"
+        case audioPlaybackTimeout = "audio_playback_timeout"
+        case audioPlaybackFailed = "audio_playback_failed"
+        case requestNotFound = "request_not_found"
+        case filesystemError = "filesystem_error"
+        case internalError = "internal_error"
+    }
+
+    struct Error: Swift.Error, Sendable, Equatable {
+        public let code: ErrorCode
+        public let message: String
+
+        public init(code: ErrorCode, message: String) {
+            self.code = code
+            self.message = message
+        }
     }
 }
 

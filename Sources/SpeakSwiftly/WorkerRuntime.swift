@@ -3,7 +3,8 @@ import TextForSpeechCore
 
 // MARK: - Worker Runtime
 
-public actor WorkerRuntime {
+public extension SpeakSwiftly {
+    actor Runtime {
     private enum Environment {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
@@ -74,8 +75,8 @@ public actor WorkerRuntime {
         let normalizationContext: SpeechNormalizationContext?
         let textFeatures: SpeechTextForensicFeatures
         let textSections: [SpeechTextForensicSection]
-        let stream: AsyncThrowingStream<[Float], Error>
-        let continuation: AsyncThrowingStream<[Float], Error>.Continuation
+        let stream: AsyncThrowingStream<[Float], any Swift.Error>
+        let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
         var sampleRate: Double?
         var generationTask: Task<Void, Never>?
         var playbackTask: Task<Void, Never>?
@@ -89,8 +90,8 @@ public actor WorkerRuntime {
             normalizationContext: SpeechNormalizationContext?,
             textFeatures: SpeechTextForensicFeatures,
             textSections: [SpeechTextForensicSection],
-            stream: AsyncThrowingStream<[Float], Error>,
-            continuation: AsyncThrowingStream<[Float], Error>.Continuation
+            stream: AsyncThrowingStream<[Float], any Swift.Error>,
+            continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
         ) {
             self.requestID = requestID
             self.op = op
@@ -198,7 +199,7 @@ public actor WorkerRuntime {
     private var preloadTask: Task<Void, Never>?
     private var requestAcceptedAt = [String: Date]()
     private var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
-    private var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, Error>.Continuation]()
+    private var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
     private var activeGeneration: ActiveRequest?
     private var activePlayback: ActivePlayback?
     private var speechJobs = [String: SpeechJobState]()
@@ -216,7 +217,7 @@ public actor WorkerRuntime {
         logEncoder.outputFormatting = [.sortedKeys]
     }
 
-    public static func live() async -> WorkerRuntime {
+    public static func live() async -> Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
         let profileStore = ProfileStore(
@@ -228,14 +229,14 @@ public actor WorkerRuntime {
         )
         let playbackController = await dependencies.makePlaybackController()
 
-        return WorkerRuntime(
+        return Runtime(
             dependencies: dependencies,
             profileStore: profileStore,
             playbackController: playbackController
         )
     }
 
-    public func statusEvents() -> AsyncStream<WorkerStatusEvent> {
+    public func statusEvents() -> AsyncStream<StatusEvent> {
         let subscriptionID = UUID()
         return AsyncStream { continuation in
             statusContinuations[subscriptionID] = continuation
@@ -468,10 +469,10 @@ public actor WorkerRuntime {
     public func speak(
         text: String,
         with profileName: String,
-        as job: SpeechJobType,
+        as job: Job,
         context normalizationContext: SpeechNormalizationContext? = nil,
         id: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    ) async -> RequestHandle {
         await submit(
             .queueSpeech(
                 id: id,
@@ -489,7 +490,7 @@ public actor WorkerRuntime {
         voice voiceDescription: String,
         outputPath: String? = nil,
         id: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    ) async -> RequestHandle {
         await submit(
             .createProfile(
                 id: id,
@@ -501,36 +502,36 @@ public actor WorkerRuntime {
         )
     }
 
-    public func profiles(id: String = UUID().uuidString) async -> WorkerRequestHandle {
+    public func profiles(id: String = UUID().uuidString) async -> RequestHandle {
         await submit(.listProfiles(id: id))
     }
 
     public func removeProfile(
         named profileName: String,
         id: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    ) async -> RequestHandle {
         await submit(.removeProfile(id: id, profileName: profileName))
     }
 
     public func queue(
-        _ queueType: WorkerQueueType,
+        _ queueType: Queue,
         id requestID: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    ) async -> RequestHandle {
         await submit(.listQueue(id: requestID, queueType: queueType))
     }
 
-    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
+    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> RequestHandle {
         await submit(.playback(id: requestID, action: action))
     }
 
-    public func clearQueue(id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
+    public func clearQueue(id requestID: String = UUID().uuidString) async -> RequestHandle {
         await submit(.clearQueue(id: requestID))
     }
 
     public func cancelRequest(
         _ id: String,
         requestID: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    ) async -> RequestHandle {
         await submit(.cancelRequest(id: requestID, requestID: id))
     }
 
@@ -1400,8 +1401,8 @@ public actor WorkerRuntime {
         let normalizedText = SpeechTextNormalizer.normalize(text, context: normalizationContext)
         let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
         let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
-        var continuation: AsyncThrowingStream<[Float], Error>.Continuation?
-        let stream = AsyncThrowingStream<[Float], Error> { continuation = $0 }
+        var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
+        let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
 
         return SpeechJobState(
             requestID: requestID,
@@ -1717,7 +1718,7 @@ public actor WorkerRuntime {
 
     private func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
         let requestID = request.id
-        let events = AsyncThrowingStream<WorkerRequestStreamEvent, Error> { continuation in
+        let events = AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> { continuation in
             requestContinuations[requestID] = continuation
             continuation.onTermination = { _ in
                 Task {
@@ -1728,7 +1729,7 @@ public actor WorkerRuntime {
 
         return WorkerRequestHandle(
             id: requestID,
-            operationName: request.opName,
+            operation: request.opName,
             profileName: request.profileName,
             events: events
         )
@@ -1897,5 +1898,6 @@ public actor WorkerRuntime {
         }
 
         return id
+    }
     }
 }

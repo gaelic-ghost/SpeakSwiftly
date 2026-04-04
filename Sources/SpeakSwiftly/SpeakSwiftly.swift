@@ -3,58 +3,82 @@ import TextForSpeechCore
 
 // MARK: - Public Library Streams
 
-public enum SpeechJobType: Sendable, Equatable {
-    case live
-}
-
-public enum WorkerQueueType: Sendable, Equatable {
-    case generation
-    case playback
-}
-
-public enum PlaybackAction: Sendable, Equatable {
-    case pause
-    case resume
-    case state
-}
-
-public enum PlaybackState: String, Codable, Sendable, Equatable {
-    case idle
-    case playing
-    case paused
-}
-
-public enum WorkerRequestStreamEvent: Sendable, Equatable {
-    case queued(WorkerQueuedEvent)
-    case acknowledged(WorkerSuccessResponse)
-    case started(WorkerStartedEvent)
-    case progress(WorkerProgressEvent)
-    case completed(WorkerSuccessResponse)
-}
-
-public struct WorkerRequestHandle: Sendable {
-    public let id: String
-    public let operationName: String
-    public let profileName: String?
-    public let events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
-
-    init(
-        id: String,
-        operationName: String,
-        profileName: String?,
-        events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
-    ) {
-        self.id = id
-        self.operationName = operationName
-        self.profileName = profileName
-        self.events = events
-    }
-}
-
-// MARK: - Public Runtime
-
 public enum SpeakSwiftly {
-    public static func live() async -> WorkerRuntime {
-        await WorkerRuntime.live()
+    public enum Job: Sendable, Equatable {
+        case live
+    }
+
+    public enum Queue: Sendable, Equatable {
+        case generation
+        case playback
+    }
+
+    public enum PlaybackAction: Sendable, Equatable {
+        case pause
+        case resume
+        case state
+    }
+
+    public enum PlaybackState: String, Codable, Sendable, Equatable {
+        case idle
+        case playing
+        case paused
+    }
+
+    public enum RequestEvent: Sendable, Equatable {
+        case queued(QueuedEvent)
+        case acknowledged(Success)
+        case started(StartedEvent)
+        case progress(ProgressEvent)
+        case completed(Success)
+    }
+
+    public struct RequestHandle: Sendable {
+        public let id: String
+        public let operation: String
+        public let profileName: String?
+        public let events: AsyncThrowingStream<RequestEvent, any Swift.Error>
+
+        init(
+            id: String,
+            operation: String,
+            profileName: String?,
+            events: AsyncThrowingStream<RequestEvent, any Swift.Error>
+        ) {
+            self.id = id
+            self.operation = operation
+            self.profileName = profileName
+            self.events = events
+        }
+    }
+
+    public static func live() async -> Runtime {
+        await Runtime.live()
     }
 }
+
+// MARK: - Internal Compatibility
+
+typealias SpeechJobType = SpeakSwiftly.Job
+typealias WorkerQueueType = SpeakSwiftly.Queue
+typealias PlaybackAction = SpeakSwiftly.PlaybackAction
+typealias PlaybackState = SpeakSwiftly.PlaybackState
+typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent
+typealias WorkerRequestHandle = SpeakSwiftly.RequestHandle
+typealias WorkerRuntime = SpeakSwiftly.Runtime
+typealias WorkerStatusStage = SpeakSwiftly.StatusStage
+typealias WorkerRequestEventName = SpeakSwiftly.RequestEventName
+typealias WorkerProgressStage = SpeakSwiftly.ProgressStage
+typealias WorkerQueuedReason = SpeakSwiftly.QueuedReason
+typealias WorkerStatusEvent = SpeakSwiftly.StatusEvent
+typealias WorkerQueuedEvent = SpeakSwiftly.QueuedEvent
+typealias WorkerStartedEvent = SpeakSwiftly.StartedEvent
+typealias WorkerProgressEvent = SpeakSwiftly.ProgressEvent
+typealias WorkerSuccessResponse = SpeakSwiftly.Success
+typealias PlaybackStateSummary = SpeakSwiftly.PlaybackStateSnapshot
+typealias ActiveWorkerRequestSummary = SpeakSwiftly.ActiveRequest
+typealias QueuedWorkerRequestSummary = SpeakSwiftly.QueuedRequest
+typealias WorkerFailureResponse = SpeakSwiftly.Failure
+typealias WorkerErrorCode = SpeakSwiftly.ErrorCode
+typealias WorkerError = SpeakSwiftly.Error
+typealias ProfileSummary = SpeakSwiftly.ProfileSummary
