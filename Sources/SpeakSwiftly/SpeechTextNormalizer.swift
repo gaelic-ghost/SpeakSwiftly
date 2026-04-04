@@ -90,6 +90,7 @@ enum SpeechTextNormalizer {
 			normalizeFilePaths,
 			normalizeDottedIdentifiers,
 			normalizeSnakeCaseIdentifiers,
+			normalizeDashedIdentifiers,
 			normalizeCamelCaseIdentifiers,
 			normalizeCodeHeavyLines,
 			normalizeSpiralProneWords,
@@ -334,6 +335,13 @@ extension SpeechTextNormalizer {
 		}
 	}
 
+	static func normalizeDashedIdentifiers(_ text: String) -> String {
+		transformTokens(in: text) { token in
+			guard isLikelyDashedIdentifier(token) else { return nil }
+			return spokenIdentifier(token)
+		}
+	}
+
 	static func normalizeCamelCaseIdentifiers(_ text: String) -> String {
 		transformTokens(in: text) { token in
 			guard isLikelyCamelCaseIdentifier(token) else { return nil }
@@ -447,7 +455,7 @@ extension SpeechTextNormalizer {
 				segments.append(" ")
 			case "-":
 				flushBuffer()
-				segments.append("dash")
+				segments.append(" ")
 			default:
 				buffer.append(character)
 			}
@@ -497,7 +505,7 @@ extension SpeechTextNormalizer {
 				parts.append(" ")
 			case "-":
 				flushBuffer()
-				parts.append("dash")
+				parts.append(" ")
 			default:
 				buffer.append(character)
 			}
@@ -956,6 +964,16 @@ extension SpeechTextNormalizer {
 	static func isLikelySnakeCaseIdentifier(_ token: String) -> Bool {
 		guard token.contains("_") else { return false }
 		let parts = token.split(separator: "_").map(String.init)
+		guard parts.count >= 2 else { return false }
+		return parts.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isAlphaNumeric) }
+	}
+
+	static func isLikelyDashedIdentifier(_ token: String) -> Bool {
+		guard token.contains("-") else { return false }
+		guard !isLikelyFilePath(token) else { return false }
+		guard !token.contains("://") else { return false }
+
+		let parts = token.split(separator: "-").map(String.init)
 		guard parts.count >= 2 else { return false }
 		return parts.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isAlphaNumeric) }
 	}

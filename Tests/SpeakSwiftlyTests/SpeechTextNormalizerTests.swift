@@ -79,6 +79,15 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("gale mini slash Workspace slash Speak Swiftly"))
     }
 
+    @Test func dashedFilePathsBecomeSpeechSafeSpacing() {
+        let text = "Path: /tmp/speak-to-user/path-now."
+
+        let normalized = SpeechTextNormalizer.normalizeFilePaths(text)
+
+        #expect(normalized.contains("tmp slash speak to user slash path now"))
+        #expect(!normalized.contains("dash"))
+    }
+
     @Test func standaloneGaleAliasesBecomeSpokenNames() {
         let text = "Please ask galew, galem, and Galew again."
 
@@ -104,6 +113,13 @@ struct SpeechTextNormalizerTests {
 
         #expect(normalized.contains("snake case stuff"))
         #expect(!normalized.contains("underscore"))
+    }
+
+    @Test func dashedIdentifiersBecomeSpeechSafeSpacing() {
+        let normalized = SpeechTextNormalizer.spokenIdentifier("kebab-case-stuff")
+
+        #expect(normalized.contains("kebab case stuff"))
+        #expect(!normalized.contains("dash"))
     }
 
     @Test func camelCaseIdentifiersBecomeSpokenIdentifiers() {
@@ -183,5 +199,16 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("tmp slash path now"))
         #expect(!normalized.contains("underscore"))
         #expect(!normalized.contains("___"))
+    }
+
+    @Test func repeatedDashesCollapseToSpeechSafeSpacing() {
+        let original = "Read kebab---case and /tmp/path---now once."
+
+        let normalized = SpeechTextNormalizer.normalize(original)
+
+        #expect(normalized.contains("kebab case"))
+        #expect(normalized.contains("tmp slash path now"))
+        #expect(!normalized.contains("dash"))
+        #expect(!normalized.contains("---"))
     }
 }
