@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
+import TextForSpeechCore
 
 struct SpeechTextNormalizerTests {
     @Test func fencedCodeBlocksBecomeSpokenCodeSamples() {
@@ -258,5 +259,52 @@ struct SpeechTextNormalizerTests {
 
         #expect(normalized.contains("current directory slash Sources slash Speak Swiftly"))
         #expect(!normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
+    }
+
+    @Test func prebuiltReplacementRulesCanOverrideHardToSpeakInputsBeforeBuiltIns() {
+        let original = "Please say chrommmaticallly once."
+        let profile = TextNormalizationProfile(
+            id: "custom",
+            displayName: "Custom",
+            replacementRules: [
+                TextReplacementRule(
+                    match: "chrommmaticallly",
+                    replacement: "chromatically",
+                    matchMode: .exactPhrase,
+                    phase: .beforeBuiltIns
+                )
+            ]
+        )
+
+        let normalized = SpeechTextNormalizer.normalize(original, profile: profile)
+
+        #expect(normalized.contains("chromatically"))
+        #expect(!normalized.contains("c h r o m"))
+    }
+
+    @Test func postbuiltReplacementRulesCanRewriteFinalSpokenOutputByInputKind() {
+        let original = "Read snake_case_stuff once."
+        let profile = TextNormalizationProfile(
+            id: "postbuilt",
+            displayName: "Postbuilt",
+            replacementRules: [
+                TextReplacementRule(
+                    match: "snake case stuff",
+                    replacement: "settings token",
+                    matchMode: .exactPhrase,
+                    phase: .afterBuiltIns,
+                    inputKinds: [.plainText]
+                )
+            ]
+        )
+
+        let normalized = SpeechTextNormalizer.normalize(
+            original,
+            profile: profile,
+            inputKind: .plainText
+        )
+
+        #expect(normalized.contains("settings token"))
+        #expect(!normalized.contains("snake case stuff"))
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import NaturalLanguage
 import RegexBuilder
+import TextForSpeechCore
 
 // MARK: - Speech Text Normalization
 
@@ -49,7 +50,8 @@ struct SpeechTextForensicSectionWindow: Sendable, Equatable {
 
 enum SpeechTextNormalizer {
 	typealias NormalizationPass = (String) -> String
-	typealias ContextualNormalizationPass = (String, SpeechNormalizationContext?) -> String
+	typealias ContextualNormalizationPass =
+		(String, SpeechNormalizationContext?, TextNormalizationProfile, TextInputKind) -> String
 
 	private static var codeMarkerRegex: Regex<Substring> {
 		Regex {
@@ -83,29 +85,47 @@ enum SpeechTextNormalizer {
 
 	private static var normalizationPasses: [ContextualNormalizationPass] {
 		[
-			{ text, _ in normalizeFencedCodeBlocks(text) },
-			{ text, _ in normalizeInlineCodeSpans(text) },
-			{ text, _ in normalizeMarkdownLinks(text) },
-			{ text, _ in normalizeURLs(text) },
-			{ text, _ in normalizeStandaloneGaleAliases(text) },
+			{ text, _, _, _ in normalizeFencedCodeBlocks(text) },
+			{ text, _, _, _ in normalizeInlineCodeSpans(text) },
+			{ text, _, _, _ in normalizeMarkdownLinks(text) },
+			{ text, _, _, _ in normalizeURLs(text) },
+			{ text, _, _, _ in normalizeStandaloneGaleAliases(text) },
 			normalizeFilePaths,
-			{ text, _ in normalizeDottedIdentifiers(text) },
-			{ text, _ in normalizeSnakeCaseIdentifiers(text) },
-			{ text, _ in normalizeDashedIdentifiers(text) },
-			{ text, _ in normalizeCamelCaseIdentifiers(text) },
-			{ text, _ in normalizeCodeHeavyLines(text) },
-			{ text, _ in normalizeSpiralProneWords(text) },
-			{ text, _ in collapseWhitespace(text) },
+			{ text, _, _, _ in normalizeDottedIdentifiers(text) },
+			{ text, _, _, _ in normalizeSnakeCaseIdentifiers(text) },
+			{ text, _, _, _ in normalizeDashedIdentifiers(text) },
+			{ text, _, _, _ in normalizeCamelCaseIdentifiers(text) },
+			{ text, _, _, _ in normalizeCodeHeavyLines(text) },
+			{ text, _, _, _ in normalizeSpiralProneWords(text) },
+			{ text, _, _, _ in collapseWhitespace(text) },
 		]
 	}
 
 	// MARK: Public API
 
-	static func normalize(_ text: String, context: SpeechNormalizationContext? = nil) -> String {
-		let normalized = normalizationPasses.reduce(canonicalize(text)) { partial, pass in
-			pass(partial, context)
+	static func normalize(
+		_ text: String,
+		context: SpeechNormalizationContext? = nil,
+		profile: TextNormalizationProfile = .default,
+		inputKind: TextInputKind = .plainText
+	) -> String {
+		let seeded = applyReplacementRules(
+			canonicalize(text),
+			profile: profile,
+			inputKind: inputKind,
+			phase: .beforeBuiltIns
+		)
+		let normalized = normalizationPasses.reduce(seeded) { partial, pass in
+			pass(partial, context, profile, inputKind)
 		}
-		let finalized = collapseWhitespace(normalized)
+		let finalized = collapseWhitespace(
+			applyReplacementRules(
+				normalized,
+				profile: profile,
+				inputKind: inputKind,
+				phase: .afterBuiltIns
+			)
+		)
 		return finalized.isEmpty ? text : finalized
 	}
 
@@ -315,7 +335,12 @@ extension SpeechTextNormalizer {
 		}
 	}
 
-	static func normalizeFilePaths(_ text: String, context: SpeechNormalizationContext? = nil) -> String {
+	static func normalizeFilePaths(
+		_ text: String,
+		context: SpeechNormalizationContext? = nil,
+		profile _: TextNormalizationProfile = .default,
+		inputKind _: TextInputKind = .plainText
+	) -> String {
 		transformTokens(in: text) { token in
 			guard isLikelyFilePath(token) else { return nil }
 			return spokenPath(token, context: context)
@@ -856,6 +881,41 @@ extension SpeechTextNormalizer {
 		}
 
 		return result
+	}
+
+	static func applyReplacementRules(
+		_ text: String,
+		profile: TextNormalizationProfile,
+		inputKind: TextInputKind,
+		phase: TextReplacementRule.Phase
+	) -> String {
+		profile.replacementRules(for: phase, inputKind: inputKind).reduce(text) { partial, rule in
+			applyReplacementRule(rule, to: partial)
+		}
+	}
+
+	private static func applyReplacementRule(_ rule: TextReplacementRule, to text: String) -> String {
+		guard !rule.match.isEmpty else { return text }
+
+		switch rule.matchMode {
+		case .exactPhrase:
+			return text.replacingOccurrences(
+				of: rule.match,
+				with: rule.replacement,
+				options: rule.caseSensitive ? [] : [.caseInsensitive]
+			)
+
+		case .wholeToken:
+			return transformTokens(in: text) { token in
+				tokenMatches(rule.match, token: token, caseSensitive: rule.caseSensitive) ? rule.replacement : nil
+			}
+		}
+	}
+
+	private static func tokenMatches(_ expected: String, token: String, caseSensitive: Bool) -> Bool {
+		caseSensitive
+			? token == expected
+			: token.compare(expected, options: [.caseInsensitive]) == .orderedSame
 	}
 
 	static func transformedToken(_ rawToken: String, transform: (String) -> String?) -> String {

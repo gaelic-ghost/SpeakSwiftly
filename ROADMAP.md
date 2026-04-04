@@ -353,12 +353,18 @@ Exit criteria:
 Scope:
 
 - [ ] Add a first-class custom replacement surface for speech-text normalization.
+- [ ] Start carving the normalization stack into the future `TextForSpeech` package family without coupling the pure text transforms to app- or file-ownership concerns.
 - [ ] Let worker owners inspect, add, remove, and clear replacement rules without hard-coding all normalization behavior into the executable.
 - [ ] Keep the normalization system concrete and readable instead of turning it into an over-abstracted plugin or rule-engine layer.
 
 Tickets:
 
+- [ ] Split out a reusable `TextForSpeech` library target inside this repository first, before deciding whether a separate standalone repository is justified.
+- [ ] Keep the lowest-level normalization core deterministic and side-effect free, with profile and replacement types that stay reusable outside `SpeakSwiftly`.
+- [ ] Add a text-system-owned runtime profile store that can snapshot the current effective profile for each job start without letting hot reload mutate in-flight requests.
+- [ ] Treat YAML loading, file watching, SwiftUI settings integration, and remote update adapters as text-system configuration concerns layered above the pure normalization core.
 - [ ] Define the smallest useful replacement-rule shape, likely simple exact-match and phrase-replacement entries before considering broader pattern support.
+- [ ] Add initial typed replacement rules with explicit phase and input-kind scoping before considering regex or broader pattern families.
 - [ ] Decide and document rule precedence between built-in normalization passes and custom replacement rules so downstream callers can predict the final spoken text.
 - [ ] Add worker operations for listing normalization replacements, adding or updating a replacement, removing a replacement, and clearing all custom replacements.
 - [ ] Add typed `SpeakSwiftlyCore` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
@@ -369,6 +375,7 @@ Tickets:
 
 Exit criteria:
 
+- [ ] The repository contains an internal `TextForSpeech` target with reusable profile and runtime primitives, and the later repo-extraction decision is still free to happen after another real consumer appears.
 - [ ] A parent process can inspect and manage custom normalization replacements through documented worker operations and the equivalent typed library path.
 - [ ] Replacement behavior is predictable, test-covered, and explicit about precedence and persistence.
 - [ ] The normalization surface stays thin and understandable instead of growing into a generic rules framework.

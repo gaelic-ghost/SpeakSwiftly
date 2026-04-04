@@ -1,25 +1,7 @@
 import Foundation
+import TextForSpeechCore
 
 // MARK: - Public Library Streams
-
-public struct SpeechNormalizationContext: Codable, Sendable, Equatable {
-    public let cwd: String?
-    public let repoRoot: String?
-
-    public init(cwd: String? = nil, repoRoot: String? = nil) {
-        self.cwd = SpeechNormalizationContext.normalizedPath(cwd)
-        self.repoRoot = SpeechNormalizationContext.normalizedPath(repoRoot)
-    }
-
-    private static func normalizedPath(_ path: String?) -> String? {
-        guard let trimmed = path?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return nil
-        }
-
-        let standardized = NSString(string: trimmed).standardizingPath
-        return standardized.isEmpty ? nil : standardized
-    }
-}
 
 public enum SpeechJobType: Sendable, Equatable {
     case live

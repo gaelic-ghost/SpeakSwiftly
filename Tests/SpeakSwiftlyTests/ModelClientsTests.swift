@@ -2,6 +2,7 @@ import Foundation
 @preconcurrency import MLX
 import Testing
 @testable import SpeakSwiftlyCore
+import TextForSpeechCore
 
 @Test func adaptivePlaybackThresholdsSeedFromTextComplexityClasses() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds

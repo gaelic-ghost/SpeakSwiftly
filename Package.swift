@@ -10,6 +10,10 @@ let package = Package(
     ],
     products: [
         .library(
+            name: "TextForSpeech",
+            targets: ["TextForSpeechCore"]
+        ),
+        .library(
             name: "SpeakSwiftlyCore",
             targets: ["SpeakSwiftlyCore"]
         ),
@@ -26,8 +30,13 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "TextForSpeechCore",
+            path: "Sources/TextForSpeechCore"
+        ),
+        .target(
             name: "SpeakSwiftlyCore",
             dependencies: [
+                "TextForSpeechCore",
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift")
             ],
@@ -39,7 +48,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
-            dependencies: ["SpeakSwiftlyCore"]
+            dependencies: ["SpeakSwiftlyCore", "TextForSpeechCore"]
         ),
     ]
 )
