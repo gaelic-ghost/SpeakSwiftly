@@ -163,6 +163,86 @@ That means:
 
 This is the right concurrency boundary for the near-term use case because it keeps profile mutation out of the middle of active speech work.
 
+## What a package consumer can do today
+
+Yes, a consumer of this package can use the public `TextForSpeech` profile API today, but there is an important boundary:
+
+- the `TextForSpeech` profile and runtime types are public
+- the current `SpeakSwiftly.Runtime` speech path does not yet expose or own a public `TextForSpeechRuntime`
+
+So today a consumer can:
+
+- construct `TextForSpeech.Profile` values
+- construct `TextForSpeech.Replacement` values
+- create a `TextForSpeechRuntime`
+- call `use(_:)`, `store(_:)`, `snapshot(named:)`, and `removeProfile(named:)`
+- choose which profile instance they want to treat as active inside their own code
+
+But today a consumer cannot yet:
+
+- inject a `TextForSpeechRuntime` into `SpeakSwiftly.Runtime`
+- tell the `SpeakSwiftly` live speech runtime to use a stored named `TextForSpeech` profile
+- mutate normalization behavior for active `SpeakSwiftly.Runtime` speech requests through a public runtime-owned profile surface
+
+That is because the current `SpeakSwiftly` runtime still calls the normalizer with the implicit default profile path rather than with a consumer-supplied `TextForSpeechRuntime` snapshot.
+
+So the public API exists, but the end-to-end wiring into the speech runtime is not finished yet.
+
+## How profiles and replacements are added today
+
+Profiles are added in a value-oriented way:
+
+1. build a `TextForSpeech.Profile`
+2. put `TextForSpeech.Replacement` values into its `replacements` array
+3. give that profile to a `TextForSpeechRuntime` through `use(_:)` or `store(_:)`
+
+There is not yet a higher-level mutating convenience API such as:
+
+- `appendReplacement(...)`
+- `updateReplacement(...)`
+- `removeReplacement(...)`
+
+Those operations are currently done by constructing a new profile value with the desired replacement array and then replacing or storing that profile.
+
+## Default profile behavior
+
+Yes, there is a default profile concept today.
+
+It exists in three ways:
+
+- `TextForSpeech.Profile()` defaults to `id: "default"`, `name: "Default"`, and an empty replacement list
+- `TextForSpeech.Profile.default` is a public convenience value
+- `TextForSpeechRuntime` defaults its active profile to `.default`
+
+What does not exist today is a mutable process-wide or package-wide global default profile registry. In other words:
+
+- there is a default profile value
+- there is an active profile on each `TextForSpeechRuntime`
+- there is not yet a public global mechanism to redefine the package's default profile for every consumer automatically
+
+If a caller wants a different effective default, the current way to do that is to create a `TextForSpeechRuntime` and set its active profile with `use(_:)`.
+
+## Persistence
+
+No, `TextForSpeech` profiles are not currently persisted to disk by the package.
+
+Today the profile model is:
+
+- public
+- `Codable`
+- in-memory only
+
+That means:
+
+- a consumer can serialize and persist profiles themselves if they want
+- the package does not yet provide built-in file IO, YAML loading, hot reload, or profile-database management
+- `TextForSpeechRuntime` stores profiles only in memory for the lifetime of that runtime object
+
+This is separate from `SpeakSwiftly` voice profiles in the speech worker, which are persisted on disk through the voice-profile store. The two concepts are different:
+
+- voice profiles are persisted audio+metadata assets used for speech synthesis
+- text normalization profiles are currently in-memory rule sets used for text shaping
+
 ## What “slices” means today
 
 There is not currently a first-class public `slice` type in `TextForSpeechCore`.
