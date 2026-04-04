@@ -17,7 +17,36 @@ A thin Swift worker executable for long-lived local speech generation around `ml
 
 SpeakSwiftly is a small Swift Package Manager executable intended to be launched and owned by another process, such as a macOS app or a Python service.
 
-The package also ships a reusable library product, `SpeakSwiftlyCore`, with parity for the worker's operation surface. Library consumers can still submit raw JSONL lines through `WorkerRuntime.accept(line:)`, but they can also use the typed Swift surface directly: submit a `WorkerRequest`, observe `WorkerStatusEvent` updates from `statusEvents()`, and consume typed per-request output through `WorkerRequestHandle.events`. Once the runtime has started, new `statusEvents()` subscribers receive an immediate snapshot of the current worker state before later transitions continue through the stream.
+The package also ships two reusable library products:
+
+- `SpeakSwiftlyCore` exposes the speech worker runtime as the namespaced `SpeakSwiftly` Swift API.
+- `TextForSpeech` exposes the reusable text-normalization core as the namespaced `TextForSpeech` Swift API.
+
+Library consumers can still submit raw JSONL lines through the process boundary, but they can also use the typed Swift surface directly: start a `SpeakSwiftly.Runtime`, observe `SpeakSwiftly.StatusEvent` updates from `statusEvents()`, and consume per-request output through `SpeakSwiftly.RequestHandle.events`. Once the runtime has started, new `statusEvents()` subscribers receive an immediate snapshot of the current worker state before later transitions continue through the stream.
+
+For example:
+
+```swift
+import SpeakSwiftlyCore
+import TextForSpeech
+
+let runtime = await SpeakSwiftly.live()
+await runtime.start()
+
+let handle = await runtime.speak(
+    text: "Hello there.",
+    with: "default-femme",
+    as: .live,
+    context: TextForSpeech.Context(
+        cwd: URL(fileURLWithPath: "/Users/galew/Workspace/SpeakSwiftly"),
+        repoRoot: URL(fileURLWithPath: "/Users/galew/Workspace/SpeakSwiftly")
+    )
+)
+
+for try await event in handle.events {
+    print(event)
+}
+```
 
 ### Motivation
 
@@ -30,7 +59,7 @@ The first intended runtime shape is:
 - A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
-- A single-consumer priority queue for incoming requests, with waiting `speak_live` work preferred over waiting non-playback work.
+- A single-consumer priority queue for incoming requests, with waiting live playback work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
 - Structured progress and lifecycle events written to `stdout`, with structured JSONL operator diagnostics on `stderr`.
 
@@ -104,7 +133,7 @@ Example response and event shapes:
 {"id":"req-9","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
 ```
 
-Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting `speak_live` requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
+Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting live playback requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
 
 `speak_live_background` uses the same playback path as `speak_live`, but it acknowledges success as soon as the request has been accepted into the worker queue. That gives an owner process a queue-and-return path without changing the blocking semantics of `speak_live`. The background request still emits the usual `started` and `progress` events later, and it can still emit a later failure response if playback breaks after the enqueue acknowledgment.
 
@@ -125,6 +154,8 @@ The test suite is organized to mirror the source responsibilities:
 - `WorkerRuntimeTests.swift`
 - `ModelClientsTests.swift`
 - `SpeakSwiftlyE2ETests.swift`
+
+The package also includes `TextForSpeech` coverage for normalization context, profile primitives, and runtime snapshot behavior.
 
 Current live-playback behavior is:
 
