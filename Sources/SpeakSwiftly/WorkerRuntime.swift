@@ -465,29 +465,11 @@ public actor WorkerRuntime {
         await startNextPlaybackIfPossible()
     }
 
-    @discardableResult
-    public func queueSpeech(
+    public func speak(
         text: String,
-        profileName: String,
-        as jobType: SpeechJobType,
-        normalizationContext: SpeechNormalizationContext? = nil,
-        id: String = UUID().uuidString
-    ) async -> String {
-        let handle = await queueSpeechHandle(
-            text: text,
-            profileName: profileName,
-            as: jobType,
-            normalizationContext: normalizationContext,
-            id: id
-        )
-        return handle.id
-    }
-
-    public func queueSpeechHandle(
-        text: String,
-        profileName: String,
-        as jobType: SpeechJobType,
-        normalizationContext: SpeechNormalizationContext? = nil,
+        with profileName: String,
+        as job: SpeechJobType,
+        context normalizationContext: SpeechNormalizationContext? = nil,
         id: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
         await submit(
@@ -495,34 +477,16 @@ public actor WorkerRuntime {
                 id: id,
                 text: text,
                 profileName: profileName,
-                jobType: jobType,
+                jobType: job,
                 normalizationContext: normalizationContext
             )
         )
     }
 
-    @discardableResult
     public func createProfile(
-        profileName: String,
-        text: String,
-        voiceDescription: String,
-        outputPath: String? = nil,
-        id: String = UUID().uuidString
-    ) async -> String {
-        let handle = await createProfileHandle(
-            profileName: profileName,
-            text: text,
-            voiceDescription: voiceDescription,
-            outputPath: outputPath,
-            id: id
-        )
-        return handle.id
-    }
-
-    public func createProfileHandle(
-        profileName: String,
-        text: String,
-        voiceDescription: String,
+        named profileName: String,
+        from text: String,
+        voice voiceDescription: String,
         outputPath: String? = nil,
         id: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
@@ -537,76 +501,34 @@ public actor WorkerRuntime {
         )
     }
 
-    @discardableResult
-    public func listProfiles(id: String = UUID().uuidString) async -> String {
-        let handle = await listProfilesHandle(id: id)
-        return handle.id
-    }
-
-    public func listProfilesHandle(id: String = UUID().uuidString) async -> WorkerRequestHandle {
+    public func profiles(id: String = UUID().uuidString) async -> WorkerRequestHandle {
         await submit(.listProfiles(id: id))
     }
 
-    @discardableResult
     public func removeProfile(
-        profileName: String,
-        id: String = UUID().uuidString
-    ) async -> String {
-        let handle = await removeProfileHandle(profileName: profileName, id: id)
-        return handle.id
-    }
-
-    public func removeProfileHandle(
-        profileName: String,
+        named profileName: String,
         id: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
         await submit(.removeProfile(id: id, profileName: profileName))
     }
 
-    @discardableResult
-    public func listQueue(_ queueType: WorkerQueueType, id requestID: String = UUID().uuidString) async -> String {
-        let handle = await listQueueHandle(queueType, id: requestID)
-        return handle.id
-    }
-
-    public func listQueueHandle(
+    public func queue(
         _ queueType: WorkerQueueType,
         id requestID: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
         await submit(.listQueue(id: requestID, queueType: queueType))
     }
 
-    @discardableResult
-    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> String {
-        let handle = await playbackHandle(action, id: requestID)
-        return handle.id
-    }
-
-    public func playbackHandle(
-        _ action: PlaybackAction,
-        id requestID: String = UUID().uuidString
-    ) async -> WorkerRequestHandle {
+    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
         await submit(.playback(id: requestID, action: action))
     }
 
-    @discardableResult
-    public func clearQueue(id requestID: String = UUID().uuidString) async -> String {
-        let handle = await clearQueueHandle(id: requestID)
-        return handle.id
-    }
-
-    public func clearQueueHandle(id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
+    public func clearQueue(id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
         await submit(.clearQueue(id: requestID))
     }
 
-    @discardableResult
-    public func cancelRequest(with id: String, requestID: String = UUID().uuidString) async -> String {
-        let handle = await cancelRequestHandle(with: id, requestID: requestID)
-        return handle.id
-    }
-
-    public func cancelRequestHandle(
-        with id: String,
+    public func cancelRequest(
+        _ id: String,
         requestID: String = UUID().uuidString
     ) async -> WorkerRequestHandle {
         await submit(.cancelRequest(id: requestID, requestID: id))

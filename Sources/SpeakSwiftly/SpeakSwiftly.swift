@@ -54,7 +54,7 @@ public struct WorkerRequestHandle: Sendable {
 // MARK: - Public Runtime
 
 public enum SpeakSwiftly {
-    public static func makeLiveRuntime() async -> WorkerRuntime {
+    public static func live() async -> WorkerRuntime {
         await WorkerRuntime.live()
     }
 }

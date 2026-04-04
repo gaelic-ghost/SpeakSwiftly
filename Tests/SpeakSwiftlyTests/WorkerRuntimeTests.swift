@@ -234,12 +234,12 @@ import Testing
         }
     })
 
-    let activeID = await runtime.queueSpeech(
+    let activeID = await runtime.speak(
         text: "Hello there",
-        profileName: "default-femme",
+        with: "default-femme",
         as: .live,
         id: "req-1"
-    )
+    ).id
     #expect(activeID == "req-1")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -249,12 +249,12 @@ import Testing
         }
     })
 
-    let backgroundID = await runtime.queueSpeech(
+    let backgroundID = await runtime.speak(
         text: "Hi there",
-        profileName: "default-femme",
+        with: "default-femme",
         as: .live,
         id: "req-2"
-    )
+    ).id
     #expect(backgroundID == "req-2")
 
     #expect(await waitUntil {
@@ -328,9 +328,9 @@ import Testing
         }
     })
 
-    _ = await runtime.queueSpeech(
+    _ = await runtime.speak(
         text: "Hello there",
-        profileName: "default-femme",
+        with: "default-femme",
         as: .live,
         id: "req-fail"
     )
@@ -386,7 +386,7 @@ import Testing
         }
     })
 
-    _ = await runtime.queueSpeech(text: "Hello there", profileName: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -395,7 +395,7 @@ import Testing
         }
     })
 
-    _ = await runtime.queueSpeech(text: "Hi there", profileName: "default-femme", as: .live, id: "req-queued-1")
+    _ = await runtime.speak(text: "Hi there", with: "default-femme", as: .live, id: "req-queued-1")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-queued-1"
@@ -404,7 +404,7 @@ import Testing
         }
     })
 
-    let listID = await runtime.listQueue(.playback, id: "req-list-queue")
+    let listID = await runtime.queue(.playback, id: "req-list-queue").id
     #expect(listID == "req-list-queue")
 
     #expect(await waitUntil {
@@ -452,9 +452,9 @@ import Testing
     })
 
     _ = await runtime.createProfile(
-        profileName: "bright-guide",
-        text: "Hello there",
-        voiceDescription: "Warm and bright",
+        named: "bright-guide",
+        from: "Hello there",
+        voice: "Warm and bright",
         id: "req-active"
     )
     #expect(await waitUntil {
@@ -477,7 +477,7 @@ import Testing
         )
     )
 
-    let clearID = await runtime.clearQueue(id: "req-clear")
+    let clearID = await runtime.clearQueue(id: "req-clear").id
     #expect(clearID == "req-clear")
 
     #expect(await waitUntil {
@@ -558,7 +558,7 @@ import Testing
         }
     }
 
-    let cancelID = await runtime.cancelRequest(with: "req-active", requestID: "req-cancel")
+    let cancelID = await runtime.cancelRequest("req-active", requestID: "req-cancel").id
     #expect(cancelID == "req-cancel")
 
     #expect(await waitUntil {
@@ -611,9 +611,9 @@ import Testing
     })
 
     _ = await runtime.createProfile(
-        profileName: "bright-guide",
-        text: "Hello there",
-        voiceDescription: "Warm and bright",
+        named: "bright-guide",
+        from: "Hello there",
+        voice: "Warm and bright",
         id: "req-active"
     )
     #expect(await waitUntil {
@@ -636,7 +636,7 @@ import Testing
         )
     )
 
-    let cancelID = await runtime.cancelRequest(with: "req-queued", requestID: "req-cancel")
+    let cancelID = await runtime.cancelRequest("req-queued", requestID: "req-cancel").id
     #expect(cancelID == "req-cancel")
 
     #expect(await waitUntil {
@@ -684,12 +684,12 @@ import Testing
     })
 
     let createID = await runtime.createProfile(
-        profileName: "bright-guide",
-        text: "Hello there",
-        voiceDescription: "Warm and bright",
+        named: "bright-guide",
+        from: "Hello there",
+        voice: "Warm and bright",
         outputPath: nil,
         id: "req-create"
-    )
+    ).id
     #expect(createID == "req-create")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -699,7 +699,7 @@ import Testing
         }
     })
 
-    let listID = await runtime.listProfiles(id: "req-list")
+    let listID = await runtime.profiles(id: "req-list").id
     #expect(listID == "req-list")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -715,7 +715,7 @@ import Testing
         }
     })
 
-    let removeID = await runtime.removeProfile(profileName: "bright-guide", id: "req-remove")
+    let removeID = await runtime.removeProfile(named: "bright-guide", id: "req-remove").id
     #expect(removeID == "req-remove")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -818,9 +818,9 @@ import Testing
         }
     })
 
-    _ = await runtime.queueSpeech(
+    _ = await runtime.speak(
         text: "Hello there, galew.",
-        profileName: "default-femme",
+        with: "default-femme",
         as: .live,
         id: "req-generation-params"
     )
@@ -944,7 +944,7 @@ import Testing
         }
     })
 
-    _ = await runtime.queueSpeech(text: "Hello there", profileName: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"

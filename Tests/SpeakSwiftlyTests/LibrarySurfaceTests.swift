@@ -3,39 +3,25 @@ import SpeakSwiftlyCore
 import TextForSpeechCore
 
 @Test func publicLibrarySurfaceConstructsLiveRuntime() async {
-    _ = await SpeakSwiftly.makeLiveRuntime()
+    _ = await SpeakSwiftly.live()
 }
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let queueSpeech: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> String = {
+    let speak: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> WorkerRequestHandle = {
         runtime,
         text,
         profileName,
         normalizationContext,
         id in
-        await runtime.queueSpeech(
+        await runtime.speak(
             text: text,
-            profileName: profileName,
+            with: profileName,
             as: .live,
-            normalizationContext: normalizationContext,
+            context: normalizationContext,
             id: id
         )
     }
-    let queueSpeechHandle: @Sendable (WorkerRuntime, String, String, SpeechNormalizationContext?, String) async -> WorkerRequestHandle = {
-        runtime,
-        text,
-        profileName,
-        normalizationContext,
-        id in
-        await runtime.queueSpeechHandle(
-            text: text,
-            profileName: profileName,
-            as: .live,
-            normalizationContext: normalizationContext,
-            id: id
-        )
-    }
-    let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> String = {
+    let createProfile: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> WorkerRequestHandle = {
         runtime,
         profileName,
         text,
@@ -43,92 +29,47 @@ import TextForSpeechCore
         outputPath,
         id in
         await runtime.createProfile(
-            profileName: profileName,
-            text: text,
-            voiceDescription: voiceDescription,
+            named: profileName,
+            from: text,
+            voice: voiceDescription,
             outputPath: outputPath,
             id: id
         )
     }
-    let createProfileHandle: @Sendable (WorkerRuntime, String, String, String, String?, String) async -> WorkerRequestHandle = {
-        runtime,
-        profileName,
-        text,
-        voiceDescription,
-        outputPath,
-        id in
-        await runtime.createProfileHandle(
-            profileName: profileName,
-            text: text,
-            voiceDescription: voiceDescription,
-            outputPath: outputPath,
-            id: id
-        )
+    let profiles: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
+        await runtime.profiles(id: id)
     }
-    let listProfiles: @Sendable (WorkerRuntime, String) async -> String = { runtime, id in
-        await runtime.listProfiles(id: id)
+    let removeProfile: @Sendable (WorkerRuntime, String, String) async -> WorkerRequestHandle = { runtime, profileName, id in
+        await runtime.removeProfile(named: profileName, id: id)
     }
-    let listProfilesHandle: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
-        await runtime.listProfilesHandle(id: id)
+    let generationQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+        await runtime.queue(.generation)
     }
-    let removeProfile: @Sendable (WorkerRuntime, String, String) async -> String = { runtime, profileName, id in
-        await runtime.removeProfile(profileName: profileName, id: id)
+    let playbackQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
+        await runtime.queue(.playback)
     }
-    let removeProfileHandle: @Sendable (WorkerRuntime, String, String) async -> WorkerRequestHandle = { runtime, profileName, id in
-        await runtime.removeProfileHandle(profileName: profileName, id: id)
-    }
-    let listGenerationQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
-        await runtime.listQueue(.generation)
-    }
-    let listGenerationQueueHandle: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
-        await runtime.listQueueHandle(.generation)
-    }
-    let listPlaybackQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
-        await runtime.listQueue(.playback)
-    }
-    let listPlaybackQueueHandle: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
-        await runtime.listQueueHandle(.playback)
-    }
-    let playbackPause: @Sendable (WorkerRuntime) async -> String = { runtime in
+    let playbackPause: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
         await runtime.playback(.pause)
     }
-    let playbackPauseHandle: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
-        await runtime.playbackHandle(.pause)
-    }
-    let clearQueue: @Sendable (WorkerRuntime) async -> String = { runtime in
+    let clearQueue: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
         await runtime.clearQueue()
     }
-    let clearQueueHandle: @Sendable (WorkerRuntime) async -> WorkerRequestHandle = { runtime in
-        await runtime.clearQueueHandle()
-    }
-    let cancelRequest: @Sendable (WorkerRuntime, String) async -> String = { runtime, id in
-        await runtime.cancelRequest(with: id)
-    }
-    let cancelRequestHandle: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
-        await runtime.cancelRequestHandle(with: id)
+    let cancelRequest: @Sendable (WorkerRuntime, String) async -> WorkerRequestHandle = { runtime, id in
+        await runtime.cancelRequest(id)
     }
     let statusEvents: @Sendable (WorkerRuntime) async -> AsyncStream<WorkerStatusEvent> = { runtime in
         await runtime.statusEvents()
     }
 
-    _ = queueSpeech
-    _ = queueSpeechHandle
+    _ = speak
     _ = createProfile
-    _ = createProfileHandle
-    _ = listProfiles
-    _ = listProfilesHandle
+    _ = profiles
     _ = removeProfile
-    _ = removeProfileHandle
-    _ = listGenerationQueue
-    _ = listGenerationQueueHandle
-    _ = listPlaybackQueue
-    _ = listPlaybackQueueHandle
+    _ = generationQueue
+    _ = playbackQueue
     _ = playbackPause
-    _ = playbackPauseHandle
     _ = clearQueue
-    _ = clearQueueHandle
     _ = cancelRequest
-    _ = cancelRequestHandle
     _ = statusEvents
 }
 

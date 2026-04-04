@@ -6,7 +6,7 @@ import SpeakSwiftlyCore
 @main
 enum SpeakSwiftlyCLI {
     static func main() async {
-        let runtime = await SpeakSwiftly.makeLiveRuntime()
+        let runtime = await SpeakSwiftly.live()
         await runtime.start()
 
         do {
