@@ -4,6 +4,8 @@ import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeechCore
 
+// MARK: - Adaptive Playback Thresholds
+
 @Test func adaptivePlaybackThresholdsSeedFromTextComplexityClasses() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(
@@ -166,6 +168,8 @@ import TextForSpeechCore
     #expect(controller.phase == .steady)
 }
 
+// MARK: - Runtime Playback Integration
+
 @Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
@@ -250,6 +254,8 @@ import TextForSpeechCore
     #expect(playback.prepareCount >= 1)
     #expect(playback.stopCount == 1)
 }
+
+// MARK: - Text Forensics and Normalization
 
 @Test func speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes() {
     let original = """
@@ -344,6 +350,8 @@ import TextForSpeechCore
     #expect(normalized.contains("snake case stuff"))
     #expect(normalized.contains("profile optional chaining sample Rate nil coalescing 24000"))
 }
+
+// MARK: - Playback Failure and Observability
 
 @Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
     let output = OutputRecorder()
@@ -728,6 +736,8 @@ import TextForSpeechCore
     #expect(normalized.contains("optional chaining"))
     #expect(normalized.contains("nil coalescing"))
 }
+
+// MARK: - Sample Shaping
 
 @Test func shapePlaybackSamplesSmoothsBoundaryJumpsAndSanitizesInvalidValues() {
     let shaped = shapePlaybackSamples(

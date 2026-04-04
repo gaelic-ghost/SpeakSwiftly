@@ -4,6 +4,8 @@ import Testing
 
 @Suite(.serialized)
 struct SpeakSwiftlyE2ETests {
+    // MARK: Test Fixtures
+
     private static let testingProfileName = "testing-profile"
     private static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
     private static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
@@ -114,6 +116,8 @@ struct SpeakSwiftlyE2ETests {
 
     Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
     """
+
+    // MARK: Basic End-to-End Paths
 
     @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
         guard Self.isE2EEnabled else { return }
@@ -228,6 +232,8 @@ struct SpeakSwiftlyE2ETests {
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))
     }
+
+    // MARK: Audible Playback and Tracing
 
     @Test func speakLiveRunsEndToEndWithStoredProfileAndRealPlaybackPath() async throws {
         guard Self.isE2EEnabled else { return }
@@ -408,6 +414,8 @@ struct SpeakSwiftlyE2ETests {
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))
     }
+
+    // MARK: Forensic Playback Probes
 
     @Test func forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest() async throws {
         guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }

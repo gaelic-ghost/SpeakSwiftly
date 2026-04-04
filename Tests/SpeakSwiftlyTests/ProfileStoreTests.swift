@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
 
+// MARK: - Profile Lifecycle
+
 @Test func createsListsLoadsAndRemovesProfiles() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
@@ -62,6 +64,8 @@ import Testing
     }
 }
 
+// MARK: - Audio Export
+
 @Test func exportsCanonicalAudioWithoutOverwritingExistingFiles() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
@@ -87,6 +91,8 @@ import Testing
         try store.exportCanonicalAudio(for: stored, to: exportURL.path)
     }
 }
+
+// MARK: - Listing and Validation
 
 @Test func listsProfilesInSortedOrder() throws {
     let fileManager = FileManager.default

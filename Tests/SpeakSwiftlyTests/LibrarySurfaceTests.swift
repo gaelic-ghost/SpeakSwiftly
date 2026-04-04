@@ -2,9 +2,13 @@ import Testing
 import SpeakSwiftlyCore
 import TextForSpeechCore
 
+// MARK: - Runtime Construction
+
 @Test func publicLibrarySurfaceConstructsLiveRuntime() async {
     _ = await SpeakSwiftly.live()
 }
+
+// MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
     let speak: @Sendable (SpeakSwiftly.Runtime, String, String, SpeechNormalizationContext?, String) async -> SpeakSwiftly.RequestHandle = {
@@ -72,6 +76,8 @@ import TextForSpeechCore
     _ = cancelRequest
     _ = statusEvents
 }
+
+// MARK: - Handle Metadata
 
 @Test func publicWorkerRequestHandleExposesStableMetadata() {
     let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation

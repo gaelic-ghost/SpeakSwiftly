@@ -1,6 +1,8 @@
 import Testing
 import TextForSpeechCore
 
+// MARK: - Runtime Snapshots
+
 @Test func textForSpeechRuntimeReturnsStableSnapshotsForLaterJobs() {
     let initialProfile = TextNormalizationProfile(
         id: "default",
@@ -28,6 +30,8 @@ import TextForSpeechCore
     #expect(secondSnapshot.name == "Updated")
     #expect(secondSnapshot.replacements.first?.replacement == "baz")
 }
+
+// MARK: - Profile Replacement Filtering
 
 @Test func textForSpeechProfileFiltersReplacementsByPhaseAndKind() {
     let profile = TextNormalizationProfile(

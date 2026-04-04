@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
 
+// MARK: - Queueing and Preload
+
 @Test func requestsQueuedDuringPreloadEmitWaitingStatusThenProcess() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
@@ -202,6 +204,8 @@ import Testing
     await profileGate.open()
 }
 
+// MARK: - Live Playback Queueing
+
 @Test func speakLiveBackgroundAcknowledgesQueueBeforePlaybackStartsAndOnlySucceedsOnce() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
@@ -353,6 +357,8 @@ import Testing
             && $0["ok"] as? Bool == true
     } == 1)
 }
+
+// MARK: - Control Operations and Typed Surface
 
 @Test func listQueueReturnsActiveAndQueuedRequestsWithoutWaitingForActivePlayback() async throws {
     let output = OutputRecorder()
@@ -1153,6 +1159,8 @@ import Testing
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_profile", "req-2:queue_speech_live", "req-3:list_profiles"])
 }
+
+// MARK: - Shutdown Behavior
 
 @Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
     let output = OutputRecorder()

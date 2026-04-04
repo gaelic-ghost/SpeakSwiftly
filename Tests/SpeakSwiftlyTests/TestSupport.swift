@@ -4,6 +4,8 @@ import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
 
+// MARK: - Locking Helpers
+
 private extension NSLock {
     func withLock<T>(_ body: () throws -> T) rethrows -> T {
         lock()
@@ -11,6 +13,8 @@ private extension NSLock {
         return try body()
     }
 }
+
+// MARK: - Output Capture
 
 final class OutputRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -95,6 +99,8 @@ final class OutputRecorder: @unchecked Sendable {
     }
 }
 
+// MARK: - Async Coordination
+
 actor AsyncGate {
     private var continuation: CheckedContinuation<Void, Never>?
     private var isOpen = false
@@ -113,6 +119,8 @@ actor AsyncGate {
         continuation = nil
     }
 }
+
+// MARK: - Playback Spies
 
 final class PlaybackSpy: @unchecked Sendable {
     enum Behavior: Sendable {
@@ -345,6 +353,8 @@ final class PlaybackSpy: @unchecked Sendable {
     }
 }
 
+// MARK: - Model Recorders
+
 final class ResidentModelRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private(set) var lastText: String?
@@ -373,6 +383,8 @@ final class ResidentModelRecorder: @unchecked Sendable {
         }
     }
 }
+
+// MARK: - Test Model and Runtime Factories
 
 func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
     AnySpeechModel(
@@ -472,6 +484,8 @@ func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
     let data = try JSONEncoder().encode(value)
     return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
+
+// MARK: - Polling Helpers
 
 func waitUntil(
     timeout: Duration = .seconds(1),

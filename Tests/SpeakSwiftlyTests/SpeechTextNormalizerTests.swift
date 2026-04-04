@@ -3,7 +3,11 @@ import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeechCore
 
+// MARK: - Speech Text Normalizer Tests
+
 struct SpeechTextNormalizerTests {
+    // MARK: Markdown and URL Handling
+
     @Test func fencedCodeBlocksBecomeSpokenCodeSamples() {
         let text = """
         Before
@@ -62,6 +66,8 @@ struct SpeechTextNormalizerTests {
 
         #expect(normalized.contains("file colon slash slash tmp slash Thing"))
     }
+
+    // MARK: File Paths and Names
 
     @Test func filePathsBecomeSpokenPaths() {
         let text = "Path: /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift."
@@ -130,6 +136,8 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("gale wumbo"))
     }
 
+    // MARK: Identifier and Code Speech
+
     @Test func dottedIdentifiersBecomeSpokenIdentifiers() {
         let text = "Read NSApplication.didFinishLaunchingNotification once."
 
@@ -179,6 +187,8 @@ struct SpeechTextNormalizerTests {
         #expect(normalized.contains("c h r o m m m a t i c a l l l y"))
         #expect(normalized.contains("q q q w w e e r r t y y"))
     }
+
+    // MARK: End-to-End Normalization
 
     @Test func normalizeRunsSingleFunctionalPipelineAcrossMixedInput() {
         let original = """
