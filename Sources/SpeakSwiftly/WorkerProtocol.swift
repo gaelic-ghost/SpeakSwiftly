@@ -22,7 +22,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     }
 }
 
-public enum WorkerRequest: Sendable, Equatable {
+enum WorkerRequest: Sendable, Equatable {
     case queueSpeech(id: String, text: String, profileName: String, jobType: SpeechJobType)
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
@@ -32,7 +32,7 @@ public enum WorkerRequest: Sendable, Equatable {
     case clearQueue(id: String)
     case cancelRequest(id: String, requestID: String)
 
-    public var id: String {
+    var id: String {
         switch self {
         case .queueSpeech(let id, _, _, _),
              .createProfile(let id, _, _, _, _),
@@ -46,7 +46,7 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public var opName: String {
+    var opName: String {
         switch self {
         case .queueSpeech(_, _, _, .live):
             "queue_speech_live"
@@ -73,7 +73,7 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public var isSpeechRequest: Bool {
+    var isSpeechRequest: Bool {
         switch self {
         case .queueSpeech:
             return true
@@ -82,14 +82,14 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public var acknowledgesEnqueueImmediately: Bool {
+    var acknowledgesEnqueueImmediately: Bool {
         if case .queueSpeech = self {
             return true
         }
         return false
     }
 
-    public var isImmediateControlOperation: Bool {
+    var isImmediateControlOperation: Bool {
         switch self {
         case .listQueue, .playback, .clearQueue, .cancelRequest:
             return true
@@ -98,7 +98,7 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public var profileName: String? {
+    var profileName: String? {
         switch self {
         case .queueSpeech(_, _, let profileName, _),
              .createProfile(_, let profileName, _, _, _),
@@ -109,7 +109,7 @@ public enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    public static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
+    static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
         let data = Data(line.utf8)
         let raw: RawWorkerRequest
 

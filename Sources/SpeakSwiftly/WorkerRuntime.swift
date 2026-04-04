@@ -242,7 +242,7 @@ public actor WorkerRuntime {
         }
     }
 
-    public func submit(_ request: WorkerRequest) async -> WorkerRequestHandle {
+    func submit(_ request: WorkerRequest) async -> WorkerRequestHandle {
         let handle = makeRequestHandle(for: request)
         await submitRequest(request)
         return handle
@@ -464,13 +464,17 @@ public actor WorkerRuntime {
         as jobType: SpeechJobType,
         id: String = UUID().uuidString
     ) async -> String {
-        await submitRequest(
-            id: id,
-            op: WorkerRequest.queueSpeech(id: id, text: text, profileName: profileName, jobType: jobType).opName,
-            text: text,
-            profileName: profileName
-        )
-        return id
+        let handle = await queueSpeechHandle(text: text, profileName: profileName, as: jobType, id: id)
+        return handle.id
+    }
+
+    public func queueSpeechHandle(
+        text: String,
+        profileName: String,
+        as jobType: SpeechJobType,
+        id: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(.queueSpeech(id: id, text: text, profileName: profileName, jobType: jobType))
     }
 
     @discardableResult
@@ -481,24 +485,42 @@ public actor WorkerRuntime {
         outputPath: String? = nil,
         id: String = UUID().uuidString
     ) async -> String {
-        await submitRequest(
-            id: id,
-            op: "create_profile",
-            text: text,
+        let handle = await createProfileHandle(
             profileName: profileName,
+            text: text,
             voiceDescription: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
+            id: id
         )
-        return id
+        return handle.id
+    }
+
+    public func createProfileHandle(
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputPath: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(
+            .createProfile(
+                id: id,
+                profileName: profileName,
+                text: text,
+                voiceDescription: voiceDescription,
+                outputPath: outputPath
+            )
+        )
     }
 
     @discardableResult
     public func listProfiles(id: String = UUID().uuidString) async -> String {
-        await submitRequest(
-            id: id,
-            op: "list_profiles"
-        )
-        return id
+        let handle = await listProfilesHandle(id: id)
+        return handle.id
+    }
+
+    public func listProfilesHandle(id: String = UUID().uuidString) async -> WorkerRequestHandle {
+        await submit(.listProfiles(id: id))
     }
 
     @discardableResult
@@ -506,49 +528,64 @@ public actor WorkerRuntime {
         profileName: String,
         id: String = UUID().uuidString
     ) async -> String {
-        await submitRequest(
-            id: id,
-            op: "remove_profile",
-            profileName: profileName
-        )
-        return id
+        let handle = await removeProfileHandle(profileName: profileName, id: id)
+        return handle.id
+    }
+
+    public func removeProfileHandle(
+        profileName: String,
+        id: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(.removeProfile(id: id, profileName: profileName))
     }
 
     @discardableResult
     public func listQueue(_ queueType: WorkerQueueType, id requestID: String = UUID().uuidString) async -> String {
-        await submitRequest(
-            id: requestID,
-            op: WorkerRequest.listQueue(id: requestID, queueType: queueType).opName
-        )
-        return requestID
+        let handle = await listQueueHandle(queueType, id: requestID)
+        return handle.id
+    }
+
+    public func listQueueHandle(
+        _ queueType: WorkerQueueType,
+        id requestID: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(.listQueue(id: requestID, queueType: queueType))
     }
 
     @discardableResult
     public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> String {
-        await submitRequest(
-            id: requestID,
-            op: WorkerRequest.playback(id: requestID, action: action).opName
-        )
-        return requestID
+        let handle = await playbackHandle(action, id: requestID)
+        return handle.id
+    }
+
+    public func playbackHandle(
+        _ action: PlaybackAction,
+        id requestID: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(.playback(id: requestID, action: action))
     }
 
     @discardableResult
     public func clearQueue(id requestID: String = UUID().uuidString) async -> String {
-        await submitRequest(
-            id: requestID,
-            op: "clear_queue"
-        )
-        return requestID
+        let handle = await clearQueueHandle(id: requestID)
+        return handle.id
+    }
+
+    public func clearQueueHandle(id requestID: String = UUID().uuidString) async -> WorkerRequestHandle {
+        await submit(.clearQueue(id: requestID))
     }
 
     @discardableResult
     public func cancelRequest(with id: String, requestID: String = UUID().uuidString) async -> String {
-        await submitRequest(
-            id: requestID,
-            op: "cancel_request",
-            requestID: id
-        )
-        return requestID
+        let handle = await cancelRequestHandle(with: id, requestID: requestID)
+        return handle.id
+    }
+
+    public func cancelRequestHandle(
+        with id: String,
+        requestID: String = UUID().uuidString
+    ) async -> WorkerRequestHandle {
+        await submit(.cancelRequest(id: requestID, requestID: id))
     }
 
     public func shutdown() async {
@@ -1729,7 +1766,12 @@ public actor WorkerRuntime {
             }
         }
 
-        return WorkerRequestHandle(id: requestID, request: request, events: events)
+        return WorkerRequestHandle(
+            id: requestID,
+            operationName: request.opName,
+            profileName: request.profileName,
+            events: events
+        )
     }
 
     private func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {

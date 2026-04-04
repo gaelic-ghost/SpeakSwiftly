@@ -5,7 +5,7 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
 
-// MARK: - Playback
+// MARK: - Playback Environment
 
 private enum WorkerEnvironment {
     static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
@@ -450,6 +450,8 @@ struct PlaybackThresholdController: Sendable {
     }
 }
 
+// MARK: - Playback Metrics
+
 enum PlaybackMetricsConfiguration {
     static let rebufferThrashWarningCount = 3
     static let rebufferThrashWindowMS = 2_000
@@ -492,6 +494,8 @@ struct RuntimeMemorySnapshot: Sendable {
     let mlxCacheLimitBytes: Int?
     let mlxMemoryLimitBytes: Int?
 }
+
+// MARK: - Type-Erased Playback Controller
 
 final class AnyPlaybackController: @unchecked Sendable {
     private let prepareImpl: @Sendable (_ sampleRate: Double) async throws -> Bool
@@ -753,8 +757,12 @@ final class AnyPlaybackController: @unchecked Sendable {
     }
 }
 
+// MARK: - AVFoundation Playback Controller
+
 @MainActor
 final class PlaybackController {
+    // MARK: - Request State
+
     @MainActor
     private final class RequestPlaybackState {
         let requestID: UInt64
@@ -836,6 +844,8 @@ final class PlaybackController {
     private var lastObservedOutputDeviceDescription: String?
     private var playbackState: PlaybackState = .idle
     private var isPlaybackPausedManually = false
+
+    // MARK: - Lifecycle
 
     init(traceEnabled: Bool = false) {
         self.traceEnabled = traceEnabled
@@ -1375,6 +1385,8 @@ final class PlaybackController {
         playbackState
     }
 
+    // MARK: - Drain Handling
+
     private func waitForPlaybackDrain(
         state: RequestPlaybackState,
         sampleRate: Double
@@ -1448,6 +1460,8 @@ final class PlaybackController {
         }
     }
 
+    // MARK: - Engine Management
+
     private func rebuildEngine(sampleRate: Double) throws {
         stop()
 
@@ -1482,6 +1496,8 @@ final class PlaybackController {
         playerNode?.reset()
         playerNode?.play()
     }
+
+    // MARK: - System Observers
 
     private func installEngineConfigurationObserver() {
         engineConfigurationObserver = NotificationCenter.default.addObserver(
@@ -1545,6 +1561,8 @@ final class PlaybackController {
         )
     }
 
+    // MARK: - Interruption Handling
+
     private func interruptActivePlayback(with error: WorkerError) {
         guard activeRequestState != nil else { return }
         guard activeRuntimeFailure == nil else { return }
@@ -1560,6 +1578,8 @@ final class PlaybackController {
             throw activeRuntimeFailure
         }
     }
+
+    // MARK: - Device Inspection
 
     private func currentDefaultOutputDeviceDescription() -> String? {
         var deviceID = AudioObjectID(kAudioObjectUnknown)
@@ -1607,6 +1627,8 @@ final class PlaybackController {
 
         return "AudioObjectID \(deviceID)"
     }
+
+    // MARK: - Buffer Preparation
 
     private func makePCMBuffer(
         from samples: [Float],
@@ -1666,6 +1688,8 @@ final class PlaybackController {
         )
     }
 }
+
+// MARK: - Sample Shaping
 
 func shapePlaybackSamples(
     _ samples: [Float],

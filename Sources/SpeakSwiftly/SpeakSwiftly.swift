@@ -33,16 +33,19 @@ public enum WorkerRequestStreamEvent: Sendable, Equatable {
 
 public struct WorkerRequestHandle: Sendable {
     public let id: String
-    public let request: WorkerRequest
+    public let operationName: String
+    public let profileName: String?
     public let events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
 
     init(
         id: String,
-        request: WorkerRequest,
+        operationName: String,
+        profileName: String?,
         events: AsyncThrowingStream<WorkerRequestStreamEvent, Error>
     ) {
         self.id = id
-        self.request = request
+        self.operationName = operationName
+        self.profileName = profileName
         self.events = events
     }
 }
