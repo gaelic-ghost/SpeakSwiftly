@@ -9,6 +9,9 @@ struct SpeakSwiftlyE2ETests {
     private static let testingProfileName = "testing-profile"
     private static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
     private static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
+    private static let testingCloneSourceText = """
+    This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.
+    """
     private static let testingPlaybackText = """
     Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
     """
@@ -117,248 +120,201 @@ struct SpeakSwiftlyE2ETests {
     Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
     """
 
-    // MARK: Basic End-to-End Paths
+    // MARK: Sequential End-to-End Workflows
 
-    @Test func createProfileRunsEndToEndWithRealModelPaths() async throws {
+    @Test func voiceDesignLaneRunsSequentialSilentAndAudibleCoverage() async throws {
         guard Self.isE2EEnabled else { return }
 
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
+        let profileName = "voice-design-profile"
 
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: true
-        )
-        defer { Task { await worker.stop() } }
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true
+            )
+            defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await Self.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-voice-design",
+                profileName: profileName,
+                text: Self.testingProfileText,
+                voiceDescription: Self.testingProfileVoiceDescription
+            )
+            try await Self.runSilentSpeech(
+                on: worker,
+                id: "req-live-voice-design-silent",
+                text: Self.testingPlaybackText,
+                profileName: profileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
 
-        let exportURL = sandbox.rootURL.appendingPathComponent("exports/profile.wav")
-        try worker.sendJSON(
-            """
-            {"id":"req-create","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)","output_path":"\(exportURL.path)"}
-            """
-        )
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: Self.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "loading_profile_model"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "generating_profile_audio"
-        } != nil)
-
-        let success = try #require(
-            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-                $0["id"] as? String == "req-create"
-                    && $0["ok"] as? Bool == true
-            }
-        )
-
-        #expect(success["profile_name"] as? String == Self.testingProfileName)
-        #expect(success["profile_path"] as? String == sandbox.profileRootURL.appendingPathComponent(Self.testingProfileName).path)
-
-        let store = ProfileStore(rootURL: sandbox.profileRootURL)
-        let storedProfile = try store.loadProfile(named: Self.testingProfileName)
-        #expect(storedProfile.manifest.sourceText == Self.testingProfileText)
-        #expect(storedProfile.manifest.voiceDescription == Self.testingProfileVoiceDescription)
-        #expect(FileManager.default.fileExists(atPath: storedProfile.referenceAudioURL.path))
-        #expect(FileManager.default.fileExists(atPath: exportURL.path))
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await Self.runAudibleSpeech(
+                on: worker,
+                id: "req-live-voice-design-audible",
+                text: Self.testingPlaybackText,
+                profileName: profileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
     }
 
-    @Test func libraryConsumerExecutableRunsEndToEndWithStoredProfileAndSilentPlayback() async throws {
+    @Test func cloneLaneWithProvidedTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
         guard Self.isE2EEnabled else { return }
 
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
+        let fixtureProfileName = "clone-source-profile"
+        let cloneProfileName = "provided-transcript-clone-profile"
+        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/provided-clone-reference.wav")
 
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: true
-        )
-        defer { Task { await worker.stop() } }
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true
+            )
+            defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await Self.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-clone-fixture",
+                profileName: fixtureProfileName,
+                text: Self.testingCloneSourceText,
+                voiceDescription: Self.testingProfileVoiceDescription,
+                outputURL: referenceAudioURL
+            )
+            #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
 
-        try worker.sendJSON(
-            """
-            {"id":"req-create","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
-        )
+            try await Self.createCloneProfile(
+                on: worker,
+                id: "req-create-clone-provided-transcript",
+                profileName: cloneProfileName,
+                referenceAudioURL: referenceAudioURL,
+                transcript: Self.testingCloneSourceText,
+                expectTranscription: false
+            )
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create"
-                && $0["ok"] as? Bool == true
-        } != nil)
+            let store = ProfileStore(rootURL: sandbox.profileRootURL)
+            let storedProfile = try store.loadProfile(named: cloneProfileName)
+            #expect(storedProfile.manifest.sourceText == Self.testingCloneSourceText)
 
-        try worker.sendJSON(
-            """
-            {"id":"req-live","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
+            try await Self.runSilentSpeech(
+                on: worker,
+                id: "req-live-clone-provided-transcript-silent",
+                text: Self.testingPlaybackText,
+                profileName: cloneProfileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live"
-                && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "buffering_audio"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "playback_finished"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live"
-                && $0["ok"] as? Bool == true
-        } != nil)
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: Self.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
 
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await Self.runAudibleSpeech(
+                on: worker,
+                id: "req-live-clone-provided-transcript-audible",
+                text: Self.testingPlaybackText,
+                profileName: cloneProfileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+    }
+
+    @Test func cloneLaneWithInferredTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
+        guard Self.isE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+        let fixtureProfileName = "inferred-clone-source-profile"
+        let cloneProfileName = "inferred-transcript-clone-profile"
+        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/inferred-clone-reference.wav")
+
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true
+            )
+            defer { Task { await worker.stop() } }
+
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await Self.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-inferred-clone-fixture",
+                profileName: fixtureProfileName,
+                text: Self.testingCloneSourceText,
+                voiceDescription: Self.testingProfileVoiceDescription,
+                outputURL: referenceAudioURL
+            )
+            #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
+
+            try await Self.createCloneProfile(
+                on: worker,
+                id: "req-create-clone-inferred-transcript",
+                profileName: cloneProfileName,
+                referenceAudioURL: referenceAudioURL,
+                transcript: nil,
+                expectTranscription: true
+            )
+
+            let store = ProfileStore(rootURL: sandbox.profileRootURL)
+            let storedProfile = try store.loadProfile(named: cloneProfileName)
+            #expect(!storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            try await Self.runSilentSpeech(
+                on: worker,
+                id: "req-live-clone-inferred-transcript-silent",
+                text: Self.testingPlaybackText,
+                profileName: cloneProfileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        do {
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: Self.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await Self.runAudibleSpeech(
+                on: worker,
+                id: "req-live-clone-inferred-transcript-audible",
+                text: Self.testingPlaybackText,
+                profileName: cloneProfileName
+            )
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
     }
 
     // MARK: Audible Playback and Tracing
-
-    @Test func speakLiveRunsEndToEndWithStoredProfileAndRealPlaybackPath() async throws {
-        guard Self.isE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: false
-        )
-        defer { Task { await worker.stop() } }
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_engine_ready",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["process_phys_footprint_bytes"] as? Int != nil
-                && details["process_resident_bytes"] as? Int != nil
-                && details["mlx_active_memory_bytes"] as? Int != nil
-                && details["mlx_cache_memory_bytes"] as? Int != nil
-                && details["mlx_peak_memory_bytes"] as? Int != nil
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-real","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-real"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-real","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-real"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "buffering_audio"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-real"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_started",
-                $0["request_id"] as? String == "req-live-real",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            let textComplexityClass = details["text_complexity_class"] as? String
-
-            return ["compact", "balanced", "extended"].contains(textComplexityClass)
-                && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
-                && details["startup_buffered_audio_ms"] as? Int != nil
-                && details["process_phys_footprint_bytes"] as? Int != nil
-                && details["process_resident_bytes"] as? Int != nil
-                && details["mlx_active_memory_bytes"] as? Int != nil
-                && details["mlx_cache_memory_bytes"] as? Int != nil
-                && details["mlx_peak_memory_bytes"] as? Int != nil
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-real",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                let textComplexityClass = details["text_complexity_class"] as? String
-
-                return ["compact", "balanced", "extended"].contains(textComplexityClass)
-                    && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
-                    && (details["low_water_target_ms"] as? Int ?? 0) >= 140
-                    && (details["resume_buffer_target_ms"] as? Int ?? 0) >= (details["startup_buffer_target_ms"] as? Int ?? 0)
-                    && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 360
-                    && (details["schedule_gap_warning_threshold_ms"] as? Int ?? 0) >= 140
-                    && details["startup_buffered_audio_ms"] as? Int != nil
-                    && details["min_queued_audio_ms"] as? Int != nil
-                    && details["max_queued_audio_ms"] as? Int != nil
-                    && details["avg_queued_audio_ms"] as? Int != nil
-                    && details["queue_depth_sample_count"] as? Int != nil
-                    && details["schedule_callback_count"] as? Int != nil
-                    && details["played_back_callback_count"] as? Int != nil
-                    && details["fade_in_chunk_count"] as? Int != nil
-                    && details["starvation_event_count"] as? Int != nil
-                    && details["process_phys_footprint_bytes"] as? Int != nil
-                    && details["process_resident_bytes"] as? Int != nil
-                    && details["mlx_active_memory_bytes"] as? Int != nil
-                    && details["mlx_cache_memory_bytes"] as? Int != nil
-                    && details["mlx_peak_memory_bytes"] as? Int != nil
-            }
-        )
-
-        #expect(playbackFinished["event"] as? String == "playback_finished")
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-real"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
 
     @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
         guard Self.isE2EEnabled, Self.isPlaybackTraceEnabled else { return }
@@ -373,20 +329,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-trace","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-trace",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-trace"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -430,20 +380,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-forensic","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-forensic",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-forensic"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -507,20 +451,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-segmented","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-segmented",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-segmented"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -594,20 +532,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-reversed-segmented","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-reversed-segmented",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-reversed-segmented"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -681,20 +613,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-conversational","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-conversational",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-conversational"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -767,20 +693,14 @@ struct SpeakSwiftlyE2ETests {
         )
         defer { Task { await worker.stop() } }
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-create-reversed-conversational","op":"create_profile","profile_name":"\(Self.testingProfileName)","text":"\(Self.testingProfileText)","voice_description":"\(Self.testingProfileVoiceDescription)"}
-            """
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-reversed-conversational",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
         )
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-create-reversed-conversational"
-                && $0["ok"] as? Bool == true
-        } != nil)
 
         try worker.sendJSON(
             """
@@ -838,6 +758,237 @@ struct SpeakSwiftlyE2ETests {
 
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))
+    }
+
+    // MARK: Workflow Helpers
+
+    private static func awaitWorkerReady(
+        _ worker: WorkerProcess,
+        expectPlaybackEngine: Bool
+    ) async throws {
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        } != nil)
+
+        guard expectPlaybackEngine else { return }
+
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_engine_ready",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["process_phys_footprint_bytes"] as? Int != nil
+                && details["process_resident_bytes"] as? Int != nil
+                && details["mlx_active_memory_bytes"] as? Int != nil
+                && details["mlx_cache_memory_bytes"] as? Int != nil
+                && details["mlx_peak_memory_bytes"] as? Int != nil
+        } != nil)
+    }
+
+    private static func createVoiceDesignProfile(
+        on worker: WorkerProcess,
+        id: String,
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        outputURL: URL? = nil
+    ) async throws {
+        if let outputURL {
+            try FileManager.default.createDirectory(
+                at: outputURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+        }
+
+        let outputPathFragment = outputURL.map { #","output_path":"\#($0.path)""# } ?? ""
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"create_profile","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "loading_profile_model"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "generating_profile_audio"
+        } != nil)
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                $0["id"] as? String == id
+                    && $0["ok"] as? Bool == true
+            }
+        )
+
+        #expect(success["profile_name"] as? String == profileName)
+        if let outputURL {
+            #expect(FileManager.default.fileExists(atPath: outputURL.path))
+        }
+    }
+
+    private static func createCloneProfile(
+        on worker: WorkerProcess,
+        id: String,
+        profileName: String,
+        referenceAudioURL: URL,
+        transcript: String?,
+        expectTranscription: Bool
+    ) async throws {
+        let transcriptFragment = transcript.map { #","transcript":"\#($0.jsonEscaped)""# } ?? ""
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"create_clone","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)"\(transcriptFragment)}
+            """
+        )
+
+        if expectTranscription {
+            #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                $0["id"] as? String == id
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "loading_clone_transcription_model"
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                $0["id"] as? String == id
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "transcribing_clone_audio"
+            } != nil)
+        }
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                $0["id"] as? String == id
+                    && $0["ok"] as? Bool == true
+            }
+        )
+
+        #expect(success["profile_name"] as? String == profileName)
+    }
+
+    private static func runSilentSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String
+    ) async throws {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"queue_speech_live","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_live"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+        } != nil)
+    }
+
+    private static func runAudibleSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String
+    ) async throws {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"queue_speech_live","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        } != nil)
+        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["event"] as? String == "playback_started",
+                $0["request_id"] as? String == id,
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            let textComplexityClass = details["text_complexity_class"] as? String
+
+            return ["compact", "balanced", "extended"].contains(textComplexityClass)
+                && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
+                && details["startup_buffered_audio_ms"] as? Int != nil
+                && details["process_phys_footprint_bytes"] as? Int != nil
+                && details["process_resident_bytes"] as? Int != nil
+                && details["mlx_active_memory_bytes"] as? Int != nil
+                && details["mlx_cache_memory_bytes"] as? Int != nil
+                && details["mlx_peak_memory_bytes"] as? Int != nil
+        } != nil)
+
+        let playbackFinished = try #require(
+            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_finished",
+                    $0["request_id"] as? String == id,
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                let textComplexityClass = details["text_complexity_class"] as? String
+
+                return ["compact", "balanced", "extended"].contains(textComplexityClass)
+                    && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
+                    && (details["low_water_target_ms"] as? Int ?? 0) >= 140
+                    && (details["resume_buffer_target_ms"] as? Int ?? 0) >= (details["startup_buffer_target_ms"] as? Int ?? 0)
+                    && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 360
+                    && (details["schedule_gap_warning_threshold_ms"] as? Int ?? 0) >= 140
+                    && details["startup_buffered_audio_ms"] as? Int != nil
+                    && details["min_queued_audio_ms"] as? Int != nil
+                    && details["max_queued_audio_ms"] as? Int != nil
+                    && details["avg_queued_audio_ms"] as? Int != nil
+                    && details["queue_depth_sample_count"] as? Int != nil
+                    && details["schedule_callback_count"] as? Int != nil
+                    && details["played_back_callback_count"] as? Int != nil
+                    && details["fade_in_chunk_count"] as? Int != nil
+                    && details["starvation_event_count"] as? Int != nil
+                    && details["process_phys_footprint_bytes"] as? Int != nil
+                    && details["process_resident_bytes"] as? Int != nil
+                    && details["mlx_active_memory_bytes"] as? Int != nil
+                    && details["mlx_cache_memory_bytes"] as? Int != nil
+                    && details["mlx_peak_memory_bytes"] as? Int != nil
+            }
+        )
+
+        #expect(playbackFinished["event"] as? String == "playback_finished")
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+        } != nil)
     }
 
     private static var e2eTimeout: Duration {
