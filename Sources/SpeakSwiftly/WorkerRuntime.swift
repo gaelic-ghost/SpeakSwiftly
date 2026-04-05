@@ -219,6 +219,8 @@ public extension SpeakSwiftly {
     private var speechJobs = [String: SpeechJobState]()
     private var playbackQueue = [String]()
 
+    // MARK: - Lifecycle
+
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
@@ -492,6 +494,8 @@ public extension SpeakSwiftly {
         await startNextPlaybackIfPossible()
     }
 
+    // MARK: - Speech Requests
+
     public func speak(
         text: String,
         with profileName: String,
@@ -512,6 +516,16 @@ public extension SpeakSwiftly {
         )
     }
 
+    // MARK: - Text Profiles
+
+    public func activeTextProfile() -> TextForSpeech.Profile {
+        textRuntime.customProfile
+    }
+
+    public func baseTextProfile() -> TextForSpeech.Profile {
+        textRuntime.baseProfile
+    }
+
     public func textProfile(named name: String) -> TextForSpeech.Profile? {
         textRuntime.profile(named: name)
     }
@@ -520,7 +534,7 @@ public extension SpeakSwiftly {
         textRuntime.storedProfiles()
     }
 
-    public func textProfileSnapshot(named name: String? = nil) -> TextForSpeech.Profile {
+    public func effectiveTextProfile(named name: String? = nil) -> TextForSpeech.Profile {
         textRuntime.snapshot(named: name)
     }
 
@@ -571,34 +585,60 @@ public extension SpeakSwiftly {
     }
 
     public func addTextReplacement(
-        _ replacement: TextForSpeech.Replacement,
-        toProfileNamed name: String? = nil
+        _ replacement: TextForSpeech.Replacement
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.addReplacement(replacement, toProfileNamed: name)
+        let profile = textRuntime.addReplacement(replacement)
+        try textRuntime.save()
+        return profile
+    }
+
+    public func addTextReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        toStoredTextProfileNamed name: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
+
+    public func replaceTextReplacement(
+        _ replacement: TextForSpeech.Replacement
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.replaceReplacement(replacement)
         try textRuntime.save()
         return profile
     }
 
     public func replaceTextReplacement(
         _ replacement: TextForSpeech.Replacement,
-        inProfileNamed name: String? = nil
+        inStoredTextProfileNamed name: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement, inProfileNamed: name)
+        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
+
+    public func removeTextReplacement(
+        id replacementID: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.removeReplacement(id: replacementID)
         try textRuntime.save()
         return profile
     }
 
     public func removeTextReplacement(
         id replacementID: String,
-        fromProfileNamed name: String? = nil
+        fromStoredTextProfileNamed name: String
     ) throws -> TextForSpeech.Profile {
         let profile = try textRuntime.removeReplacement(
             id: replacementID,
-            fromProfileNamed: name
+            fromStoredProfileNamed: name
         )
         try textRuntime.save()
         return profile
     }
+
+    // MARK: - Voice Profiles
 
     public func createProfile(
         named profileName: String,
@@ -628,6 +668,8 @@ public extension SpeakSwiftly {
     ) async -> RequestHandle {
         await submit(.removeProfile(id: id, profileName: profileName))
     }
+
+    // MARK: - Queue and Playback
 
     public func queue(
         _ queueType: Queue,

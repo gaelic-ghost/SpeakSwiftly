@@ -1,5 +1,20 @@
 # TextForSpeech Split and SpeakSwiftly Integration Plan
 
+## Status
+
+As of `2026-04-05`, the core split described here is functionally complete:
+
+- `TextForSpeech` is the source of truth for text normalization models, runtime state, persistence, and normalization execution.
+- `SpeakSwiftly` depends on `TextForSpeech` by local package path during development.
+- `SpeakSwiftly.Runtime` exposes public text-profile inspection, editing, persistence, and request-time selection APIs.
+- The current always-on base normalization behavior is preserved in `TextForSpeech.Profile.base`.
+
+The remaining work from this plan has shifted from extraction to refinement:
+
+- higher-level editing ergonomics
+- YAML-backed configuration and hot reload
+- additional format-specific normalization growth
+
 ## Goal
 
 Finish the `TextForSpeech` extraction as a real package split instead of leaving it as a half-moved internal subsystem.
@@ -9,7 +24,7 @@ At the end of this work:
 - `TextForSpeech` is the source of truth for text normalization models, runtime state, persistence, and normalization execution.
 - `SpeakSwiftly` depends on `TextForSpeech` as an external package.
 - `SpeakSwiftly` consumers can manage normalization profiles through public `SpeakSwiftly` APIs.
-- speech requests can select a normalization profile and input kind at request time.
+- speech requests can select a normalization profile and text format at request time.
 
 ## Non-negotiable behavior
 
@@ -50,7 +65,7 @@ The simpler path considered first was keeping `TextForSpeech` as a mostly-standa
 `TextForSpeech` should own:
 
 - `TextForSpeech.Context`
-- `TextForSpeech.Kind`
+- `TextForSpeech.Format`
 - `TextForSpeech.Replacement`
 - `TextForSpeech.Profile`
 - `TextForSpeechRuntime`
@@ -162,7 +177,7 @@ The exact names should stay Swifty and value-oriented, but the workflow should s
 - removing a normalization profile
 - resetting to base-only behavior
 - choosing a normalization profile for a speech request
-- choosing an input kind for a speech request
+- choosing a text format for a speech request
 
 The important practical outcome is that a `SpeakSwiftly` consumer can manage normalization without reaching around the runtime and rebuilding internal assumptions themselves.
 
@@ -229,7 +244,7 @@ In `SpeakSwiftly`:
 1. Add public APIs to manage normalization profiles.
 2. Extend speech request APIs so callers can specify:
    - normalization profile ID
-   - input kind
+   - text format
    - context
 3. Extend the worker protocol if needed so the CLI/process boundary can also select profile and kind.
 4. Add integration tests for:

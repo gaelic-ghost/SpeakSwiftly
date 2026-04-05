@@ -34,8 +34,14 @@ import TextForSpeech
     let textProfiles: @Sendable (SpeakSwiftly.Runtime) async -> [TextForSpeech.Profile] = { runtime in
         await runtime.textProfiles()
     }
-    let textProfileSnapshot: @Sendable (SpeakSwiftly.Runtime, String?) async -> TextForSpeech.Profile = { runtime, name in
-        await runtime.textProfileSnapshot(named: name)
+    let activeTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> TextForSpeech.Profile = { runtime in
+        await runtime.activeTextProfile()
+    }
+    let baseTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> TextForSpeech.Profile = { runtime in
+        await runtime.baseTextProfile()
+    }
+    let effectiveTextProfile: @Sendable (SpeakSwiftly.Runtime, String?) async -> TextForSpeech.Profile = { runtime, name in
+        await runtime.effectiveTextProfile(named: name)
     }
     let textProfilePersistenceURL: @Sendable (SpeakSwiftly.Runtime) async -> URL? = { runtime in
         await runtime.textProfilePersistenceURL()
@@ -65,23 +71,38 @@ import TextForSpeech
     let resetTextProfile: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
         try await runtime.resetTextProfile()
     }
-    let addTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String?) async throws -> TextForSpeech.Profile = {
+    let addActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        runtime,
+        replacement in
+        try await runtime.addTextReplacement(replacement)
+    }
+    let addStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
         runtime,
         replacement,
         name in
-        try await runtime.addTextReplacement(replacement, toProfileNamed: name)
+        try await runtime.addTextReplacement(replacement, toStoredTextProfileNamed: name)
     }
-    let replaceTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String?) async throws -> TextForSpeech.Profile = {
+    let replaceActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        runtime,
+        replacement in
+        try await runtime.replaceTextReplacement(replacement)
+    }
+    let replaceStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
         runtime,
         replacement,
         name in
-        try await runtime.replaceTextReplacement(replacement, inProfileNamed: name)
+        try await runtime.replaceTextReplacement(replacement, inStoredTextProfileNamed: name)
     }
-    let removeTextReplacement: @Sendable (SpeakSwiftly.Runtime, String, String?) async throws -> TextForSpeech.Profile = {
+    let removeActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, String) async throws -> TextForSpeech.Profile = {
+        runtime,
+        replacementID in
+        try await runtime.removeTextReplacement(id: replacementID)
+    }
+    let removeStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, String, String) async throws -> TextForSpeech.Profile = {
         runtime,
         replacementID,
         name in
-        try await runtime.removeTextReplacement(id: replacementID, fromProfileNamed: name)
+        try await runtime.removeTextReplacement(id: replacementID, fromStoredTextProfileNamed: name)
     }
     let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
@@ -129,7 +150,9 @@ import TextForSpeech
     _ = removeProfile
     _ = textProfile
     _ = textProfiles
-    _ = textProfileSnapshot
+    _ = activeTextProfile
+    _ = baseTextProfile
+    _ = effectiveTextProfile
     _ = textProfilePersistenceURL
     _ = loadTextProfiles
     _ = saveTextProfiles
@@ -138,9 +161,12 @@ import TextForSpeech
     _ = useTextProfile
     _ = removeTextProfile
     _ = resetTextProfile
-    _ = addTextReplacement
-    _ = replaceTextReplacement
-    _ = removeTextReplacement
+    _ = addActiveTextReplacement
+    _ = addStoredTextReplacement
+    _ = replaceActiveTextReplacement
+    _ = replaceStoredTextReplacement
+    _ = removeActiveTextReplacement
+    _ = removeStoredTextReplacement
     _ = generationQueue
     _ = playbackQueue
     _ = playbackPause

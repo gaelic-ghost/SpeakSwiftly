@@ -8,71 +8,70 @@ This note explains the current `TextForSpeech` model in maintainer terms, with s
 - text replacements
 - slices
 
-The first two are first-class public API today. The third is only partially formalized today and mostly shows up through forensic sectioning in `SpeechTextNormalizer`.
+The first two are now first-class public API in the extracted `TextForSpeech` package and are wired through `SpeakSwiftly.Runtime`. The third is still only partially formalized, but it is no longer hidden entirely inside `SpeakSwiftly`; the public `TextForSpeech` surface now exposes section and section-window forensic data.
 
 ## Normalization profile
 
-A normalization profile is the top-level policy object for text cleanup before speech generation.
+A normalization profile is the reusable custom rule set that rides on top of the always-on base normalizer.
 
-Today that type is [`TextForSpeech.Profile`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L84). It is intentionally small:
+Today that type is `TextForSpeech.Profile`. It stays intentionally small:
 
 - `id`
 - `name`
 - `replacements`
 
-Conceptually, a profile answers the question:
+The important design choice is that a profile is not the whole normalization engine. It does not carry request-local path context, detected format, or runtime-owned persistence state. It answers a narrower question:
 
-> "Given this kind of input, what custom text-shaping rules should run around the built-in normalizer?"
-
-The important design choice here is that the profile does not try to own everything about normalization. It does not currently carry path context, input text, or runtime state. It is just the reusable rule set.
+> "What custom rewrite rules should run around the built-in speech-safe normalizer?"
 
 That keeps the responsibilities clean:
 
-- `TextForSpeech.Context` carries request-specific environment like `cwd` and `repoRoot`.
-- `TextForSpeech.Kind` says what the input is, such as Markdown, plain text, or Swift source.
-- `TextForSpeech.Profile` carries the reusable custom policy.
+- `TextForSpeech.Context` carries request-local environment like `cwd`, `repoRoot`, and optional `format`.
+- `TextForSpeech.Profile` carries the reusable custom replacement policy.
+- `TextForSpeechRuntime` owns the active custom profile, stored named profiles, and persistence.
+- the built-in normalizer remains always on through the base profile and the concrete normalization passes.
 
 So when a normalization job starts, the mental model is:
 
-1. identify the input kind
-2. capture the current profile snapshot
-3. apply the built-in normalizer with that profile and context
+1. choose or detect the input format
+2. snapshot the effective profile for that job
+3. run the built-in normalizer plus the selected custom replacements
 
 ## Text replacements
 
-Text replacements are the actual custom rules inside a profile.
+Text replacements are the custom rules inside a profile.
 
-Today that type is [`TextForSpeech.Replacement`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L45). Each replacement describes:
+Today that type is `TextForSpeech.Replacement`. Each replacement describes:
 
 - what text to match
 - what spoken text to substitute
 - how to match it
 - when to run it
-- which input kinds it applies to
+- which formats it applies to
 - how strongly it should win against other rules
 
 The important fields are:
 
 - `text`
-  This is the source text to look for.
+  The source text to look for.
 - `replacement`
-  This is the spoken form you want after the rule runs.
+  The spoken form you want after the rule runs.
 - `match`
-  Right now this is either exact phrase matching or whole-token matching.
+  Exact phrase matching or whole-token matching.
 - `phase`
-  This is either `beforeNormalization` or `afterNormalization`.
-- `kinds`
-  This scopes a rule to a subset of input kinds.
+  Either `beforeNormalization` or `afterNormalization`.
+- `formats`
+  A format filter for rules that should only apply to some input families.
 - `priority`
   Higher priority wins first within the same phase.
 - `isCaseSensitive`
-  This keeps the caller in control of whether matching should be strict.
+  Whether matching should stay strict.
 
 The simplest way to think about a replacement is:
 
-> "If this specific text shows up in this kind of input, rewrite it to this more speakable form at this point in the pipeline."
+> "If this source text shows up in this kind of input, rewrite it to this more speakable form at this point in the pipeline."
 
-Examples of good replacement use cases:
+Good replacement use cases include:
 
 - project-specific proper nouns
 - acronyms the built-in normalizer says badly
@@ -82,11 +81,11 @@ Examples of good replacement use cases:
 
 ## Replacement phases
 
-The phase split is the part that matters most architecturally.
+The phase split is still the part that matters most architecturally.
 
 `beforeNormalization` means:
 
-- run this rule before the built-in normalizer starts rewriting paths, identifiers, links, and code-ish text
+- run this rule before the built-in normalizer rewrites paths, identifiers, links, and code-ish text
 - use this when you need to protect or rename hard-to-speak source text before the built-ins touch it
 
 `afterNormalization` means:
@@ -94,25 +93,13 @@ The phase split is the part that matters most architecturally.
 - run this rule after the built-in normalizer has already made the text more speakable
 - use this when you want final-pass polish on the spoken output
 
-The reason both phases exist is that these solve different problems.
+That is why the runtime executes phase-aware selections instead of treating replacements as one flat bag of rules.
 
-`beforeNormalization` is for source-shape control.
-Example:
+## Input formats
 
-- convert a product codename or model name into a safer phrase before token splitting or identifier cleanup changes it
+Formats are the coarse input taxonomy.
 
-`afterNormalization` is for spoken-form cleanup.
-Example:
-
-- replace an already-normalized phrase with a more human preferred wording
-
-That is why the current profile API exposes `replacements(for:in:)` instead of one flat replacement list during execution. The runtime needs phase-aware selection, not just a bag of rules.
-
-## Input kinds
-
-Kinds are the coarse input taxonomy.
-
-Today that type is [`TextForSpeech.Kind`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L21), with cases such as:
+Today that type is `TextForSpeech.Format`, with cases such as:
 
 - `plain`
 - `markdown`
@@ -125,199 +112,182 @@ Today that type is [`TextForSpeech.Kind`](https://github.com/gaelic-ghost/SpeakS
 - `cli`
 - `list`
 
-The important behavior is that kinds can match hierarchically. For example, `.source` matches `.swift`, `.python`, and `.rust`.
+The important behavior is that formats can match hierarchically. For example, `.source` matches `.swift`, `.python`, and `.rust`.
 
-That gives profiles a useful middle ground:
+The second important behavior is that format is now optional in `TextForSpeech.Context`. Callers can provide it when they know better, but the package can also detect a likely format when it is omitted.
+
+So the model gives us a useful middle ground:
 
 - one rule can target all source code
 - another rule can target only Swift source
-
-So the model is specific enough to be useful without exploding into dozens of narrowly coupled profile types.
+- a caller can skip format selection entirely and let `TextForSpeech` infer it
 
 ## Runtime ownership
 
-The current in-memory profile holder is [`TextForSpeechRuntime`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L121).
+The runtime-owned profile holder is `TextForSpeechRuntime`.
 
-It is intentionally small:
+It now owns:
 
-- `profile`
-  The currently active profile.
+- `baseProfile`
+  The always-on built-in normalization layer.
+- `customProfile`
+  The active custom profile layered on top of the base profile.
 - `profiles`
-  Stored named profiles.
+  Stored named custom profiles.
+- `persistenceURL`
+  The configured persistence location, when persistence is enabled.
+
+The core runtime operations are:
+
 - `snapshot(named:)`
-  Returns the profile a new job should use.
+- `profile(named:)`
+- `storedProfiles()`
 - `use(_:)`
-  Replaces the active profile.
 - `store(_:)`
-  Adds or updates a named stored profile.
+- `createProfile(id:named:replacements:)`
 - `removeProfile(named:)`
-  Removes a stored profile and resets the active one to default if needed.
+- `addReplacement(_:)`
+- `addReplacement(_:toStoredProfileNamed:)`
+- `replaceReplacement(_:)`
+- `replaceReplacement(_:inStoredProfileNamed:)`
+- `removeReplacement(id:)`
+- `removeReplacement(id:fromStoredProfileNamed:)`
+- `load()`
+- `save()`
+- `restore(_:)`
 
-The important model here is snapshot-per-job.
-
-That means:
+The concurrency model is still snapshot-per-job:
 
 - UI or config reload can change the active profile immediately
 - already-started jobs keep the snapshot they began with
-- later jobs see the updated profile
-
-This is the right concurrency boundary for the near-term use case because it keeps profile mutation out of the middle of active speech work.
+- later jobs see the updated effective profile
 
 ## What a package consumer can do today
 
-Yes, a consumer of this package can use the public `TextForSpeech` profile API today, but there is an important boundary:
+Today a `SpeakSwiftly` consumer can use the text-profile system end to end.
 
-- the `TextForSpeech` profile and runtime types are public
-- the current `SpeakSwiftly.Runtime` speech path does not yet expose or own a public `TextForSpeechRuntime`
-
-So today a consumer can:
+At the `TextForSpeech` layer, a consumer can:
 
 - construct `TextForSpeech.Profile` values
 - construct `TextForSpeech.Replacement` values
-- create a `TextForSpeechRuntime`
-- call `use(_:)`, `store(_:)`, `snapshot(named:)`, and `removeProfile(named:)`
-- choose which profile instance they want to treat as active inside their own code
+- normalize text directly through `TextForSpeech.normalize`
+- manage active and stored profiles through `TextForSpeechRuntime`
+- persist or reload text-profile state through `TextForSpeechRuntime`
 
-But today a consumer cannot yet:
+At the `SpeakSwiftly` layer, a consumer can now:
 
-- inject a `TextForSpeechRuntime` into `SpeakSwiftly.Runtime`
-- tell the `SpeakSwiftly` live speech runtime to use a stored named `TextForSpeech` profile
-- mutate normalization behavior for active `SpeakSwiftly.Runtime` speech requests through a public runtime-owned profile surface
+- inspect `activeTextProfile()`
+- inspect `baseTextProfile()`
+- inspect `textProfile(named:)`
+- inspect `textProfiles()`
+- inspect `effectiveTextProfile(named:)`
+- create and store named text profiles
+- select an active text profile
+- add, replace, and remove text replacements on both the active profile and stored named profiles
+- pass `textProfileName` and `textContext` into `speak(...)`
 
-That is because the current `SpeakSwiftly` runtime still calls the normalizer with the implicit default profile path rather than with a consumer-supplied `TextForSpeechRuntime` snapshot.
-
-So the public API exists, but the end-to-end wiring into the speech runtime is not finished yet.
+So the earlier “public model exists, but the speech runtime does not actually use it” gap is closed now.
 
 ## How profiles and replacements are added today
 
-Profiles are added in a value-oriented way:
+Profiles can still be built as plain value types, but the runtime editing workflow is now first-class.
+
+Value-style setup still works:
 
 1. build a `TextForSpeech.Profile`
 2. put `TextForSpeech.Replacement` values into its `replacements` array
-3. give that profile to a `TextForSpeechRuntime` through `use(_:)` or `store(_:)`
+3. hand that profile to `TextForSpeechRuntime` through `use(_:)` or `store(_:)`
 
-There is not yet a higher-level mutating convenience API such as:
+But the runtime-owned editing path is now available too:
 
-- `appendReplacement(...)`
-- `updateReplacement(...)`
-- `removeReplacement(...)`
+- `createProfile(id:named:replacements:)`
+- `addReplacement(_:)`
+- `addReplacement(_:toStoredProfileNamed:)`
+- `replaceReplacement(_:)`
+- `replaceReplacement(_:inStoredProfileNamed:)`
+- `removeReplacement(id:)`
+- `removeReplacement(id:fromStoredProfileNamed:)`
 
-Those operations are currently done by constructing a new profile value with the desired replacement array and then replacing or storing that profile.
+That means callers no longer have to rebuild whole profile values for every small persisted edit.
 
 ## Default profile behavior
 
-Yes, there is a default profile concept today.
+There are now three profile concepts that matter:
 
-It exists in three ways:
+- `TextForSpeech.Profile.base`
+  The always-on built-in base behavior.
+- `TextForSpeech.Profile.default`
+  The default empty custom profile.
+- `TextForSpeechRuntime.customProfile`
+  The currently active custom profile for that runtime.
 
-- `TextForSpeech.Profile()` defaults to `id: "default"`, `name: "Default"`, and an empty replacement list
-- `TextForSpeech.Profile.default` is a public convenience value
-- `TextForSpeechRuntime` defaults its active profile to `.default`
+The effective profile for a job is:
 
-What does not exist today is a mutable process-wide or package-wide global default profile registry. In other words:
+1. `baseProfile`
+2. merged with the selected stored profile, if one was requested
+3. otherwise merged with `customProfile`
 
-- there is a default profile value
-- there is an active profile on each `TextForSpeechRuntime`
-- there is not yet a public global mechanism to redefine the package's default profile for every consumer automatically
+So the system is intentionally hybrid:
 
-If a caller wants a different effective default, the current way to do that is to create a `TextForSpeechRuntime` and set its active profile with `use(_:)`.
+- the built-in normalization behavior is never accidentally disabled
+- custom profiles extend or override that base behavior
+- the active custom profile still behaves like the editable default layer for a runtime
 
 ## Persistence
 
-No, `TextForSpeech` profiles are not currently persisted to disk by the package.
+Yes, `TextForSpeech` profiles are now persisted by the package when a runtime is configured with a `persistenceURL`.
 
-Today the profile model is:
+Persistence is JSON-backed today through:
 
-- public
-- `Codable`
-- in-memory only
+- `TextForSpeech.PersistedState`
+- `TextForSpeech.PersistenceError`
+- `TextForSpeechRuntime.load()`
+- `TextForSpeechRuntime.save()`
+- `TextForSpeechRuntime.restore(_:)`
 
-That means:
+In `SpeakSwiftly`, the live runtime wires that persistence into the speech-facing text-profile helpers. The adjacent `TextForSpeech` runtime state is loaded on startup and saved after text-profile edits.
 
-- a consumer can serialize and persist profiles themselves if they want
-- the package does not yet provide built-in file IO, YAML loading, hot reload, or profile-database management
-- `TextForSpeechRuntime` stores profiles only in memory for the lifetime of that runtime object
-
-This is separate from `SpeakSwiftly` voice profiles in the speech worker, which are persisted on disk through the voice-profile store. The two concepts are different:
-
-- voice profiles are persisted audio+metadata assets used for speech synthesis
-- text normalization profiles are currently in-memory rule sets used for text shaping
+YAML and hot reload are still future work; the persisted model today is intentionally smaller and package-owned.
 
 ## What “slices” means today
 
-There is not currently a first-class public `slice` type in `TextForSpeechCore`.
+There is still not a first-class public type literally named `Slice`.
 
-What does exist today is a slice-like concept inside [`SpeechTextNormalizer`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/SpeechTextNormalizer.swift):
+But the slice-like structure is no longer private implementation detail either. The public `TextForSpeech` surface now exposes:
 
-- `forensicSections(originalText:)`
-- `forensicSectionWindows(originalText:totalDurationMS:totalChunkCount:)`
+- `TextForSpeech.ForensicFeatures`
+- `TextForSpeech.Section`
+- `TextForSpeech.SectionWindow`
+- `TextForSpeech.sections(originalText:)`
+- `TextForSpeech.sectionWindows(originalText:totalDurationMS:totalChunkCount:)`
 
-Those functions currently split text into meaningful segments for playback forensics and observability. The current sectioning strategy is:
+Those sectioning APIs still behave like the first real draft of a slice system:
 
 1. split by Markdown headers if present
 2. otherwise split by paragraphs
 3. otherwise fall back to one full-request section
 
-So today, a "slice" is best understood as:
+So “slice” is still best understood as a maintainer concept rather than a public product name. But the structural data behind that idea now lives in `TextForSpeech`, not in a private `SpeakSwiftly`-only normalizer.
 
-> "A meaningful segment of the original input that can be named, measured, and mapped onto playback."
+## Practical mental model
 
-The existing section model is not yet part of the public `TextForSpeech` namespace, but it already behaves like the first draft of a slice system.
-
-## What slices would likely become
-
-If we promote slices into the public `TextForSpeech` model later, I think they should become a real normalization primitive rather than staying only forensic metadata.
-
-A likely slice model would answer:
-
-- what segment of text is this
-- what kind of segment is it
-- what context applies inside this segment
-- what profile or replacement subset should apply here
-
-In practice, that could grow into something like:
-
-- Markdown header sections
-- paragraph slices
-- code-block slices
-- list-item slices
-- log-entry slices
-- CLI block slices
-- HTML block slices
-
-The important reason to add slices would not be “more structure for its own sake.” It would unlock real near-term behavior:
-
-- apply different normalization strategies to prose versus code blocks in the same request
-- preserve a stable mapping between playback diagnostics and the source text segment being spoken
-- allow profile rules to target only certain slice kinds later
-- make downstream UI or inspection tools show what part of the text was being spoken when playback struggled
-
-That is a durable building-block change if we do it. It would not just be a forensic helper anymore.
-
-## Current mental model
-
-If you want the simplest maintainers’ summary, use this:
+If you only need one concise model in your head, it should be this:
 
 - `Context`
-  Request-local environment for path shortening and similar context-aware cleanup.
-- `Kind`
-  What broad family of input this is.
-- `Profile`
-  The reusable custom normalization policy for a job.
+  Request-local environment and optional format hint.
+- `Format`
+  The broad input family, either caller-specified or detected.
+- `Profile.base`
+  The always-on built-in normalization layer.
+- `customProfile`
+  The active editable custom layer for a runtime.
+- `profiles`
+  Stored named custom layers.
 - `Replacement`
-  An individual rule inside that profile.
-- `Runtime`
-  The in-memory owner of the current profile state and named profile snapshots.
-- `Sections`, today
-  Slice-like forensic structure that exists in the normalizer but is not yet a public `TextForSpeech` model.
+  One custom rewrite rule inside a profile.
+- `snapshot(named:)`
+  The effective profile captured for one job.
+- `Section` and `SectionWindow`
+  Public forensic structure that already behaves like the first draft of slices.
 
-## What to avoid
-
-Some boundaries are worth preserving as this grows.
-
-- Do not make the profile carry request-specific path context.
-- Do not make replacements own runtime mutation or file watching.
-- Do not blur “current active profile state” with “pure normalization rules.”
-- Do not describe slices as a shipped public API concept until they really are one.
-
-That separation keeps the current model easy to reason about while still leaving room for a real slice system later.
+The thing to avoid conceptually is blurring “always-on base normalization,” “active custom edits,” and “stored named custom profiles” into one flat bucket. The current system is cleaner than that on purpose.

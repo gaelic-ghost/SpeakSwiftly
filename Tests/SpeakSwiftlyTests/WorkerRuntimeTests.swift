@@ -186,8 +186,9 @@ import TextForSpeech
     )
 
     #expect(await secondRuntime.textProfile(named: "logs")?.replacements.map(\.id) == ["logs-rule"])
-    #expect(await secondRuntime.textProfileSnapshot().id == "ops")
-    #expect(await secondRuntime.textProfileSnapshot().replacements.map(\.id) == ["ops-rule"])
+    #expect(await secondRuntime.activeTextProfile().id == "ops")
+    #expect(await secondRuntime.activeTextProfile().replacements.map(\.id) == ["ops-rule"])
+    #expect(await secondRuntime.effectiveTextProfile(named: "logs").replacements.map(\.id) == ["logs-rule"])
 }
 
 @Test func textProfileEditingHelpersMutateAndPersistStoredProfiles() async throws {
@@ -206,17 +207,20 @@ import TextForSpeech
 
     let added = try await runtime.addTextReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
-        toProfileNamed: "logs"
+        toStoredTextProfileNamed: "logs"
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
     let replaced = try await runtime.replaceTextReplacement(
         TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
-        inProfileNamed: "logs"
+        inStoredTextProfileNamed: "logs"
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
 
-    let emptied = try await runtime.removeTextReplacement(id: "stderr-rule", fromProfileNamed: "logs")
+    let emptied = try await runtime.removeTextReplacement(
+        id: "stderr-rule",
+        fromStoredTextProfileNamed: "logs"
+    )
     #expect(emptied.replacements.isEmpty)
 
     let reloaded = try await makeRuntime(
@@ -226,6 +230,39 @@ import TextForSpeech
         residentModelLoader: { makeResidentModel() }
     )
     #expect(await reloaded.textProfile(named: "logs")?.replacements.isEmpty == true)
+}
+
+@Test func activeTextProfileEditingHelpersMutateAndPersistCustomProfile() async throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let runtime = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    let added = try await runtime.addTextReplacement(
+        TextForSpeech.Replacement("stdout", with: "standard output", id: "stdout-rule")
+    )
+    #expect(added.replacements.map(\.id) == ["stdout-rule"])
+
+    let replaced = try await runtime.replaceTextReplacement(
+        TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule")
+    )
+    #expect(replaced.replacements.first?.replacement == "standard out")
+
+    let emptied = try await runtime.removeTextReplacement(id: "stdout-rule")
+    #expect(emptied.replacements.isEmpty)
+
+    let reloaded = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+    #expect(await reloaded.activeTextProfile().replacements.isEmpty)
 }
 
 @Test func waitingRequestsReportPriorityQueuePositions() async throws {

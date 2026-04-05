@@ -37,9 +37,10 @@ let handle = await runtime.speak(
     text: "Hello there.",
     with: "default-femme",
     as: .live,
-    context: TextForSpeech.Context(
-        cwd: URL(fileURLWithPath: "/Users/galew/Workspace/SpeakSwiftly"),
-        repoRoot: URL(fileURLWithPath: "/Users/galew/Workspace/SpeakSwiftly")
+    textProfileName: "logs",
+    textContext: TextForSpeech.Context(
+        cwd: "/Users/galew/Workspace/SpeakSwiftly",
+        repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
     )
 )
 
@@ -47,6 +48,8 @@ for try await event in handle.events {
     print(event)
 }
 ```
+
+Text shaping is part of the typed runtime surface too. `SpeakSwiftly.Runtime` can read the active, base, stored, and effective text profiles, persist changes through the adjacent `TextForSpeech` runtime, and incrementally add, replace, or remove text replacements without rebuilding whole profile values for each small edit.
 
 ### Motivation
 
@@ -108,6 +111,7 @@ Example request shapes:
 
 ```json
 {"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1c","op":"speak_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
 {"id":"req-1b","op":"speak_live_background","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
@@ -155,7 +159,26 @@ The test suite is organized to mirror the source responsibilities:
 - `ModelClientsTests.swift`
 - `SpeakSwiftlyE2ETests.swift`
 
-The package also includes `TextForSpeech` coverage for normalization context, profile primitives, and runtime snapshot behavior.
+The package also includes `TextForSpeech` coverage for normalization context, profile primitives, persistence, and effective-profile behavior.
+
+The current typed text-profile helpers on `SpeakSwiftly.Runtime` are:
+
+- `activeTextProfile()`
+- `baseTextProfile()`
+- `textProfile(named:)`
+- `textProfiles()`
+- `effectiveTextProfile(named:)`
+- `createTextProfile(id:named:replacements:)`
+- `storeTextProfile(_:)`
+- `useTextProfile(_:)`
+- `removeTextProfile(named:)`
+- `resetTextProfile()`
+- `addTextReplacement(_:)`
+- `addTextReplacement(_:toStoredTextProfileNamed:)`
+- `replaceTextReplacement(_:)`
+- `replaceTextReplacement(_:inStoredTextProfileNamed:)`
+- `removeTextReplacement(id:)`
+- `removeTextReplacement(id:fromStoredTextProfileNamed:)`
 
 Current live-playback behavior is:
 
