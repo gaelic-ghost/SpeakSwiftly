@@ -10,10 +10,6 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "TextForSpeech",
-            targets: ["TextForSpeechCore"]
-        ),
-        .library(
             name: "SpeakSwiftlyCore",
             targets: ["SpeakSwiftlyCore"]
         ),
@@ -23,6 +19,7 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(path: "../TextForSpeech"),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
             revision: "2fd41458059e2d80403436167d5263f585d120d4"
@@ -30,13 +27,9 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "TextForSpeechCore",
-            path: "Sources/TextForSpeechCore"
-        ),
-        .target(
             name: "SpeakSwiftlyCore",
             dependencies: [
-                "TextForSpeechCore",
+                .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift")
             ],
@@ -48,7 +41,10 @@ let package = Package(
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
-            dependencies: ["SpeakSwiftlyCore", "TextForSpeechCore"]
+            dependencies: [
+                "SpeakSwiftlyCore",
+                .product(name: "TextForSpeech", package: "TextForSpeech"),
+            ]
         ),
     ]
 )

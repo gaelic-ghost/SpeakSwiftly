@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import MLX
 import Testing
 @testable import SpeakSwiftlyCore
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Adaptive Playback Thresholds
 
@@ -273,8 +273,8 @@ import TextForSpeechCore
     Also say chrommmaticallly and qqqwweerrtyy once.
     """
 
-    let normalized = SpeechTextNormalizer.normalize(original)
-    let features = SpeechTextNormalizer.forensicFeatures(originalText: original, normalizedText: normalized)
+    let normalized = TextForSpeech.normalize(original)
+    let features = TextForSpeech.forensicFeatures(originalText: original, normalizedText: normalized)
 
     #expect(features.originalCharacterCount > 0)
     #expect(features.normalizedCharacterCount > 0)
@@ -313,13 +313,13 @@ import TextForSpeechCore
     End this probe clearly and without looping.
     """
 
-    let sections = SpeechTextNormalizer.forensicSections(originalText: original)
+    let sections = TextForSpeech.sections(originalText: original)
     #expect(sections.map(\.title) == ["Section One", "Section Two", "Section Three", "Footer"])
     #expect(sections.allSatisfy { $0.kind == .markdownHeader })
     #expect(sections.allSatisfy { $0.normalizedCharacterCount > 0 })
     #expect(abs(sections.map(\.normalizedCharacterShare).reduce(0, +) - 1.0) < 0.0001)
 
-    let windows = SpeechTextNormalizer.forensicSectionWindows(
+    let windows = TextForSpeech.sectionWindows(
         originalText: original,
         totalDurationMS: 12_000,
         totalChunkCount: 75
@@ -342,7 +342,7 @@ import TextForSpeechCore
     Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
     """
 
-    let normalized = SpeechTextNormalizer.normalize(original)
+    let normalized = TextForSpeech.normalize(original)
 
     #expect(normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
@@ -735,6 +735,54 @@ import TextForSpeechCore
     #expect(normalized.contains("Code sample."))
     #expect(normalized.contains("optional chaining"))
     #expect(normalized.contains("nil coalescing"))
+}
+
+@Test func speakLiveAppliesStoredTextProfileBeforeResidentGeneration() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel(recorder: residentRecorder) }
+    )
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    await runtime.storeTextProfile(
+        TextForSpeech.Profile(
+            id: "logs",
+            name: "Logs",
+            replacements: [
+                TextForSpeech.Replacement("stderr", with: "standard error"),
+                TextForSpeech.Replacement("snake case stuff", with: "settings token", in: .afterNormalization)
+            ]
+        )
+    )
+    await runtime.start()
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-1","op":"queue_speech_live","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_name":"logs","text_format":"plain_text"}
+        """#
+    )
+
+    #expect(await waitUntil { residentRecorder.lastText != nil })
+
+    let normalized = try #require(residentRecorder.lastText)
+    #expect(normalized.contains("standard error"))
+    #expect(normalized.contains("settings token"))
 }
 
 // MARK: - Sample Shaping

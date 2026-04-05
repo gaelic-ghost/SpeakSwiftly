@@ -1,6 +1,6 @@
 import Testing
 import SpeakSwiftlyCore
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Runtime Construction
 
@@ -11,19 +11,39 @@ import TextForSpeechCore
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, SpeechNormalizationContext?, String) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         text,
         profileName,
-        normalizationContext,
+        textProfileName,
+        textContext,
         id in
         await runtime.speak(
             text: text,
             with: profileName,
             as: .live,
-            context: normalizationContext,
+            textProfileName: textProfileName,
+            textContext: textContext,
             id: id
         )
+    }
+    let textProfile: @Sendable (SpeakSwiftly.Runtime, String) async -> TextForSpeech.Profile? = { runtime, name in
+        await runtime.textProfile(named: name)
+    }
+    let textProfileSnapshot: @Sendable (SpeakSwiftly.Runtime, String?) async -> TextForSpeech.Profile = { runtime, name in
+        await runtime.textProfileSnapshot(named: name)
+    }
+    let storeTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async -> Void = { runtime, profile in
+        await runtime.storeTextProfile(profile)
+    }
+    let useTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async -> Void = { runtime, profile in
+        await runtime.useTextProfile(profile)
+    }
+    let removeTextProfile: @Sendable (SpeakSwiftly.Runtime, String) async -> Void = { runtime, name in
+        await runtime.removeTextProfile(named: name)
+    }
+    let resetTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> Void = { runtime in
+        await runtime.resetTextProfile()
     }
     let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
@@ -69,6 +89,12 @@ import TextForSpeechCore
     _ = createProfile
     _ = profiles
     _ = removeProfile
+    _ = textProfile
+    _ = textProfileSnapshot
+    _ = storeTextProfile
+    _ = useTextProfile
+    _ = removeTextProfile
+    _ = resetTextProfile
     _ = generationQueue
     _ = playbackQueue
     _ = playbackPause

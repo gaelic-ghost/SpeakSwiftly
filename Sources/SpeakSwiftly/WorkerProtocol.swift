@@ -1,5 +1,5 @@
 import Foundation
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Request Envelope
 
@@ -8,8 +8,10 @@ struct RawWorkerRequest: Decodable, Sendable {
     let op: String?
     let text: String?
     let profileName: String?
+    let textProfileName: String?
     let cwd: String?
     let repoRoot: String?
+    let textFormat: TextForSpeech.Format?
     let requestID: String?
     let voiceDescription: String?
     let outputPath: String?
@@ -19,8 +21,10 @@ struct RawWorkerRequest: Decodable, Sendable {
         case op
         case text
         case profileName = "profile_name"
+        case textProfileName = "text_profile_name"
         case cwd
         case repoRoot = "repo_root"
+        case textFormat = "text_format"
         case requestID = "request_id"
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
@@ -32,8 +36,9 @@ enum WorkerRequest: Sendable, Equatable {
         id: String,
         text: String,
         profileName: String,
+        textProfileName: String?,
         jobType: SpeechJobType,
-        normalizationContext: SpeechNormalizationContext?
+        textContext: TextForSpeech.Context?
     )
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case listProfiles(id: String)
@@ -45,7 +50,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var id: String {
         switch self {
-        case .queueSpeech(let id, _, _, _, _),
+        case .queueSpeech(let id, _, _, _, _, _),
              .createProfile(let id, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
@@ -59,7 +64,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var opName: String {
         switch self {
-        case .queueSpeech(_, _, _, .live, _):
+        case .queueSpeech(_, _, _, _, .live, _):
             "queue_speech_live"
         case .createProfile:
             "create_profile"
@@ -111,7 +116,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var profileName: String? {
         switch self {
-        case .queueSpeech(_, _, let profileName, _, _),
+        case .queueSpeech(_, _, let profileName, _, _, _),
              .createProfile(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
@@ -120,10 +125,19 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    var normalizationContext: SpeechNormalizationContext? {
+    var textProfileName: String? {
         switch self {
-        case .queueSpeech(_, _, _, _, let normalizationContext):
-            normalizationContext
+        case .queueSpeech(_, _, _, let textProfileName, _, _):
+            textProfileName
+        case .createProfile, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+            nil
+        }
+    }
+
+    var textContext: TextForSpeech.Context? {
+        switch self {
+        case .queueSpeech(_, _, _, _, _, let textContext):
+            textContext
         case .createProfile, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
@@ -151,16 +165,19 @@ enum WorkerRequest: Sendable, Equatable {
         case "queue_speech_live":
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let normalizationContext = SpeechNormalizationContext(
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            let textContext = TextForSpeech.Context(
                 cwd: raw.cwd,
-                repoRoot: raw.repoRoot
+                repoRoot: raw.repoRoot,
+                format: raw.textFormat
             ).nilIfEmpty
             return .queueSpeech(
                 id: id,
                 text: text,
                 profileName: profileName,
+                textProfileName: textProfileName,
                 jobType: .live,
-                normalizationContext: normalizationContext
+                textContext: textContext
             )
 
         case "create_profile":
@@ -448,8 +465,8 @@ private extension String {
     }
 }
 
-private extension SpeechNormalizationContext {
-    var nilIfEmpty: SpeechNormalizationContext? {
-        cwd == nil && repoRoot == nil ? nil : self
+private extension TextForSpeech.Context {
+    var nilIfEmpty: TextForSpeech.Context? {
+        cwd == nil && repoRoot == nil && format == nil ? nil : self
     }
 }

@@ -1,5 +1,5 @@
 import Foundation
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Public Library Streams
 
@@ -66,6 +66,10 @@ typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent
 typealias WorkerRequestHandle = SpeakSwiftly.RequestHandle
 typealias WorkerRuntime = SpeakSwiftly.Runtime
+typealias SpeechNormalizationContext = TextForSpeech.Context
+typealias SpeechTextForensicFeatures = TextForSpeech.ForensicFeatures
+typealias SpeechTextForensicSection = TextForSpeech.Section
+typealias SpeechTextForensicSectionWindow = TextForSpeech.SectionWindow
 typealias WorkerStatusStage = SpeakSwiftly.StatusStage
 typealias WorkerRequestEventName = SpeakSwiftly.RequestEventName
 typealias WorkerProgressStage = SpeakSwiftly.ProgressStage

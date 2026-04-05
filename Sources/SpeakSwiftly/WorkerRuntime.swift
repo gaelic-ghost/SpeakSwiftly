@@ -1,5 +1,5 @@
 import Foundation
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Worker Runtime
 
@@ -72,7 +72,8 @@ public extension SpeakSwiftly {
         let text: String
         let normalizedText: String
         let profileName: String
-        let normalizationContext: SpeechNormalizationContext?
+        let textProfileName: String?
+        let textContext: TextForSpeech.Context?
         let textFeatures: SpeechTextForensicFeatures
         let textSections: [SpeechTextForensicSection]
         let stream: AsyncThrowingStream<[Float], any Swift.Error>
@@ -87,7 +88,8 @@ public extension SpeakSwiftly {
             text: String,
             normalizedText: String,
             profileName: String,
-            normalizationContext: SpeechNormalizationContext?,
+            textProfileName: String?,
+            textContext: TextForSpeech.Context?,
             textFeatures: SpeechTextForensicFeatures,
             textSections: [SpeechTextForensicSection],
             stream: AsyncThrowingStream<[Float], any Swift.Error>,
@@ -98,7 +100,8 @@ public extension SpeakSwiftly {
             self.text = text
             self.normalizedText = normalizedText
             self.profileName = profileName
-            self.normalizationContext = normalizationContext
+            self.textProfileName = textProfileName
+            self.textContext = textContext
             self.textFeatures = textFeatures
             self.textSections = textSections
             self.stream = stream
@@ -116,8 +119,10 @@ public extension SpeakSwiftly {
         let op: String
         let text: String?
         let profileName: String?
+        let textProfileName: String?
         let cwd: String?
         let repoRoot: String?
+        let textFormat: TextForSpeech.Format?
         let requestID: String?
         let voiceDescription: String?
         let outputPath: String?
@@ -127,8 +132,10 @@ public extension SpeakSwiftly {
             case op
             case text
             case profileName = "profile_name"
+            case textProfileName = "text_profile_name"
             case cwd
             case repoRoot = "repo_root"
+            case textFormat = "text_format"
             case requestID = "request_id"
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
@@ -189,6 +196,7 @@ public extension SpeakSwiftly {
     private let encoder = JSONEncoder()
     private let logEncoder = JSONEncoder()
     private let profileStore: ProfileStore
+    private let textRuntime: TextForSpeechRuntime
     private let playbackController: AnyPlaybackController
     private let generationController = GenerationController()
     private let logTimestampFormatter = ISO8601DateFormatter()
@@ -208,10 +216,12 @@ public extension SpeakSwiftly {
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
+        textRuntime: TextForSpeechRuntime,
         playbackController: AnyPlaybackController
     ) {
         self.dependencies = dependencies
         self.profileStore = profileStore
+        self.textRuntime = textRuntime
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
         logEncoder.outputFormatting = [.sortedKeys]
@@ -227,11 +237,13 @@ public extension SpeakSwiftly {
             ),
             fileManager: dependencies.fileManager
         )
+        let textRuntime = TextForSpeechRuntime()
         let playbackController = await dependencies.makePlaybackController()
 
         return Runtime(
             dependencies: dependencies,
             profileStore: profileStore,
+            textRuntime: textRuntime,
             playbackController: playbackController
         )
     }
@@ -470,7 +482,8 @@ public extension SpeakSwiftly {
         text: String,
         with profileName: String,
         as job: Job,
-        context normalizationContext: SpeechNormalizationContext? = nil,
+        textProfileName: String? = nil,
+        textContext: TextForSpeech.Context? = nil,
         id: String = UUID().uuidString
     ) async -> RequestHandle {
         await submit(
@@ -478,10 +491,35 @@ public extension SpeakSwiftly {
                 id: id,
                 text: text,
                 profileName: profileName,
+                textProfileName: textProfileName,
                 jobType: job,
-                normalizationContext: normalizationContext
+                textContext: textContext
             )
         )
+    }
+
+    public func textProfile(named name: String) -> TextForSpeech.Profile? {
+        textRuntime.profile(named: name)
+    }
+
+    public func textProfileSnapshot(named name: String? = nil) -> TextForSpeech.Profile {
+        textRuntime.snapshot(named: name)
+    }
+
+    public func storeTextProfile(_ profile: TextForSpeech.Profile) {
+        textRuntime.store(profile)
+    }
+
+    public func useTextProfile(_ profile: TextForSpeech.Profile) {
+        textRuntime.use(profile)
+    }
+
+    public func removeTextProfile(named name: String) {
+        textRuntime.removeProfile(named: name)
+    }
+
+    public func resetTextProfile() {
+        textRuntime.reset()
     }
 
     public func createProfile(
@@ -596,7 +634,7 @@ public extension SpeakSwiftly {
             await self.processGeneration(job.request, token: job.token)
         }
         activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
-        if case .queueSpeech(let id, _, _, _, _) = job.request {
+        if case .queueSpeech(let id, _, _, _, _, _) = job.request {
             speechJobs[id]?.generationTask = task
         }
     }
@@ -606,7 +644,7 @@ public extension SpeakSwiftly {
 
         do {
             switch request {
-            case .queueSpeech(let id, let text, let profileName, .live, _):
+            case .queueSpeech(let id, let text, let profileName, _, .live, _):
                 try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                 disposition = .requestStillPendingPlayback(id)
 
@@ -1033,8 +1071,9 @@ public extension SpeakSwiftly {
                 id: requestID,
                 text: speechJob.text,
                 profileName: speechJob.profileName,
+                textProfileName: speechJob.textProfileName,
                 jobType: .live,
-                normalizationContext: speechJob.normalizationContext
+                textContext: speechJob.textContext
             )
             await logError(
                 cancellation.message,
@@ -1062,8 +1101,9 @@ public extension SpeakSwiftly {
                 id: requestID,
                 text: speechJob.text,
                 profileName: speechJob.profileName,
+                textProfileName: speechJob.textProfileName,
                 jobType: .live,
-                normalizationContext: speechJob.normalizationContext
+                textContext: speechJob.textContext
             )
             await completeRequest(request: request, result: .failure(error))
         }
@@ -1321,7 +1361,8 @@ public extension SpeakSwiftly {
         op: String,
         text: String? = nil,
         profileName: String? = nil,
-        normalizationContext: SpeechNormalizationContext? = nil,
+        textProfileName: String? = nil,
+        textContext: TextForSpeech.Context? = nil,
         requestID: String? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil
@@ -1331,8 +1372,10 @@ public extension SpeakSwiftly {
             op: op,
             text: text,
             profileName: profileName,
-            cwd: normalizationContext?.cwd,
-            repoRoot: normalizationContext?.repoRoot,
+            textProfileName: textProfileName,
+            cwd: textContext?.cwd,
+            repoRoot: textContext?.repoRoot,
+            textFormat: textContext?.format,
             requestID: requestID,
             voiceDescription: voiceDescription,
             outputPath: outputPath
@@ -1355,13 +1398,14 @@ public extension SpeakSwiftly {
 
     private func submitRequest(_ request: WorkerRequest) async {
         switch request {
-        case .queueSpeech(let id, let text, let profileName, _, let normalizationContext):
+        case .queueSpeech(let id, let text, let profileName, let textProfileName, _, let textContext):
             await submitRequest(
                 id: id,
                 op: request.opName,
                 text: text,
                 profileName: profileName,
-                normalizationContext: normalizationContext
+                textProfileName: textProfileName,
+                textContext: textContext
             )
         case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
             await submitRequest(
@@ -1391,16 +1435,22 @@ public extension SpeakSwiftly {
         let requestID = request.id
         let op = request.opName
         let text = switch request {
-        case .queueSpeech(_, let text, _, _, _):
+        case .queueSpeech(_, let text, _, _, _, _):
             text
         default:
             ""
         }
         let profileName = request.profileName ?? "unknown-profile"
-        let normalizationContext = request.normalizationContext
-        let normalizedText = SpeechTextNormalizer.normalize(text, context: normalizationContext)
-        let textFeatures = SpeechTextNormalizer.forensicFeatures(originalText: text, normalizedText: normalizedText)
-        let textSections = SpeechTextNormalizer.forensicSections(originalText: text)
+        let textProfileName = request.textProfileName
+        let textContext = request.textContext
+        let textProfile = textRuntime.snapshot(named: textProfileName)
+        let normalizedText = TextForSpeech.normalize(
+            text,
+            context: textContext,
+            profile: textProfile
+        )
+        let textFeatures = TextForSpeech.forensicFeatures(originalText: text, normalizedText: normalizedText)
+        let textSections = TextForSpeech.sections(originalText: text)
         var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
         let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
 
@@ -1410,7 +1460,8 @@ public extension SpeakSwiftly {
             text: text,
             normalizedText: normalizedText,
             profileName: profileName,
-            normalizationContext: normalizationContext,
+            textProfileName: textProfileName,
+            textContext: textContext,
             textFeatures: textFeatures,
             textSections: textSections,
             stream: stream,
@@ -1501,8 +1552,9 @@ public extension SpeakSwiftly {
             id: id,
             text: speechJob.text,
             profileName: speechJob.profileName,
+            textProfileName: speechJob.textProfileName,
             jobType: .live,
-            normalizationContext: speechJob.normalizationContext
+            textContext: speechJob.textContext
         )
         await completeRequest(request: request, result: result)
     }
@@ -1700,7 +1752,7 @@ public extension SpeakSwiftly {
         await logRequestEvent("playback_finished", requestID: id, op: op, profileName: profileName, details: details)
 
         let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
-        let sectionWindows = SpeechTextNormalizer.forensicSectionWindows(
+        let sectionWindows = TextForSpeech.sectionWindows(
             originalText: speechJob.text,
             totalDurationMS: totalDurationMS,
             totalChunkCount: playbackSummary.chunkCount

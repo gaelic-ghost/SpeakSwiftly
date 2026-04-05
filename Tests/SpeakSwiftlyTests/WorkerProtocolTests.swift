@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
-import TextForSpeechCore
+import TextForSpeech
 
 // MARK: - Request Decoding
 
@@ -13,15 +13,16 @@ import TextForSpeechCore
             id: "req-1",
             text: "Hello",
             profileName: "default-femme",
+            textProfileName: nil,
             jobType: .live,
-            normalizationContext: nil
+            textContext: nil
         )
     )
 }
 
-@Test func decodesSpeakLiveRequestWithNormalizationContext() throws {
+@Test func decodesSpeakLiveRequestWithTextContextAndProfile() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#
+        from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#
     )
 
     #expect(
@@ -29,10 +30,12 @@ import TextForSpeechCore
             id: "req-1",
             text: "Hello",
             profileName: "default-femme",
+            textProfileName: "logs",
             jobType: .live,
-            normalizationContext: SpeechNormalizationContext(
+            textContext: TextForSpeech.Context(
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
-                repoRoot: "/Users/galew/Workspace/SpeakSwiftly"
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
+                format: .cli
             )
         )
     )

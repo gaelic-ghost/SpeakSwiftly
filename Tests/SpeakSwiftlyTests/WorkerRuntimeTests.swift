@@ -544,8 +544,9 @@ import Testing
             id: "req-active",
             text: "Hello there",
             profileName: "default-femme",
+            textProfileName: nil,
             jobType: .live,
-            normalizationContext: nil
+            textContext: nil
         )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
@@ -964,8 +965,9 @@ import Testing
             id: "req-stream-bg",
             text: "Hi there",
             profileName: "default-femme",
+            textProfileName: nil,
             jobType: .live,
-            normalizationContext: nil
+            textContext: nil
         )
     )
     var iterator = handle.events.makeAsyncIterator()
@@ -1340,8 +1342,9 @@ import Testing
             id: "req-active-shutdown-stream",
             text: "Hello there",
             profileName: "default-femme",
+            textProfileName: nil,
             jobType: .live,
-            normalizationContext: nil
+            textContext: nil
         )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()

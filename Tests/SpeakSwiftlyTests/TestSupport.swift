@@ -3,6 +3,7 @@ import Foundation
 @preconcurrency import MLXLMCommon
 import Testing
 @testable import SpeakSwiftlyCore
+import TextForSpeech
 
 // MARK: - Locking Helpers
 
@@ -471,6 +472,7 @@ func makeRuntime(
     return WorkerRuntime(
         dependencies: dependencies,
         profileStore: store,
+        textRuntime: TextForSpeechRuntime(),
         playbackController: playbackController
     )
 }
