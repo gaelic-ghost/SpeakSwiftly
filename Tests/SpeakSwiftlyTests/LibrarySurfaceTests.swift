@@ -119,6 +119,19 @@ import TextForSpeech
             id: id
         )
     }
+    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, String?, String) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        profileName,
+        referenceAudioURL,
+        transcript,
+        id in
+        await runtime.createClone(
+            named: profileName,
+            from: referenceAudioURL,
+            transcript: transcript,
+            id: id
+        )
+    }
     let profiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, id in
         await runtime.profiles(id: id)
     }
@@ -146,6 +159,7 @@ import TextForSpeech
 
     _ = speak
     _ = createProfile
+    _ = createClone
     _ = profiles
     _ = removeProfile
     _ = textProfile

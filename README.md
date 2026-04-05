@@ -61,6 +61,7 @@ The first intended runtime shape is:
 - Newline-delimited JSON over `stdin` and `stdout`.
 - A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
+- A second on-demand clone path that imports caller-provided reference audio, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
 - A single-consumer priority queue for incoming requests, with waiting live playback work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
@@ -154,6 +155,7 @@ Current operation families are:
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
 - Queue-and-return live playback via `speak_live_background` for callers that want enqueue acknowledgment instead of waiting for playback completion.
 - On-demand `1.7B` VoiceDesign profile creation.
+- On-demand clone profile creation from caller-provided reference audio, with optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
 - Playback-prioritized request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
@@ -187,6 +189,11 @@ The current typed text-profile helpers on `SpeakSwiftly.Runtime` are:
 - `replaceTextReplacement(_:inStoredTextProfileNamed:)`
 - `removeTextReplacement(id:)`
 - `removeTextReplacement(id:fromStoredTextProfileNamed:)`
+
+The current typed voice-profile creation helpers on `SpeakSwiftly.Runtime` are:
+
+- `createProfile(named:from:voice:outputPath:id:)`
+- `createClone(named:from:transcript:id:)`
 
 Current live-playback behavior is:
 

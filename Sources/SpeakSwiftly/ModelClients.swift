@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import MLX
+import MLXAudioSTT
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 import TextForSpeech
@@ -10,6 +11,14 @@ private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     let model: any SpeechGenerationModel
 
     init(model: any SpeechGenerationModel) {
+        self.model = model
+    }
+}
+
+private final class UnsafeCloneTranscriptionModelBox: @unchecked Sendable {
+    let model: GLMASRModel
+
+    init(model: GLMASRModel) {
         self.model = model
     }
 }
@@ -116,6 +125,50 @@ final class AnySpeechModel: @unchecked Sendable {
     }
 }
 
+final class AnyCloneTranscriptionModel: @unchecked Sendable {
+    private let sampleRateValue: Int
+    private let transcribeImpl: @Sendable (
+        _ audio: [Float],
+        _ generationParameters: STTGenerateParameters
+    ) -> String
+
+    var sampleRate: Int {
+        sampleRateValue
+    }
+
+    init(
+        sampleRate: Int,
+        transcribe: @escaping @Sendable (
+            _ audio: [Float],
+            _ generationParameters: STTGenerateParameters
+        ) -> String
+    ) {
+        sampleRateValue = sampleRate
+        transcribeImpl = transcribe
+    }
+
+    convenience init(model: GLMASRModel) {
+        let box = UnsafeCloneTranscriptionModelBox(model: model)
+
+        self.init(
+            sampleRate: ModelFactory.cloneTranscriptionSampleRate,
+            transcribe: { audio, generationParameters in
+                box.model.generate(
+                    audio: MLXArray(audio),
+                    generationParameters: generationParameters
+                ).text
+            }
+        )
+    }
+
+    func transcribe(
+        audio: [Float],
+        generationParameters: STTGenerateParameters
+    ) -> String {
+        transcribeImpl(audio, generationParameters)
+    }
+}
+
 enum GenerationPolicy {
     private static let residentTemperature: Float = 0.9
     private static let residentTopP: Float = 1.0
@@ -123,6 +176,9 @@ enum GenerationPolicy {
     private static let profileTemperature: Float = 0.9
     private static let profileTopP: Float = 1.0
     private static let profileRepetitionPenalty: Float = 1.05
+    private static let cloneTranscriptionMaxTokens = 256
+    private static let cloneTranscriptionChunkDuration: Float = 120.0
+    private static let cloneTranscriptionMinimumChunkDuration: Float = 1.0
 
     static func residentParameters(for text: String) -> GenerateParameters {
         GenerateParameters(
@@ -142,6 +198,19 @@ enum GenerationPolicy {
         )
     }
 
+    static func cloneTranscriptionParameters() -> STTGenerateParameters {
+        STTGenerateParameters(
+            maxTokens: cloneTranscriptionMaxTokens,
+            temperature: 0.0,
+            topP: 0.95,
+            topK: 0,
+            verbose: false,
+            language: "English",
+            chunkDuration: cloneTranscriptionChunkDuration,
+            minChunkDuration: cloneTranscriptionMinimumChunkDuration
+        )
+    }
+
     private static func residentMaxTokens(for text: String) -> Int {
         let wordCount = max(TextForSpeech.words(in: text).count, 1)
         return min(2_048, max(56, wordCount * 8))
@@ -156,6 +225,11 @@ enum GenerationPolicy {
 enum ModelFactory {
     static let residentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
+    static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
+    static let canonicalProfileSampleRate = 24_000
+    static let cloneTranscriptionSampleRate = 16_000
+    static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
+    static let importedCloneVoiceDescription = "Imported reference audio clone."
 
     static func loadResidentModel() async throws -> AnySpeechModel {
         try await loadModel(modelRepo: residentModelRepo)
@@ -163,6 +237,11 @@ enum ModelFactory {
 
     static func loadProfileModel() async throws -> AnySpeechModel {
         try await loadModel(modelRepo: profileModelRepo)
+    }
+
+    static func loadCloneTranscriptionModel() async throws -> AnyCloneTranscriptionModel {
+        let model = try await GLMASRModel.fromPretrained(cloneTranscriptionModelRepo)
+        return AnyCloneTranscriptionModel(model: model)
     }
 
     private static func loadModel(modelRepo: String) async throws -> AnySpeechModel {

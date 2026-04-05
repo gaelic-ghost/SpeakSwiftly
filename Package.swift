@@ -34,6 +34,7 @@ let package = Package(
             dependencies: [
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift")
             ],
             path: "Sources/SpeakSwiftly"

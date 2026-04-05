@@ -98,10 +98,7 @@ actor GenerationController {
             return false
         }
 
-        if let active,
-           case .createProfile(_, let activeProfileName, _, _, _) = active.request,
-           activeProfileName == profileName
-        {
+        if let active, activeRequestCreatesProfileNamed(active.request, profileName: profileName) {
             return true
         }
 
@@ -110,13 +107,22 @@ actor GenerationController {
                 break
             }
 
-            if case .createProfile(_, let queuedProfileName, _, _, _) = queuedJob.request,
-               queuedProfileName == profileName
-            {
+            if activeRequestCreatesProfileNamed(queuedJob.request, profileName: profileName) {
                 return true
             }
         }
 
         return false
+    }
+
+    private func activeRequestCreatesProfileNamed(_ request: WorkerRequest, profileName: String) -> Bool {
+        switch request {
+        case .createProfile(_, let activeProfileName, _, _, _):
+            return activeProfileName == profileName
+        case .createClone(_, let activeProfileName, _, _):
+            return activeProfileName == profileName
+        default:
+            return false
+        }
     }
 }

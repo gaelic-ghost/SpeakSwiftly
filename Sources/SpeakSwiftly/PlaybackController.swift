@@ -1751,9 +1751,11 @@ struct WorkerDependencies {
     let fileManager: FileManager
     let loadResidentModel: @Sendable () async throws -> AnySpeechModel
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel
+    let loadCloneTranscriptionModel: @Sendable () async throws -> AnyCloneTranscriptionModel
     let makePlaybackController: @MainActor @Sendable () -> AnyPlaybackController
     let writeWAV: @Sendable (_ samples: [Float], _ sampleRate: Int, _ url: URL) throws -> Void
     let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
+    let loadAudioFloats: @Sendable (_ url: URL, _ sampleRate: Int) throws -> [Float]
     let writeStdout: @Sendable (Data) throws -> Void
     let writeStderr: @Sendable (String) -> Void
     let now: @Sendable () -> Date
@@ -1766,6 +1768,7 @@ struct WorkerDependencies {
             fileManager: fileManager,
             loadResidentModel: { try await ModelFactory.loadResidentModel() },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
+            loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
             makePlaybackController: {
                 if environment[WorkerEnvironment.silentPlayback] == "1" {
                     return .silent(traceEnabled: environment[WorkerEnvironment.playbackTrace] == "1")
@@ -1782,6 +1785,7 @@ struct WorkerDependencies {
                 let (_, audio) = try MLXAudioCore.loadAudioArray(from: url, sampleRate: sampleRate)
                 return audio
             },
+            loadAudioFloats: loadFloatAudioSamples,
             writeStdout: { data in
                 try FileHandle.standardOutput.write(contentsOf: data)
             },
@@ -1794,6 +1798,68 @@ struct WorkerDependencies {
             },
             now: Date.init,
             readRuntimeMemory: currentRuntimeMemorySnapshot
+        )
+    }
+}
+
+private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Float] {
+    let audioFile = try AVAudioFile(forReading: url)
+    let format = audioFile.processingFormat
+    let sourceSampleRate = Int(format.sampleRate.rounded())
+    let frameCapacity = max(AVAudioFrameCount(audioFile.length), 1)
+
+    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+        throw WorkerError(
+            code: .filesystemError,
+            message: "SpeakSwiftly could not allocate an audio buffer while reading '\(url.path)'."
+        )
+    }
+
+    try audioFile.read(into: buffer)
+
+    guard let channelData = buffer.floatChannelData else {
+        throw WorkerError(
+            code: .filesystemError,
+            message: "SpeakSwiftly could not access floating-point samples while decoding '\(url.path)'. The file may use an unsupported audio format."
+        )
+    }
+
+    let channelCount = Int(format.channelCount)
+    let frameLength = Int(buffer.frameLength)
+    guard frameLength > 0 else { return [] }
+
+    var mono = [Float](repeating: 0, count: frameLength)
+
+    if channelCount == 1 {
+        mono = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+    } else {
+        let divisor = Float(channelCount)
+        for frameIndex in 0..<frameLength {
+            var sum: Float = 0
+            for channelIndex in 0..<channelCount {
+                sum += channelData[channelIndex][frameIndex]
+            }
+            mono[frameIndex] = sum / divisor
+        }
+    }
+
+    guard sampleRate > 0 else {
+        throw WorkerError(
+            code: .filesystemError,
+            message: "SpeakSwiftly was asked to decode '\(url.path)' with invalid target sample rate \(sampleRate)."
+        )
+    }
+
+    if sourceSampleRate == sampleRate {
+        return mono
+    }
+
+    do {
+        return try resampleAudio(mono, from: sourceSampleRate, to: sampleRate)
+    } catch {
+        throw WorkerError(
+            code: .filesystemError,
+            message: "SpeakSwiftly could not resample '\(url.path)' from \(sourceSampleRate) Hz to \(sampleRate) Hz. \(error.localizedDescription)"
         )
     }
 }

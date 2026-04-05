@@ -132,6 +132,8 @@ public extension SpeakSwiftly {
         let requestID: String?
         let voiceDescription: String?
         let outputPath: String?
+        let referenceAudioPath: String?
+        let transcript: String?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -145,6 +147,8 @@ public extension SpeakSwiftly {
             case requestID = "request_id"
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
+            case referenceAudioPath = "reference_audio_path"
+            case transcript
         }
     }
 
@@ -658,6 +662,22 @@ public extension SpeakSwiftly {
         )
     }
 
+    public func createClone(
+        named profileName: String,
+        from referenceAudioURL: URL,
+        transcript: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> RequestHandle {
+        await submit(
+            .createClone(
+                id: id,
+                profileName: profileName,
+                referenceAudioPath: referenceAudioURL.path,
+                transcript: transcript
+            )
+        )
+    }
+
     public func profiles(id: String = UUID().uuidString) async -> RequestHandle {
         await submit(.listProfiles(id: id))
     }
@@ -784,6 +804,21 @@ public extension SpeakSwiftly {
                     )
                 ))
 
+            case .createClone(let id, let profileName, let referenceAudioPath, let transcript):
+                let storedProfile = try await handleCreateClone(
+                    id: id,
+                    profileName: profileName,
+                    referenceAudioPath: referenceAudioPath,
+                    transcript: transcript
+                )
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        profileName: storedProfile.manifest.profileName,
+                        profilePath: storedProfile.directoryURL.path
+                    )
+                ))
+
             case .listProfiles(let id):
                 let listStartedAt = dependencies.now()
                 let profiles = try profileStore.listProfiles()
@@ -879,6 +914,7 @@ public extension SpeakSwiftly {
 
             case .queueSpeech,
                  .createProfile,
+                 .createClone,
                  .listProfiles,
                  .removeProfile:
                 result = .failure(
@@ -1076,6 +1112,209 @@ public extension SpeakSwiftly {
         }
 
         return storedProfile
+    }
+
+    private func handleCreateClone(
+        id: String,
+        profileName: String,
+        referenceAudioPath: String,
+        transcript: String?
+    ) async throws -> StoredProfile {
+        let op = WorkerRequest.createClone(
+            id: id,
+            profileName: profileName,
+            referenceAudioPath: referenceAudioPath,
+            transcript: transcript
+        ).opName
+        try profileStore.validateProfileName(profileName)
+        let referenceAudioURL = try resolveCloneReferenceAudioURL(referenceAudioPath, requestID: id)
+
+        let sourceAudioLoadStartedAt = dependencies.now()
+        let canonicalAudio = try requireLoadedCloneAudio(
+            from: referenceAudioURL,
+            sampleRate: ModelFactory.canonicalProfileSampleRate,
+            requestID: id,
+            pathLabel: "clone source audio",
+            op: op
+        )
+        await logRequestEvent(
+            "clone_source_audio_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(referenceAudioURL.path),
+                "sample_rate": .int(ModelFactory.canonicalProfileSampleRate),
+                "duration_ms": .int(elapsedMS(since: sourceAudioLoadStartedAt)),
+            ]
+        )
+        try Task.checkCancellation()
+
+        let resolvedTranscript = try await resolvedCloneTranscript(
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            referenceAudioURL: referenceAudioURL,
+            transcript: transcript
+        )
+        try Task.checkCancellation()
+
+        await emitProgress(id: id, stage: .writingProfileAssets)
+        let tempDirectory = dependencies.fileManager.temporaryDirectory
+            .appendingPathComponent("SpeakSwiftly", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
+
+        let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
+        try dependencies.writeWAV(canonicalAudio, ModelFactory.canonicalProfileSampleRate, tempWavURL)
+        let canonicalAudioData = try Data(contentsOf: tempWavURL)
+
+        let profileWriteStartedAt = dependencies.now()
+        let storedProfile = try profileStore.createProfile(
+            profileName: profileName,
+            modelRepo: ModelFactory.importedCloneModelRepo,
+            voiceDescription: ModelFactory.importedCloneVoiceDescription,
+            sourceText: resolvedTranscript,
+            sampleRate: ModelFactory.canonicalProfileSampleRate,
+            canonicalAudioData: canonicalAudioData
+        )
+        await logRequestEvent(
+            "clone_profile_written",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(storedProfile.directoryURL.path),
+                "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
+            ]
+        )
+
+        return storedProfile
+    }
+
+    private func resolvedCloneTranscript(
+        requestID id: String,
+        op: String,
+        profileName: String,
+        referenceAudioURL: URL,
+        transcript: String?
+    ) async throws -> String {
+        if let transcript = transcript?.trimmingCharacters(in: .whitespacesAndNewlines), !transcript.isEmpty {
+            return transcript
+        }
+
+        await emitProgress(id: id, stage: .loadingCloneTranscriptionModel)
+        let modelLoadStartedAt = dependencies.now()
+        var cloneTranscriptionModel: AnyCloneTranscriptionModel? = try await dependencies.loadCloneTranscriptionModel()
+        await logRequestEvent(
+            "clone_transcription_model_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "model_repo": .string(ModelFactory.cloneTranscriptionModelRepo),
+                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
+            ]
+        )
+        defer {
+            cloneTranscriptionModel = nil
+        }
+        try Task.checkCancellation()
+
+        guard let cloneTranscriptionModel else {
+            throw WorkerError(
+                code: .internalError,
+                message: "Clone request '\(id)' lost its transcription model before transcription started. This indicates a SpeakSwiftly runtime bug."
+            )
+        }
+
+        let transcriptionAudioLoadStartedAt = dependencies.now()
+        let transcriptionAudio = try requireLoadedCloneAudio(
+            from: referenceAudioURL,
+            sampleRate: cloneTranscriptionModel.sampleRate,
+            requestID: id,
+            pathLabel: "clone transcription audio",
+            op: op
+        )
+        await logRequestEvent(
+            "clone_transcription_audio_loaded",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "path": .string(referenceAudioURL.path),
+                "sample_rate": .int(cloneTranscriptionModel.sampleRate),
+                "duration_ms": .int(elapsedMS(since: transcriptionAudioLoadStartedAt)),
+            ]
+        )
+
+        await emitProgress(id: id, stage: .transcribingCloneAudio)
+        let transcriptionStartedAt = dependencies.now()
+        let inferredTranscript = cloneTranscriptionModel
+            .transcribe(
+                audio: transcriptionAudio,
+                generationParameters: GenerationPolicy.cloneTranscriptionParameters()
+            )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        await logRequestEvent(
+            "clone_audio_transcribed",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "duration_ms": .int(elapsedMS(since: transcriptionStartedAt)),
+                "character_count": .int(inferredTranscript.count),
+            ]
+        )
+
+        guard !inferredTranscript.isEmpty else {
+            throw WorkerError(
+                code: .modelGenerationFailed,
+                message: "Clone request '\(id)' could not infer a transcript from '\(referenceAudioURL.path)'. Provide 'transcript' explicitly or retry with clearer speech audio."
+            )
+        }
+
+        return inferredTranscript
+    }
+
+    private func resolveCloneReferenceAudioURL(_ referenceAudioPath: String, requestID: String) throws -> URL {
+        let resolvedURL = profileStore.resolveOutputURL(referenceAudioPath)
+
+        guard resolvedURL.isFileURL else {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Clone request '\(requestID)' must reference local audio via a file URL or filesystem path. Received '\(referenceAudioPath)'."
+            )
+        }
+
+        guard dependencies.fileManager.fileExists(atPath: resolvedURL.path) else {
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Clone request '\(requestID)' could not find reference audio at '\(resolvedURL.path)'."
+            )
+        }
+
+        return resolvedURL
+    }
+
+    private func requireLoadedCloneAudio(
+        from url: URL,
+        sampleRate: Int,
+        requestID: String,
+        pathLabel: String,
+        op: String
+    ) throws -> [Float] {
+        let audio = try dependencies.loadAudioFloats(url, sampleRate)
+
+        guard !audio.isEmpty else {
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Request '\(requestID)' could not load \(pathLabel) from '\(url.path)' at sample rate \(sampleRate) for operation '\(op)'. The file may be unreadable, unsupported, or empty."
+            )
+        }
+
+        return audio
     }
 
     private func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {
@@ -1485,7 +1724,9 @@ public extension SpeakSwiftly {
         textContext: TextForSpeech.Context? = nil,
         requestID: String? = nil,
         voiceDescription: String? = nil,
-        outputPath: String? = nil
+        outputPath: String? = nil,
+        referenceAudioPath: String? = nil,
+        transcript: String? = nil
     ) async {
         let request = OutgoingWorkerRequest(
             id: id,
@@ -1498,7 +1739,9 @@ public extension SpeakSwiftly {
             textFormat: textContext?.format,
             requestID: requestID,
             voiceDescription: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
+            referenceAudioPath: referenceAudioPath,
+            transcript: transcript
         )
 
         do {
@@ -1535,6 +1778,14 @@ public extension SpeakSwiftly {
                 profileName: profileName,
                 voiceDescription: voiceDescription,
                 outputPath: outputPath
+            )
+        case .createClone(let id, let profileName, let referenceAudioPath, let transcript):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                profileName: profileName,
+                referenceAudioPath: referenceAudioPath,
+                transcript: transcript
             )
         case .listProfiles(let id):
             await submitRequest(id: id, op: request.opName)

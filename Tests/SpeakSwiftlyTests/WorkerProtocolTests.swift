@@ -57,6 +57,21 @@ import TextForSpeech
     )
 }
 
+@Test func decodesCreateCloneRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","transcript":"Hello from imported audio"}"#
+    )
+
+    #expect(
+        request == .createClone(
+            id: "req-clone",
+            profileName: "ghost-copy",
+            referenceAudioPath: "./voice.m4a",
+            transcript: "Hello from imported audio"
+        )
+    )
+}
+
 @Test func decodesListProfilesRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-3","op":"list_profiles"}"#)
     #expect(request == .listProfiles(id: "req-3"))

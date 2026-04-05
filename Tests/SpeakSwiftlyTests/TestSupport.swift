@@ -429,6 +429,15 @@ func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -
     )
 }
 
+func makeCloneTranscriptionModel(
+    transcript: String = "Inferred transcript from reference audio."
+) -> AnyCloneTranscriptionModel {
+    AnyCloneTranscriptionModel(
+        sampleRate: ModelFactory.cloneTranscriptionSampleRate,
+        transcribe: { _, _ in transcript }
+    )
+}
+
 func makeProfileStore(rootURL: URL) throws -> ProfileStore {
     let store = ProfileStore(rootURL: rootURL, fileManager: .default)
     try store.ensureRootExists()
@@ -441,9 +450,13 @@ func makeRuntime(
     playback: PlaybackSpy,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
+    loadedCloneAudioSamples: [Float] = [],
     residentModelLoader: @escaping @Sendable () async throws -> AnySpeechModel,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
         makeProfileModel()
+    },
+    cloneTranscriptionModelLoader: @escaping @Sendable () async throws -> AnyCloneTranscriptionModel = {
+        makeCloneTranscriptionModel()
     }
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
@@ -456,6 +469,7 @@ func makeRuntime(
         fileManager: .default,
         loadResidentModel: residentModelLoader,
         loadProfileModel: profileModelLoader,
+        loadCloneTranscriptionModel: cloneTranscriptionModelLoader,
         makePlaybackController: { playbackController },
         writeWAV: { samples, _, url in
             let bytes = samples.map(\.bitPattern).flatMap { value in
@@ -466,6 +480,9 @@ func makeRuntime(
         loadAudioSamples: { _, _ in
             audioLoadRecorder?.recordAudioLoad()
             return loadedAudioSamples
+        },
+        loadAudioFloats: { _, _ in
+            loadedCloneAudioSamples
         },
         writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,

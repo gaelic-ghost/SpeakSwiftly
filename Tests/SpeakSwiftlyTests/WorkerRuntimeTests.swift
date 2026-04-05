@@ -850,6 +850,157 @@ import TextForSpeech
     })
 }
 
+@Test func createCloneStoresProvidedTranscriptWithoutTranscription() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+    try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+
+    let referenceAudioURL = storeRoot.appendingPathComponent("reference.wav")
+    try Data([0x01]).write(to: referenceAudioURL, options: .atomic)
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        loadedCloneAudioSamples: [0.1, 0.2, 0.3],
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.createClone(
+        named: "ghost-copy",
+        from: referenceAudioURL,
+        transcript: "Provided transcript",
+        id: "req-clone"
+    ).id
+    #expect(createID == "req-clone")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-clone"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "ghost-copy"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-clone"
+            && $0["stage"] as? String == "transcribing_clone_audio"
+    })
+
+    let storedProfile = try makeProfileStore(rootURL: storeRoot).loadProfile(named: "ghost-copy")
+    #expect(storedProfile.manifest.sourceText == "Provided transcript")
+    #expect(storedProfile.manifest.voiceDescription == ModelFactory.importedCloneVoiceDescription)
+    #expect(storedProfile.manifest.modelRepo == ModelFactory.importedCloneModelRepo)
+}
+
+@Test func createCloneCanInferTranscriptFromReferenceAudio() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+    try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+
+    let referenceAudioURL = storeRoot.appendingPathComponent("reference.wav")
+    try Data([0x01]).write(to: referenceAudioURL, options: .atomic)
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        loadedCloneAudioSamples: [0.4, 0.5, 0.6],
+        residentModelLoader: { makeResidentModel() },
+        cloneTranscriptionModelLoader: {
+            makeCloneTranscriptionModel(transcript: "Inferred transcript")
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.createClone(
+        named: "ghost-copy",
+        from: referenceAudioURL,
+        transcript: nil,
+        id: "req-clone"
+    ).id
+    #expect(createID == "req-clone")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-clone"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "ghost-copy"
+        }
+    })
+    #expect(output.containsJSONObject {
+        $0["id"] as? String == "req-clone"
+            && $0["event"] as? String == "progress"
+            && $0["stage"] as? String == "loading_clone_transcription_model"
+    })
+    #expect(output.containsJSONObject {
+        $0["id"] as? String == "req-clone"
+            && $0["event"] as? String == "progress"
+            && $0["stage"] as? String == "transcribing_clone_audio"
+    })
+
+    let storedProfile = try makeProfileStore(rootURL: storeRoot).loadProfile(named: "ghost-copy")
+    #expect(storedProfile.manifest.sourceText == "Inferred transcript")
+}
+
+@Test func createCloneFailsWhenTranscriptInferenceReturnsNothing() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+    try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+
+    let referenceAudioURL = storeRoot.appendingPathComponent("reference.wav")
+    try Data([0x01]).write(to: referenceAudioURL, options: .atomic)
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        loadedCloneAudioSamples: [0.7, 0.8, 0.9],
+        residentModelLoader: { makeResidentModel() },
+        cloneTranscriptionModelLoader: {
+            makeCloneTranscriptionModel(transcript: "")
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.createClone(
+        named: "ghost-copy",
+        from: referenceAudioURL,
+        transcript: nil,
+        id: "req-clone"
+    ).id
+    #expect(createID == "req-clone")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-clone"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "model_generation_failed"
+        }
+    })
+}
+
 @Test func typedStatusAndRequestStreamsExposeWorkerOutputForLibraryConsumers() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

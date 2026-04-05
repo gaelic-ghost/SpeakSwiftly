@@ -15,6 +15,8 @@ struct RawWorkerRequest: Decodable, Sendable {
     let requestID: String?
     let voiceDescription: String?
     let outputPath: String?
+    let referenceAudioPath: String?
+    let transcript: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -28,6 +30,8 @@ struct RawWorkerRequest: Decodable, Sendable {
         case requestID = "request_id"
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
+        case referenceAudioPath = "reference_audio_path"
+        case transcript
     }
 }
 
@@ -41,6 +45,7 @@ enum WorkerRequest: Sendable, Equatable {
         textContext: TextForSpeech.Context?
     )
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
+    case createClone(id: String, profileName: String, referenceAudioPath: String, transcript: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
     case listQueue(id: String, queueType: WorkerQueueType)
@@ -52,6 +57,7 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(let id, _, _, _, _, _),
              .createProfile(let id, _, _, _, _),
+             .createClone(let id, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
              .listQueue(let id, _),
@@ -68,6 +74,8 @@ enum WorkerRequest: Sendable, Equatable {
             "queue_speech_live"
         case .createProfile:
             "create_profile"
+        case .createClone:
+            "create_clone"
         case .listProfiles:
             "list_profiles"
         case .removeProfile:
@@ -118,6 +126,7 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(_, _, let profileName, _, _, _),
              .createProfile(_, let profileName, _, _, _),
+             .createClone(_, let profileName, _, _),
              .removeProfile(_, let profileName):
             profileName
         case .listProfiles, .listQueue, .playback, .clearQueue, .cancelRequest:
@@ -129,7 +138,7 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(_, _, _, let textProfileName, _, _):
             textProfileName
-        case .createProfile, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
     }
@@ -138,7 +147,7 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(_, _, _, _, _, let textContext):
             textContext
-        case .createProfile, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
     }
@@ -186,6 +195,17 @@ enum WorkerRequest: Sendable, Equatable {
             let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
             let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .createProfile(id: id, profileName: profileName, text: text, voiceDescription: voiceDescription, outputPath: outputPath)
+
+        case "create_clone":
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
+            let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .createClone(
+                id: id,
+                profileName: profileName,
+                referenceAudioPath: referenceAudioPath,
+                transcript: transcript
+            )
 
         case "list_profiles":
             return .listProfiles(id: id)
@@ -252,6 +272,8 @@ public extension SpeakSwiftly {
         case playbackFinished = "playback_finished"
         case loadingProfileModel = "loading_profile_model"
         case generatingProfileAudio = "generating_profile_audio"
+        case loadingCloneTranscriptionModel = "loading_clone_transcription_model"
+        case transcribingCloneAudio = "transcribing_clone_audio"
         case writingProfileAssets = "writing_profile_assets"
         case exportingProfileAudio = "exporting_profile_audio"
         case removingProfile = "removing_profile"
