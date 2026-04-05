@@ -15,25 +15,25 @@ public extension SpeakSwiftly {
         }
     }
 
-    private enum PlaybackConfiguration {
+    enum PlaybackConfiguration {
         // Shorter chunk cadence gives playback a second chunk in reserve before
         // the first one drains, which reduces audible shudder from one-chunk starts.
         static let residentStreamingInterval = 0.18
     }
 
-    private enum ResidentState: Sendable {
+    enum ResidentState: Sendable {
         case warming
         case ready(AnySpeechModel)
         case failed(WorkerError)
     }
 
-    private struct ActiveRequest: Sendable {
+    struct ActiveRequest: Sendable {
         let token: UUID
         let request: WorkerRequest
         let task: Task<Void, Never>
     }
 
-    private struct WorkerSuccessPayload: Sendable {
+    struct WorkerSuccessPayload: Sendable {
         let id: String
         let profileName: String?
         let profilePath: String?
@@ -67,12 +67,12 @@ public extension SpeakSwiftly {
         }
     }
 
-    private enum GenerationCompletionDisposition: Sendable {
+    enum GenerationCompletionDisposition: Sendable {
         case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
         case requestStillPendingPlayback(String)
     }
 
-    private final class SpeechJobState: @unchecked Sendable {
+    final class SpeechJobState: @unchecked Sendable {
         let requestID: String
         let op: String
         let text: String
@@ -115,12 +115,12 @@ public extension SpeakSwiftly {
         }
     }
 
-    private struct ActivePlayback: Sendable {
+    struct ActivePlayback: Sendable {
         let requestID: String
         let task: Task<Void, Never>
     }
 
-    private struct OutgoingWorkerRequest: Encodable {
+    struct OutgoingWorkerRequest: Encodable {
         let id: String
         let op: String
         let text: String?
@@ -152,12 +152,12 @@ public extension SpeakSwiftly {
         }
     }
 
-    private enum LogLevel: String, Encodable {
+    enum LogLevel: String, Encodable {
         case info
         case error
     }
 
-    private enum LogValue: Encodable, Sendable {
+    enum LogValue: Encodable, Sendable {
         case string(String)
         case int(Int)
         case double(Double)
@@ -178,7 +178,7 @@ public extension SpeakSwiftly {
         }
     }
 
-    private struct LogEvent: Encodable {
+    struct LogEvent: Encodable {
         let event: String
         let level: LogLevel
         let ts: String
@@ -202,26 +202,26 @@ public extension SpeakSwiftly {
         }
     }
 
-    private let dependencies: WorkerDependencies
-    private let encoder = JSONEncoder()
-    private let logEncoder = JSONEncoder()
-    private let profileStore: ProfileStore
-    private let textRuntime: TextForSpeechRuntime
-    private let playbackController: AnyPlaybackController
-    private let generationController = GenerationController()
-    private let logTimestampFormatter = ISO8601DateFormatter()
+    let dependencies: WorkerDependencies
+    let encoder = JSONEncoder()
+    let logEncoder = JSONEncoder()
+    let profileStore: ProfileStore
+    let textRuntime: TextForSpeechRuntime
+    let playbackController: AnyPlaybackController
+    let generationController = GenerationController()
+    let logTimestampFormatter = ISO8601DateFormatter()
     private let maxAcceptedSpeechJobs = 8
 
-    private var residentState: ResidentState = .warming
-    private var isShuttingDown = false
-    private var preloadTask: Task<Void, Never>?
-    private var requestAcceptedAt = [String: Date]()
-    private var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
-    private var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
-    private var activeGeneration: ActiveRequest?
-    private var activePlayback: ActivePlayback?
-    private var speechJobs = [String: SpeechJobState]()
-    private var playbackQueue = [String]()
+    var residentState: ResidentState = .warming
+    var isShuttingDown = false
+    var preloadTask: Task<Void, Never>?
+    var requestAcceptedAt = [String: Date]()
+    var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
+    var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
+    var activeGeneration: ActiveRequest?
+    var activePlayback: ActivePlayback?
+    var speechJobs = [String: SpeechJobState]()
+    var playbackQueue = [String]()
 
     // MARK: - Lifecycle
 
@@ -496,251 +496,6 @@ public extension SpeakSwiftly {
         }
         try? await startNextGenerationIfPossible()
         await startNextPlaybackIfPossible()
-    }
-
-    // MARK: - Speech Requests
-
-    public func speak(
-        text: String,
-        with profileName: String,
-        as job: Job,
-        textProfileName: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        id: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(
-            .queueSpeech(
-                id: id,
-                text: text,
-                profileName: profileName,
-                textProfileName: textProfileName,
-                jobType: job,
-                textContext: textContext
-            )
-        )
-    }
-
-    // MARK: - Text Profiles
-
-    public func activeTextProfile() -> TextForSpeech.Profile {
-        textRuntime.customProfile
-    }
-
-    public func baseTextProfile() -> TextForSpeech.Profile {
-        textRuntime.baseProfile
-    }
-
-    public func textProfile(named name: String) -> TextForSpeech.Profile? {
-        textRuntime.profile(named: name)
-    }
-
-    public func textProfiles() -> [TextForSpeech.Profile] {
-        textRuntime.storedProfiles()
-    }
-
-    public func effectiveTextProfile(named name: String? = nil) -> TextForSpeech.Profile {
-        textRuntime.snapshot(named: name)
-    }
-
-    public func textProfilePersistenceURL() -> URL? {
-        textRuntime.persistenceURL
-    }
-
-    public func loadTextProfiles() throws {
-        try textRuntime.load()
-    }
-
-    public func saveTextProfiles() throws {
-        try textRuntime.save()
-    }
-
-    public func createTextProfile(
-        id: String,
-        named name: String,
-        replacements: [TextForSpeech.Replacement] = []
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.createProfile(
-            id: id,
-            named: name,
-            replacements: replacements
-        )
-        try textRuntime.save()
-        return profile
-    }
-
-    public func storeTextProfile(_ profile: TextForSpeech.Profile) throws {
-        textRuntime.store(profile)
-        try textRuntime.save()
-    }
-
-    public func useTextProfile(_ profile: TextForSpeech.Profile) throws {
-        textRuntime.use(profile)
-        try textRuntime.save()
-    }
-
-    public func removeTextProfile(named name: String) throws {
-        textRuntime.removeProfile(named: name)
-        try textRuntime.save()
-    }
-
-    public func resetTextProfile() throws {
-        textRuntime.reset()
-        try textRuntime.save()
-    }
-
-    public func addTextReplacement(
-        _ replacement: TextForSpeech.Replacement
-    ) throws -> TextForSpeech.Profile {
-        let profile = textRuntime.addReplacement(replacement)
-        try textRuntime.save()
-        return profile
-    }
-
-    public func addTextReplacement(
-        _ replacement: TextForSpeech.Replacement,
-        toStoredTextProfileNamed name: String
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: name)
-        try textRuntime.save()
-        return profile
-    }
-
-    public func replaceTextReplacement(
-        _ replacement: TextForSpeech.Replacement
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement)
-        try textRuntime.save()
-        return profile
-    }
-
-    public func replaceTextReplacement(
-        _ replacement: TextForSpeech.Replacement,
-        inStoredTextProfileNamed name: String
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: name)
-        try textRuntime.save()
-        return profile
-    }
-
-    public func removeTextReplacement(
-        id replacementID: String
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.removeReplacement(id: replacementID)
-        try textRuntime.save()
-        return profile
-    }
-
-    public func removeTextReplacement(
-        id replacementID: String,
-        fromStoredTextProfileNamed name: String
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.removeReplacement(
-            id: replacementID,
-            fromStoredProfileNamed: name
-        )
-        try textRuntime.save()
-        return profile
-    }
-
-    // MARK: - Voice Profiles
-
-    public func createProfile(
-        named profileName: String,
-        from text: String,
-        voice voiceDescription: String,
-        outputPath: String? = nil,
-        id: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(
-            .createProfile(
-                id: id,
-                profileName: profileName,
-                text: text,
-                voiceDescription: voiceDescription,
-                outputPath: outputPath
-            )
-        )
-    }
-
-    public func createClone(
-        named profileName: String,
-        from referenceAudioURL: URL,
-        transcript: String? = nil,
-        id: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(
-            .createClone(
-                id: id,
-                profileName: profileName,
-                referenceAudioPath: referenceAudioURL.path,
-                transcript: transcript
-            )
-        )
-    }
-
-    public func profiles(id: String = UUID().uuidString) async -> RequestHandle {
-        await submit(.listProfiles(id: id))
-    }
-
-    public func removeProfile(
-        named profileName: String,
-        id: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(.removeProfile(id: id, profileName: profileName))
-    }
-
-    // MARK: - Queue and Playback
-
-    public func queue(
-        _ queueType: Queue,
-        id requestID: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(.listQueue(id: requestID, queueType: queueType))
-    }
-
-    public func playback(_ action: PlaybackAction, id requestID: String = UUID().uuidString) async -> RequestHandle {
-        await submit(.playback(id: requestID, action: action))
-    }
-
-    public func clearQueue(id requestID: String = UUID().uuidString) async -> RequestHandle {
-        await submit(.clearQueue(id: requestID))
-    }
-
-    public func cancelRequest(
-        _ id: String,
-        requestID: String = UUID().uuidString
-    ) async -> RequestHandle {
-        await submit(.cancelRequest(id: requestID, requestID: id))
-    }
-
-    public func shutdown() async {
-        guard !isShuttingDown else { return }
-
-        isShuttingDown = true
-        preloadTask?.cancel()
-
-        let cancellationError = WorkerError(
-            code: .requestCancelled,
-            message: "The request was cancelled because the SpeakSwiftly worker is shutting down."
-        )
-
-        if let activeGeneration {
-            self.activeGeneration = nil
-            activeGeneration.task.cancel()
-            failRequestStream(for: activeGeneration.request.id, error: cancellationError)
-            requestAcceptedAt.removeValue(forKey: activeGeneration.request.id)
-            await emitFailure(id: activeGeneration.request.id, error: cancellationError)
-        }
-
-        if let activePlayback {
-            self.activePlayback = nil
-            activePlayback.task.cancel()
-        }
-
-        await failQueuedRequests(with: cancellationError)
-        await failWaitingPlaybackRequests(with: cancellationError)
-        await playbackController.stop()
-        await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(await generationQueueDepth())])
     }
 
     // MARK: - Processing
@@ -1317,7 +1072,7 @@ public extension SpeakSwiftly {
         return audio
     }
 
-    private func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {
+    func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {
         [
             "original_character_count": .int(features.originalCharacterCount),
             "normalized_character_count": .int(features.normalizedCharacterCount),
@@ -1338,7 +1093,7 @@ public extension SpeakSwiftly {
         ]
     }
 
-    private func textSectionDetails(_ section: SpeechTextForensicSection) -> [String: LogValue] {
+    func textSectionDetails(_ section: SpeechTextForensicSection) -> [String: LogValue] {
         [
             "section_index": .int(section.index),
             "section_title": .string(section.title),
@@ -1349,7 +1104,7 @@ public extension SpeakSwiftly {
         ]
     }
 
-    private func textSectionWindowDetails(_ window: SpeechTextForensicSectionWindow) -> [String: LogValue] {
+    func textSectionWindowDetails(_ window: SpeechTextForensicSectionWindow) -> [String: LogValue] {
         textSectionDetails(window.section).merging(
             [
                 "estimated_start_ms": .int(window.estimatedStartMS),
@@ -1380,7 +1135,7 @@ public extension SpeakSwiftly {
         }
     }
 
-    private func failQueuedRequests(with error: WorkerError) async {
+    func failQueuedRequests(with error: WorkerError) async {
         let queuedJobs = await generationController.clearQueued()
 
         for job in queuedJobs {
@@ -1445,7 +1200,7 @@ public extension SpeakSwiftly {
         return queuedJobs.count + waitingPlaybackRequestIDs.count
     }
 
-    private func failWaitingPlaybackRequests(with error: WorkerError) async {
+    func failWaitingPlaybackRequests(with error: WorkerError) async {
         let protectedRequestIDs = Set([activeGeneration?.request.id, activePlayback?.requestID].compactMap { $0 })
         let waitingPlaybackRequestIDs = playbackQueue.filter { !protectedRequestIDs.contains($0) }
 
@@ -1556,250 +1311,6 @@ public extension SpeakSwiftly {
     private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
         await completeRequest(request: request, result: result)
-    }
-
-    private func completeRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
-        switch result {
-        case .success(let payload):
-            await logRequestEvent(
-                "request_succeeded",
-                requestID: payload.id,
-                op: nil,
-                profileName: payload.profileName
-            )
-            let success = WorkerSuccessResponse(
-                id: payload.id,
-                profileName: payload.profileName,
-                profilePath: payload.profilePath,
-                profiles: payload.profiles,
-                activeRequest: payload.activeRequest,
-                queue: payload.queue,
-                playbackState: payload.playbackState,
-                clearedCount: payload.clearedCount,
-                cancelledRequestID: payload.cancelledRequestID
-            )
-            yieldRequestEvent(.completed(success), for: request.id)
-            finishRequestStream(for: request.id)
-            if !request.acknowledgesEnqueueImmediately {
-                await emit(success)
-            }
-
-        case .failure(let error):
-            failRequestStream(for: request.id, error: error)
-            await logError(error.message, requestID: request.id, details: ["failure_code": .string(error.code.rawValue)])
-            await emitFailure(id: request.id, error: error)
-        }
-    }
-
-    private func cancellationError(for id: String) -> WorkerError {
-        if isShuttingDown {
-            return WorkerError(
-                code: .requestCancelled,
-                message: "Request '\(id)' was cancelled because the SpeakSwiftly worker is shutting down."
-            )
-        }
-
-        return WorkerError(
-            code: .requestCancelled,
-            message: "Request '\(id)' was cancelled before it could complete."
-        )
-    }
-
-    // MARK: - Emission
-
-    private func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
-        let reason: WorkerQueuedReason
-        switch residentState {
-        case .warming:
-            reason = .waitingForResidentModel
-        case .failed:
-            return nil
-        case .ready:
-            guard await generationController.activeJob() != nil else { return nil }
-            reason = .waitingForActiveRequest
-        }
-
-        let queuePosition = await generationController.waitingPosition(
-            for: job.token,
-            residentReady: isResidentReady
-        ) ?? 1
-        return WorkerQueuedEvent(id: job.request.id, reason: reason, queuePosition: queuePosition)
-    }
-
-    private var isResidentReady: Bool {
-        if case .ready = residentState {
-            return true
-        }
-        return false
-    }
-
-    private func generationActiveRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let activeGeneration else { return nil }
-        return ActiveWorkerRequestSummary(
-            id: activeGeneration.request.id,
-            op: activeGeneration.request.opName,
-            profileName: activeGeneration.request.profileName
-        )
-    }
-
-    private func playbackActiveRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let requestID = activePlayback?.requestID, let speechJob = speechJobs[requestID] else { return nil }
-        return ActiveWorkerRequestSummary(id: requestID, op: speechJob.op, profileName: speechJob.profileName)
-    }
-
-    private func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
-        switch queueType {
-        case .generation:
-            let jobs = await generationController.queuedJobsOrdered()
-            return jobs.enumerated().map { offset, job in
-                QueuedWorkerRequestSummary(
-                    id: job.request.id,
-                    op: job.request.opName,
-                    profileName: job.request.profileName,
-                    queuePosition: offset + 1
-                )
-            }
-        case .playback:
-            let waitingPlaybackQueue = playbackQueue.filter { $0 != activePlayback?.requestID }
-            return waitingPlaybackQueue.enumerated().compactMap { offset, requestID in
-                guard let speechJob = speechJobs[requestID] else { return nil }
-                return QueuedWorkerRequestSummary(
-                    id: requestID,
-                    op: speechJob.op,
-                    profileName: speechJob.profileName,
-                    queuePosition: offset + 1
-                )
-            }
-        }
-    }
-
-    private func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
-        switch queueType {
-        case .generation:
-            return generationActiveRequestSummary()
-        case .playback:
-            return playbackActiveRequestSummary()
-        }
-    }
-
-    private func generationQueueDepth() async -> Int {
-        (await generationController.queuedJobsOrdered()).count
-    }
-
-    private func emitStarted(for request: WorkerRequest) async {
-        await emit(WorkerStartedEvent(id: request.id, op: request.opName))
-    }
-
-    private func emitProgress(id: String, stage: WorkerProgressStage) async {
-        let progress = WorkerProgressEvent(id: id, stage: stage)
-        await emit(progress)
-        yieldRequestEvent(.progress(progress), for: id)
-    }
-
-    private func emitStatus(_ stage: WorkerStatusStage) async {
-        let status = WorkerStatusEvent(stage: stage)
-        await emit(status)
-        broadcastStatus(status)
-    }
-
-    private func emitFailure(id: String, error: WorkerError) async {
-        await emit(WorkerFailureResponse(id: id, code: error.code, message: error.message))
-    }
-
-    private func emit<T: Encodable>(_ value: T) async {
-        do {
-            let data = try encoder.encode(value) + Data("\n".utf8)
-            try dependencies.writeStdout(data)
-        } catch {
-            await logError("SpeakSwiftly could not write a JSONL event to stdout. \(error.localizedDescription)")
-        }
-    }
-
-    private func submitRequest(
-        id: String,
-        op: String,
-        text: String? = nil,
-        profileName: String? = nil,
-        textProfileName: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        requestID: String? = nil,
-        voiceDescription: String? = nil,
-        outputPath: String? = nil,
-        referenceAudioPath: String? = nil,
-        transcript: String? = nil
-    ) async {
-        let request = OutgoingWorkerRequest(
-            id: id,
-            op: op,
-            text: text,
-            profileName: profileName,
-            textProfileName: textProfileName,
-            cwd: textContext?.cwd,
-            repoRoot: textContext?.repoRoot,
-            textFormat: textContext?.format,
-            requestID: requestID,
-            voiceDescription: voiceDescription,
-            outputPath: outputPath,
-            referenceAudioPath: referenceAudioPath,
-            transcript: transcript
-        )
-
-        do {
-            let data = try encoder.encode(request)
-            let line = String(decoding: data, as: UTF8.self)
-            await accept(line: line)
-        } catch {
-            await emitFailure(
-                id: id,
-                error: WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly could not encode the outgoing '\(op)' request before queueing it. \(error.localizedDescription)"
-                )
-            )
-        }
-    }
-
-    private func submitRequest(_ request: WorkerRequest) async {
-        switch request {
-        case .queueSpeech(let id, let text, let profileName, let textProfileName, _, let textContext):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                text: text,
-                profileName: profileName,
-                textProfileName: textProfileName,
-                textContext: textContext
-            )
-        case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                text: text,
-                profileName: profileName,
-                voiceDescription: voiceDescription,
-                outputPath: outputPath
-            )
-        case .createClone(let id, let profileName, let referenceAudioPath, let transcript):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                profileName: profileName,
-                referenceAudioPath: referenceAudioPath,
-                transcript: transcript
-            )
-        case .listProfiles(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .removeProfile(let id, let profileName):
-            await submitRequest(id: id, op: request.opName, profileName: profileName)
-        case .listQueue(let id, _):
-            await submitRequest(id: id, op: request.opName)
-        case .playback(let id, _):
-            await submitRequest(id: id, op: request.opName)
-        case .clearQueue(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .cancelRequest(let id, let requestID):
-            await submitRequest(id: id, op: request.opName, requestID: requestID)
-        }
     }
 
     private func makeSpeechJobState(for request: WorkerRequest) -> SpeechJobState {
@@ -2074,253 +1585,5 @@ public extension SpeakSwiftly {
         }
     }
 
-    private func logPlaybackFinished(
-        for speechJob: SpeechJobState,
-        playbackSummary: PlaybackSummary,
-        sampleRate: Double
-    ) async {
-        let id = speechJob.requestID
-        let op = speechJob.op
-        let profileName = speechJob.profileName
-
-        var details: [String: LogValue] = [
-            "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
-            "chunk_count": .int(playbackSummary.chunkCount),
-            "sample_count": .int(playbackSummary.sampleCount),
-            "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
-            "startup_buffer_target_ms": .int(playbackSummary.thresholds.startupBufferTargetMS),
-            "low_water_target_ms": .int(playbackSummary.thresholds.lowWaterTargetMS),
-            "resume_buffer_target_ms": .int(playbackSummary.thresholds.resumeBufferTargetMS),
-            "chunk_gap_warning_threshold_ms": .int(playbackSummary.thresholds.chunkGapWarningMS),
-            "schedule_gap_warning_threshold_ms": .int(playbackSummary.thresholds.scheduleGapWarningMS),
-            "rebuffer_event_count": .int(playbackSummary.rebufferEventCount),
-            "rebuffer_total_duration_ms": .int(playbackSummary.rebufferTotalDurationMS),
-            "longest_rebuffer_duration_ms": .int(playbackSummary.longestRebufferDurationMS),
-            "starvation_event_count": .int(playbackSummary.starvationEventCount),
-            "queue_depth_sample_count": .int(playbackSummary.queueDepthSampleCount),
-            "schedule_callback_count": .int(playbackSummary.scheduleCallbackCount),
-            "played_back_callback_count": .int(playbackSummary.playedBackCallbackCount),
-            "fade_in_chunk_count": .int(playbackSummary.fadeInChunkCount),
-        ]
-
-        if let startupBufferedAudioMS = playbackSummary.startupBufferedAudioMS { details["startup_buffered_audio_ms"] = .int(startupBufferedAudioMS) }
-        if let timeToFirstChunkMS = playbackSummary.timeToFirstChunkMS { details["time_to_first_chunk_ms"] = .int(timeToFirstChunkMS) }
-        if let timeToPrerollReadyMS = playbackSummary.timeToPrerollReadyMS { details["time_to_preroll_ready_ms"] = .int(timeToPrerollReadyMS) }
-        if let timeFromPrerollReadyToDrainMS = playbackSummary.timeFromPrerollReadyToDrainMS { details["time_from_preroll_ready_to_drain_ms"] = .int(timeFromPrerollReadyToDrainMS) }
-        if let minQueuedAudioMS = playbackSummary.minQueuedAudioMS { details["min_queued_audio_ms"] = .int(minQueuedAudioMS) }
-        if let maxQueuedAudioMS = playbackSummary.maxQueuedAudioMS { details["max_queued_audio_ms"] = .int(maxQueuedAudioMS) }
-        if let avgQueuedAudioMS = playbackSummary.avgQueuedAudioMS { details["avg_queued_audio_ms"] = .int(avgQueuedAudioMS) }
-        if let maxInterChunkGapMS = playbackSummary.maxInterChunkGapMS { details["max_inter_chunk_gap_ms"] = .int(maxInterChunkGapMS) }
-        if let avgInterChunkGapMS = playbackSummary.avgInterChunkGapMS { details["avg_inter_chunk_gap_ms"] = .int(avgInterChunkGapMS) }
-        if let maxScheduleGapMS = playbackSummary.maxScheduleGapMS { details["max_schedule_gap_ms"] = .int(maxScheduleGapMS) }
-        if let avgScheduleGapMS = playbackSummary.avgScheduleGapMS { details["avg_schedule_gap_ms"] = .int(avgScheduleGapMS) }
-        if let maxBoundaryDiscontinuity = playbackSummary.maxBoundaryDiscontinuity { details["max_boundary_discontinuity"] = .double(maxBoundaryDiscontinuity) }
-        if let maxLeadingAbsAmplitude = playbackSummary.maxLeadingAbsAmplitude { details["max_leading_abs_amplitude"] = .double(maxLeadingAbsAmplitude) }
-        if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude { details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude) }
-        details.merge(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
-        details["section_count"] = .int(speechJob.textSections.count)
-        details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
-        await logRequestEvent("playback_finished", requestID: id, op: op, profileName: profileName, details: details)
-
-        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
-        let sectionWindows = TextForSpeech.sectionWindows(
-            originalText: speechJob.text,
-            totalDurationMS: totalDurationMS,
-            totalChunkCount: playbackSummary.chunkCount
-        )
-        for window in sectionWindows {
-            await logRequestEvent(
-                "playback_section_window",
-                requestID: id,
-                op: op,
-                profileName: profileName,
-                details: textSectionWindowDetails(window)
-            )
-        }
-    }
-
-    private func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
-        let requestID = request.id
-        let events = AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> { continuation in
-            requestContinuations[requestID] = continuation
-            continuation.onTermination = { _ in
-                Task {
-                    await self.removeRequestContinuation(for: requestID)
-                }
-            }
-        }
-
-        return WorkerRequestHandle(
-            id: requestID,
-            operation: request.opName,
-            profileName: request.profileName,
-            events: events
-        )
-    }
-
-    private func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {
-        requestContinuations[requestID]?.yield(event)
-    }
-
-    private func finishRequestStream(for requestID: String) {
-        requestContinuations[requestID]?.finish()
-        requestContinuations.removeValue(forKey: requestID)
-    }
-
-    private func failRequestStream(for requestID: String, error: WorkerError) {
-        requestContinuations[requestID]?.finish(
-            throwing: WorkerError(code: error.code, message: error.message)
-        )
-        requestContinuations.removeValue(forKey: requestID)
-    }
-
-    private func broadcastStatus(_ status: WorkerStatusEvent) {
-        for continuation in statusContinuations.values {
-            continuation.yield(status)
-        }
-    }
-
-    private func currentStatusSnapshot() -> WorkerStatusEvent? {
-        switch residentState {
-        case .warming:
-            guard preloadTask != nil else { return nil }
-            return WorkerStatusEvent(stage: .warmingResidentModel)
-        case .ready:
-            return WorkerStatusEvent(stage: .residentModelReady)
-        case .failed:
-            return WorkerStatusEvent(stage: .residentModelFailed)
-        }
-    }
-
-    private func removeStatusContinuation(_ id: UUID) {
-        statusContinuations.removeValue(forKey: id)
-    }
-
-    private func removeRequestContinuation(for requestID: String) {
-        requestContinuations.removeValue(forKey: requestID)
-    }
-
-    private func logError(
-        _ message: String,
-        requestID: String? = nil,
-        op: String? = nil,
-        profileName: String? = nil,
-        details: [String: LogValue]? = nil
-    ) async {
-        var mergedDetails = details ?? [:]
-        mergedDetails["message"] = .string(message)
-        await logEvent(
-            "worker_error",
-            level: .error,
-            requestID: requestID,
-            op: op,
-            profileName: profileName,
-            elapsedMS: requestID.flatMap(elapsedMS(for:)),
-            details: mergedDetails
-        )
-    }
-
-    private func logRequestEvent(
-        _ event: String,
-        requestID: String,
-        op: String?,
-        profileName: String? = nil,
-        queueDepth: Int? = nil,
-        details: [String: LogValue]? = nil
-    ) async {
-        await logEvent(
-            event,
-            requestID: requestID,
-            op: op,
-            profileName: profileName,
-            queueDepth: queueDepth,
-            elapsedMS: elapsedMS(for: requestID),
-            details: details
-        )
-    }
-
-    private func memoryDetails() -> [String: LogValue] {
-        guard let snapshot = dependencies.readRuntimeMemory() else {
-            return [:]
-        }
-
-        var details = [String: LogValue]()
-        if let processResidentBytes = snapshot.processResidentBytes {
-            details["process_resident_bytes"] = .int(processResidentBytes)
-        }
-        if let processPhysFootprintBytes = snapshot.processPhysFootprintBytes {
-            details["process_phys_footprint_bytes"] = .int(processPhysFootprintBytes)
-        }
-        if let mlxActiveMemoryBytes = snapshot.mlxActiveMemoryBytes {
-            details["mlx_active_memory_bytes"] = .int(mlxActiveMemoryBytes)
-        }
-        if let mlxCacheMemoryBytes = snapshot.mlxCacheMemoryBytes {
-            details["mlx_cache_memory_bytes"] = .int(mlxCacheMemoryBytes)
-        }
-        if let mlxPeakMemoryBytes = snapshot.mlxPeakMemoryBytes {
-            details["mlx_peak_memory_bytes"] = .int(mlxPeakMemoryBytes)
-        }
-        if let mlxCacheLimitBytes = snapshot.mlxCacheLimitBytes {
-            details["mlx_cache_limit_bytes"] = .int(mlxCacheLimitBytes)
-        }
-        if let mlxMemoryLimitBytes = snapshot.mlxMemoryLimitBytes {
-            details["mlx_memory_limit_bytes"] = .int(mlxMemoryLimitBytes)
-        }
-        return details
-    }
-
-    private func logEvent(
-        _ event: String,
-        level: LogLevel = .info,
-        requestID: String? = nil,
-        op: String? = nil,
-        profileName: String? = nil,
-        queueDepth: Int? = nil,
-        elapsedMS: Int? = nil,
-        details: [String: LogValue]? = nil
-    ) async {
-        let logEvent = LogEvent(
-            event: event,
-            level: level,
-            ts: logTimestampFormatter.string(from: dependencies.now()),
-            requestID: requestID,
-            op: op,
-            profileName: profileName,
-            queueDepth: queueDepth,
-            elapsedMS: elapsedMS,
-            details: details
-        )
-
-        do {
-            let data = try logEncoder.encode(logEvent)
-            dependencies.writeStderr(String(decoding: data, as: UTF8.self))
-        } catch {
-            dependencies.writeStderr(
-                #"{"event":"worker_error","level":"error","ts":"\#(logTimestampFormatter.string(from: dependencies.now()))","details":{"message":"SpeakSwiftly could not encode a stderr log event.","error":"\#(error.localizedDescription)"}}"#
-            )
-        }
-    }
-
-    private func elapsedMS(for requestID: String) -> Int? {
-        guard let startedAt = requestAcceptedAt[requestID] else { return nil }
-        return elapsedMS(since: startedAt)
-    }
-
-    private func elapsedMS(since startedAt: Date) -> Int {
-        Int((dependencies.now().timeIntervalSince(startedAt) * 1_000).rounded())
-    }
-
-    private func bestEffortID(from line: String) -> String {
-        guard
-            let data = line.data(using: .utf8),
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let id = object["id"] as? String,
-            !id.isEmpty
-        else {
-            return "unknown"
-        }
-
-        return id
-    }
     }
 }

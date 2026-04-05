@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Profile Models
+// MARK: - Voice & Clone Profile Models
 
 struct ProfileManifest: Codable, Sendable, Equatable {
     let version: Int
