@@ -34,20 +34,23 @@ Why this matters for `SpeakSwiftly`:
 
 Relevant code:
 
-- [`PlaybackController.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/PlaybackController.swift)
-- [`WorkerRuntime.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerRuntime.swift)
-- [`WorkerProtocol.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerProtocol.swift)
+- [`Playback/PlaybackController.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackController.swift)
+- [`Playback/PlaybackOperations.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackOperations.swift)
+- [`Runtime/WorkerRuntime.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Runtime/WorkerRuntime.swift)
+- [`Runtime/WorkerProtocol.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Runtime/WorkerProtocol.swift)
 
 Current `PlaybackController` behavior:
 
+- `PlaybackController` is now a real playback-owned actor that coordinates queued playback jobs, active playback state, cancellation, and shutdown.
+- The lower-level AVFoundation engine driver is internal to the playback feature rather than being the thing that owns queue state.
 - `prepare(sampleRate:)` only rebuilds the engine when the engine is missing, the player node is missing, or the stored sample rate has changed.
 - If the engine already exists and the sample rate is unchanged, the controller only tries to restart `audioEngine` if it is not running and then calls `playerNode.play()` if needed.
 - `rebuildEngine(sampleRate:)` creates a fresh `AVAudioEngine`, attaches `AVAudioPlayerNode`, connects it to `mainMixerNode`, prepares, starts, and begins playback.
 
 Concrete code points:
 
-- [`PlaybackController.swift:793`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/PlaybackController.swift#L793)
-- [`PlaybackController.swift:1297`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/PlaybackController.swift#L1297)
+- [`Playback/PlaybackController.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackController.swift)
+- [`Playback/PlaybackOperations.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackOperations.swift)
 
 What is missing today:
 
@@ -125,10 +128,9 @@ This investigation also confirmed that the worker already implements queue-contr
 
 Relevant code:
 
-- [`WorkerProtocol.swift:61`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerProtocol.swift#L61)
-- [`WorkerRuntime.swift:466`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerRuntime.swift#L466)
-- [`WorkerRuntime.swift:636`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerRuntime.swift#L636)
-- [`WorkerRuntime.swift:1250`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/WorkerRuntime.swift#L1250)
+- [`Runtime/WorkerProtocol.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Runtime/WorkerProtocol.swift)
+- [`Runtime/WorkerRuntime.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Runtime/WorkerRuntime.swift)
+- [`Playback/PlaybackOperations.swift`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackOperations.swift)
 
 Interpretation:
 

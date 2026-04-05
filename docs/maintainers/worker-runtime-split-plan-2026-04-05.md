@@ -33,9 +33,17 @@ The top-level source layout is already moving in the right direction:
 - `Sources/SpeakSwiftly/Playback`
 - `Sources/SpeakSwiftly/Runtime`
 
-The remaining issue is inside `Runtime/`, where `WorkerRuntime.swift` is still acting like a mini-subsystem.
+The remaining issue is inside `Runtime/`, where `WorkerRuntime.swift` was still acting like a mini-subsystem when this plan was written.
 
-There is also an empty `Sources/SpeakSwiftly/Normalization` folder. That folder should either earn real owned files later or be removed once the runtime split settles. It should not remain as an empty hint of future structure.
+That specific normalization concern has now been resolved:
+
+- `Sources/SpeakSwiftly/Normalization/TextNormalizer.swift` now owns `SpeakSwiftly.Normalizer`
+- the public text-normalization API now lives in `Sources/SpeakSwiftly/API/TextNormalization.swift`
+
+Playback also widened from a simple engine wrapper into a real feature-owned subsystem during the same cleanup arc:
+
+- `Sources/SpeakSwiftly/Playback/PlaybackController.swift` now owns playback queue state and active playback coordination
+- `Sources/SpeakSwiftly/Playback/PlaybackOperations.swift` now owns the playback-facing runtime bridge code that used to live in `Runtime/`
 
 ## Split Goal
 
@@ -127,13 +135,25 @@ This first implementation pass should:
 
 ## Follow-On Split Candidates
 
-Once the first pass lands cleanly, the next likely candidates are:
+Once the first pass lands cleanly, the next likely candidates were:
 
 - `WorkerRuntime+VoiceProfiles.swift`
-- `WorkerRuntime+PlaybackQueue.swift`
+- playback queue ownership in a real playback-owned type
 - `WorkerRuntime+SpeechJobs.swift`
 
 Those should happen only if the first pass still leaves clear responsibility clusters that are painful to maintain together.
+
+## What Landed
+
+This note started as a forward-looking split plan, but the key structural moves have now landed:
+
+- public library-facing runtime API moved into `Sources/SpeakSwiftly/API`
+- text-normalization API and logic moved out of `Runtime/`
+- voice-profile logic moved into `Sources/SpeakSwiftly/Generation`
+- playback queue ownership moved into a real `PlaybackController` actor in `Sources/SpeakSwiftly/Playback`
+- playback runtime bridge code moved into `Sources/SpeakSwiftly/Playback/PlaybackOperations.swift`
+
+The runtime is still an important actor boundary, but it is no longer carrying the public API surface or playback queue ownership directly.
 
 ## Non-Goals For This Pass
 

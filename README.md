@@ -161,13 +161,14 @@ Current operation families are:
 - Structured terminal success and failure responses.
 - Structured JSONL `stderr` logs that explain the most likely cause when something breaks and include request timing context.
 
-The test suite is organized to mirror the source responsibilities:
+The test suite is organized to mirror the source tree:
 
-- `WorkerProtocolTests.swift`
-- `ProfileStoreTests.swift`
-- `WorkerRuntimeTests.swift`
-- `ModelClientsTests.swift`
-- `SpeakSwiftlyE2ETests.swift`
+- `Tests/SpeakSwiftlyTests/API/LibrarySurfaceTests.swift`
+- `Tests/SpeakSwiftlyTests/Generation/ModelClientsTests.swift`
+- `Tests/SpeakSwiftlyTests/Generation/ProfileStoreTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerProtocolTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeTests.swift`
+- `Tests/SpeakSwiftlyTests/E2E/SpeakSwiftlyE2ETests.swift`
 
 The package also includes `TextForSpeech` coverage for normalization context, profile primitives, persistence, and effective-profile behavior.
 
@@ -203,6 +204,7 @@ Current live-playback behavior is:
 - `speak_live` loads the stored profile and reference audio first.
 - The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
 - The resident and profile-generation paths now pass explicit local generation parameters instead of relying on whatever default values the current `mlx-audio-swift` dependency tip happens to expose, which helps keep short utterances from drifting back into runaway generation behavior.
+- Playback is now owned by a real `PlaybackController` actor in `Sources/SpeakSwiftly/Playback/PlaybackController.swift`, while the lower-level AVFoundation engine driver stays internal to the playback feature instead of living in `Runtime/`.
 - The local `AVAudioEngine` and `AVAudioPlayerNode` are prepared as part of resident-model warmup and then reused across requests instead of being recreated for each utterance.
 - Real playback uses adaptive duration-based thresholds instead of the older fixed chunk gate. Compact requests seed around `360 ms` of startup audio, balanced requests around `520 ms`, and extended requests much higher, with later cadence and rebuffer signals able to raise those targets further during playback.
 - Requests emit `buffering_audio` when the first non-empty chunk arrives and `preroll_ready` when the startup buffer has been satisfied and audio has been scheduled into the hot player path.
@@ -232,6 +234,14 @@ For text-shape forensics, the worker also logs narrow per-shape counts such as m
 ## Repository Layout
 
 SpeakSwiftly is intended to be the source-of-truth standalone repository for this package.
+
+The package source tree is organized by responsibility:
+
+- `Sources/SpeakSwiftly/API` contains the public package-facing library surface.
+- `Sources/SpeakSwiftly/Generation` contains generation and voice-profile logic.
+- `Sources/SpeakSwiftly/Normalization` contains `SpeakSwiftly.Normalizer` and text-normalization logic.
+- `Sources/SpeakSwiftly/Playback` contains the playback subsystem, including the real `PlaybackController` type and playback operations.
+- `Sources/SpeakSwiftly/Runtime` contains worker-runtime internals such as protocol decoding, request orchestration, lifecycle, and emission.
 
 The preferred ownership model is:
 

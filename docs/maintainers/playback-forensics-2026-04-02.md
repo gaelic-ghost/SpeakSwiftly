@@ -194,7 +194,7 @@ Interpretation:
   - the sectioned conversational prose previously logged a stale broad code-heaviness forensic flag even though playback seeding was already length-only
   - the same prose also landed in `text_complexity_class: "extended"`
 - Important clarification:
-  - the playback controller's `text_complexity_class` is currently length-only in [PlaybackController.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/PlaybackController.swift)
+  - the playback controller's `text_complexity_class` is currently length-only in [Playback/PlaybackController.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/Playback/PlaybackController.swift)
   - the stale broad normalizer code-heaviness flag has now been removed, so future forensic comparisons should not conflate section punctuation with request-level playback seeding
 - The latest cross-family comparison suggests:
   - prose is somewhat better than code-heavy material, but not dramatically better
