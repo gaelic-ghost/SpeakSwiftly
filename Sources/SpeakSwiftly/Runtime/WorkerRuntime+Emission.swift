@@ -156,6 +156,7 @@ extension SpeakSwiftly.Runtime {
         profileName: String? = nil,
         textProfileName: String? = nil,
         textContext: TextForSpeech.Context? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestID: String? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil,
@@ -170,7 +171,9 @@ extension SpeakSwiftly.Runtime {
             textProfileName: textProfileName,
             cwd: textContext?.cwd,
             repoRoot: textContext?.repoRoot,
-            textFormat: textContext?.format,
+            textFormat: textContext?.textFormat,
+            nestedSourceFormat: textContext?.nestedSourceFormat,
+            sourceFormat: sourceFormat,
             requestID: requestID,
             voiceDescription: voiceDescription,
             outputPath: outputPath,
@@ -195,14 +198,15 @@ extension SpeakSwiftly.Runtime {
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-        case .queueSpeech(let id, let text, let profileName, let textProfileName, _, let textContext):
+        case .queueSpeech(let id, let text, let profileName, let textProfileName, _, let textContext, let sourceFormat):
             await submitRequest(
                 id: id,
                 op: request.opName,
                 text: text,
                 profileName: profileName,
                 textProfileName: textProfileName,
-                textContext: textContext
+                textContext: textContext,
+                sourceFormat: sourceFormat
             )
         case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
             await submitRequest(

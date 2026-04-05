@@ -11,7 +11,9 @@ struct RawWorkerRequest: Decodable, Sendable {
     let textProfileName: String?
     let cwd: String?
     let repoRoot: String?
-    let textFormat: TextForSpeech.Format?
+    let textFormat: TextForSpeech.TextFormat?
+    let nestedSourceFormat: TextForSpeech.SourceFormat?
+    let sourceFormat: TextForSpeech.SourceFormat?
     let requestID: String?
     let voiceDescription: String?
     let outputPath: String?
@@ -27,11 +29,98 @@ struct RawWorkerRequest: Decodable, Sendable {
         case cwd
         case repoRoot = "repo_root"
         case textFormat = "text_format"
+        case nestedSourceFormat = "nested_source_format"
+        case sourceFormat = "source_format"
         case requestID = "request_id"
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
         case referenceAudioPath = "reference_audio_path"
         case transcript
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        op = try container.decodeIfPresent(String.self, forKey: .op)
+        text = try container.decodeIfPresent(String.self, forKey: .text)
+        profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
+        textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
+        cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
+        repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
+        requestID = try container.decodeIfPresent(String.self, forKey: .requestID)
+        voiceDescription = try container.decodeIfPresent(String.self, forKey: .voiceDescription)
+        outputPath = try container.decodeIfPresent(String.self, forKey: .outputPath)
+        referenceAudioPath = try container.decodeIfPresent(String.self, forKey: .referenceAudioPath)
+        transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
+
+        let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
+        let explicitNestedSourceFormat = try Self.decodeSourceFormat(
+            in: container,
+            forKey: .nestedSourceFormat
+        )
+        let explicitSourceFormat = try Self.decodeSourceFormat(
+            in: container,
+            forKey: .sourceFormat
+        )
+
+        if let rawTextFormat {
+            if let parsedTextFormat = TextForSpeech.TextFormat(rawValue: rawTextFormat) {
+                textFormat = parsedTextFormat
+                sourceFormat = explicitSourceFormat
+            } else if let legacyFormat = TextForSpeech.Format(rawValue: rawTextFormat) {
+                let compatibility = Self.legacyCompatibility(for: legacyFormat)
+                textFormat = compatibility.textFormat
+                sourceFormat = explicitSourceFormat ?? compatibility.sourceFormat
+            } else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .textFormat,
+                    in: container,
+                    debugDescription: "Unsupported text_format value '\(rawTextFormat)'."
+                )
+            }
+        } else {
+            textFormat = nil
+            sourceFormat = explicitSourceFormat
+        }
+
+        nestedSourceFormat = explicitNestedSourceFormat
+    }
+
+    private static func decodeSourceFormat(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) throws -> TextForSpeech.SourceFormat? {
+        guard let raw = try container.decodeIfPresent(String.self, forKey: key) else {
+            return nil
+        }
+
+        guard let format = TextForSpeech.SourceFormat(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: container,
+                debugDescription: "Unsupported \(key.stringValue) value '\(raw)'."
+            )
+        }
+
+        return format
+    }
+
+    private static func legacyCompatibility(
+        for format: TextForSpeech.Format
+    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?) {
+        switch format {
+        case .plain: (.plain, nil)
+        case .markdown: (.markdown, nil)
+        case .html: (.html, nil)
+        case .log: (.log, nil)
+        case .cli: (.cli, nil)
+        case .list: (.list, nil)
+        case .source: (nil, .generic)
+        case .swift: (nil, .swift)
+        case .python: (nil, .python)
+        case .rust: (nil, .rust)
+        }
     }
 }
 
@@ -42,7 +131,8 @@ enum WorkerRequest: Sendable, Equatable {
         profileName: String,
         textProfileName: String?,
         jobType: SpeechJobType,
-        textContext: TextForSpeech.Context?
+        textContext: TextForSpeech.Context?,
+        sourceFormat: TextForSpeech.SourceFormat?
     )
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case createClone(id: String, profileName: String, referenceAudioPath: String, transcript: String?)
@@ -55,7 +145,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var id: String {
         switch self {
-        case .queueSpeech(let id, _, _, _, _, _),
+        case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
              .createProfile(let id, _, _, _, _),
              .createClone(let id, _, _, _),
              .listProfiles(let id),
@@ -70,7 +160,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var opName: String {
         switch self {
-        case .queueSpeech(_, _, _, _, .live, _):
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
             "queue_speech_live"
         case .createProfile:
             "create_profile"
@@ -124,7 +214,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var profileName: String? {
         switch self {
-        case .queueSpeech(_, _, let profileName, _, _, _),
+        case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
              .createProfile(_, let profileName, _, _, _),
              .createClone(_, let profileName, _, _),
              .removeProfile(_, let profileName):
@@ -136,7 +226,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var textProfileName: String? {
         switch self {
-        case .queueSpeech(_, _, _, let textProfileName, _, _):
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
             textProfileName
         case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
@@ -145,8 +235,17 @@ enum WorkerRequest: Sendable, Equatable {
 
     var textContext: TextForSpeech.Context? {
         switch self {
-        case .queueSpeech(_, _, _, _, _, let textContext):
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
             textContext
+        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+            nil
+        }
+    }
+
+    var sourceFormat: TextForSpeech.SourceFormat? {
+        switch self {
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
+            sourceFormat
         case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
             nil
         }
@@ -158,6 +257,11 @@ enum WorkerRequest: Sendable, Equatable {
 
         do {
             raw = try decoder.decode(RawWorkerRequest.self, from: data)
+        } catch let error as DecodingError {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "The request line contains an invalid field value or shape. \(describeDecodingError(error))"
+            )
         } catch {
             throw WorkerError(code: .invalidJSON, message: "The request line is not valid JSON. Each request must be a single JSON object on one line.")
         }
@@ -175,10 +279,17 @@ enum WorkerRequest: Sendable, Equatable {
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            if raw.sourceFormat != nil && (raw.textFormat != nil || raw.nestedSourceFormat != nil) {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
+                )
+            }
             let textContext = TextForSpeech.Context(
                 cwd: raw.cwd,
                 repoRoot: raw.repoRoot,
-                format: raw.textFormat
+                textFormat: raw.textFormat,
+                nestedSourceFormat: raw.nestedSourceFormat
             ).nilIfEmpty
             return .queueSpeech(
                 id: id,
@@ -186,7 +297,8 @@ enum WorkerRequest: Sendable, Equatable {
                 profileName: profileName,
                 textProfileName: textProfileName,
                 jobType: .live,
-                textContext: textContext
+                textContext: textContext,
+                sourceFormat: raw.sourceFormat
             )
 
         case "create_profile":
@@ -246,6 +358,19 @@ enum WorkerRequest: Sendable, Equatable {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
         }
         return trimmed
+    }
+
+    private static func describeDecodingError(_ error: DecodingError) -> String {
+        switch error {
+        case .dataCorrupted(let context):
+            context.debugDescription
+        case .keyNotFound(let key, let context):
+            "Missing key '\(key.stringValue)'. \(context.debugDescription)"
+        case .typeMismatch(_, let context), .valueNotFound(_, let context):
+            context.debugDescription
+        @unknown default:
+            "The request payload could not be decoded."
+        }
     }
 }
 
@@ -489,6 +614,6 @@ private extension String {
 
 private extension TextForSpeech.Context {
     var nilIfEmpty: TextForSpeech.Context? {
-        cwd == nil && repoRoot == nil && format == nil ? nil : self
+        cwd == nil && repoRoot == nil && textFormat == nil && nestedSourceFormat == nil ? nil : self
     }
 }

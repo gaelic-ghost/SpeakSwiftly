@@ -80,7 +80,9 @@ public extension SpeakSwiftly {
         let textProfileName: String?
         let cwd: String?
         let repoRoot: String?
-        let textFormat: TextForSpeech.Format?
+        let textFormat: TextForSpeech.TextFormat?
+        let nestedSourceFormat: TextForSpeech.SourceFormat?
+        let sourceFormat: TextForSpeech.SourceFormat?
         let requestID: String?
         let voiceDescription: String?
         let outputPath: String?
@@ -96,6 +98,8 @@ public extension SpeakSwiftly {
             case cwd
             case repoRoot = "repo_root"
             case textFormat = "text_format"
+            case nestedSourceFormat = "nested_source_format"
+            case sourceFormat = "source_format"
             case requestID = "request_id"
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
@@ -495,7 +499,7 @@ public extension SpeakSwiftly {
             await self.processGeneration(job.request, token: job.token)
         }
         activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
-        if case .queueSpeech(let id, _, _, _, _, _) = job.request {
+        if case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _) = job.request {
             await playbackController.setGenerationTask(task, for: id)
         }
     }
@@ -505,7 +509,7 @@ public extension SpeakSwiftly {
 
         do {
             switch request {
-            case .queueSpeech(let id, let text, let profileName, _, .live, _):
+            case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
                 try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                 disposition = .requestStillPendingPlayback(id)
 
@@ -832,7 +836,7 @@ public extension SpeakSwiftly {
         let requestID = request.id
         let op = request.opName
         let text = switch request {
-        case .queueSpeech(_, let text, _, _, _, _):
+        case .queueSpeech(id: _, text: let text, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _):
             text
         default:
             ""
@@ -840,12 +844,22 @@ public extension SpeakSwiftly {
         let profileName = request.profileName ?? "unknown-profile"
         let textProfileName = request.textProfileName
         let textContext = request.textContext
+        let sourceFormat = request.sourceFormat
         let textProfile = textRuntime.snapshot(named: textProfileName)
-        let normalizedText = TextForSpeech.normalize(
-            text,
-            context: textContext,
-            profile: textProfile
-        )
+        let normalizedText = if let sourceFormat {
+            TextForSpeech.normalizeSource(
+                text,
+                as: sourceFormat,
+                context: textContext,
+                profile: textProfile
+            )
+        } else {
+            TextForSpeech.normalizeText(
+                text,
+                context: textContext,
+                profile: textProfile
+            )
+        }
         let textFeatures = TextForSpeech.forensicFeatures(originalText: text, normalizedText: normalizedText)
         let textSections = TextForSpeech.sections(originalText: text)
         var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
@@ -859,6 +873,7 @@ public extension SpeakSwiftly {
             profileName: profileName,
             textProfileName: textProfileName,
             textContext: textContext,
+            sourceFormat: sourceFormat,
             textFeatures: textFeatures,
             textSections: textSections,
             stream: stream,

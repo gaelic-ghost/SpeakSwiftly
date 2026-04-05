@@ -12,12 +12,13 @@ import TextForSpeech
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, String) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         text,
         profileName,
         textProfileName,
         textContext,
+        sourceFormat,
         id in
         await runtime.speak(
             text: text,
@@ -25,6 +26,7 @@ import TextForSpeech
             as: .live,
             textProfileName: textProfileName,
             textContext: textContext,
+            sourceFormat: sourceFormat,
             id: id
         )
     }

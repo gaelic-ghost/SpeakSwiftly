@@ -15,7 +15,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileName: nil,
             jobType: .live,
-            textContext: nil
+            textContext: nil,
+            sourceFormat: nil
         )
     )
 }
@@ -35,8 +36,66 @@ import TextForSpeech
             textContext: TextForSpeech.Context(
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
                 repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
-                format: .cli
-            )
+                textFormat: .cli
+            ),
+            sourceFormat: nil
+        )
+    )
+}
+
+@Test func decodesSpeakLiveRequestWithNestedSourceFormat() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-embedded","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}"#
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-embedded",
+            text: "```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```",
+            profileName: "default-femme",
+            textProfileName: nil,
+            jobType: .live,
+            textContext: TextForSpeech.Context(
+                textFormat: .markdown,
+                nestedSourceFormat: .swift
+            ),
+            sourceFormat: nil
+        )
+    )
+}
+
+@Test func decodesSpeakLiveRequestWithWholeSourceFormat() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-source",
+            text: "struct WorkerRuntime { let sampleRate: Int }",
+            profileName: "default-femme",
+            textProfileName: nil,
+            jobType: .live,
+            textContext: nil,
+            sourceFormat: .swift
+        )
+    )
+}
+
+@Test func decodesLegacyWholeSourceTextFormatAsSourceLane() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-legacy-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","text_format":"swift_source"}"#
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-legacy-source",
+            text: "struct WorkerRuntime { let sampleRate: Int }",
+            profileName: "default-femme",
+            textProfileName: nil,
+            jobType: .live,
+            textContext: nil,
+            sourceFormat: .swift
         )
     )
 }

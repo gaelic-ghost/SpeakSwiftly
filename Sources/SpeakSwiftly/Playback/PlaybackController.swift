@@ -768,6 +768,7 @@ final class PlaybackJob: @unchecked Sendable {
     let profileName: String
     let textProfileName: String?
     let textContext: TextForSpeech.Context?
+    let sourceFormat: TextForSpeech.SourceFormat?
     let textFeatures: SpeechTextForensicFeatures
     let textSections: [SpeechTextForensicSection]
     let stream: AsyncThrowingStream<[Float], any Swift.Error>
@@ -784,6 +785,7 @@ final class PlaybackJob: @unchecked Sendable {
         profileName: String,
         textProfileName: String?,
         textContext: TextForSpeech.Context?,
+        sourceFormat: TextForSpeech.SourceFormat?,
         textFeatures: SpeechTextForensicFeatures,
         textSections: [SpeechTextForensicSection],
         stream: AsyncThrowingStream<[Float], any Swift.Error>,
@@ -796,6 +798,7 @@ final class PlaybackJob: @unchecked Sendable {
         self.profileName = profileName
         self.textProfileName = textProfileName
         self.textContext = textContext
+        self.sourceFormat = sourceFormat
         self.textFeatures = textFeatures
         self.textSections = textSections
         self.stream = stream

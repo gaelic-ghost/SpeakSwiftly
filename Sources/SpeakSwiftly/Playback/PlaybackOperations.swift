@@ -123,7 +123,8 @@ extension SpeakSwiftly.Runtime {
             profileName: job.profileName,
             textProfileName: job.textProfileName,
             jobType: .live,
-            textContext: job.textContext
+            textContext: job.textContext,
+            sourceFormat: job.sourceFormat
         )
         await completeRequest(request: request, result: result)
     }

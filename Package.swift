@@ -20,8 +20,7 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            from: "0.9.1"
+            path: "../TextForSpeech"
         ),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",

@@ -49,6 +49,20 @@ for try await event in handle.events {
 }
 ```
 
+Use `sourceFormat` when the whole input is source code instead of mixed prose with embedded code:
+
+```swift
+import SpeakSwiftlyCore
+import TextForSpeech
+
+let sourceHandle = await runtime.speak(
+    text: "struct WorkerRuntime { let sampleRate: Int }",
+    with: "default-femme",
+    as: .live,
+    sourceFormat: .swift
+)
+```
+
 Text shaping is part of the typed runtime surface too. `SpeakSwiftly.Runtime` can read the active, base, stored, and effective text profiles, persist changes through the adjacent `TextForSpeech` runtime, and incrementally add, replace, or remove text replacements without rebuilding whole profile values for each small edit.
 
 ### Motivation
@@ -121,6 +135,8 @@ Example request shapes:
 ```json
 {"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-1c","op":"speak_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
+{"id":"req-1d","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
+{"id":"req-1e","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
 {"id":"req-1b","op":"speak_live_background","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}

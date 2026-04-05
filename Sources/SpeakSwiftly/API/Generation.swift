@@ -10,6 +10,7 @@ public extension SpeakSwiftly.Runtime {
         as job: SpeakSwiftly.Job,
         textProfileName: String? = nil,
         textContext: TextForSpeech.Context? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
         await submit(
@@ -19,7 +20,8 @@ public extension SpeakSwiftly.Runtime {
                 profileName: profileName,
                 textProfileName: textProfileName,
                 jobType: job,
-                textContext: textContext
+                textContext: textContext,
+                sourceFormat: sourceFormat
             )
         )
     }

@@ -663,7 +663,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileName: nil,
             jobType: .live,
-            textContext: nil
+            textContext: nil,
+            sourceFormat: nil
         )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
@@ -1235,7 +1236,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileName: nil,
             jobType: .live,
-            textContext: nil
+            textContext: nil,
+            sourceFormat: nil
         )
     )
     var iterator = handle.events.makeAsyncIterator()
@@ -1625,7 +1627,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileName: nil,
             jobType: .live,
-            textContext: nil
+            textContext: nil,
+            sourceFormat: nil
         )
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()

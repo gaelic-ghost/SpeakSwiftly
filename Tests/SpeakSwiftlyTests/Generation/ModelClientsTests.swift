@@ -785,6 +785,44 @@ import TextForSpeech
     #expect(normalized.contains("settings token"))
 }
 
+@Test func speakLiveUsesExplicitWholeSourceLaneBeforeResidentGeneration() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel(recorder: residentRecorder) }
+    )
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    await runtime.start()
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
+        """#
+    )
+
+    #expect(await waitUntil { residentRecorder.lastText != nil })
+
+    let normalized = try #require(residentRecorder.lastText)
+    #expect(normalized.contains("open brace"))
+    #expect(normalized.contains("sample Rate"))
+}
+
 // MARK: - Sample Shaping
 
 @Test func shapePlaybackSamplesSmoothsBoundaryJumpsAndSanitizesInvalidValues() {
