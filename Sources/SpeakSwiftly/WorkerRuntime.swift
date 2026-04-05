@@ -516,6 +516,10 @@ public extension SpeakSwiftly {
         textRuntime.profile(named: name)
     }
 
+    public func textProfiles() -> [TextForSpeech.Profile] {
+        textRuntime.storedProfiles()
+    }
+
     public func textProfileSnapshot(named name: String? = nil) -> TextForSpeech.Profile {
         textRuntime.snapshot(named: name)
     }
@@ -530,6 +534,20 @@ public extension SpeakSwiftly {
 
     public func saveTextProfiles() throws {
         try textRuntime.save()
+    }
+
+    public func createTextProfile(
+        id: String,
+        named name: String,
+        replacements: [TextForSpeech.Replacement] = []
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.createProfile(
+            id: id,
+            named: name,
+            replacements: replacements
+        )
+        try textRuntime.save()
+        return profile
     }
 
     public func storeTextProfile(_ profile: TextForSpeech.Profile) throws {
@@ -550,6 +568,36 @@ public extension SpeakSwiftly {
     public func resetTextProfile() throws {
         textRuntime.reset()
         try textRuntime.save()
+    }
+
+    public func addTextReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        toProfileNamed name: String? = nil
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.addReplacement(replacement, toProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
+
+    public func replaceTextReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        inProfileNamed name: String? = nil
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.replaceReplacement(replacement, inProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
+
+    public func removeTextReplacement(
+        id replacementID: String,
+        fromProfileNamed name: String? = nil
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.removeReplacement(
+            id: replacementID,
+            fromProfileNamed: name
+        )
+        try textRuntime.save()
+        return profile
     }
 
     public func createProfile(

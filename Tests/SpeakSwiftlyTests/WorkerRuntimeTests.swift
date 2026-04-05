@@ -190,6 +190,44 @@ import TextForSpeech
     #expect(await secondRuntime.textProfileSnapshot().replacements.map(\.id) == ["ops-rule"])
 }
 
+@Test func textProfileEditingHelpersMutateAndPersistStoredProfiles() async throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let runtime = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    let created = try await runtime.createTextProfile(id: "logs", named: "Logs")
+    #expect(created.replacements.isEmpty)
+
+    let added = try await runtime.addTextReplacement(
+        TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
+        toProfileNamed: "logs"
+    )
+    #expect(added.replacements.map(\.id) == ["stderr-rule"])
+
+    let replaced = try await runtime.replaceTextReplacement(
+        TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
+        inProfileNamed: "logs"
+    )
+    #expect(replaced.replacements.first?.replacement == "standard standard error")
+
+    let emptied = try await runtime.removeTextReplacement(id: "stderr-rule", fromProfileNamed: "logs")
+    #expect(emptied.replacements.isEmpty)
+
+    let reloaded = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+    #expect(await reloaded.textProfile(named: "logs")?.replacements.isEmpty == true)
+}
+
 @Test func waitingRequestsReportPriorityQueuePositions() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
