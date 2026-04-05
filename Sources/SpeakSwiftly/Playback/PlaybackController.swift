@@ -2040,7 +2040,11 @@ struct WorkerDependencies {
                 )
             },
             writeWAV: { samples, sampleRate, url in
-                try AudioUtils.writeWavFile(samples: samples, sampleRate: sampleRate, fileURL: url)
+                try AudioUtils.writeWavFile(
+                    samples: samples,
+                    sampleRate: Double(sampleRate),
+                    fileURL: url
+                )
             },
             loadAudioSamples: { url, sampleRate in
                 let (_, audio) = try MLXAudioCore.loadAudioArray(from: url, sampleRate: sampleRate)
