@@ -14,7 +14,7 @@ The first two are first-class public API today. The third is only partially form
 
 A normalization profile is the top-level policy object for text cleanup before speech generation.
 
-Today that type is [`TextForSpeech.Profile`](/Users/galew/Workspace/SpeakSwiftly/Sources/TextForSpeechCore/TextForSpeech.swift#L84). It is intentionally small:
+Today that type is [`TextForSpeech.Profile`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L84). It is intentionally small:
 
 - `id`
 - `name`
@@ -42,7 +42,7 @@ So when a normalization job starts, the mental model is:
 
 Text replacements are the actual custom rules inside a profile.
 
-Today that type is [`TextForSpeech.Replacement`](/Users/galew/Workspace/SpeakSwiftly/Sources/TextForSpeechCore/TextForSpeech.swift#L45). Each replacement describes:
+Today that type is [`TextForSpeech.Replacement`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L45). Each replacement describes:
 
 - what text to match
 - what spoken text to substitute
@@ -112,7 +112,7 @@ That is why the current profile API exposes `replacements(for:in:)` instead of o
 
 Kinds are the coarse input taxonomy.
 
-Today that type is [`TextForSpeech.Kind`](/Users/galew/Workspace/SpeakSwiftly/Sources/TextForSpeechCore/TextForSpeech.swift#L21), with cases such as:
+Today that type is [`TextForSpeech.Kind`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L21), with cases such as:
 
 - `plain`
 - `markdown`
@@ -136,7 +136,7 @@ So the model is specific enough to be useful without exploding into dozens of na
 
 ## Runtime ownership
 
-The current in-memory profile holder is [`TextForSpeechRuntime`](/Users/galew/Workspace/SpeakSwiftly/Sources/TextForSpeechCore/TextForSpeech.swift#L121).
+The current in-memory profile holder is [`TextForSpeechRuntime`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/TextForSpeechCore/TextForSpeech.swift#L121).
 
 It is intentionally small:
 
@@ -247,7 +247,7 @@ This is separate from `SpeakSwiftly` voice profiles in the speech worker, which 
 
 There is not currently a first-class public `slice` type in `TextForSpeechCore`.
 
-What does exist today is a slice-like concept inside [`SpeechTextNormalizer`](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift):
+What does exist today is a slice-like concept inside [`SpeechTextNormalizer`](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/SpeechTextNormalizer.swift):
 
 - `forensicSections(originalText:)`
 - `forensicSectionWindows(originalText:totalDurationMS:totalChunkCount:)`

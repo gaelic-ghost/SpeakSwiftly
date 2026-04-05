@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This note describes the current `SpeechTextNormalizer` implementation in [SpeechTextNormalizer.swift](/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift) after the functional cleanup pass. The goal of the normalizer is to take text that often makes the local model spiral into bad generations, parse it into recognizable problem shapes, and rewrite only those shapes into more speakable text.
+This note describes the current `SpeechTextNormalizer` implementation in [SpeechTextNormalizer.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Sources/SpeakSwiftly/SpeechTextNormalizer.swift) after the functional cleanup pass. The goal of the normalizer is to take text that often makes the local model spiral into bad generations, parse it into recognizable problem shapes, and rewrite only those shapes into more speakable text.
 
 ## Current shape
 
@@ -39,12 +39,12 @@ The implementation now relies on two Apple text APIs:
 - `NaturalLanguage.NLTokenizer`
   - Used for word tokenization in `naturalLanguageTokenRanges(in:)` and `naturalLanguageWords(in:)`.
   - Apple documents `NLTokenizer` as a tokenizer that segments natural language text into semantic units and exposes token ranges through `tokens(for:)` and `enumerateTokens(in:using:)`.
-  - Source: [NLTokenizer](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/naturallanguage/nltokenizer)
-  - Source: [enumerateTokens(in:using:)](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/naturallanguage/nltokenizer/enumeratetokens(in:using:))
+  - Source: [NLTokenizer](https://developer.apple.com/documentation/naturallanguage/nltokenizer)
+  - Source: [enumerateTokens(in:using:)](https://developer.apple.com/documentation/naturallanguage/nltokenizer/enumeratetokens(in:using:))
 - `RegexBuilder`
   - Used for the code-marker detector so the broad code signal is expressed with Swift’s regex DSL instead of string regex literals.
   - Apple documents `RegexBuilder` as a DSL for building regexes for searching and replacing in text.
-  - Source: [RegexBuilder](http://127.0.0.1:53593/Dash/dash-apple-api/load?request_key=ls/documentation/regexbuilder)
+  - Source: [RegexBuilder](https://developer.apple.com/documentation/regexbuilder)
 
 ## Pass-by-pass behavior
 
@@ -229,7 +229,7 @@ Current counters include:
 
 ## Test coverage
 
-The current tests now include dedicated helper coverage in [SpeechTextNormalizerTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeechTextNormalizerTests.swift):
+The current tests now include dedicated helper coverage in [SpeechTextNormalizerTests.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Tests/SpeakSwiftlyTests/SpeechTextNormalizerTests.swift):
 
 - fenced code blocks
 - inline code spans
@@ -243,7 +243,7 @@ The current tests now include dedicated helper coverage in [SpeechTextNormalizer
 - spiral-prone words
 - mixed integration cases
 
-Existing integration coverage remains in [ModelClientsTests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/ModelClientsTests.swift), and the package-level behavior is still exercised through [SpeakSwiftlyE2ETests.swift](/Users/galew/Workspace/SpeakSwiftly/Tests/SpeakSwiftlyTests/SpeakSwiftlyE2ETests.swift).
+Existing integration coverage remains in [ModelClientsTests.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Tests/SpeakSwiftlyTests/ModelClientsTests.swift), and the package-level behavior is still exercised through [SpeakSwiftlyE2ETests.swift](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/Tests/SpeakSwiftlyTests/SpeakSwiftlyE2ETests.swift).
 
 ## Current known limits
 

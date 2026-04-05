@@ -1,6 +1,6 @@
 # SpeakSwiftly
 
-A thin Swift worker executable for long-lived local speech generation around `mlx-audio-swift`.
+A Swift speech worker and runtime package for long-lived local text-to-speech built on `mlx-audio-swift`.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ A thin Swift worker executable for long-lived local speech generation around `ml
 
 ## Overview
 
-SpeakSwiftly is a small Swift Package Manager executable intended to be launched and owned by another process, such as a macOS app or a Python service.
+SpeakSwiftly is a Swift Package Manager package built to be launched and owned by another process, such as a macOS app or a Python service. It keeps the MLX-backed speech runtime in one focused place while still exposing typed Swift APIs for callers that do not want to speak JSONL directly.
 
 The package also ships two reusable library products:
 
@@ -65,7 +65,7 @@ The first intended runtime shape is:
 
 ## Setup
 
-This repository is a standard Swift package with `mlx-audio-swift` wired in as the model/runtime dependency.
+This repository is a standard Swift package with [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) wired in as the model and runtime dependency.
 
 ```bash
 swift build
@@ -194,20 +194,19 @@ SpeakSwiftly is intended to be the source-of-truth standalone repository for thi
 
 The preferred ownership model is:
 
-- This repository remains the primary development home for `SpeakSwiftly`.
-- A separate GitHub remote is created for this repository.
-- The larger `speak-to-user` repository consumes `SpeakSwiftly` as a Git submodule under `packages/SpeakSwiftly`.
+- This repository remains the primary development home for [`SpeakSwiftly`](https://github.com/gaelic-ghost/SpeakSwiftly).
+- The larger [`speak-to-user`](https://github.com/gaelic-ghost/speak-to-user) repository consumes `SpeakSwiftly` as a Git submodule under `packages/SpeakSwiftly`.
 - Feature work happens here first, and the consuming repository updates its submodule pointer when it is ready to adopt a newer revision.
 
 That arrangement keeps the package history, tags, and releases independent while still letting the larger repository pin an exact commit.
 
-The local release workflow also has one adjacent-repo integration step now: the adjacent `../speak-to-user-mcp` checkout includes a repo-managed hook installer at `scripts/install-speakswiftly-release-hook.sh` and a tag handler at `scripts/handle-adjacent-speakswiftly-release-tag.sh`. When that hook is installed there, a new local `SpeakSwiftly` release tag created here refreshes the cached worker runtime in `../speak-to-user-mcp` so the day-to-day MCP consumer stays aligned with the latest tagged standalone release.
+The local release workflow also has one adjacent-repo integration step now: the adjacent [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) checkout includes a repo-managed hook installer at `scripts/install-speakswiftly-release-hook.sh` and a tag handler at `scripts/handle-adjacent-speakswiftly-release-tag.sh`. When that hook is installed there, a new local `SpeakSwiftly` release tag created here refreshes the cached worker runtime in `../speak-to-user-mcp` so the day-to-day MCP consumer stays aligned with the latest tagged standalone release.
 
 Today that adjacent-repo refresh is intentionally narrow:
 
-- It updates the cached binary used by `../speak-to-user-mcp`.
+- It updates the cached binary used by [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp).
 - It does not yet fan out to every other neighboring local repository that may also consume a cached `SpeakSwiftly` binary.
-- Other adjacent consumers such as `../speak-to-user-server` still need an explicit follow-up expansion of that release propagation workflow.
+- Other adjacent consumers such as [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) still need an explicit follow-up expansion of that release propagation workflow.
 
 When `speak-to-user` is using this package, the expected package path is:
 
