@@ -282,7 +282,9 @@ struct SpeakSwiftlyE2ETests {
 
             let store = ProfileStore(rootURL: sandbox.profileRootURL)
             let storedProfile = try store.loadProfile(named: cloneProfileName)
-            #expect(!storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+            #expect(!inferredTranscript.isEmpty)
+            #expect(Self.transcriptLooksCloseToCloneSource(inferredTranscript))
 
             try await Self.runSilentSpeech(
                 on: worker,
@@ -989,6 +991,37 @@ struct SpeakSwiftlyE2ETests {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
         } != nil)
+    }
+
+    private static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
+        let expectedTokens = normalizedTranscriptTokens(from: Self.testingCloneSourceText)
+        let actualTokens = normalizedTranscriptTokens(from: transcript)
+
+        guard !expectedTokens.isEmpty, !actualTokens.isEmpty else {
+            return false
+        }
+
+        let sharedTokens = expectedTokens.intersection(actualTokens)
+        let recall = Double(sharedTokens.count) / Double(expectedTokens.count)
+        let precision = Double(sharedTokens.count) / Double(actualTokens.count)
+
+        return recall >= 0.7 && precision >= 0.6
+    }
+
+    private static func normalizedTranscriptTokens(from text: String) -> Set<String> {
+        let scalars = text.lowercased().unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar) {
+                return Character(scalar)
+            }
+            return " "
+        }
+        let normalized = String(scalars)
+        return Set(
+            normalized
+                .split(whereSeparator: \.isWhitespace)
+                .map(String.init)
+                .filter { !$0.isEmpty }
+        )
     }
 
     private static var e2eTimeout: Duration {
