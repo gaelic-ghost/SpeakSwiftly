@@ -133,11 +133,10 @@ The intended first protocol is newline-delimited JSON over standard input and ou
 Example request shapes:
 
 ```json
-{"id":"req-1","op":"speak_live","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1c","op":"speak_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
+{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1c","op":"queue_speech_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
 {"id":"req-1d","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
 {"id":"req-1e","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
-{"id":"req-1b","op":"speak_live_background","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
@@ -148,11 +147,9 @@ Example response and event shapes:
 ```json
 {"event":"worker_status","stage":"warming_resident_model"}
 {"id":"req-1","event":"queued","reason":"waiting_for_resident_model","queue_position":1}
-{"id":"req-1b","ok":true}
 {"id":"req-2","event":"queued","reason":"waiting_for_active_request","queue_position":2}
 {"event":"worker_status","stage":"resident_model_ready"}
-{"id":"req-1","event":"started","op":"speak_live"}
-{"id":"req-1b","event":"started","op":"speak_live_background"}
+{"id":"req-1","event":"started","op":"queue_speech_live"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
@@ -164,12 +161,11 @@ Example response and event shapes:
 
 Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting live playback requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
 
-`speak_live_background` uses the same playback path as `speak_live`, but it acknowledges success as soon as the request has been accepted into the worker queue. That gives an owner process a queue-and-return path without changing the blocking semantics of `speak_live`. The background request still emits the usual `started` and `progress` events later, and it can still emit a later failure response if playback breaks after the enqueue acknowledgment.
+`queue_speech_live` is the wire-level live playback operation. The worker acknowledges queue acceptance immediately through the request stream, then emits the usual `started`, `progress`, and terminal success or failure events later as playback advances.
 
 Current operation families are:
 
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
-- Queue-and-return live playback via `speak_live_background` for callers that want enqueue acknowledgment instead of waiting for playback completion.
 - On-demand `1.7B` VoiceDesign profile creation.
 - On-demand clone profile creation from caller-provided reference audio, with optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
@@ -217,7 +213,7 @@ The current typed voice-profile creation helpers on `SpeakSwiftly.Runtime` are:
 
 Current live-playback behavior is:
 
-- `speak_live` loads the stored profile and reference audio first.
+- `queue_speech_live` loads the stored profile and reference audio first.
 - The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
 - The resident and profile-generation paths now pass explicit local generation parameters instead of relying on whatever default values the current `mlx-audio-swift` dependency tip happens to expose, which helps keep short utterances from drifting back into runaway generation behavior.
 - Playback is now owned by a real `PlaybackController` actor in `Sources/SpeakSwiftly/Playback/PlaybackController.swift`, while the lower-level AVFoundation engine driver stays internal to the playback feature instead of living in `Runtime/`.
