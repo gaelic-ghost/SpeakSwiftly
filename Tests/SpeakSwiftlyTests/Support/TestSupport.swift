@@ -490,12 +490,14 @@ func makeRuntime(
         readRuntimeMemory: { nil }
     )
 
-    return WorkerRuntime(
+    let runtime = WorkerRuntime(
         dependencies: dependencies,
         profileStore: store,
         textRuntime: textRuntime,
-        playbackController: playbackController
+        playbackController: PlaybackController(driver: playbackController)
     )
+    await runtime.installPlaybackHooks()
+    return runtime
 }
 
 func makeTempDirectoryURL() -> URL {

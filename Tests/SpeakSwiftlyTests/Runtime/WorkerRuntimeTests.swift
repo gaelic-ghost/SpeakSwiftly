@@ -1576,6 +1576,7 @@ import TextForSpeech
 @Test func shutdownFailsTypedRequestStreamsForActiveAndQueuedRequests() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
+    let profileGate = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1594,7 +1595,12 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
     )
 
     await runtime.start()
@@ -1625,12 +1631,18 @@ import TextForSpeech
     )
 
     let queuedHandle = await runtime.submit(
-        .listProfiles(id: "req-queued-shutdown-stream")
+        .createProfile(
+            id: "req-queued-shutdown-stream",
+            profileName: "shutdown-queued-profile",
+            text: "A queued request that should still be active when shutdown begins.",
+            voiceDescription: "Warm and bright",
+            outputPath: nil
+        )
     )
     var queuedIterator = queuedHandle.events.makeAsyncIterator()
 
     let queuedEvent = try await queuedIterator.next()
-    #expect(queuedEvent == .started(WorkerStartedEvent(id: "req-queued-shutdown-stream", op: "list_profiles")))
+    #expect(queuedEvent == .started(WorkerStartedEvent(id: "req-queued-shutdown-stream", op: "create_profile")))
 
     await runtime.shutdown()
 
@@ -1647,6 +1659,9 @@ import TextForSpeech
     } catch let error as WorkerError {
         #expect(error.code == .requestCancelled)
     }
+
+    await profileGate.open()
+    await playbackDrain.open()
 }
 
 @Test func shutdownRejectsNewRequests() async throws {

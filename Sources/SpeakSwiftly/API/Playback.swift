@@ -47,14 +47,13 @@ public extension SpeakSwiftly.Runtime {
             await emitFailure(id: activeGeneration.request.id, error: cancellationError)
         }
 
-        if let activePlayback {
-            self.activePlayback = nil
-            activePlayback.task.cancel()
-        }
-
         await failQueuedRequests(with: cancellationError)
         await failWaitingPlaybackRequests(with: cancellationError)
-        await playbackController.stop()
+        let cancelledPlaybackJobs = await playbackController.shutdown()
+        for job in cancelledPlaybackJobs {
+            job.continuation.finish(throwing: cancellationError)
+            await completePlaybackJob(job, result: .failure(cancellationError))
+        }
         await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(await generationQueueDepth())])
     }
 }

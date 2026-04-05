@@ -90,15 +90,6 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
-    func playbackActiveRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let requestID = activePlayback?.requestID, let speechJob = speechJobs[requestID] else { return nil }
-        return ActiveWorkerRequestSummary(
-            id: requestID,
-            op: speechJob.op,
-            profileName: speechJob.profileName
-        )
-    }
-
     func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
         switch queueType {
         case .generation:
@@ -112,16 +103,7 @@ extension SpeakSwiftly.Runtime {
                 )
             }
         case .playback:
-            let waitingPlaybackQueue = playbackQueue.filter { $0 != activePlayback?.requestID }
-            return waitingPlaybackQueue.enumerated().compactMap { offset, requestID in
-                guard let speechJob = speechJobs[requestID] else { return nil }
-                return QueuedWorkerRequestSummary(
-                    id: requestID,
-                    op: speechJob.op,
-                    profileName: speechJob.profileName,
-                    queuePosition: offset + 1
-                )
-            }
+            return await playbackController.queuedRequestSummaries()
         }
     }
 
@@ -130,7 +112,7 @@ extension SpeakSwiftly.Runtime {
         case .generation:
             return generationActiveRequestSummary()
         case .playback:
-            return playbackActiveRequestSummary()
+            return await playbackController.activeRequestSummary()
         }
     }
 
@@ -255,7 +237,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func logPlaybackFinished(
-        for speechJob: SpeechJobState,
+        for speechJob: PlaybackJob,
         playbackSummary: PlaybackSummary,
         sampleRate: Double
     ) async {

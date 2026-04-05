@@ -72,54 +72,6 @@ public extension SpeakSwiftly {
         case requestStillPendingPlayback(String)
     }
 
-    final class SpeechJobState: @unchecked Sendable {
-        let requestID: String
-        let op: String
-        let text: String
-        let normalizedText: String
-        let profileName: String
-        let textProfileName: String?
-        let textContext: TextForSpeech.Context?
-        let textFeatures: SpeechTextForensicFeatures
-        let textSections: [SpeechTextForensicSection]
-        let stream: AsyncThrowingStream<[Float], any Swift.Error>
-        let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
-        var sampleRate: Double?
-        var generationTask: Task<Void, Never>?
-        var playbackTask: Task<Void, Never>?
-
-        init(
-            requestID: String,
-            op: String,
-            text: String,
-            normalizedText: String,
-            profileName: String,
-            textProfileName: String?,
-            textContext: TextForSpeech.Context?,
-            textFeatures: SpeechTextForensicFeatures,
-            textSections: [SpeechTextForensicSection],
-            stream: AsyncThrowingStream<[Float], any Swift.Error>,
-            continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
-        ) {
-            self.requestID = requestID
-            self.op = op
-            self.text = text
-            self.normalizedText = normalizedText
-            self.profileName = profileName
-            self.textProfileName = textProfileName
-            self.textContext = textContext
-            self.textFeatures = textFeatures
-            self.textSections = textSections
-            self.stream = stream
-            self.continuation = continuation
-        }
-    }
-
-    struct ActivePlayback: Sendable {
-        let requestID: String
-        let task: Task<Void, Never>
-    }
-
     struct OutgoingWorkerRequest: Encodable {
         let id: String
         let op: String
@@ -207,7 +159,7 @@ public extension SpeakSwiftly {
     let logEncoder = JSONEncoder()
     let profileStore: ProfileStore
     let textRuntime: TextForSpeechRuntime
-    let playbackController: AnyPlaybackController
+    let playbackController: PlaybackController
     let generationController = GenerationController()
     let logTimestampFormatter = ISO8601DateFormatter()
     private let maxAcceptedSpeechJobs = 8
@@ -219,17 +171,13 @@ public extension SpeakSwiftly {
     var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
     var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
     var activeGeneration: ActiveRequest?
-    var activePlayback: ActivePlayback?
-    var speechJobs = [String: SpeechJobState]()
-    var playbackQueue = [String]()
-
     // MARK: - Lifecycle
 
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
         textRuntime: TextForSpeechRuntime,
-        playbackController: AnyPlaybackController
+        playbackController: PlaybackController
     ) {
         self.dependencies = dependencies
         self.profileStore = profileStore
@@ -258,13 +206,32 @@ public extension SpeakSwiftly {
             let message = "SpeakSwiftly could not load persisted text profiles from '\(textRuntime.persistenceURL?.path ?? "unknown path")'. \(error.localizedDescription)\n"
             FileHandle.standardError.write(Data(message.utf8))
         }
-        let playbackController = await dependencies.makePlaybackController()
+        let playbackController = PlaybackController(driver: await dependencies.makePlaybackController())
 
-        return Runtime(
+        let runtime = Runtime(
             dependencies: dependencies,
             profileStore: profileStore,
             textRuntime: textRuntime,
             playbackController: playbackController
+        )
+        await runtime.installPlaybackHooks()
+        return runtime
+    }
+
+    func installPlaybackHooks() async {
+        await playbackController.bind(
+            PlaybackHooks(
+                handleEvent: { event, job in
+                    await self.handlePlaybackEvent(event, for: job)
+                },
+                logFinished: { job, playbackSummary, sampleRate in
+                    await self.emitProgress(id: job.requestID, stage: .playbackFinished)
+                    await self.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
+                },
+                completeJob: { job, result in
+                    await self.completePlaybackJob(job, result: result)
+                }
+            )
         )
     }
 
@@ -326,7 +293,7 @@ public extension SpeakSwiftly {
                     )
                 }
                 try await startNextGenerationIfPossible()
-                await startNextPlaybackIfPossible()
+                await playbackController.startNextIfPossible()
             } catch is CancellationError {
                 guard !isShuttingDown else { return }
 
@@ -446,7 +413,7 @@ public extension SpeakSwiftly {
             return
         }
 
-        if request.isSpeechRequest, speechJobs.count >= maxAcceptedSpeechJobs {
+        if request.isSpeechRequest, await playbackController.jobCount() >= maxAcceptedSpeechJobs {
             let workerError = WorkerError(
                 code: .invalidRequest,
                 message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more."
@@ -468,8 +435,7 @@ public extension SpeakSwiftly {
         )
         if request.isSpeechRequest {
             let speechJob = makeSpeechJobState(for: request)
-            speechJobs[request.id] = speechJob
-            playbackQueue.append(request.id)
+            await playbackController.enqueue(speechJob)
         }
         if let queuedEvent = await makeQueuedEvent(for: job) {
             await emit(queuedEvent)
@@ -495,7 +461,7 @@ public extension SpeakSwiftly {
             await emit(acknowledgement)
         }
         try? await startNextGenerationIfPossible()
-        await startNextPlaybackIfPossible()
+        await playbackController.startNextIfPossible()
     }
 
     // MARK: - Processing
@@ -530,7 +496,7 @@ public extension SpeakSwiftly {
         }
         activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
         if case .queueSpeech(let id, _, _, _, _, _) = job.request {
-            speechJobs[id]?.generationTask = task
+            await playbackController.setGenerationTask(task, for: id)
         }
     }
 
@@ -642,14 +608,11 @@ public extension SpeakSwiftly {
                 )
 
             case .playback(let id, let action):
-                let playbackState = await handlePlaybackControl(action)
+                _ = await playbackController.handle(action)
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        playbackState: PlaybackStateSummary(
-                            state: playbackState,
-                            activeRequest: playbackActiveRequestSummary()
-                        )
+                        playbackState: await playbackController.stateSnapshot()
                     )
                 )
 
@@ -697,7 +660,7 @@ public extension SpeakSwiftly {
 
     private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
         let residentModel = try residentModelOrThrow()
-        guard let speechJob = speechJobs[id] else {
+        guard let speechJob = await playbackController.job(for: id) else {
             throw WorkerError(
                 code: .internalError,
                 message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug."
@@ -834,8 +797,7 @@ public extension SpeakSwiftly {
 
         for job in queuedJobs {
             if job.request.isSpeechRequest {
-                _ = removeSpeechJob(requestID: job.request.id)
-                removePlaybackJob(requestID: job.request.id)
+                _ = await playbackController.discard(requestID: job.request.id)
             }
             failRequestStream(for: job.request.id, error: error)
             requestAcceptedAt.removeValue(forKey: job.request.id)
@@ -858,7 +820,7 @@ public extension SpeakSwiftly {
 
         guard !isShuttingDown else { return }
         try? await startNextGenerationIfPossible()
-        await startNextPlaybackIfPossible()
+        await playbackController.startNextIfPossible()
     }
 
     private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
@@ -866,7 +828,7 @@ public extension SpeakSwiftly {
         await completeRequest(request: request, result: result)
     }
 
-    private func makeSpeechJobState(for request: WorkerRequest) -> SpeechJobState {
+    private func makeSpeechJobState(for request: WorkerRequest) -> PlaybackJob {
         let requestID = request.id
         let op = request.opName
         let text = switch request {
@@ -889,7 +851,7 @@ public extension SpeakSwiftly {
         var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
         let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
 
-        return SpeechJobState(
+        return PlaybackJob(
             requestID: requestID,
             op: op,
             text: text,
