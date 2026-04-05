@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import SpeakSwiftlyCore
 import TextForSpeech
@@ -33,17 +34,26 @@ import TextForSpeech
     let textProfileSnapshot: @Sendable (SpeakSwiftly.Runtime, String?) async -> TextForSpeech.Profile = { runtime, name in
         await runtime.textProfileSnapshot(named: name)
     }
-    let storeTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async -> Void = { runtime, profile in
-        await runtime.storeTextProfile(profile)
+    let textProfilePersistenceURL: @Sendable (SpeakSwiftly.Runtime) async -> URL? = { runtime in
+        await runtime.textProfilePersistenceURL()
     }
-    let useTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async -> Void = { runtime, profile in
-        await runtime.useTextProfile(profile)
+    let loadTextProfiles: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
+        try await runtime.loadTextProfiles()
     }
-    let removeTextProfile: @Sendable (SpeakSwiftly.Runtime, String) async -> Void = { runtime, name in
-        await runtime.removeTextProfile(named: name)
+    let saveTextProfiles: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
+        try await runtime.saveTextProfiles()
     }
-    let resetTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> Void = { runtime in
-        await runtime.resetTextProfile()
+    let storeTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async throws -> Void = { runtime, profile in
+        try await runtime.storeTextProfile(profile)
+    }
+    let useTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async throws -> Void = { runtime, profile in
+        try await runtime.useTextProfile(profile)
+    }
+    let removeTextProfile: @Sendable (SpeakSwiftly.Runtime, String) async throws -> Void = { runtime, name in
+        try await runtime.removeTextProfile(named: name)
+    }
+    let resetTextProfile: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
+        try await runtime.resetTextProfile()
     }
     let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
@@ -91,6 +101,9 @@ import TextForSpeech
     _ = removeProfile
     _ = textProfile
     _ = textProfileSnapshot
+    _ = textProfilePersistenceURL
+    _ = loadTextProfiles
+    _ = saveTextProfiles
     _ = storeTextProfile
     _ = useTextProfile
     _ = removeTextProfile

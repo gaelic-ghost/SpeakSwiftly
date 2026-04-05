@@ -447,6 +447,10 @@ func makeRuntime(
     }
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
+    let textRuntime = TextForSpeechRuntime(
+        persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
+    )
+    try textRuntime.load()
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
         fileManager: .default,
@@ -472,7 +476,7 @@ func makeRuntime(
     return WorkerRuntime(
         dependencies: dependencies,
         profileStore: store,
-        textRuntime: TextForSpeechRuntime(),
+        textRuntime: textRuntime,
         playbackController: playbackController
     )
 }

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import SpeakSwiftlyCore
+import TextForSpeech
 
 // MARK: - Queueing and Preload
 
@@ -146,6 +147,47 @@ import Testing
     } catch let error as WorkerError {
         #expect(error.code == .modelGenerationFailed)
     }
+}
+
+@Test func persistedTextProfilesReloadAcrossRuntimeConstruction() async throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let firstRuntime = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+    try await firstRuntime.storeTextProfile(
+        TextForSpeech.Profile(
+            id: "logs",
+            name: "Logs",
+            replacements: [
+                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")
+            ]
+        )
+    )
+    try await firstRuntime.useTextProfile(
+        TextForSpeech.Profile(
+            id: "ops",
+            name: "Ops",
+            replacements: [
+                TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")
+            ]
+        )
+    )
+
+    let secondRuntime = try await makeRuntime(
+        rootURL: rootURL,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    #expect(await secondRuntime.textProfile(named: "logs")?.replacements.map(\.id) == ["logs-rule"])
+    #expect(await secondRuntime.textProfileSnapshot().id == "ops")
+    #expect(await secondRuntime.textProfileSnapshot().replacements.map(\.id) == ["ops-rule"])
 }
 
 @Test func waitingRequestsReportPriorityQueuePositions() async throws {

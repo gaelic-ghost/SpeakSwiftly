@@ -9,6 +9,12 @@ public extension SpeakSwiftly {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
 
+    private enum TextProfilePersistence {
+        static func url(in rootURL: URL) -> URL {
+            rootURL.appending(path: ProfileStore.textProfilesFileName)
+        }
+    }
+
     private enum PlaybackConfiguration {
         // Shorter chunk cadence gives playback a second chunk in reserve before
         // the first one drains, which reduces audible shudder from one-chunk starts.
@@ -237,7 +243,15 @@ public extension SpeakSwiftly {
             ),
             fileManager: dependencies.fileManager
         )
-        let textRuntime = TextForSpeechRuntime()
+        let textRuntime = TextForSpeechRuntime(
+            persistenceURL: TextProfilePersistence.url(in: profileStore.rootURL)
+        )
+        do {
+            try textRuntime.load()
+        } catch {
+            let message = "SpeakSwiftly could not load persisted text profiles from '\(textRuntime.persistenceURL?.path ?? "unknown path")'. \(error.localizedDescription)\n"
+            FileHandle.standardError.write(Data(message.utf8))
+        }
         let playbackController = await dependencies.makePlaybackController()
 
         return Runtime(
@@ -506,20 +520,36 @@ public extension SpeakSwiftly {
         textRuntime.snapshot(named: name)
     }
 
-    public func storeTextProfile(_ profile: TextForSpeech.Profile) {
+    public func textProfilePersistenceURL() -> URL? {
+        textRuntime.persistenceURL
+    }
+
+    public func loadTextProfiles() throws {
+        try textRuntime.load()
+    }
+
+    public func saveTextProfiles() throws {
+        try textRuntime.save()
+    }
+
+    public func storeTextProfile(_ profile: TextForSpeech.Profile) throws {
         textRuntime.store(profile)
+        try textRuntime.save()
     }
 
-    public func useTextProfile(_ profile: TextForSpeech.Profile) {
+    public func useTextProfile(_ profile: TextForSpeech.Profile) throws {
         textRuntime.use(profile)
+        try textRuntime.save()
     }
 
-    public func removeTextProfile(named name: String) {
+    public func removeTextProfile(named name: String) throws {
         textRuntime.removeProfile(named: name)
+        try textRuntime.save()
     }
 
-    public func resetTextProfile() {
+    public func resetTextProfile() throws {
         textRuntime.reset()
+        try textRuntime.save()
     }
 
     public func createProfile(

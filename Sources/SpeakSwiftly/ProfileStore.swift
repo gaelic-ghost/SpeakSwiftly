@@ -52,6 +52,7 @@ struct StoredProfile: Sendable, Equatable {
 struct ProfileStore {
     static let directoryName = "SpeakSwiftly"
     static let profilesDirectoryName = "profiles"
+    static let textProfilesFileName = "text-profiles.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
 
