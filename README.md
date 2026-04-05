@@ -74,7 +74,7 @@ This repository is a standard Swift package with [`mlx-audio-swift`](https://git
 Library consumers can depend on the package directly from GitHub:
 
 ```swift
-.package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "0.9.0")
+.package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "0.9.2")
 ```
 
 Then add the `SpeakSwiftlyCore` product to the target that will own the runtime. If the caller also wants direct access to text-profile primitives, add [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech.git) separately too.
@@ -238,13 +238,7 @@ The preferred ownership model is:
 
 That arrangement keeps the package history, tags, and releases independent while still letting the larger repository pin an exact commit.
 
-The local release workflow also has one adjacent-repo integration step now: the adjacent [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) checkout includes a repo-managed hook installer at `scripts/install-speakswiftly-release-hook.sh` and a tag handler at `scripts/handle-adjacent-speakswiftly-release-tag.sh`. When that hook is installed there, a new local `SpeakSwiftly` release tag created here refreshes the cached worker runtime in `../speak-to-user-mcp` so the day-to-day MCP consumer stays aligned with the latest tagged standalone release.
-
-Today that adjacent-repo refresh is intentionally narrow:
-
-- It updates the cached binary used by [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp).
-- It does not yet fan out to every other neighboring local repository that may also consume a cached `SpeakSwiftly` binary.
-- Other adjacent consumers such as [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) still need an explicit follow-up expansion of that release propagation workflow.
+Older adjacent consumers such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should now point at one shared built runtime directory instead of relying on tag-triggered copy hooks. The preferred local development shape is to build `SpeakSwiftly` once in the monorepo checkout and then point those hosts at the Xcode products directory so the executable and MLX bundle stay together.
 
 When `speak-to-user` is using this package, the expected package path is:
 
@@ -284,7 +278,11 @@ xcodebuild build \
   -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
 ```
 
-Opt-in real-model e2e coverage is available for the on-demand `1.7B` path, the resident `0.6B` path with silent playback, and the resident `0.6B` path through the real local `AVAudioEngine` playback stack. The harness builds and launches that Xcode-backed worker automatically:
+Opt-in real-model e2e coverage is available for three main sequential workflows, and the harness builds and launches the Xcode-backed worker automatically:
+
+- VoiceDesign profile creation, then silent playback, then audible playback.
+- Clone profile creation from caller-provided reference audio plus transcript, then silent playback, then audible playback.
+- Clone profile creation from caller-provided reference audio with transcript inference, then silent playback, then audible playback. That third lane also checks that the inferred transcript stays meaningfully close to the known spoken source text used to generate the reference audio fixture inside the sandbox.
 
 ```bash
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
@@ -316,9 +314,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swi
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest
 ```
 
-The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each test still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
-
-The default shared per-user profile store now also includes a real `testing-profile` created through the worker itself, so downstream apps can reuse the same clone profile outside the isolated e2e sandbox.
+The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each workflow still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
 
 If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of an Xcode-built products directory. Rebuild with `xcodebuild`, then run the executable with `DYLD_FRAMEWORK_PATH` pointed at the matching Xcode build products directory.
 
