@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Runtime Voice Profiles
+// MARK: - Voice Profile Generation Logic
 
 extension SpeakSwiftly.Runtime {
     func handleCreateProfile(

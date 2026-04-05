@@ -1316,10 +1316,7 @@ private final class WorkerProcess: @unchecked Sendable {
     }
 
     private static func computeWorkerExecutableURL() throws -> URL {
-        let packageRootURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let packageRootURL = try packageRootURL()
         let derivedDataURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-dd", isDirectory: true)
         let sourcePackagesURL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -1350,6 +1347,27 @@ private final class WorkerProcess: @unchecked Sendable {
         }
 
         return executableURL
+    }
+
+    private static func packageRootURL() throws -> URL {
+        let fileManager = FileManager.default
+        var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+        while true {
+            let manifestURL = candidateURL.appendingPathComponent("Package.swift", isDirectory: false)
+            if fileManager.fileExists(atPath: manifestURL.path) {
+                return candidateURL
+            }
+
+            let parentURL = candidateURL.deletingLastPathComponent()
+            guard parentURL != candidateURL else {
+                throw WorkerProcessError(
+                    "SpeakSwiftly e2e tests could not find the package root while walking upward from '\(#filePath)'. Expected to find a directory containing 'Package.swift'."
+                )
+            }
+
+            candidateURL = parentURL
+        }
     }
 
     private static func buildWorkerProduct(

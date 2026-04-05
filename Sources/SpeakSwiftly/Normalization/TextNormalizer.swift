@@ -1,122 +1,126 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - Public Normalizer
+// MARK: - Text Normalization Logic
 
-public extension SpeakSwiftly {
-    struct Normalizer: Sendable {
-        let runtime: SpeakSwiftly.Runtime
+extension SpeakSwiftly.Runtime {
+    func normalizerActiveProfile() -> TextForSpeech.Profile {
+        textRuntime.customProfile
+    }
 
-        init(runtime: SpeakSwiftly.Runtime) {
-            self.runtime = runtime
-        }
+    func normalizerBaseProfile() -> TextForSpeech.Profile {
+        textRuntime.baseProfile
+    }
 
-        public func activeProfile() async -> TextForSpeech.Profile {
-            await runtime.normalizerActiveProfile()
-        }
+    func normalizerProfile(named name: String) -> TextForSpeech.Profile? {
+        textRuntime.profile(named: name)
+    }
 
-        public func baseProfile() async -> TextForSpeech.Profile {
-            await runtime.normalizerBaseProfile()
-        }
+    func normalizerProfiles() -> [TextForSpeech.Profile] {
+        textRuntime.storedProfiles()
+    }
 
-        public func profile(named name: String) async -> TextForSpeech.Profile? {
-            await runtime.normalizerProfile(named: name)
-        }
+    func normalizerEffectiveProfile(named name: String? = nil) -> TextForSpeech.Profile {
+        textRuntime.snapshot(named: name)
+    }
 
-        public func profiles() async -> [TextForSpeech.Profile] {
-            await runtime.normalizerProfiles()
-        }
+    func normalizerPersistenceURL() -> URL? {
+        textRuntime.persistenceURL
+    }
 
-        public func effectiveProfile(named name: String? = nil) async -> TextForSpeech.Profile {
-            await runtime.normalizerEffectiveProfile(named: name)
-        }
+    func normalizerLoadProfiles() throws {
+        try textRuntime.load()
+    }
 
-        public func persistenceURL() async -> URL? {
-            await runtime.normalizerPersistenceURL()
-        }
+    func normalizerSaveProfiles() throws {
+        try textRuntime.save()
+    }
 
-        public func loadProfiles() async throws {
-            try await runtime.normalizerLoadProfiles()
-        }
+    func normalizerCreateProfile(
+        id: String,
+        named name: String,
+        replacements: [TextForSpeech.Replacement] = []
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.createProfile(
+            id: id,
+            named: name,
+            replacements: replacements
+        )
+        try textRuntime.save()
+        return profile
+    }
 
-        public func saveProfiles() async throws {
-            try await runtime.normalizerSaveProfiles()
-        }
+    func normalizerStoreProfile(_ profile: TextForSpeech.Profile) throws {
+        textRuntime.store(profile)
+        try textRuntime.save()
+    }
 
-        public func createProfile(
-            id: String,
-            named name: String,
-            replacements: [TextForSpeech.Replacement] = []
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerCreateProfile(
-                id: id,
-                named: name,
-                replacements: replacements
-            )
-        }
+    func normalizerUseProfile(_ profile: TextForSpeech.Profile) throws {
+        textRuntime.use(profile)
+        try textRuntime.save()
+    }
 
-        public func storeProfile(_ profile: TextForSpeech.Profile) async throws {
-            try await runtime.normalizerStoreProfile(profile)
-        }
+    func normalizerRemoveProfile(named name: String) throws {
+        textRuntime.removeProfile(named: name)
+        try textRuntime.save()
+    }
 
-        public func useProfile(_ profile: TextForSpeech.Profile) async throws {
-            try await runtime.normalizerUseProfile(profile)
-        }
+    func normalizerReset() throws {
+        textRuntime.reset()
+        try textRuntime.save()
+    }
 
-        public func removeProfile(named name: String) async throws {
-            try await runtime.normalizerRemoveProfile(named: name)
-        }
+    func normalizerAddReplacement(
+        _ replacement: TextForSpeech.Replacement
+    ) throws -> TextForSpeech.Profile {
+        let profile = textRuntime.addReplacement(replacement)
+        try textRuntime.save()
+        return profile
+    }
 
-        public func reset() async throws {
-            try await runtime.normalizerReset()
-        }
+    func normalizerAddReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        toStoredProfileNamed name: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
 
-        public func addReplacement(
-            _ replacement: TextForSpeech.Replacement
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerAddReplacement(replacement)
-        }
+    func normalizerReplaceReplacement(
+        _ replacement: TextForSpeech.Replacement
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.replaceReplacement(replacement)
+        try textRuntime.save()
+        return profile
+    }
 
-        public func addReplacement(
-            _ replacement: TextForSpeech.Replacement,
-            toStoredProfileNamed name: String
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerAddReplacement(
-                replacement,
-                toStoredProfileNamed: name
-            )
-        }
+    func normalizerReplaceReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        inStoredProfileNamed name: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: name)
+        try textRuntime.save()
+        return profile
+    }
 
-        public func replaceReplacement(
-            _ replacement: TextForSpeech.Replacement
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerReplaceReplacement(replacement)
-        }
+    func normalizerRemoveReplacement(
+        id replacementID: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.removeReplacement(id: replacementID)
+        try textRuntime.save()
+        return profile
+    }
 
-        public func replaceReplacement(
-            _ replacement: TextForSpeech.Replacement,
-            inStoredProfileNamed name: String
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerReplaceReplacement(
-                replacement,
-                inStoredProfileNamed: name
-            )
-        }
-
-        public func removeReplacement(
-            id replacementID: String
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerRemoveReplacement(id: replacementID)
-        }
-
-        public func removeReplacement(
-            id replacementID: String,
-            fromStoredProfileNamed name: String
-        ) async throws -> TextForSpeech.Profile {
-            try await runtime.normalizerRemoveReplacement(
-                id: replacementID,
-                fromStoredProfileNamed: name
-            )
-        }
+    func normalizerRemoveReplacement(
+        id replacementID: String,
+        fromStoredProfileNamed name: String
+    ) throws -> TextForSpeech.Profile {
+        let profile = try textRuntime.removeReplacement(
+            id: replacementID,
+            fromStoredProfileNamed: name
+        )
+        try textRuntime.save()
+        return profile
     }
 }

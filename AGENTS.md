@@ -30,6 +30,14 @@
 - Land monorepo submodule bumps through a pull request against the monorepo instead of pushing those pointer updates directly to monorepo `main`.
 - Use tagged releases for the monorepo when publishing coordinated umbrella states that depend on specific submodule versions.
 
+## Repository Structure
+
+- Keep `Sources/SpeakSwiftly/API` as the single home for public `SpeakSwiftly.Runtime` API entry points and other operator-facing library surface declarations.
+- Keep feature logic in its feature directory, not in `Runtime/`. For example, text-normalization logic belongs in `Normalization/`, generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
+- Keep `Sources/SpeakSwiftly/Runtime` for runtime-only internals such as worker request handling, queue orchestration, lifecycle management, event emission, and other machinery that is genuinely part of the worker runtime itself.
+- Do not split one feature across three places when two will do. For any given feature, prefer one API file in `API/` plus one logic file in the relevant feature directory.
+- When reorganizing tests, mirror the source tree by feature area so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find.
+
 ## Swift Coding Preferences
 
 - Prefer the simplest correct Swift that is easiest to read, reason about, and maintain.
