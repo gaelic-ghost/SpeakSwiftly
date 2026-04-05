@@ -1,74 +1,8 @@
 import Foundation
-import TextForSpeech
 
-// MARK: - Runtime Public API
+// MARK: - Playback API
 
 public extension SpeakSwiftly.Runtime {
-    func speak(
-        text: String,
-        with profileName: String,
-        as job: SpeakSwiftly.Job,
-        textProfileName: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(
-            .queueSpeech(
-                id: id,
-                text: text,
-                profileName: profileName,
-                textProfileName: textProfileName,
-                jobType: job,
-                textContext: textContext
-            )
-        )
-    }
-
-    func createProfile(
-        named profileName: String,
-        from text: String,
-        voice voiceDescription: String,
-        outputPath: String? = nil,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(
-            .createProfile(
-                id: id,
-                profileName: profileName,
-                text: text,
-                voiceDescription: voiceDescription,
-                outputPath: outputPath
-            )
-        )
-    }
-
-    func createClone(
-        named profileName: String,
-        from referenceAudioURL: URL,
-        transcript: String? = nil,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(
-            .createClone(
-                id: id,
-                profileName: profileName,
-                referenceAudioPath: referenceAudioURL.path,
-                transcript: transcript
-            )
-        )
-    }
-
-    func profiles(id: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await submit(.listProfiles(id: id))
-    }
-
-    func removeProfile(
-        named profileName: String,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.removeProfile(id: id, profileName: profileName))
-    }
-
     func queue(
         _ queueType: SpeakSwiftly.Queue,
         id requestID: String = UUID().uuidString

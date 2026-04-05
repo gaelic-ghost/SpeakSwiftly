@@ -120,9 +120,3 @@ public extension SpeakSwiftly {
         }
     }
 }
-
-public extension SpeakSwiftly.Runtime {
-    nonisolated var normalizer: SpeakSwiftly.Normalizer {
-        SpeakSwiftly.Normalizer(runtime: self)
-    }
-}
