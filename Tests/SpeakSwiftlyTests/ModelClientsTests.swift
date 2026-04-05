@@ -760,7 +760,7 @@ import TextForSpeech
         canonicalAudioData: Data([0x01, 0x02])
     )
 
-    try await runtime.storeTextProfile(
+    try await runtime.normalizer.storeProfile(
         TextForSpeech.Profile(
             id: "logs",
             name: "Logs",

@@ -28,81 +28,84 @@ import TextForSpeech
             id: id
         )
     }
-    let textProfile: @Sendable (SpeakSwiftly.Runtime, String) async -> TextForSpeech.Profile? = { runtime, name in
-        await runtime.textProfile(named: name)
+    let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
+        runtime.normalizer
     }
-    let textProfiles: @Sendable (SpeakSwiftly.Runtime) async -> [TextForSpeech.Profile] = { runtime in
-        await runtime.textProfiles()
+    let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, name in
+        await normalizer.profile(named: name)
     }
-    let activeTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> TextForSpeech.Profile = { runtime in
-        await runtime.activeTextProfile()
+    let profilesList: @Sendable (SpeakSwiftly.Normalizer) async -> [TextForSpeech.Profile] = { normalizer in
+        await normalizer.profiles()
     }
-    let baseTextProfile: @Sendable (SpeakSwiftly.Runtime) async -> TextForSpeech.Profile = { runtime in
-        await runtime.baseTextProfile()
+    let activeProfile: @Sendable (SpeakSwiftly.Normalizer) async -> TextForSpeech.Profile = { normalizer in
+        await normalizer.activeProfile()
     }
-    let effectiveTextProfile: @Sendable (SpeakSwiftly.Runtime, String?) async -> TextForSpeech.Profile = { runtime, name in
-        await runtime.effectiveTextProfile(named: name)
+    let baseProfile: @Sendable (SpeakSwiftly.Normalizer) async -> TextForSpeech.Profile = { normalizer in
+        await normalizer.baseProfile()
     }
-    let textProfilePersistenceURL: @Sendable (SpeakSwiftly.Runtime) async -> URL? = { runtime in
-        await runtime.textProfilePersistenceURL()
+    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer, String?) async -> TextForSpeech.Profile = { normalizer, name in
+        await normalizer.effectiveProfile(named: name)
     }
-    let loadTextProfiles: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
-        try await runtime.loadTextProfiles()
+    let persistenceURL: @Sendable (SpeakSwiftly.Normalizer) async -> URL? = { normalizer in
+        await normalizer.persistenceURL()
     }
-    let saveTextProfiles: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
-        try await runtime.saveTextProfiles()
+    let loadProfiles: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
+        try await normalizer.loadProfiles()
     }
-    let createTextProfile: @Sendable (SpeakSwiftly.Runtime, String, String, [TextForSpeech.Replacement]) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let saveProfiles: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
+        try await normalizer.saveProfiles()
+    }
+    let createProfileObject: @Sendable (SpeakSwiftly.Normalizer, String, String, [TextForSpeech.Replacement]) async throws -> TextForSpeech.Profile = {
+        normalizer,
         id,
         name,
         replacements in
-        try await runtime.createTextProfile(id: id, named: name, replacements: replacements)
+        try await normalizer.createProfile(id: id, named: name, replacements: replacements)
     }
-    let storeTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async throws -> Void = { runtime, profile in
-        try await runtime.storeTextProfile(profile)
+    let storeProfile: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Profile) async throws -> Void = { normalizer, profile in
+        try await normalizer.storeProfile(profile)
     }
-    let useTextProfile: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Profile) async throws -> Void = { runtime, profile in
-        try await runtime.useTextProfile(profile)
+    let useProfile: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Profile) async throws -> Void = { normalizer, profile in
+        try await normalizer.useProfile(profile)
     }
-    let removeTextProfile: @Sendable (SpeakSwiftly.Runtime, String) async throws -> Void = { runtime, name in
-        try await runtime.removeTextProfile(named: name)
+    let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> Void = { normalizer, name in
+        try await normalizer.removeProfile(named: name)
     }
-    let resetTextProfile: @Sendable (SpeakSwiftly.Runtime) async throws -> Void = { runtime in
-        try await runtime.resetTextProfile()
+    let reset: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
+        try await normalizer.reset()
     }
-    let addActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacement in
-        try await runtime.addTextReplacement(replacement)
+        try await normalizer.addReplacement(replacement)
     }
-    let addStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacement,
         name in
-        try await runtime.addTextReplacement(replacement, toStoredTextProfileNamed: name)
+        try await normalizer.addReplacement(replacement, toStoredProfileNamed: name)
     }
-    let replaceActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacement in
-        try await runtime.replaceTextReplacement(replacement)
+        try await normalizer.replaceReplacement(replacement)
     }
-    let replaceStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacement,
         name in
-        try await runtime.replaceTextReplacement(replacement, inStoredTextProfileNamed: name)
+        try await normalizer.replaceReplacement(replacement, inStoredProfileNamed: name)
     }
-    let removeActiveTextReplacement: @Sendable (SpeakSwiftly.Runtime, String) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacementID in
-        try await runtime.removeTextReplacement(id: replacementID)
+        try await normalizer.removeReplacement(id: replacementID)
     }
-    let removeStoredTextReplacement: @Sendable (SpeakSwiftly.Runtime, String, String) async throws -> TextForSpeech.Profile = {
-        runtime,
+    let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, String, String) async throws -> TextForSpeech.Profile = {
+        normalizer,
         replacementID,
         name in
-        try await runtime.removeTextReplacement(id: replacementID, fromStoredTextProfileNamed: name)
+        try await normalizer.removeReplacement(id: replacementID, fromStoredProfileNamed: name)
     }
     let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
@@ -158,29 +161,30 @@ import TextForSpeech
     }
 
     _ = speak
+    _ = normalizer
     _ = createProfile
     _ = createClone
     _ = profiles
     _ = removeProfile
-    _ = textProfile
-    _ = textProfiles
-    _ = activeTextProfile
-    _ = baseTextProfile
-    _ = effectiveTextProfile
-    _ = textProfilePersistenceURL
-    _ = loadTextProfiles
-    _ = saveTextProfiles
-    _ = createTextProfile
-    _ = storeTextProfile
-    _ = useTextProfile
-    _ = removeTextProfile
-    _ = resetTextProfile
-    _ = addActiveTextReplacement
-    _ = addStoredTextReplacement
-    _ = replaceActiveTextReplacement
-    _ = replaceStoredTextReplacement
-    _ = removeActiveTextReplacement
-    _ = removeStoredTextReplacement
+    _ = profile
+    _ = profilesList
+    _ = activeProfile
+    _ = baseProfile
+    _ = effectiveProfile
+    _ = persistenceURL
+    _ = loadProfiles
+    _ = saveProfiles
+    _ = createProfileObject
+    _ = storeProfile
+    _ = useProfile
+    _ = removeProfileObject
+    _ = reset
+    _ = addActiveReplacement
+    _ = addStoredReplacement
+    _ = replaceActiveReplacement
+    _ = replaceStoredReplacement
+    _ = removeActiveReplacement
+    _ = removeStoredReplacement
     _ = generationQueue
     _ = playbackQueue
     _ = playbackPause

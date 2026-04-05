@@ -171,24 +171,27 @@ The test suite is organized to mirror the source responsibilities:
 
 The package also includes `TextForSpeech` coverage for normalization context, profile primitives, persistence, and effective-profile behavior.
 
-The current typed text-profile helpers on `SpeakSwiftly.Runtime` are:
+The typed text-profile helpers now live on `runtime.normalizer` as `SpeakSwiftly.Normalizer`:
 
-- `activeTextProfile()`
-- `baseTextProfile()`
-- `textProfile(named:)`
-- `textProfiles()`
-- `effectiveTextProfile(named:)`
-- `createTextProfile(id:named:replacements:)`
-- `storeTextProfile(_:)`
-- `useTextProfile(_:)`
-- `removeTextProfile(named:)`
-- `resetTextProfile()`
-- `addTextReplacement(_:)`
-- `addTextReplacement(_:toStoredTextProfileNamed:)`
-- `replaceTextReplacement(_:)`
-- `replaceTextReplacement(_:inStoredTextProfileNamed:)`
-- `removeTextReplacement(id:)`
-- `removeTextReplacement(id:fromStoredTextProfileNamed:)`
+- `activeProfile()`
+- `baseProfile()`
+- `profile(named:)`
+- `profiles()`
+- `effectiveProfile(named:)`
+- `persistenceURL()`
+- `loadProfiles()`
+- `saveProfiles()`
+- `createProfile(id:named:replacements:)`
+- `storeProfile(_:)`
+- `useProfile(_:)`
+- `removeProfile(named:)`
+- `reset()`
+- `addReplacement(_:)`
+- `addReplacement(_:toStoredProfileNamed:)`
+- `replaceReplacement(_:)`
+- `replaceReplacement(_:inStoredProfileNamed:)`
+- `removeReplacement(id:)`
+- `removeReplacement(id:fromStoredProfileNamed:)`
 
 The current typed voice-profile creation helpers on `SpeakSwiftly.Runtime` are:
 
