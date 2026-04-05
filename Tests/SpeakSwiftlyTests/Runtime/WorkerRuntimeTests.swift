@@ -1425,6 +1425,13 @@ import TextForSpeech
                 && $0["ok"] as? Bool == true
         }
     })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-3"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "list_profiles"
+        }
+    })
 
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_profile", "req-2:queue_speech_live", "req-3:list_profiles"])
