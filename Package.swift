@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "SpeakSwiftly",
     platforms: [
-        .macOS("15.0"),
+        .macOS(.v15),
     ],
     products: [
         .library(
@@ -19,7 +19,10 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../TextForSpeech"),
+        .package(
+            url: "https://github.com/gaelic-ghost/TextForSpeech.git",
+            from: "0.9.1"
+        ),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
             revision: "2fd41458059e2d80403436167d5263f585d120d4"

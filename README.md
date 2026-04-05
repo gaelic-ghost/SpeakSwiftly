@@ -70,6 +70,14 @@ The first intended runtime shape is:
 
 This repository is a standard Swift package with [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) wired in as the model and runtime dependency.
 
+Library consumers can depend on the package directly from GitHub:
+
+```swift
+.package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "0.9.0")
+```
+
+Then add the `SpeakSwiftlyCore` product to the target that will own the runtime. If the caller also wants direct access to text-profile primitives, add [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech.git) separately too.
+
 ```bash
 swift build
 ```
