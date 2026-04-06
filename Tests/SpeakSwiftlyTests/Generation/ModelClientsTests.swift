@@ -144,6 +144,26 @@ import TextForSpeech
     #expect(controller.phase == .steady)
 }
 
+@Test func adaptivePlaybackThresholdsStayInWarmupWhileEarlyCadenceTrailsRealtimePlayback() {
+    var controller = PlaybackThresholdController(
+        text: String(
+            repeating: "This is ordinary spoken prose for playback buffering. ",
+            count: 7
+        )
+    )
+
+    #expect(controller.phase == .warmup)
+
+    for _ in 0..<7 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 250)
+    }
+
+    #expect(controller.phase == .warmup)
+    #expect(controller.thresholds.startupBufferTargetMS >= 1_600)
+    #expect(controller.thresholds.lowWaterTargetMS >= 600)
+    #expect(controller.thresholds.resumeBufferTargetMS >= 1_400)
+}
+
 @Test func adaptivePlaybackThresholdsEnterRecoveryAfterRebufferAndReturnToSteadyAfterStableChunks() {
     var controller = PlaybackThresholdController(
         text: """
