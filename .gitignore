@@ -4,7 +4,9 @@
 xcuserdata/
 DerivedData/
 .derived/
+/.local/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 *.profraw
+!scripts/repo-maintenance/release/*.sh

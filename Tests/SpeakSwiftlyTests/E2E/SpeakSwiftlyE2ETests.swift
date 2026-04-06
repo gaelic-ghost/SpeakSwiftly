@@ -1317,19 +1317,10 @@ private final class WorkerProcess: @unchecked Sendable {
 
     private static func computeWorkerExecutableURL() throws -> URL {
         let packageRootURL = try packageRootURL()
-        let derivedDataURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-dd", isDirectory: true)
-        let sourcePackagesURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-spm", isDirectory: true)
+        try publishWorkerRuntime(packageRootURL: packageRootURL, configuration: "Debug")
 
-        try buildWorkerProduct(
-            packageRootURL: packageRootURL,
-            derivedDataURL: derivedDataURL,
-            sourcePackagesURL: sourcePackagesURL
-        )
-
-        let productsURL = derivedDataURL
-            .appendingPathComponent("Build/Products/Debug", isDirectory: true)
+        let productsURL = packageRootURL
+            .appendingPathComponent(".local/xcode/Debug", isDirectory: true)
         let executableURL = productsURL.appendingPathComponent("SpeakSwiftly", isDirectory: false)
         let metallibURL = productsURL
             .appendingPathComponent("mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib", isDirectory: false)
@@ -1372,24 +1363,24 @@ private final class WorkerProcess: @unchecked Sendable {
 
     private static func buildWorkerProduct(
         packageRootURL: URL,
-        derivedDataURL: URL,
-        sourcePackagesURL: URL
+        configuration: String
     ) throws {
         let process = Process()
-        let logURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e.log", isDirectory: false)
+        let logURL = packageRootURL
+            .appendingPathComponent(".local/xcode/SpeakSwiftly-e2e-publish-\(configuration.lowercased()).log", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: packageRootURL.appendingPathComponent(".local/xcode", isDirectory: true),
+            withIntermediateDirectories: true
+        )
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let logHandle = try FileHandle(forWritingTo: logURL)
         defer { try? logHandle.close() }
 
         process.currentDirectoryURL = packageRootURL
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [
-            "build",
-            "-scheme", "SpeakSwiftly",
-            "-destination", "platform=macOS",
-            "-derivedDataPath", derivedDataURL.path,
-            "-clonedSourcePackagesDirPath", sourcePackagesURL.path,
+            "scripts/repo-maintenance/publish-runtime.sh",
+            "--configuration", configuration,
         ]
         process.standardOutput = logHandle
         process.standardError = logHandle
@@ -1401,9 +1392,19 @@ private final class WorkerProcess: @unchecked Sendable {
             let outputData = try Data(contentsOf: logURL)
             let output = String(decoding: outputData, as: UTF8.self)
             throw WorkerProcessError(
-                "The Xcode-backed SpeakSwiftly build failed with status \(process.terminationStatus). `xcodebuild` output:\n\(output)"
+                "The SpeakSwiftly runtime publisher failed with status \(process.terminationStatus). Publisher output:\n\(output)"
             )
         }
+    }
+
+    private static func publishWorkerRuntime(
+        packageRootURL: URL,
+        configuration: String
+    ) throws {
+        try buildWorkerProduct(
+            packageRootURL: packageRootURL,
+            configuration: configuration
+        )
     }
 }
 

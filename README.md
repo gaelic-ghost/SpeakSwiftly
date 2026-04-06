@@ -110,29 +110,33 @@ swift build
 
 The executable intentionally leans on the existing `mlx-audio-swift` API surface and keeps its own scope focused on process ownership, queueing, playback, and profile storage.
 
-For real MLX-backed runs, use `xcodebuild` instead of relying on the SwiftPM command-line executable. Upstream `mlx-swift` is explicit that command-line SwiftPM does not build the Metal shader bundle, while `xcodebuild` does, and command-line tools need that bundle visible at runtime.
+For real MLX-backed runs, use the repo-maintenance runtime publisher instead of relying on the SwiftPM command-line executable. Upstream `mlx-swift` is explicit that command-line SwiftPM does not build the Metal shader bundle, while `xcodebuild` does, and command-line tools need that bundle visible at runtime.
 
 ```bash
-xcodebuild build \
-  -scheme SpeakSwiftly \
-  -destination 'platform=macOS' \
-  -derivedDataPath "$PWD/.derived" \
-  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Release
 ```
+
+That command publishes stable local Xcode-backed runtime directories here:
+
+- Debug: [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug)
+- Release: [`.local/xcode/Release`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Release)
+
+Each published runtime includes:
+
+- the `SpeakSwiftly` executable
+- the bundled `mlx-swift_Cmlx.bundle/.../default.metallib`
+- a metadata manifest at [`.local/xcode/SpeakSwiftly.debug.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.debug.json) or [`.local/xcode/SpeakSwiftly.release.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.release.json)
 
 ## Usage
 
-Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, build with `xcodebuild` and run the product from the Xcode build directory with `DYLD_FRAMEWORK_PATH` pointing at that same products directory.
+Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, publish the runtime first, then run the product from the published runtime directory with `DYLD_FRAMEWORK_PATH` pointing at that same directory.
 
 ```bash
-xcodebuild build \
-  -scheme SpeakSwiftly \
-  -destination 'platform=macOS' \
-  -derivedDataPath "$PWD/.derived" \
-  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 
-DYLD_FRAMEWORK_PATH="$PWD/.derived/Build/Products/Debug" \
-  "$PWD/.derived/Build/Products/Debug/SpeakSwiftly"
+DYLD_FRAMEWORK_PATH="$PWD/.local/xcode/Debug" \
+  "$PWD/.local/xcode/Debug/SpeakSwiftly"
 ```
 
 At startup the worker begins preloading the resident `0.6B` model and emits JSONL status events on `stdout`.
@@ -301,7 +305,7 @@ The preferred ownership model is:
 
 That arrangement keeps the package history, tags, and releases independent while still letting the larger repository pin an exact commit.
 
-Older adjacent consumers such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should now point at one shared built runtime directory instead of relying on tag-triggered copy hooks. The preferred local development shape is to build `SpeakSwiftly` once in the monorepo checkout and then point those hosts at the Xcode products directory so the executable and MLX bundle stay together.
+Older adjacent consumers such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should now point at one shared published runtime directory instead of relying on tag-triggered copy hooks or raw DerivedData guesses. The preferred local development shape is to publish `SpeakSwiftly` once here and then point those hosts at the stable runtime directory so the executable and MLX bundle stay together.
 
 When `speak-to-user` is using this package, the expected package path is:
 
@@ -331,17 +335,13 @@ swift build
 swift test
 ```
 
-Real MLX-backed validation should use an Xcode-built worker product. A reproducible local command is:
+Real MLX-backed validation should use a published Xcode-backed worker runtime. A reproducible local command is:
 
 ```bash
-xcodebuild build \
-  -scheme SpeakSwiftly \
-  -destination 'platform=macOS' \
-  -derivedDataPath "$PWD/.derived" \
-  -clonedSourcePackagesDirPath /tmp/SpeakSwiftly-xcodebuild-spm
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
-Opt-in real-model e2e coverage is available for three main sequential workflows, and the harness builds and launches the Xcode-backed worker automatically:
+Opt-in real-model e2e coverage is available for three main sequential workflows, and the harness now publishes and launches the shared Debug runtime automatically at [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug):
 
 - VoiceDesign profile creation, then silent playback, then audible playback.
 - Clone profile creation from caller-provided reference audio plus transcript, then silent playback, then audible playback.
@@ -379,7 +379,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swi
 
 The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each workflow still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
 
-If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of an Xcode-built products directory. Rebuild with `xcodebuild`, then run the executable with `DYLD_FRAMEWORK_PATH` pointed at the matching Xcode build products directory.
+If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime, then run the executable with `DYLD_FRAMEWORK_PATH` pointed at the matching published runtime directory.
 
 ## License
 
