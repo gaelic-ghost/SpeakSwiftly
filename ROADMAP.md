@@ -33,6 +33,7 @@
 - [ ] Milestone 15: Package structure and breakout planning
 - [ ] Milestone 16: `mlx-audio-swift` upgrade review
 - [ ] Milestone 17: Notification-linked priority playback
+- [ ] Milestone 18: Package docs and distribution polish
 
 ## Milestone 0: Bootstrap
 
@@ -238,6 +239,29 @@ Tickets:
 - [x] Include request id, operation name, relevant profile name, queue depth, and elapsed time in operator-facing runtime logs.
 - [x] Add resident-model preload instrumentation for start time, finish time, duration, model repo, and failure classification.
 - [x] Add playback instrumentation for profile-load time, time to first generated chunk, time from first chunk to drain, and generated chunk or sample counts.
+
+## Milestone 18: Package docs and distribution polish
+
+Scope:
+
+- [ ] Add first-class package documentation and index metadata so Swift package consumers can discover and understand the library surface without reading the source tree.
+- [ ] Standardize repository formatting expectations for Swift code so contributor output stays predictable across local work and CI.
+- [ ] Keep Swift Package Index presentation aligned with the actual package surface without adding maintenance-only metadata that the package does not need.
+
+Tickets:
+
+- [ ] Add a first DocC catalog for `SpeakSwiftlyCore` with entry points for runtime ownership, top-level normalizer ownership, and the JSONL worker contract.
+- [ ] Add baseline DocC coverage for text-profile management, live playback requests, and voice-profile creation operations.
+- [ ] Add SwiftFormat to the repository with checked-in configuration and a documented formatting command.
+- [ ] Decide whether SwiftLint belongs in the same pass or should remain a separate follow-up once SwiftFormat is in place.
+- [ ] Add a minimal `.spi.yml` that reflects the package's DocC and Swift Package Index needs once the docs surface exists.
+- [ ] Document when `.spi.yml` needs changes and keep it intentionally small.
+
+Exit criteria:
+
+- [ ] A new consumer can navigate the main package API through DocC instead of relying on README snippets alone.
+- [ ] Swift formatting expectations are explicit, repeatable, and checked into the repo.
+- [ ] Swift Package Index has the minimal metadata it needs to render the package cleanly without stale or speculative configuration.
 - [x] Add playback queue-depth instrumentation so low-buffer and starvation conditions are visible in stderr logs.
 - [x] Add profile-store instrumentation for create, load, list, remove, and export with concrete filesystem paths.
 - [x] Add automated assertions for important stderr diagnostics in the fast test suite.
