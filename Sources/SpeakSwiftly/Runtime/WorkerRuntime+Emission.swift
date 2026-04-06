@@ -18,6 +18,9 @@ extension SpeakSwiftly.Runtime {
                 profileName: payload.profileName,
                 profilePath: payload.profilePath,
                 profiles: payload.profiles,
+                textProfile: payload.textProfile,
+                textProfiles: payload.textProfiles,
+                textProfilePath: payload.textProfilePath,
                 activeRequest: payload.activeRequest,
                 queue: payload.queue,
                 playbackState: payload.playbackState,
@@ -155,6 +158,12 @@ extension SpeakSwiftly.Runtime {
         text: String? = nil,
         profileName: String? = nil,
         textProfileName: String? = nil,
+        textProfileID: String? = nil,
+        textProfileDisplayName: String? = nil,
+        textProfile: TextForSpeech.Profile? = nil,
+        replacements: [TextForSpeech.Replacement]? = nil,
+        replacement: TextForSpeech.Replacement? = nil,
+        replacementID: String? = nil,
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestID: String? = nil,
@@ -169,6 +178,12 @@ extension SpeakSwiftly.Runtime {
             text: text,
             profileName: profileName,
             textProfileName: textProfileName,
+            textProfileID: textProfileID,
+            textProfileDisplayName: textProfileDisplayName,
+            textProfile: textProfile,
+            replacements: replacements,
+            replacement: replacement,
+            replacementID: replacementID,
             cwd: textContext?.cwd,
             repoRoot: textContext?.repoRoot,
             textFormat: textContext?.textFormat,
@@ -229,6 +244,49 @@ extension SpeakSwiftly.Runtime {
             await submitRequest(id: id, op: request.opName)
         case .removeProfile(let id, let profileName):
             await submitRequest(id: id, op: request.opName, profileName: profileName)
+        case .textProfileActive(let id),
+             .textProfileBase(let id),
+             .textProfiles(let id),
+             .textProfilePersistence(let id),
+             .loadTextProfiles(let id),
+             .saveTextProfiles(let id),
+             .resetTextProfile(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .textProfile(let id, let name),
+             .removeTextProfile(let id, let name):
+            await submitRequest(id: id, op: request.opName, textProfileName: name)
+        case .textProfileEffective(let id, let name):
+            await submitRequest(id: id, op: request.opName, textProfileName: name)
+        case .createTextProfile(let id, let profileID, let profileName, let replacements):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                textProfileID: profileID,
+                textProfileDisplayName: profileName,
+                replacements: replacements
+            )
+        case .storeTextProfile(let id, let profile),
+             .useTextProfile(let id, let profile):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                textProfile: profile
+            )
+        case .addTextReplacement(let id, let replacement, let profileName),
+             .replaceTextReplacement(let id, let replacement, let profileName):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                textProfileName: profileName,
+                replacement: replacement
+            )
+        case .removeTextReplacement(let id, let replacementID, let profileName):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                textProfileName: profileName,
+                replacementID: replacementID
+            )
         case .listQueue(let id, _):
             await submitRequest(id: id, op: request.opName)
         case .playback(let id, _):

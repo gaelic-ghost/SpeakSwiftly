@@ -265,6 +265,116 @@ import TextForSpeech
     #expect(await reloaded.normalizer.activeProfile().replacements.isEmpty)
 }
 
+@Test func textProfileProtocolOperationsMutateAndExposeNormalizerState() async throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        rootURL: rootURL,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.accept(
+        line: #"{"id":"req-create-text","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-create-text"
+                && $0["ok"] as? Bool == true
+                && ($0["text_profile"] as? [String: Any])?["id"] as? String == "logs"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-add-text","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-add-text"
+                && (($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.count == 1
+        }
+    })
+
+    let activeProfile = TextForSpeech.Profile(
+        id: "ops",
+        name: "Ops",
+        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")]
+    )
+    let activeProfileJSON = try String(decoding: JSONEncoder().encode(activeProfile), as: UTF8.self)
+    await runtime.accept(
+        line: #"{"id":"req-use-text","op":"use_text_profile","text_profile":"# + activeProfileJSON + #"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-use-text"
+                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "ops"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-text-active","op":"text_profile_active"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-active"
+                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "ops"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-text-list","op":"text_profiles"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-list"
+                && (($0["text_profiles"] as? [[String: Any]])?.count ?? 0) >= 1
+                && ($0["text_profile_path"] as? String)?.hasSuffix("text-profiles.json") == true
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-reset-text","op":"reset_text_profile"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-reset-text"
+                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "default"
+        }
+    })
+}
+
+@Test func textProfileProtocolOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+    let output = OutputRecorder()
+    let preloadGate = AsyncGate()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: {
+            await preloadGate.wait()
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+    await runtime.accept(line: #"{"id":"req-text-list","op":"text_profiles"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-list"
+                && $0["event"] as? String == "started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-list"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-text-list"
+            && $0["event"] as? String == "queued"
+    })
+
+    await preloadGate.open()
+}
+
 @Test func waitingRequestsReportPriorityQueuePositions() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()

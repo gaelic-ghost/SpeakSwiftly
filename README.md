@@ -151,6 +151,11 @@ Example request shapes:
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
+{"id":"req-5","op":"text_profile_active"}
+{"id":"req-6","op":"text_profiles"}
+{"id":"req-7","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
+{"id":"req-8","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-9","op":"use_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
 ```
 
 Example response and event shapes:
@@ -167,12 +172,16 @@ Example response and event shapes:
 {"id":"req-1","ok":true}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
 {"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
-{"id":"req-9","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
+{"id":"req-6","ok":true,"text_profiles":[{"id":"logs","name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}],"text_profile_path":"/path/to/text-profiles.json"}
+{"id":"req-9","ok":true,"text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]},"text_profile_path":"/path/to/text-profiles.json"}
+{"id":"req-10","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
 ```
 
 Queued events are only emitted for requests that will actually wait. Once the resident model is ready, waiting live playback requests are scheduled ahead of waiting non-playback work, but active work is never interrupted.
 
 `queue_speech_live` is the wire-level live playback operation. The worker acknowledges queue acceptance immediately through the request stream, then emits the usual `started`, `progress`, and terminal success or failure events later as playback advances.
+
+The `text_profile_*`, `load_text_profiles`, `save_text_profiles`, and `*_text_replacement` operations are immediate control operations. They do not wait for resident-model warmup and do not enter the serialized speech-generation queue.
 
 Current operation families are:
 
@@ -180,6 +189,7 @@ Current operation families are:
 - On-demand `1.7B` VoiceDesign profile creation.
 - On-demand clone profile creation from caller-provided reference audio, with optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
+- Immediate text-profile inspection, persistence, and replacement editing with JSONL and typed-library parity.
 - Playback-prioritized request handling with preload-aware queue status.
 - Structured terminal success and failure responses.
 - Structured JSONL `stderr` logs that explain the most likely cause when something breaks and include request timing context.

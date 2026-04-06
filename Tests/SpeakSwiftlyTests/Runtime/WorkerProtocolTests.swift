@@ -141,6 +141,76 @@ import TextForSpeech
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))
 }
 
+@Test func decodesTextProfileReadRequests() throws {
+    let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"text_profile_active"}"#)
+    #expect(active == .textProfileActive(id: "req-text-active"))
+
+    let base = try WorkerRequest.decode(from: #"{"id":"req-text-base","op":"text_profile_base"}"#)
+    #expect(base == .textProfileBase(id: "req-text-base"))
+
+    let named = try WorkerRequest.decode(
+        from: #"{"id":"req-text-one","op":"text_profile","text_profile_name":"logs"}"#
+    )
+    #expect(named == .textProfile(id: "req-text-one", name: "logs"))
+
+    let list = try WorkerRequest.decode(from: #"{"id":"req-text-list","op":"text_profiles"}"#)
+    #expect(list == .textProfiles(id: "req-text-list"))
+
+    let effective = try WorkerRequest.decode(
+        from: #"{"id":"req-text-effective","op":"text_profile_effective","text_profile_name":"logs"}"#
+    )
+    #expect(effective == .textProfileEffective(id: "req-text-effective", name: "logs"))
+}
+
+@Test func decodesTextProfileMutationRequests() throws {
+    let create = try WorkerRequest.decode(
+        from: #"{"id":"req-text-create","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}"#
+    )
+    #expect(
+        create == .createTextProfile(
+            id: "req-text-create",
+            profileID: "logs",
+            profileName: "Logs",
+            replacements: [
+                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")
+            ]
+        )
+    )
+
+    let profile = TextForSpeech.Profile(
+        id: "ops",
+        name: "Ops",
+        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")]
+    )
+    let storePayload = try String(decoding: JSONEncoder().encode(profile), as: UTF8.self)
+    let store = try WorkerRequest.decode(
+        from: #"{"id":"req-text-store","op":"store_text_profile","text_profile":"# + storePayload + #"}"#
+    )
+    #expect(store == .storeTextProfile(id: "req-text-store", profile: profile))
+
+    let add = try WorkerRequest.decode(
+        from: #"{"id":"req-text-add","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
+    )
+    #expect(
+        add == .addTextReplacement(
+            id: "req-text-add",
+            replacement: TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
+            profileName: "logs"
+        )
+    )
+
+    let remove = try WorkerRequest.decode(
+        from: #"{"id":"req-text-remove-replacement","op":"remove_text_replacement","replacement_id":"logs-rule","text_profile_name":"logs"}"#
+    )
+    #expect(
+        remove == .removeTextReplacement(
+            id: "req-text-remove-replacement",
+            replacementID: "logs-rule",
+            profileName: "logs"
+        )
+    )
+}
+
 @Test func decodesListQueueRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_queue_generation"}"#)
     #expect(request == .listQueue(id: "req-5", queueType: .generation))
@@ -240,6 +310,22 @@ import TextForSpeech
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
     #expect(success["cleared_count"] as? Int == 2)
     #expect(success["cancelled_request_id"] as? String == "req-queued")
+
+    let textSuccess = try jsonObject(
+        SpeakSwiftly.Success(
+            id: "req-text-1",
+            textProfile: TextForSpeech.Profile(
+                id: "logs",
+                name: "Logs",
+                replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")]
+            ),
+            textProfiles: [TextForSpeech.Profile(id: "logs", name: "Logs")],
+            textProfilePath: "/tmp/text-profiles.json"
+        )
+    )
+    #expect((textSuccess["text_profile"] as? [String: Any])?["id"] as? String == "logs")
+    #expect((textSuccess["text_profiles"] as? [[String: Any]])?.count == 1)
+    #expect(textSuccess["text_profile_path"] as? String == "/tmp/text-profiles.json")
 
     let failure = try jsonObject(
         SpeakSwiftly.Failure(

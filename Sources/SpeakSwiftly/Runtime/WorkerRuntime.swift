@@ -32,6 +32,9 @@ public extension SpeakSwiftly {
         let profileName: String?
         let profilePath: String?
         let profiles: [ProfileSummary]?
+        let textProfile: TextForSpeech.Profile?
+        let textProfiles: [TextForSpeech.Profile]?
+        let textProfilePath: String?
         let activeRequest: ActiveWorkerRequestSummary?
         let queue: [QueuedWorkerRequestSummary]?
         let playbackState: PlaybackStateSummary?
@@ -43,6 +46,9 @@ public extension SpeakSwiftly {
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
+            textProfile: TextForSpeech.Profile? = nil,
+            textProfiles: [TextForSpeech.Profile]? = nil,
+            textProfilePath: String? = nil,
             activeRequest: ActiveWorkerRequestSummary? = nil,
             queue: [QueuedWorkerRequestSummary]? = nil,
             playbackState: PlaybackStateSummary? = nil,
@@ -53,6 +59,9 @@ public extension SpeakSwiftly {
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
+            self.textProfile = textProfile
+            self.textProfiles = textProfiles
+            self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
             self.queue = queue
             self.playbackState = playbackState
@@ -72,6 +81,12 @@ public extension SpeakSwiftly {
         let text: String?
         let profileName: String?
         let textProfileName: String?
+        let textProfileID: String?
+        let textProfileDisplayName: String?
+        let textProfile: TextForSpeech.Profile?
+        let replacements: [TextForSpeech.Replacement]?
+        let replacement: TextForSpeech.Replacement?
+        let replacementID: String?
         let cwd: String?
         let repoRoot: String?
         let textFormat: TextForSpeech.TextFormat?
@@ -89,6 +104,12 @@ public extension SpeakSwiftly {
             case text
             case profileName = "profile_name"
             case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
+            case textProfileDisplayName = "text_profile_display_name"
+            case textProfile = "text_profile"
+            case replacements
+            case replacement
+            case replacementID = "replacement_id"
             case cwd
             case repoRoot = "repo_root"
             case textFormat = "text_format"
@@ -572,7 +593,26 @@ public extension SpeakSwiftly {
                 )
                 disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id, profileName: profileName)))
 
-            case .listQueue, .playback, .clearQueue, .cancelRequest:
+            case .textProfileActive,
+                 .textProfileBase,
+                 .textProfile,
+                 .textProfiles,
+                 .textProfileEffective,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .createTextProfile,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .removeTextProfile,
+                 .resetTextProfile,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement,
+                 .listQueue,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
                 disposition = .requestCompleted(.failure(
                     WorkerError(
                         code: .internalError,
@@ -596,9 +636,187 @@ public extension SpeakSwiftly {
 
     private func processImmediateControlRequest(_ request: WorkerRequest) async {
         let result: Result<WorkerSuccessPayload, WorkerError>
+        let textProfilePath = await normalizerRef.persistenceURL()?.path
 
         do {
             switch request {
+            case .textProfileActive(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.activeProfile(),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfileBase(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.baseProfile(),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfile(let id, let name):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.profile(named: name),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfiles(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfiles: await normalizerRef.profiles(),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfileEffective(let id, let name):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.effectiveProfile(named: name),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfilePersistence(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .loadTextProfiles(let id):
+                try await normalizerRef.loadProfiles()
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.activeProfile(),
+                        textProfiles: await normalizerRef.profiles(),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .saveTextProfiles(let id):
+                try await normalizerRef.saveProfiles()
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .createTextProfile(let id, let profileID, let profileName, let replacements):
+                let profile = try await normalizerRef.createProfile(
+                    id: profileID,
+                    named: profileName,
+                    replacements: replacements
+                )
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .storeTextProfile(let id, let profile):
+                try await normalizerRef.storeProfile(profile)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .useTextProfile(let id, let profile):
+                try await normalizerRef.useProfile(profile)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .removeTextProfile(let id, let profileName):
+                try await normalizerRef.removeProfile(named: profileName)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .resetTextProfile(let id):
+                try await normalizerRef.reset()
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: await normalizerRef.activeProfile(),
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .addTextReplacement(let id, let replacement, let profileName):
+                let profile = if let profileName {
+                    try await normalizerRef.addReplacement(
+                        replacement,
+                        toStoredProfileNamed: profileName
+                    )
+                } else {
+                    try await normalizerRef.addReplacement(replacement)
+                }
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .replaceTextReplacement(let id, let replacement, let profileName):
+                let profile = if let profileName {
+                    try await normalizerRef.replaceReplacement(
+                        replacement,
+                        inStoredProfileNamed: profileName
+                    )
+                } else {
+                    try await normalizerRef.replaceReplacement(replacement)
+                }
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .removeTextReplacement(let id, let replacementID, let profileName):
+                let profile = if let profileName {
+                    try await normalizerRef.removeReplacement(
+                        id: replacementID,
+                        fromStoredProfileNamed: profileName
+                    )
+                } else {
+                    try await normalizerRef.removeReplacement(id: replacementID)
+                }
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
             case .listQueue(let id, let queueType):
                 result = .success(
                     WorkerSuccessPayload(

@@ -9,6 +9,12 @@ struct RawWorkerRequest: Decodable, Sendable {
     let text: String?
     let profileName: String?
     let textProfileName: String?
+    let textProfileID: String?
+    let textProfileDisplayName: String?
+    let textProfile: TextForSpeech.Profile?
+    let replacements: [TextForSpeech.Replacement]?
+    let replacement: TextForSpeech.Replacement?
+    let replacementID: String?
     let cwd: String?
     let repoRoot: String?
     let textFormat: TextForSpeech.TextFormat?
@@ -26,6 +32,12 @@ struct RawWorkerRequest: Decodable, Sendable {
         case text
         case profileName = "profile_name"
         case textProfileName = "text_profile_name"
+        case textProfileID = "text_profile_id"
+        case textProfileDisplayName = "text_profile_display_name"
+        case textProfile = "text_profile"
+        case replacements
+        case replacement
+        case replacementID = "replacement_id"
         case cwd
         case repoRoot = "repo_root"
         case textFormat = "text_format"
@@ -46,6 +58,12 @@ struct RawWorkerRequest: Decodable, Sendable {
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
         textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
+        textProfileID = try container.decodeIfPresent(String.self, forKey: .textProfileID)
+        textProfileDisplayName = try container.decodeIfPresent(String.self, forKey: .textProfileDisplayName)
+        textProfile = try container.decodeIfPresent(TextForSpeech.Profile.self, forKey: .textProfile)
+        replacements = try container.decodeIfPresent([TextForSpeech.Replacement].self, forKey: .replacements)
+        replacement = try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: .replacement)
+        replacementID = try container.decodeIfPresent(String.self, forKey: .replacementID)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
         requestID = try container.decodeIfPresent(String.self, forKey: .requestID)
@@ -138,6 +156,22 @@ enum WorkerRequest: Sendable, Equatable {
     case createClone(id: String, profileName: String, referenceAudioPath: String, transcript: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
+    case textProfileActive(id: String)
+    case textProfileBase(id: String)
+    case textProfile(id: String, name: String)
+    case textProfiles(id: String)
+    case textProfileEffective(id: String, name: String?)
+    case textProfilePersistence(id: String)
+    case loadTextProfiles(id: String)
+    case saveTextProfiles(id: String)
+    case createTextProfile(id: String, profileID: String, profileName: String, replacements: [TextForSpeech.Replacement])
+    case storeTextProfile(id: String, profile: TextForSpeech.Profile)
+    case useTextProfile(id: String, profile: TextForSpeech.Profile)
+    case removeTextProfile(id: String, profileName: String)
+    case resetTextProfile(id: String)
+    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
+    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
+    case removeTextReplacement(id: String, replacementID: String, profileName: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
     case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String)
@@ -150,6 +184,22 @@ enum WorkerRequest: Sendable, Equatable {
              .createClone(let id, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
+             .textProfileActive(let id),
+             .textProfileBase(let id),
+             .textProfile(let id, _),
+             .textProfiles(let id),
+             .textProfileEffective(let id, _),
+             .textProfilePersistence(let id),
+             .loadTextProfiles(let id),
+             .saveTextProfiles(let id),
+             .createTextProfile(let id, _, _, _),
+             .storeTextProfile(let id, _),
+             .useTextProfile(let id, _),
+             .removeTextProfile(let id, _),
+             .resetTextProfile(let id),
+             .addTextReplacement(let id, _, _),
+             .replaceTextReplacement(let id, _, _),
+             .removeTextReplacement(let id, _, _),
              .listQueue(let id, _),
              .playback(let id, _),
              .clearQueue(let id),
@@ -170,6 +220,38 @@ enum WorkerRequest: Sendable, Equatable {
             "list_profiles"
         case .removeProfile:
             "remove_profile"
+        case .textProfileActive:
+            "text_profile_active"
+        case .textProfileBase:
+            "text_profile_base"
+        case .textProfile:
+            "text_profile"
+        case .textProfiles:
+            "text_profiles"
+        case .textProfileEffective:
+            "text_profile_effective"
+        case .textProfilePersistence:
+            "text_profile_persistence"
+        case .loadTextProfiles:
+            "load_text_profiles"
+        case .saveTextProfiles:
+            "save_text_profiles"
+        case .createTextProfile:
+            "create_text_profile"
+        case .storeTextProfile:
+            "store_text_profile"
+        case .useTextProfile:
+            "use_text_profile"
+        case .removeTextProfile:
+            "remove_text_profile"
+        case .resetTextProfile:
+            "reset_text_profile"
+        case .addTextReplacement:
+            "add_text_replacement"
+        case .replaceTextReplacement:
+            "replace_text_replacement"
+        case .removeTextReplacement:
+            "remove_text_replacement"
         case .listQueue(_, .generation):
             "list_queue_generation"
         case .listQueue(_, .playback):
@@ -205,7 +287,26 @@ enum WorkerRequest: Sendable, Equatable {
 
     var isImmediateControlOperation: Bool {
         switch self {
-        case .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .textProfileActive,
+             .textProfileBase,
+             .textProfile,
+             .textProfiles,
+             .textProfileEffective,
+             .textProfilePersistence,
+             .loadTextProfiles,
+             .saveTextProfiles,
+             .createTextProfile,
+             .storeTextProfile,
+             .useTextProfile,
+             .removeTextProfile,
+             .resetTextProfile,
+             .addTextReplacement,
+             .replaceTextReplacement,
+             .removeTextReplacement,
+             .listQueue,
+             .playback,
+             .clearQueue,
+             .cancelRequest:
             return true
         default:
             return false
@@ -219,8 +320,31 @@ enum WorkerRequest: Sendable, Equatable {
              .createClone(_, let profileName, _, _),
              .removeProfile(_, let profileName):
             profileName
-        case .listProfiles, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .textProfileActive,
+             .textProfileBase,
+             .textProfiles,
+             .textProfilePersistence,
+             .loadTextProfiles,
+             .saveTextProfiles,
+             .storeTextProfile,
+             .useTextProfile,
+             .resetTextProfile,
+             .listProfiles,
+             .listQueue,
+             .playback,
+             .clearQueue,
+             .cancelRequest:
             nil
+        case .textProfile(_, let name),
+             .removeTextProfile(_, let name):
+            name
+        case .textProfileEffective(_, let name),
+             .addTextReplacement(_, _, let name),
+             .replaceTextReplacement(_, _, let name),
+             .removeTextReplacement(_, _, let name):
+            name
+        case .createTextProfile(_, let profileID, _, _):
+            profileID
         }
     }
 
@@ -228,7 +352,30 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
             textProfileName
-        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .createProfile,
+             .createClone,
+             .listProfiles,
+             .removeProfile,
+             .textProfileActive,
+             .textProfileBase,
+             .textProfile,
+             .textProfiles,
+             .textProfileEffective,
+             .textProfilePersistence,
+             .loadTextProfiles,
+             .saveTextProfiles,
+             .createTextProfile,
+             .storeTextProfile,
+             .useTextProfile,
+             .removeTextProfile,
+             .resetTextProfile,
+             .addTextReplacement,
+             .replaceTextReplacement,
+             .removeTextReplacement,
+             .listQueue,
+             .playback,
+             .clearQueue,
+             .cancelRequest:
             nil
         }
     }
@@ -237,7 +384,30 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
             textContext
-        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .createProfile,
+             .createClone,
+             .listProfiles,
+             .removeProfile,
+             .textProfileActive,
+             .textProfileBase,
+             .textProfile,
+             .textProfiles,
+             .textProfileEffective,
+             .textProfilePersistence,
+             .loadTextProfiles,
+             .saveTextProfiles,
+             .createTextProfile,
+             .storeTextProfile,
+             .useTextProfile,
+             .removeTextProfile,
+             .resetTextProfile,
+             .addTextReplacement,
+             .replaceTextReplacement,
+             .removeTextReplacement,
+             .listQueue,
+             .playback,
+             .clearQueue,
+             .cancelRequest:
             nil
         }
     }
@@ -246,7 +416,30 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
             sourceFormat
-        case .createProfile, .createClone, .listProfiles, .removeProfile, .listQueue, .playback, .clearQueue, .cancelRequest:
+        case .createProfile,
+             .createClone,
+             .listProfiles,
+             .removeProfile,
+             .textProfileActive,
+             .textProfileBase,
+             .textProfile,
+             .textProfiles,
+             .textProfileEffective,
+             .textProfilePersistence,
+             .loadTextProfiles,
+             .saveTextProfiles,
+             .createTextProfile,
+             .storeTextProfile,
+             .useTextProfile,
+             .removeTextProfile,
+             .resetTextProfile,
+             .addTextReplacement,
+             .replaceTextReplacement,
+             .removeTextReplacement,
+             .listQueue,
+             .playback,
+             .clearQueue,
+             .cancelRequest:
             nil
         }
     }
@@ -325,6 +518,96 @@ enum WorkerRequest: Sendable, Equatable {
         case "remove_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
+
+        case "text_profile_active":
+            return .textProfileActive(id: id)
+
+        case "text_profile_base":
+            return .textProfileBase(id: id)
+
+        case "text_profile":
+            let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
+            return .textProfile(id: id, name: textProfileName)
+
+        case "text_profiles":
+            return .textProfiles(id: id)
+
+        case "text_profile_effective":
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .textProfileEffective(id: id, name: textProfileName)
+
+        case "text_profile_persistence":
+            return .textProfilePersistence(id: id)
+
+        case "load_text_profiles":
+            return .loadTextProfiles(id: id)
+
+        case "save_text_profiles":
+            return .saveTextProfiles(id: id)
+
+        case "create_text_profile":
+            let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+            let textProfileDisplayName = try requireNonEmpty(
+                raw.textProfileDisplayName,
+                field: "text_profile_display_name",
+                id: id
+            )
+            return .createTextProfile(
+                id: id,
+                profileID: textProfileID,
+                profileName: textProfileDisplayName,
+                replacements: raw.replacements ?? []
+            )
+
+        case "store_text_profile":
+            guard let textProfile = raw.textProfile else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' is missing a 'text_profile' object."
+                )
+            }
+            return .storeTextProfile(id: id, profile: textProfile)
+
+        case "use_text_profile":
+            guard let textProfile = raw.textProfile else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' is missing a 'text_profile' object."
+                )
+            }
+            return .useTextProfile(id: id, profile: textProfile)
+
+        case "remove_text_profile":
+            let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
+            return .removeTextProfile(id: id, profileName: textProfileName)
+
+        case "reset_text_profile":
+            return .resetTextProfile(id: id)
+
+        case "add_text_replacement":
+            guard let replacement = raw.replacement else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' is missing a 'replacement' object."
+                )
+            }
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .addTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+
+        case "replace_text_replacement":
+            guard let replacement = raw.replacement else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' is missing a 'replacement' object."
+                )
+            }
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .replaceTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+
+        case "remove_text_replacement":
+            let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
 
         case "list_queue_generation":
             return .listQueue(id: id, queueType: .generation)
@@ -466,6 +749,9 @@ public extension SpeakSwiftly {
         public let profileName: String?
         public let profilePath: String?
         public let profiles: [ProfileSummary]?
+        public let textProfile: TextForSpeech.Profile?
+        public let textProfiles: [TextForSpeech.Profile]?
+        public let textProfilePath: String?
         public let activeRequest: ActiveRequest?
         public let queue: [QueuedRequest]?
         public let playbackState: PlaybackStateSnapshot?
@@ -478,6 +764,9 @@ public extension SpeakSwiftly {
             case profileName = "profile_name"
             case profilePath = "profile_path"
             case profiles
+            case textProfile = "text_profile"
+            case textProfiles = "text_profiles"
+            case textProfilePath = "text_profile_path"
             case activeRequest = "active_request"
             case queue
             case playbackState = "playback_state"
@@ -490,6 +779,9 @@ public extension SpeakSwiftly {
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
+            textProfile: TextForSpeech.Profile? = nil,
+            textProfiles: [TextForSpeech.Profile]? = nil,
+            textProfilePath: String? = nil,
             activeRequest: ActiveRequest? = nil,
             queue: [QueuedRequest]? = nil,
             playbackState: PlaybackStateSnapshot? = nil,
@@ -500,6 +792,9 @@ public extension SpeakSwiftly {
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
+            self.textProfile = textProfile
+            self.textProfiles = textProfiles
+            self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
             self.queue = queue
             self.playbackState = playbackState
