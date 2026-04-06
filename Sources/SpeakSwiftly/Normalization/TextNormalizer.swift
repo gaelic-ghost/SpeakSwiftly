@@ -3,40 +3,40 @@ import TextForSpeech
 
 // MARK: - Text Normalization Logic
 
-extension SpeakSwiftly.Runtime {
-    func normalizerActiveProfile() -> TextForSpeech.Profile {
+public extension SpeakSwiftly.Normalizer {
+    func activeProfile() -> TextForSpeech.Profile {
         textRuntime.customProfile
     }
 
-    func normalizerBaseProfile() -> TextForSpeech.Profile {
+    func baseProfile() -> TextForSpeech.Profile {
         textRuntime.baseProfile
     }
 
-    func normalizerProfile(named name: String) -> TextForSpeech.Profile? {
+    func profile(named name: String) -> TextForSpeech.Profile? {
         textRuntime.profile(named: name)
     }
 
-    func normalizerProfiles() -> [TextForSpeech.Profile] {
+    func profiles() -> [TextForSpeech.Profile] {
         textRuntime.storedProfiles()
     }
 
-    func normalizerEffectiveProfile(named name: String? = nil) -> TextForSpeech.Profile {
+    func effectiveProfile(named name: String? = nil) -> TextForSpeech.Profile {
         textRuntime.snapshot(named: name)
     }
 
-    func normalizerPersistenceURL() -> URL? {
+    func persistenceURL() -> URL? {
         textRuntime.persistenceURL
     }
 
-    func normalizerLoadProfiles() throws {
+    func loadProfiles() throws {
         try textRuntime.load()
     }
 
-    func normalizerSaveProfiles() throws {
+    func saveProfiles() throws {
         try textRuntime.save()
     }
 
-    func normalizerCreateProfile(
+    func createProfile(
         id: String,
         named name: String,
         replacements: [TextForSpeech.Replacement] = []
@@ -50,27 +50,27 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerStoreProfile(_ profile: TextForSpeech.Profile) throws {
+    func storeProfile(_ profile: TextForSpeech.Profile) throws {
         textRuntime.store(profile)
         try textRuntime.save()
     }
 
-    func normalizerUseProfile(_ profile: TextForSpeech.Profile) throws {
+    func useProfile(_ profile: TextForSpeech.Profile) throws {
         textRuntime.use(profile)
         try textRuntime.save()
     }
 
-    func normalizerRemoveProfile(named name: String) throws {
+    func removeProfile(named name: String) throws {
         textRuntime.removeProfile(named: name)
         try textRuntime.save()
     }
 
-    func normalizerReset() throws {
+    func reset() throws {
         textRuntime.reset()
         try textRuntime.save()
     }
 
-    func normalizerAddReplacement(
+    func addReplacement(
         _ replacement: TextForSpeech.Replacement
     ) throws -> TextForSpeech.Profile {
         let profile = textRuntime.addReplacement(replacement)
@@ -78,7 +78,7 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerAddReplacement(
+    func addReplacement(
         _ replacement: TextForSpeech.Replacement,
         toStoredProfileNamed name: String
     ) throws -> TextForSpeech.Profile {
@@ -87,7 +87,7 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerReplaceReplacement(
+    func replaceReplacement(
         _ replacement: TextForSpeech.Replacement
     ) throws -> TextForSpeech.Profile {
         let profile = try textRuntime.replaceReplacement(replacement)
@@ -95,7 +95,7 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerReplaceReplacement(
+    func replaceReplacement(
         _ replacement: TextForSpeech.Replacement,
         inStoredProfileNamed name: String
     ) throws -> TextForSpeech.Profile {
@@ -104,7 +104,7 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerRemoveReplacement(
+    func removeReplacement(
         id replacementID: String
     ) throws -> TextForSpeech.Profile {
         let profile = try textRuntime.removeReplacement(id: replacementID)
@@ -112,7 +112,7 @@ extension SpeakSwiftly.Runtime {
         return profile
     }
 
-    func normalizerRemoveReplacement(
+    func removeReplacement(
         id replacementID: String,
         fromStoredProfileNamed name: String
     ) throws -> TextForSpeech.Profile {

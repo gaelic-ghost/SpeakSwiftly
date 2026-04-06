@@ -52,8 +52,10 @@ public enum SpeakSwiftly {
         }
     }
 
-    public static func live() async -> Runtime {
-        await Runtime.live()
+    public static func live(
+        normalizer: SpeakSwiftly.Normalizer? = nil
+    ) async -> Runtime {
+        await Runtime.live(normalizer: normalizer)
     }
 }
 

@@ -460,10 +460,10 @@ func makeRuntime(
     }
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
-    let textRuntime = TextForSpeechRuntime(
+    let normalizer = SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
     )
-    try textRuntime.load()
+    try await normalizer.loadProfiles()
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
         fileManager: .default,
@@ -493,7 +493,7 @@ func makeRuntime(
     let runtime = WorkerRuntime(
         dependencies: dependencies,
         profileStore: store,
-        textRuntime: textRuntime,
+        normalizer: normalizer,
         playbackController: PlaybackController(driver: playbackController)
     )
     await runtime.installPlaybackHooks()

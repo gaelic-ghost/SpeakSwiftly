@@ -9,12 +9,6 @@ public extension SpeakSwiftly {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
 
-    private enum TextProfilePersistence {
-        static func url(in rootURL: URL) -> URL {
-            rootURL.appending(path: ProfileStore.textProfilesFileName)
-        }
-    }
-
     enum PlaybackConfiguration {
         // Shorter chunk cadence gives playback a second chunk in reserve before
         // the first one drains, which reduces audible shudder from one-chunk starts.
@@ -162,7 +156,7 @@ public extension SpeakSwiftly {
     let encoder = JSONEncoder()
     let logEncoder = JSONEncoder()
     let profileStore: ProfileStore
-    let textRuntime: TextForSpeechRuntime
+    let normalizerRef: SpeakSwiftly.Normalizer
     let playbackController: PlaybackController
     let generationController = GenerationController()
     let logTimestampFormatter = ISO8601DateFormatter()
@@ -180,18 +174,20 @@ public extension SpeakSwiftly {
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
-        textRuntime: TextForSpeechRuntime,
+        normalizer: SpeakSwiftly.Normalizer,
         playbackController: PlaybackController
     ) {
         self.dependencies = dependencies
         self.profileStore = profileStore
-        self.textRuntime = textRuntime
+        normalizerRef = normalizer
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
         logEncoder.outputFormatting = [.sortedKeys]
     }
 
-    public static func live() async -> Runtime {
+    public static func live(
+        normalizer: SpeakSwiftly.Normalizer? = nil
+    ) async -> Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
         let profileStore = ProfileStore(
@@ -201,13 +197,14 @@ public extension SpeakSwiftly {
             ),
             fileManager: dependencies.fileManager
         )
-        let textRuntime = TextForSpeechRuntime(
-            persistenceURL: TextProfilePersistence.url(in: profileStore.rootURL)
+        let normalizer = normalizer ?? SpeakSwiftly.Normalizer(
+            persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
         )
         do {
-            try textRuntime.load()
+            try await normalizer.loadProfiles()
         } catch {
-            let message = "SpeakSwiftly could not load persisted text profiles from '\(textRuntime.persistenceURL?.path ?? "unknown path")'. \(error.localizedDescription)\n"
+            let path = await normalizer.persistenceURL()?.path ?? "unknown path"
+            let message = "SpeakSwiftly could not load persisted text profiles from '\(path)'. \(error.localizedDescription)\n"
             FileHandle.standardError.write(Data(message.utf8))
         }
         let playbackController = PlaybackController(driver: await dependencies.makePlaybackController())
@@ -215,7 +212,7 @@ public extension SpeakSwiftly {
         let runtime = Runtime(
             dependencies: dependencies,
             profileStore: profileStore,
-            textRuntime: textRuntime,
+            normalizer: normalizer,
             playbackController: playbackController
         )
         await runtime.installPlaybackHooks()
@@ -438,7 +435,7 @@ public extension SpeakSwiftly {
             queueDepth: await generationQueueDepth()
         )
         if request.isSpeechRequest {
-            let speechJob = makeSpeechJobState(for: request)
+            let speechJob = await makeSpeechJobState(for: request)
             await playbackController.enqueue(speechJob)
         }
         if let queuedEvent = await makeQueuedEvent(for: job) {
@@ -832,7 +829,7 @@ public extension SpeakSwiftly {
         await completeRequest(request: request, result: result)
     }
 
-    private func makeSpeechJobState(for request: WorkerRequest) -> PlaybackJob {
+    private func makeSpeechJobState(for request: WorkerRequest) async -> PlaybackJob {
         let requestID = request.id
         let op = request.opName
         let text = switch request {
@@ -845,7 +842,7 @@ public extension SpeakSwiftly {
         let textProfileName = request.textProfileName
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
-        let textProfile = textRuntime.snapshot(named: textProfileName)
+        let textProfile = await normalizerRef.effectiveProfile(named: textProfileName)
         let normalizedText = if let sourceFormat {
             TextForSpeech.normalizeSource(
                 text,

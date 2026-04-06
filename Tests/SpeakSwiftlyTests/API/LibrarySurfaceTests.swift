@@ -9,6 +9,12 @@ import TextForSpeech
     _ = await SpeakSwiftly.live()
 }
 
+@Test func publicLibrarySurfaceConstructsTopLevelNormalizer() {
+    let persistenceURL = URL(fileURLWithPath: "/tmp/speakswiftly-test-profiles.json")
+    let normalizer = SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+    _ = normalizer
+}
+
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
@@ -32,6 +38,12 @@ import TextForSpeech
     }
     let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
         runtime.normalizer
+    }
+    let makeNormalizer: @Sendable (URL?) -> SpeakSwiftly.Normalizer = { persistenceURL in
+        SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+    }
+    let liveWithNormalizer: @Sendable (SpeakSwiftly.Normalizer) async -> SpeakSwiftly.Runtime = { normalizer in
+        await SpeakSwiftly.live(normalizer: normalizer)
     }
     let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, name in
         await normalizer.profile(named: name)
@@ -164,6 +176,8 @@ import TextForSpeech
 
     _ = speak
     _ = normalizer
+    _ = makeNormalizer
+    _ = liveWithNormalizer
     _ = createProfile
     _ = createClone
     _ = profiles
