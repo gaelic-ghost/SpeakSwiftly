@@ -30,7 +30,18 @@ For example:
 import SpeakSwiftlyCore
 import TextForSpeech
 
-let runtime = await SpeakSwiftly.live()
+let normalizer = SpeakSwiftly.Normalizer()
+try await normalizer.storeProfile(
+    TextForSpeech.Profile(
+        id: "logs",
+        name: "Logs",
+        replacements: [
+            TextForSpeech.Replacement("stderr", with: "standard error")
+        ]
+    )
+)
+
+let runtime = await SpeakSwiftly.live(normalizer: normalizer)
 await runtime.start()
 
 let handle = await runtime.speak(
@@ -63,7 +74,7 @@ let sourceHandle = await runtime.speak(
 )
 ```
 
-Text shaping is part of the typed runtime surface too. `SpeakSwiftly.Runtime` can read the active, base, stored, and effective text profiles, persist changes through the adjacent `TextForSpeech` runtime, and incrementally add, replace, or remove text replacements without rebuilding whole profile values for each small edit.
+Text shaping is its own typed surface too. `SpeakSwiftly.Normalizer` is a first-class object that owns text-profile state and persistence, and `SpeakSwiftly.Runtime` can consume an injected normalizer for speech work. `runtime.normalizer` still exists as a compatibility alias to the injected normalizer, but it is no longer the primary API to build around.
 
 ### Motivation
 
@@ -184,7 +195,22 @@ The test suite is organized to mirror the source tree:
 
 The package also includes `TextForSpeech` coverage for normalization context, profile primitives, persistence, and effective-profile behavior.
 
-The typed text-profile helpers now live on `runtime.normalizer` as `SpeakSwiftly.Normalizer`:
+The typed text-profile helpers live on top-level `SpeakSwiftly.Normalizer` instances:
+
+```swift
+let normalizer = SpeakSwiftly.Normalizer(
+    persistenceURL: profilesURL
+)
+
+try await normalizer.loadProfiles()
+try await normalizer.addReplacement(
+    TextForSpeech.Replacement("stderr", with: "standard error")
+)
+
+let runtime = await SpeakSwiftly.live(normalizer: normalizer)
+```
+
+Current `SpeakSwiftly.Normalizer` helpers are:
 
 - `activeProfile()`
 - `baseProfile()`
@@ -205,6 +231,8 @@ The typed text-profile helpers now live on `runtime.normalizer` as `SpeakSwiftly
 - `replaceReplacement(_:inStoredProfileNamed:)`
 - `removeReplacement(id:)`
 - `removeReplacement(id:fromStoredProfileNamed:)`
+
+`runtime.normalizer` remains available as a compatibility alias to the injected normalizer object when callers already have a runtime in hand.
 
 The current typed voice-profile creation helpers on `SpeakSwiftly.Runtime` are:
 
