@@ -232,8 +232,20 @@ enum ModelFactory {
     static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
     static let importedCloneVoiceDescription = "Imported reference audio clone."
 
-    static func loadResidentModel(for backend: SpeakSwiftly.SpeechBackend) async throws -> AnySpeechModel {
-        try await loadModel(modelRepo: residentModelRepo(for: backend))
+    static func loadResidentModels(for backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels {
+        switch backend {
+        case .qwen3:
+            return .qwen3(try await loadModel(modelRepo: residentModelRepo(for: backend)))
+        case .marvis:
+            async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
+            async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
+            return .marvis(
+                MarvisResidentModels(
+                    conversationalA: try await conversationalA,
+                    conversationalB: try await conversationalB
+                )
+            )
+        }
     }
 
     static func residentModelRepo(for backend: SpeakSwiftly.SpeechBackend) -> String {

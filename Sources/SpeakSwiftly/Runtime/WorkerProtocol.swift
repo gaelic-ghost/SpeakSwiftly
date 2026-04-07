@@ -22,6 +22,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let nestedSourceFormat: TextForSpeech.SourceFormat?
     let sourceFormat: TextForSpeech.SourceFormat?
     let requestID: String?
+    let vibe: SpeakSwiftly.Vibe?
     let voiceDescription: String?
     let outputPath: String?
     let referenceAudioPath: String?
@@ -46,6 +47,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case nestedSourceFormat = "nested_source_format"
         case sourceFormat = "source_format"
         case requestID = "request_id"
+        case vibe
         case voiceDescription = "voice_description"
         case outputPath = "output_path"
         case referenceAudioPath = "reference_audio_path"
@@ -70,6 +72,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
         requestID = try container.decodeIfPresent(String.self, forKey: .requestID)
+        vibe = try container.decodeIfPresent(SpeakSwiftly.Vibe.self, forKey: .vibe)
         voiceDescription = try container.decodeIfPresent(String.self, forKey: .voiceDescription)
         outputPath = try container.decodeIfPresent(String.self, forKey: .outputPath)
         referenceAudioPath = try container.decodeIfPresent(String.self, forKey: .referenceAudioPath)
@@ -157,8 +160,8 @@ enum WorkerRequest: Sendable, Equatable {
     )
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
-    case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
-    case createClone(id: String, profileName: String, referenceAudioPath: String, transcript: String?)
+    case createProfile(id: String, profileName: String, text: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)
+    case createClone(id: String, profileName: String, referenceAudioPath: String, vibe: SpeakSwiftly.Vibe, transcript: String?)
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
     case textProfileActive(id: String)
@@ -187,8 +190,8 @@ enum WorkerRequest: Sendable, Equatable {
         case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
              .generatedFile(let id, _),
              .generatedFiles(let id),
-             .createProfile(let id, _, _, _, _),
-             .createClone(let id, _, _, _),
+             .createProfile(let id, _, _, _, _, _),
+             .createClone(let id, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
              .textProfileActive(let id),
@@ -349,8 +352,8 @@ enum WorkerRequest: Sendable, Equatable {
     var profileName: String? {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
-             .createProfile(_, let profileName, _, _, _),
-             .createClone(_, let profileName, _, _),
+             .createProfile(_, let profileName, _, _, _, _),
+             .createClone(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
         case .generatedFile,
@@ -571,18 +574,28 @@ enum WorkerRequest: Sendable, Equatable {
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
+            let vibe = try require(raw.vibe, field: "vibe", id: id)
             let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
             let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .createProfile(id: id, profileName: profileName, text: text, voiceDescription: voiceDescription, outputPath: outputPath)
+            return .createProfile(
+                id: id,
+                profileName: profileName,
+                text: text,
+                vibe: vibe,
+                voiceDescription: voiceDescription,
+                outputPath: outputPath
+            )
 
         case "create_clone":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
+            let vibe = try require(raw.vibe, field: "vibe", id: id)
             let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .createClone(
                 id: id,
                 profileName: profileName,
                 referenceAudioPath: referenceAudioPath,
+                vibe: vibe,
                 transcript: transcript
             )
 
@@ -715,6 +728,13 @@ enum WorkerRequest: Sendable, Equatable {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
         }
         return trimmed
+    }
+
+    private static func require<T>(_ value: T?, field: String, id: String) throws -> T {
+        guard let value else {
+            throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a '\(field)' field.")
+        }
+        return value
     }
 
     private static func describeDecodingError(_ error: DecodingError) -> String {

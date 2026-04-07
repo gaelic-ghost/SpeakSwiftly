@@ -8,16 +8,15 @@ extension SpeakSwiftly.Runtime {
     func marvisGenerationStream(
         model: AnySpeechModel,
         text: String,
-        materialization: StoredProfileMaterialization,
-        refAudio: MLXArray?,
+        voice: MarvisResidentVoice,
         generationParameters: GenerateParameters,
         streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
         model.generateSamplesStream(
             text: text,
-            voice: nil,
-            refAudio: refAudio,
-            refText: materialization.manifest.referenceText,
+            voice: voice.rawValue,
+            refAudio: nil,
+            refText: nil,
             language: nil,
             generationParameters: generationParameters,
             streamingInterval: streamingInterval

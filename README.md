@@ -97,9 +97,11 @@ The first intended runtime shape is:
 - Newline-delimited JSON over `stdin` and `stdout`.
 - A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
-- A second on-demand clone path that imports caller-provided reference audio, targets around 10 seconds of clear source speech, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
+- A second on-demand clone path that imports caller-provided reference audio, requires an explicit profile `vibe`, targets around 10 seconds of clear source speech, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
 - A persisted runtime configuration file that can remember the preferred resident speech backend across launches.
+- Resident backend switching only between `qwen3` and `marvis`.
+- Marvis resident warmup that keeps both built-in prompt voices hot and routes requests by stored profile vibe: `.femme` and `.androgenous` use `conversational_a`, while `.masc` uses `conversational_b`.
 - A single-consumer priority queue for incoming requests, with waiting live playback work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
 - Structured progress and lifecycle events written to `stdout`, with structured JSONL operator diagnostics on `stderr`.
@@ -188,7 +190,7 @@ Example request shapes:
 {"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
 {"id":"req-1g","op":"generated_file","artifact_id":"req-1f"}
 {"id":"req-1h","op":"generated_files"}
-{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
+{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
 {"id":"req-5","op":"text_profile_active"}
@@ -218,7 +220,7 @@ Example response and event shapes:
 {"id":"req-1g","ok":true,"generated_file":{"artifact_id":"req-1f","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d3166/generated.wav"}}
 {"id":"req-1h","ok":true,"generated_files":[{"artifact_id":"req-1f","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d3166/generated.wav"}]}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
-{"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
+{"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","vibe":"femme","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
 {"id":"req-6","ok":true,"text_profiles":[{"id":"logs","name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}],"text_profile_path":"/path/to/text-profiles.json"}
 {"id":"req-9","ok":true,"text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]},"text_profile_path":"/path/to/text-profiles.json"}
 {"id":"req-10","ok":false,"code":"profile_not_found","message":"Profile 'ghost' was not found in the SpeakSwiftly profile store."}
@@ -237,7 +239,7 @@ Current operation families are:
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
 - Resident `0.6B` startup warmup and generated-file rendering with managed artifact metadata and fetch/list reads.
 - On-demand `1.7B` VoiceDesign profile creation.
-- On-demand clone profile creation from caller-provided reference audio, with a documented target of around 10 seconds of clear source speech and optional transcript inference.
+- On-demand clone profile creation from caller-provided reference audio, with a required `vibe`, a documented target of around 10 seconds of clear source speech, and optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
 - Immediate text-profile inspection, persistence, and replacement editing with JSONL and typed-library parity.
 - Playback-prioritized request handling with preload-aware queue status.
@@ -297,15 +299,17 @@ Current `SpeakSwiftly.Normalizer` helpers are:
 The current typed generation and profile helpers on `SpeakSwiftly.Runtime` are:
 
 - `speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
-- `createProfile(named:from:voice:outputPath:id:)`
-- `createClone(named:from:transcript:id:)`
+- `createProfile(named:from:vibe:voice:outputPath:id:)`
+- `createClone(named:from:vibe:transcript:id:)`
 - `generatedFile(id:requestID:)`
 - `generatedFiles(id:)`
 
 Current live-playback behavior is:
 
-- `queue_speech_live` loads the stored profile and reference audio first.
-- `queue_speech_file` loads the stored profile and reference audio first, then saves the completed WAV under the generated-file store instead of scheduling playback.
+- `queue_speech_live` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses the stored profile reference audio and transcript, while `marvis` uses the stored profile vibe to select the already-warm built-in preset voice.
+- `queue_speech_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
+- Marvis resident warmup keeps both `conversational_a` and `conversational_b` loaded at once because the model is small enough that per-request preset switching does not need another preload cycle.
+- Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.androgenous` -> `conversational_a`, `.masc` -> `conversational_b`.
 - The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
 - The resident and profile-generation paths now pass explicit local generation parameters instead of relying on whatever default values the current `mlx-audio-swift` dependency tip happens to expose, which helps keep short utterances from drifting back into runaway generation behavior.
 - Playback is now owned by a real `PlaybackController` actor in `Sources/SpeakSwiftly/Playback/PlaybackController.swift`, while the lower-level AVFoundation engine driver stays internal to the playback feature instead of living in `Runtime/`.

@@ -19,6 +19,7 @@ struct ProfileMaterializationManifest: Codable, Sendable, Equatable {
 struct ProfileManifest: Codable, Sendable, Equatable {
     let version: Int
     let profileName: String
+    let vibe: SpeakSwiftly.Vibe
     let createdAt: Date
     let sourceKind: ProfileSourceKind
     let modelRepo: String
@@ -39,15 +40,29 @@ private struct LegacyProfileManifest: Codable, Sendable, Equatable {
     let sampleRate: Int
 }
 
+private struct LegacyMultiBackendProfileManifest: Codable, Sendable, Equatable {
+    let version: Int
+    let profileName: String
+    let createdAt: Date
+    let sourceKind: ProfileSourceKind
+    let modelRepo: String
+    let voiceDescription: String
+    let sourceText: String
+    let sampleRate: Int
+    let backendMaterializations: [ProfileMaterializationManifest]
+}
+
 public extension SpeakSwiftly {
     struct ProfileSummary: Codable, Sendable, Equatable {
         public let profileName: String
+        public let vibe: SpeakSwiftly.Vibe
         public let createdAt: Date
         public let voiceDescription: String
         public let sourceText: String
 
         enum CodingKeys: String, CodingKey {
             case profileName = "profile_name"
+            case vibe
             case createdAt = "created_at"
             case voiceDescription = "voice_description"
             case sourceText = "source_text"
@@ -55,11 +70,13 @@ public extension SpeakSwiftly {
 
         public init(
             profileName: String,
+            vibe: SpeakSwiftly.Vibe,
             createdAt: Date,
             voiceDescription: String,
             sourceText: String
         ) {
             self.profileName = profileName
+            self.vibe = vibe
             self.createdAt = createdAt
             self.voiceDescription = voiceDescription
             self.sourceText = sourceText
@@ -87,18 +104,17 @@ struct StoredProfile: Sendable, Equatable {
     let materializations: [StoredProfileMaterialization]
 
     var referenceAudioURL: URL {
-        materializations.first(where: { $0.manifest.backend == .qwen3 })?.referenceAudioURL
-            ?? materializations[0].referenceAudioURL
+        try! qwenMaterialization().referenceAudioURL
     }
 
-    func materialization(for backend: SpeakSwiftly.SpeechBackend) throws -> StoredProfileMaterialization {
-        if let materialization = materializations.first(where: { $0.manifest.backend == backend }) {
+    func qwenMaterialization() throws -> StoredProfileMaterialization {
+        if let materialization = materializations.first(where: { $0.manifest.backend == .qwen3 }) {
             return materialization
         }
 
         throw WorkerError(
             code: .profileNotFound,
-            message: "Profile '\(manifest.profileName)' does not contain a stored '\(backend.rawValue)' materialization. Recreate the profile to prepare assets for that backend."
+            message: "Profile '\(manifest.profileName)' does not contain a stored 'qwen3' materialization. Recreate the profile to prepare Qwen assets for that profile."
         )
     }
 }
@@ -112,7 +128,7 @@ struct ProfileStore {
     static let configurationFileName = "configuration.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
-    static let manifestVersion = 2
+    static let manifestVersion = 3
 
     let rootURL: URL
     let fileManager: FileManager
@@ -149,6 +165,7 @@ struct ProfileStore {
 
     func createProfile(
         profileName: String,
+        vibe: SpeakSwiftly.Vibe,
         modelRepo: String,
         voiceDescription: String,
         sourceText: String,
@@ -165,18 +182,11 @@ struct ProfileStore {
                 sampleRate: sampleRate,
                 audioData: canonicalAudioData
             ),
-            ProfileMaterializationDraft(
-                backend: .marvis,
-                modelRepo: ModelFactory.residentModelRepo(for: .marvis),
-                referenceAudioFile: Self.audioFileName,
-                referenceText: sourceText,
-                sampleRate: sampleRate,
-                audioData: canonicalAudioData
-            ),
         ]
 
         return try createProfile(
             profileName: profileName,
+            vibe: vibe,
             sourceKind: sourceKind,
             sourceModelRepo: modelRepo,
             voiceDescription: voiceDescription,
@@ -188,6 +198,7 @@ struct ProfileStore {
 
     func createProfile(
         profileName: String,
+        vibe: SpeakSwiftly.Vibe,
         sourceKind: ProfileSourceKind,
         sourceModelRepo: String,
         voiceDescription: String,
@@ -219,6 +230,7 @@ struct ProfileStore {
         let manifest = ProfileManifest(
             version: Self.manifestVersion,
             profileName: profileName,
+            vibe: vibe,
             createdAt: createdAt,
             sourceKind: sourceKind,
             modelRepo: sourceModelRepo,
@@ -309,6 +321,7 @@ struct ProfileStore {
         return manifests.map {
             ProfileSummary(
                 profileName: $0.profileName,
+                vibe: $0.vibe,
                 createdAt: $0.createdAt,
                 voiceDescription: $0.voiceDescription,
                 sourceText: $0.sourceText
@@ -414,6 +427,12 @@ struct ProfileStore {
             return manifest
         }
 
+        if let legacyManifest = try? decoder.decode(LegacyMultiBackendProfileManifest.self, from: manifestData) {
+            let upgradedManifest = upgradeLegacyMultiBackendManifest(legacyManifest)
+            try writeManifest(upgradedManifest, to: directoryURL)
+            return upgradedManifest
+        }
+
         if let legacyManifest = try? decoder.decode(LegacyProfileManifest.self, from: manifestData) {
             let upgradedManifest = upgradeLegacyManifest(legacyManifest)
             try writeManifest(upgradedManifest, to: directoryURL)
@@ -437,19 +456,15 @@ struct ProfileStore {
                 referenceText: legacyManifest.sourceText,
                 sampleRate: legacyManifest.sampleRate
             ),
-            ProfileMaterializationManifest(
-                backend: .marvis,
-                modelRepo: ModelFactory.residentModelRepo(for: .marvis),
-                createdAt: legacyManifest.createdAt,
-                referenceAudioFile: legacyManifest.referenceAudioFile,
-                referenceText: legacyManifest.sourceText,
-                sampleRate: legacyManifest.sampleRate
-            ),
         ]
 
         return ProfileManifest(
             version: Self.manifestVersion,
             profileName: legacyManifest.profileName,
+            vibe: inferredLegacyVibe(
+                profileName: legacyManifest.profileName,
+                voiceDescription: legacyManifest.voiceDescription
+            ),
             createdAt: legacyManifest.createdAt,
             sourceKind: sourceKind,
             modelRepo: legacyManifest.modelRepo,
@@ -458,6 +473,67 @@ struct ProfileStore {
             sampleRate: legacyManifest.sampleRate,
             backendMaterializations: materializations
         )
+    }
+
+    private func upgradeLegacyMultiBackendManifest(_ legacyManifest: LegacyMultiBackendProfileManifest) -> ProfileManifest {
+        let qwenMaterializations = legacyManifest.backendMaterializations.filter { $0.backend == .qwen3 }
+        let materializations = if qwenMaterializations.isEmpty {
+            [
+                ProfileMaterializationManifest(
+                    backend: .qwen3,
+                    modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                    createdAt: legacyManifest.createdAt,
+                    referenceAudioFile: Self.audioFileName,
+                    referenceText: legacyManifest.sourceText,
+                    sampleRate: legacyManifest.sampleRate
+                ),
+            ]
+        } else {
+            qwenMaterializations
+        }
+
+        return ProfileManifest(
+            version: Self.manifestVersion,
+            profileName: legacyManifest.profileName,
+            vibe: inferredLegacyVibe(
+                profileName: legacyManifest.profileName,
+                voiceDescription: legacyManifest.voiceDescription
+            ),
+            createdAt: legacyManifest.createdAt,
+            sourceKind: legacyManifest.sourceKind,
+            modelRepo: legacyManifest.modelRepo,
+            voiceDescription: legacyManifest.voiceDescription,
+            sourceText: legacyManifest.sourceText,
+            sampleRate: legacyManifest.sampleRate,
+            backendMaterializations: materializations
+        )
+    }
+
+    private func inferredLegacyVibe(
+        profileName: String,
+        voiceDescription: String
+    ) -> SpeakSwiftly.Vibe {
+        let signal = "\(profileName) \(voiceDescription)".lowercased()
+
+        if signal.contains("femme")
+            || signal.contains("female")
+            || signal.contains("feminine")
+            || signal.contains("woman")
+            || signal.contains("girl")
+        {
+            return .femme
+        }
+
+        if signal.contains("masc")
+            || signal.contains("male")
+            || signal.contains("masculine")
+            || signal.contains("man")
+            || signal.contains("boy")
+        {
+            return .masc
+        }
+
+        return .androgenous
     }
 
     private func writeMaterializationFiles(

@@ -17,7 +17,7 @@ private func makeSpeechBackendResolutionDependencies(
 ) -> WorkerDependencies {
     WorkerDependencies(
         fileManager: fileManager,
-        loadResidentModel: { _ in makeResidentModel() },
+        loadResidentModels: { backend in makeResidentModels(for: backend) },
         loadProfileModel: { makeProfileModel() },
         loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
         makePlaybackController: { AnyPlaybackController.silent() },
@@ -494,7 +494,7 @@ private func makeSpeechBackendResolutionDependencies(
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1463,6 +1463,7 @@ private func makeSpeechBackendResolutionDependencies(
                 profiles: [
                     ProfileSummary(
                         profileName: "default-femme",
+                        vibe: .femme,
                         createdAt: createdAt,
                         voiceDescription: "Warm and bright.",
                         sourceText: "Reference transcript"
@@ -1752,7 +1753,7 @@ private func makeSpeechBackendResolutionDependencies(
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1810,7 +1811,7 @@ private func makeSpeechBackendResolutionDependencies(
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"brand-new","text":"Hello there","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"brand-new","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -2056,6 +2057,7 @@ private func makeSpeechBackendResolutionDependencies(
             id: "req-queued-shutdown-stream",
             profileName: "shutdown-queued-profile",
             text: "A queued request that should still be active when shutdown begins.",
+            vibe: .femme,
             voiceDescription: "Warm and bright",
             outputPath: nil
         )
@@ -2141,7 +2143,7 @@ private func makeSpeechBackendResolutionDependencies(
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {

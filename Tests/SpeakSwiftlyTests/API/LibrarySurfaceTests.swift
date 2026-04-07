@@ -161,30 +161,34 @@ import TextForSpeech
         name in
         try await normalizer.removeReplacement(id: replacementID, fromStoredProfileNamed: name)
     }
-    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, SpeakSwiftly.Vibe, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         profileName,
         text,
+        vibe,
         voiceDescription,
         outputPath,
         id in
         await runtime.createProfile(
             named: profileName,
             from: text,
+            vibe: vibe,
             voice: voiceDescription,
             outputPath: outputPath,
             id: id
         )
     }
-    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, SpeakSwiftly.Vibe, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         profileName,
         referenceAudioURL,
+        vibe,
         transcript,
         id in
         await runtime.createClone(
             named: profileName,
             from: referenceAudioURL,
+            vibe: vibe,
             transcript: transcript,
             id: id
         )

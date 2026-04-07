@@ -120,7 +120,7 @@ import TextForSpeech
 
 @Test func decodesCreateProfileRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello","voice_description":"Warm and bright","output_path":"./voice.wav"}"#
+        from: #"{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav"}"#
     )
 
     #expect(
@@ -128,6 +128,7 @@ import TextForSpeech
             id: "req-2",
             profileName: "bright-guide",
             text: "Hello",
+            vibe: .femme,
             voiceDescription: "Warm and bright",
             outputPath: "./voice.wav"
         )
@@ -136,7 +137,7 @@ import TextForSpeech
 
 @Test func decodesCreateCloneRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","transcript":"Hello from imported audio"}"#
+        from: #"{"id":"req-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio"}"#
     )
 
     #expect(
@@ -144,6 +145,7 @@ import TextForSpeech
             id: "req-clone",
             profileName: "ghost-copy",
             referenceAudioPath: "./voice.m4a",
+            vibe: .masc,
             transcript: "Hello from imported audio"
         )
     )
