@@ -316,6 +316,86 @@ struct SpeakSwiftlyE2ETests {
         }
     }
 
+    @Test func generatedFileLaneRunsEndToEndAndSupportsManagedArtifactReads() async throws {
+        guard Self.isE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: true
+        )
+        defer { Task { await worker.stop() } }
+
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-generated-file-profile",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
+        )
+
+        let generatedFile = try await Self.runGeneratedFileSpeech(
+            on: worker,
+            id: "req-generated-file-e2e",
+            text: Self.testingPlaybackText,
+            profileName: Self.testingProfileName
+        )
+        #expect(generatedFile["artifact_id"] as? String == "req-generated-file-e2e")
+        #expect(generatedFile["profile_name"] as? String == Self.testingProfileName)
+
+        let generatedFilePath = try #require(generatedFile["file_path"] as? String)
+        #expect(FileManager.default.fileExists(atPath: generatedFilePath))
+
+        try worker.sendJSON(
+            """
+            {"id":"req-generated-file-read","op":"generated_file","artifact_id":"req-generated-file-e2e"}
+            """
+        )
+
+        let fetchedGeneratedFile = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["id"] as? String == "req-generated-file-read",
+                    $0["ok"] as? Bool == true,
+                    let generatedFile = $0["generated_file"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return generatedFile["artifact_id"] as? String == "req-generated-file-e2e"
+            }
+        )
+        let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
+        #expect(fetchedGeneratedFilePayload["file_path"] as? String == generatedFilePath)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-generated-files-read","op":"generated_files"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["id"] as? String == "req-generated-files-read",
+                $0["ok"] as? Bool == true,
+                let generatedFiles = $0["generated_files"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedFiles.contains {
+                $0["artifact_id"] as? String == "req-generated-file-e2e"
+                    && $0["file_path"] as? String == generatedFilePath
+            }
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
     // MARK: Audible Playback and Tracing
 
     @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
@@ -991,6 +1071,56 @@ struct SpeakSwiftlyE2ETests {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
         } != nil)
+    }
+
+    private static func runGeneratedFileSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String
+    ) async throws -> [String: Any] {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"queue_speech_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+                && $0["generated_file"] == nil
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_file"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "generating_file_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "writing_generated_file"
+        } != nil)
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["id"] as? String == id,
+                    $0["ok"] as? Bool == true,
+                    let generatedFile = $0["generated_file"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return generatedFile["artifact_id"] as? String == id
+            }
+        )
+
+        return try #require(success["generated_file"] as? [String: Any])
     }
 
     private static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
