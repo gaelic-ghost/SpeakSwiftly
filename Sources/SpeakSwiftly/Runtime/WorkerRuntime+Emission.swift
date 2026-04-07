@@ -17,6 +17,8 @@ extension SpeakSwiftly.Runtime {
                 id: payload.id,
                 generatedFile: payload.generatedFile,
                 generatedFiles: payload.generatedFiles,
+                generationJob: payload.generationJob,
+                generationJobs: payload.generationJobs,
                 profileName: payload.profileName,
                 profilePath: payload.profilePath,
                 profiles: payload.profiles,
@@ -158,6 +160,7 @@ extension SpeakSwiftly.Runtime {
         id: String,
         op: String,
         artifactID: String? = nil,
+        jobID: String? = nil,
         text: String? = nil,
         profileName: String? = nil,
         textProfileName: String? = nil,
@@ -180,6 +183,7 @@ extension SpeakSwiftly.Runtime {
             id: id,
             op: op,
             artifactID: artifactID,
+            jobID: jobID,
             text: text,
             profileName: profileName,
             textProfileName: textProfileName,
@@ -236,6 +240,17 @@ extension SpeakSwiftly.Runtime {
                 artifactID: artifactID
             )
         case .generatedFiles(let id):
+            await submitRequest(
+                id: id,
+                op: request.opName
+            )
+        case .generationJob(let id, let jobID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                jobID: jobID
+            )
+        case .generationJobs(let id):
             await submitRequest(
                 id: id,
                 op: request.opName

@@ -31,6 +31,8 @@ public extension SpeakSwiftly {
         let id: String
         let generatedFile: SpeakSwiftly.GeneratedFile?
         let generatedFiles: [SpeakSwiftly.GeneratedFile]?
+        let generationJob: SpeakSwiftly.GenerationJob?
+        let generationJobs: [SpeakSwiftly.GenerationJob]?
         let profileName: String?
         let profilePath: String?
         let profiles: [ProfileSummary]?
@@ -47,6 +49,8 @@ public extension SpeakSwiftly {
             id: String,
             generatedFile: SpeakSwiftly.GeneratedFile? = nil,
             generatedFiles: [SpeakSwiftly.GeneratedFile]? = nil,
+            generationJob: SpeakSwiftly.GenerationJob? = nil,
+            generationJobs: [SpeakSwiftly.GenerationJob]? = nil,
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
@@ -62,6 +66,8 @@ public extension SpeakSwiftly {
             self.id = id
             self.generatedFile = generatedFile
             self.generatedFiles = generatedFiles
+            self.generationJob = generationJob
+            self.generationJobs = generationJobs
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
@@ -85,6 +91,7 @@ public extension SpeakSwiftly {
         let id: String
         let op: String
         let artifactID: String?
+        let jobID: String?
         let text: String?
         let profileName: String?
         let textProfileName: String?
@@ -110,6 +117,7 @@ public extension SpeakSwiftly {
             case id
             case op
             case artifactID = "artifact_id"
+            case jobID = "job_id"
             case text
             case profileName = "profile_name"
             case textProfileName = "text_profile_name"
@@ -189,6 +197,7 @@ public extension SpeakSwiftly {
     let logEncoder = JSONEncoder()
     let profileStore: ProfileStore
     let generatedFileStore: GeneratedFileStore
+    let generationJobStore: GenerationJobStore
     let normalizerRef: SpeakSwiftly.Normalizer
     let playbackController: PlaybackController
     let generationController = GenerationController()
@@ -209,6 +218,7 @@ public extension SpeakSwiftly {
         speechBackend: SpeakSwiftly.SpeechBackend,
         profileStore: ProfileStore,
         generatedFileStore: GeneratedFileStore,
+        generationJobStore: GenerationJobStore,
         normalizer: SpeakSwiftly.Normalizer,
         playbackController: PlaybackController
     ) {
@@ -216,6 +226,7 @@ public extension SpeakSwiftly {
         self.speechBackend = speechBackend
         self.profileStore = profileStore
         self.generatedFileStore = generatedFileStore
+        self.generationJobStore = generationJobStore
         normalizerRef = normalizer
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
@@ -248,6 +259,9 @@ public extension SpeakSwiftly {
         let generatedFileStore = GeneratedFileStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true)
         )
+        let generationJobStore = GenerationJobStore(
+            rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true)
+        )
         do {
             try await normalizer.loadProfiles()
         } catch {
@@ -262,6 +276,7 @@ public extension SpeakSwiftly {
             speechBackend: configuredSpeechBackend,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
+            generationJobStore: generationJobStore,
             normalizer: normalizer,
             playbackController: playbackController
         )
@@ -520,6 +535,24 @@ public extension SpeakSwiftly {
             return
         }
 
+        let queuedGenerationJob: SpeakSwiftly.GenerationJob?
+        do {
+            queuedGenerationJob = try createQueuedGenerationJobIfNeeded(for: request)
+        } catch let workerError as WorkerError {
+            failRequestStream(for: request.id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: request.id)
+            await emitFailure(id: request.id, error: workerError)
+            return
+        } catch {
+            let workerError = WorkerError(
+                code: .filesystemError,
+                message: "Request '\(request.id)' could not create a persisted generation job record before queueing file generation. \(error.localizedDescription)"
+            )
+            failRequestStream(for: request.id, error: workerError)
+            requestAcceptedAt.removeValue(forKey: request.id)
+            await emitFailure(id: request.id, error: workerError)
+            return
+        }
         let job = await generationController.enqueue(request)
         requestAcceptedAt[request.id] = dependencies.now()
         await logRequestEvent(
@@ -545,7 +578,10 @@ public extension SpeakSwiftly {
             )
         }
         if request.acknowledgesEnqueueImmediately {
-            let acknowledgement = WorkerSuccessResponse(id: request.id)
+            let acknowledgement = WorkerSuccessResponse(
+                id: request.id,
+                generationJob: queuedGenerationJob
+            )
             yieldRequestEvent(.acknowledged(acknowledgement), for: request.id)
             await logRequestEvent(
                 "request_enqueue_acknowledged",
@@ -576,6 +612,8 @@ public extension SpeakSwiftly {
         }
 
         guard let job = await generationController.beginNextIfPossible(residentReady: true) else { return }
+
+        try? markGenerationJobRunningIfNeeded(for: job.request)
 
         await emitStarted(for: job.request)
         yieldRequestEvent(.started(WorkerStartedEvent(id: job.request.id, op: job.request.opName)), for: job.request.id)
@@ -623,10 +661,26 @@ public extension SpeakSwiftly {
                     textContext: textContext,
                     sourceFormat: sourceFormat
                 )
+                let completedJob = try generationJobStore.markCompleted(
+                    id: id,
+                    artifacts: [
+                        SpeakSwiftly.GenerationArtifact(
+                            artifactID: generatedFile.artifactID,
+                            kind: .audioWAV,
+                            createdAt: generatedFile.createdAt,
+                            filePath: generatedFile.filePath,
+                            sampleRate: generatedFile.sampleRate,
+                            profileName: generatedFile.profileName,
+                            textProfileName: generatedFile.textProfileName
+                        )
+                    ],
+                    completedAt: dependencies.now()
+                )
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
-                        generatedFile: generatedFile
+                        generatedFile: generatedFile,
+                        generationJob: completedJob
                     )
                 ))
 
@@ -696,6 +750,8 @@ public extension SpeakSwiftly {
 
             case .generatedFile,
                  .generatedFiles,
+                 .generationJob,
+                 .generationJobs,
                  .textProfileActive,
                  .textProfileBase,
                  .textProfile,
@@ -756,6 +812,22 @@ public extension SpeakSwiftly {
                     WorkerSuccessPayload(
                         id: id,
                         generatedFiles: try generatedFileStore.listGeneratedFiles()
+                    )
+                )
+
+            case .generationJob(let id, let jobID):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generationJob: try generationJobStore.loadGenerationJob(id: jobID)
+                    )
+                )
+
+            case .generationJobs(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generationJobs: try generationJobStore.listGenerationJobs()
                     )
                 )
 
@@ -1158,6 +1230,7 @@ public extension SpeakSwiftly {
             if job.request.requiresPlayback {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
+            markGenerationJobFailedIfNeeded(for: job.request, error: error)
             failRequestStream(for: job.request.id, error: error)
             requestAcceptedAt.removeValue(forKey: job.request.id)
             await emitFailure(id: job.request.id, error: error)
@@ -1169,6 +1242,7 @@ public extension SpeakSwiftly {
 
         activeGeneration = nil
         await generationController.finishActive(token: token)
+        recordGenerationDispositionIfNeeded(for: request, disposition: disposition)
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
         switch disposition {
         case .requestCompleted(let result):
@@ -1185,6 +1259,118 @@ public extension SpeakSwiftly {
     private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
         await completeRequest(request: request, result: result)
+    }
+
+    private func createQueuedGenerationJobIfNeeded(
+        for request: WorkerRequest
+    ) throws -> SpeakSwiftly.GenerationJob? {
+        guard case .queueSpeech(
+            id: let id,
+            text: let text,
+            profileName: let profileName,
+            textProfileName: let textProfileName,
+            jobType: .file,
+            textContext: _,
+            sourceFormat: _
+        ) = request else {
+            return nil
+        }
+
+        return try generationJobStore.createFileJob(
+            jobID: id,
+            profileName: profileName,
+            textProfileName: textProfileName,
+            speechBackend: speechBackend,
+            text: text,
+            createdAt: dependencies.now()
+        )
+    }
+
+    private func markGenerationJobRunningIfNeeded(for request: WorkerRequest) throws {
+        guard case .queueSpeech(
+            id: let id,
+            text: _,
+            profileName: _,
+            textProfileName: _,
+            jobType: .file,
+            textContext: _,
+            sourceFormat: _
+        ) = request else {
+            return
+        }
+
+        _ = try generationJobStore.markRunning(id: id, startedAt: dependencies.now())
+    }
+
+    private func recordGenerationDispositionIfNeeded(
+        for request: WorkerRequest,
+        disposition: GenerationCompletionDisposition
+    ) {
+        guard case .queueSpeech(
+            id: let id,
+            text: _,
+            profileName: _,
+            textProfileName: _,
+            jobType: .file,
+            textContext: _,
+            sourceFormat: _
+        ) = request else {
+            return
+        }
+
+        switch disposition {
+        case .requestStillPendingPlayback:
+            return
+        case .requestCompleted(.success(let payload)):
+            if payload.generationJob != nil {
+                return
+            }
+            if let generatedFile = payload.generatedFile {
+                let artifact = SpeakSwiftly.GenerationArtifact(
+                    artifactID: generatedFile.artifactID,
+                    kind: .audioWAV,
+                    createdAt: generatedFile.createdAt,
+                    filePath: generatedFile.filePath,
+                    sampleRate: generatedFile.sampleRate,
+                    profileName: generatedFile.profileName,
+                    textProfileName: generatedFile.textProfileName
+                )
+                _ = try? generationJobStore.markCompleted(
+                    id: id,
+                    artifacts: [artifact],
+                    completedAt: dependencies.now()
+                )
+            }
+        case .requestCompleted(.failure(let error)):
+            _ = try? generationJobStore.markFailed(
+                id: id,
+                error: error,
+                failedAt: dependencies.now()
+            )
+        }
+    }
+
+    func markGenerationJobFailedIfNeeded(
+        for request: WorkerRequest,
+        error: WorkerError
+    ) {
+        guard case .queueSpeech(
+            id: let id,
+            text: _,
+            profileName: _,
+            textProfileName: _,
+            jobType: .file,
+            textContext: _,
+            sourceFormat: _
+        ) = request else {
+            return
+        }
+
+        _ = try? generationJobStore.markFailed(
+            id: id,
+            error: error,
+            failedAt: dependencies.now()
+        )
     }
 
     private func makeSpeechJobState(for request: WorkerRequest) async -> PlaybackJob {

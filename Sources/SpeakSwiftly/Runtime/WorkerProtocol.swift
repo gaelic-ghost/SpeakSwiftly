@@ -7,6 +7,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let id: String?
     let op: String?
     let artifactID: String?
+    let jobID: String?
     let text: String?
     let profileName: String?
     let textProfileName: String?
@@ -32,6 +33,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case id
         case op
         case artifactID = "artifact_id"
+        case jobID = "job_id"
         case text
         case profileName = "profile_name"
         case textProfileName = "text_profile_name"
@@ -60,6 +62,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
+        jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
         textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
@@ -160,6 +163,8 @@ enum WorkerRequest: Sendable, Equatable {
     )
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
+    case generationJob(id: String, jobID: String)
+    case generationJobs(id: String)
     case createProfile(id: String, profileName: String, text: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)
     case createClone(id: String, profileName: String, referenceAudioPath: String, vibe: SpeakSwiftly.Vibe, transcript: String?)
     case listProfiles(id: String)
@@ -190,6 +195,8 @@ enum WorkerRequest: Sendable, Equatable {
         case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
              .generatedFile(let id, _),
              .generatedFiles(let id),
+             .generationJob(let id, _),
+             .generationJobs(let id),
              .createProfile(let id, _, _, _, _, _),
              .createClone(let id, _, _, _, _),
              .listProfiles(let id),
@@ -228,6 +235,10 @@ enum WorkerRequest: Sendable, Equatable {
             "generated_file"
         case .generatedFiles:
             "generated_files"
+        case .generationJob:
+            "generation_job"
+        case .generationJobs:
+            "generation_jobs"
         case .createProfile:
             "create_profile"
         case .createClone:
@@ -323,6 +334,8 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .generatedFile,
              .generatedFiles,
+             .generationJob,
+             .generationJobs,
              .textProfileActive,
              .textProfileBase,
              .textProfile,
@@ -358,6 +371,8 @@ enum WorkerRequest: Sendable, Equatable {
             profileName
         case .generatedFile,
              .generatedFiles,
+             .generationJob,
+             .generationJobs,
              .textProfileActive,
              .textProfileBase,
              .textProfiles,
@@ -392,6 +407,8 @@ enum WorkerRequest: Sendable, Equatable {
             textProfileName
         case .generatedFile,
              .generatedFiles,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -426,6 +443,8 @@ enum WorkerRequest: Sendable, Equatable {
             textContext
         case .generatedFile,
              .generatedFiles,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -460,6 +479,8 @@ enum WorkerRequest: Sendable, Equatable {
             sourceFormat
         case .generatedFile,
              .generatedFiles,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -570,6 +591,13 @@ enum WorkerRequest: Sendable, Equatable {
 
         case "generated_files":
             return .generatedFiles(id: id)
+
+        case "generation_job":
+            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+            return .generationJob(id: id, jobID: jobID)
+
+        case "generation_jobs":
+            return .generationJobs(id: id)
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
@@ -844,6 +872,8 @@ public extension SpeakSwiftly {
         public let ok = true
         public let generatedFile: GeneratedFile?
         public let generatedFiles: [GeneratedFile]?
+        public let generationJob: GenerationJob?
+        public let generationJobs: [GenerationJob]?
         public let profileName: String?
         public let profilePath: String?
         public let profiles: [ProfileSummary]?
@@ -861,6 +891,8 @@ public extension SpeakSwiftly {
             case ok
             case generatedFile = "generated_file"
             case generatedFiles = "generated_files"
+            case generationJob = "generation_job"
+            case generationJobs = "generation_jobs"
             case profileName = "profile_name"
             case profilePath = "profile_path"
             case profiles
@@ -878,6 +910,8 @@ public extension SpeakSwiftly {
             id: String,
             generatedFile: GeneratedFile? = nil,
             generatedFiles: [GeneratedFile]? = nil,
+            generationJob: GenerationJob? = nil,
+            generationJobs: [GenerationJob]? = nil,
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
@@ -893,6 +927,8 @@ public extension SpeakSwiftly {
             self.id = id
             self.generatedFile = generatedFile
             self.generatedFiles = generatedFiles
+            self.generationJob = generationJob
+            self.generationJobs = generationJobs
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
@@ -980,6 +1016,8 @@ public extension SpeakSwiftly {
         case unknownOperation = "unknown_operation"
         case generatedFileNotFound = "generated_file_not_found"
         case generatedFileAlreadyExists = "generated_file_already_exists"
+        case generationJobNotFound = "generation_job_not_found"
+        case generationJobAlreadyExists = "generation_job_already_exists"
         case profileNotFound = "profile_not_found"
         case profileAlreadyExists = "profile_already_exists"
         case invalidProfileName = "invalid_profile_name"

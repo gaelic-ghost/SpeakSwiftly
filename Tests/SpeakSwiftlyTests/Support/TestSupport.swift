@@ -475,6 +475,15 @@ func makeGeneratedFileStore(rootURL: URL) throws -> GeneratedFileStore {
     return store
 }
 
+func makeGenerationJobStore(rootURL: URL) throws -> GenerationJobStore {
+    let store = GenerationJobStore(
+        rootURL: rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
+        fileManager: .default
+    )
+    try store.ensureRootExists()
+    return store
+}
+
 func makeRuntime<ResidentModelResult>(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
@@ -493,6 +502,7 @@ func makeRuntime<ResidentModelResult>(
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
+    let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     let normalizer = SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
     )
@@ -547,6 +557,7 @@ func makeRuntime<ResidentModelResult>(
         speechBackend: speechBackend,
         profileStore: store,
         generatedFileStore: generatedFileStore,
+        generationJobStore: generationJobStore,
         normalizer: normalizer,
         playbackController: PlaybackController(driver: playbackController)
     )

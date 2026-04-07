@@ -510,12 +510,13 @@ Scope:
 Tickets:
 
 - [ ] Define a persisted generation-job record shape that can represent queued, running, completed, failed, and expired generated-file requests.
+- [ ] Make job kind explicit in the contract from the start: file jobs for one-file generation and batch jobs for many-file generation.
 - [ ] Split durable identifiers intentionally into `jobID` for generation work and `artifactID` for saved outputs so later batch generation does not force a naming reset.
 - [ ] Decide which parts of job state belong in the immediate worker contract versus a later service or MCP resource surface.
 - [ ] Add first-class stored artifact metadata for generated files so callers can list, inspect, fetch, and eventually garbage-collect output intentionally.
 - [ ] Define the retention, cleanup, and expiry rules for generated files and their job metadata without making single-file generation harder to reason about.
 - [ ] Reconcile current request-id behavior with the new durable identifier split so `queue_speech_file` no longer implies that one request id is the saved artifact id.
-- [ ] Design the batch-generation shape explicitly, including a future `generated_batch(id:)` and `generated_batches()` surface where batches are named and modeled as batches, backed by the same persisted-job model instead of being exposed as awkward "job job" terminology.
+- [ ] Design the batch-generation shape explicitly, including a future `generated_batch(id:)` and `generated_batches()` surface where a batch is the many-files unit and is backed by a batch job in the persisted-job model.
 - [ ] Add reconnectable inspection semantics for completed and in-flight generation jobs so callers do not have to keep one typed stream or stdio session attached for long-running work.
 - [ ] Document the point at which this milestone should become a true service or subscription surface rather than an extension of the current worker contract.
 

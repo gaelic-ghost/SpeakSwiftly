@@ -60,16 +60,21 @@ The durable identifier model should be:
 
 That means the request id should become the durable `jobID`, not the durable artifact id.
 
+Within the generation layer for this milestone, the persisted execution model should explicitly support two job kinds:
+
+- `file job`: one job that produces one saved file
+- `batch job`: one job that produces many saved files
+
 This is the most important contract choice in the whole milestone.
 
 It keeps single-file generation easy to reason about:
 
-- one job
+- one file job
 - one artifact
 
 and it composes cleanly into later batch generation:
 
-- one job
+- one batch job
 - many artifacts
 
 The alternative considered first was keeping one id for both concepts. That would feel simpler today, but it would force either duplicate fake ids or a breaking rename once batch output lands. That path should be rejected now while the surface is still small.
@@ -102,6 +107,7 @@ Persist one record per generation request with fields along these lines:
 
 - `version`
 - `jobID`
+- `jobKind`
 - `createdAt`
 - `updatedAt`
 - `requestedByRequestID`
@@ -129,6 +135,11 @@ The stored record should also leave room for progress-like details without inven
 - `completedAt`
 - `failedAt`
 - `expiresAt`
+
+`jobKind` should be explicit from the start:
+
+- `file`
+- `batch`
 
 ### Generation Artifact
 
@@ -169,11 +180,11 @@ The worker contract should widen intentionally, but only enough to make persiste
 The next worker operations should be:
 
 - `queue_speech_file`
-  submit generation work and return a durable `jobID`
+  submit a file job and return a durable `jobID`
 - `generation_job`
-  fetch one persisted generation job by `jobID`
+  fetch one persisted job by `jobID`
 - `generation_jobs`
-  list known generation jobs with compact summaries
+  list known jobs with compact summaries
 
 The current artifact reads should remain:
 
@@ -221,29 +232,36 @@ That keeps ownership easy to reason about and avoids orphaned file cleanup seman
 
 ## Batch Shape
 
-The future batch model should be called a batch.
+The generation-job model should be explicit and boring:
 
-That means the naming split should be:
+- file jobs exist
+- batch jobs exist
+- batch means many files
+
+The intended naming split for generation work should be:
 
 - `job`: one persisted execution record
-- `batch`: one caller-facing multi-item generation unit
+- `file job`: one job that creates one file artifact
+- `batch job`: one job that creates many file artifacts
+- `batch`: the caller-facing multi-file unit represented by a batch job
 
 The intended direction is:
 
-- one batch submission creates one persisted generation job
-- that job records batch metadata and can own many artifact references
-- later reads should expose `generated_batch(id:)` and `generated_batches()` as first-class batch surfaces, not as awkward job wrappers
+- one file submission creates one file job
+- one future batch submission creates one batch job
+- a batch job records batch metadata and can own many artifact references
+- later reads should expose `generated_batch(id:)` and `generated_batches()` as first-class batch surfaces
 
-So "batch" should not be treated as a throwaway description for a special kind of job. It should be a real public concept that sits on top of the same persisted execution model.
+So "batch" should not be treated as a vague synonym for "job." In this milestone it is the caller-facing name for the many-files generation shape, and it is backed by a batch job in the persisted generation model.
 
 The model should be:
 
 - single-file generation:
-  one job, one artifact
+  one file job, one artifact
 - batch generation:
-  one batch, backed by one job, with many artifacts
+  one batch job, many artifacts
 
-This is why `jobID` and `artifactID` must separate now, and why batch naming should stay explicit.
+This is why `jobID` and `artifactID` must separate now, and why file-job and batch-job naming should stay explicit.
 
 ## State Transition Rules
 
@@ -267,13 +285,13 @@ Important cleanup rule:
 
 The first implementation pass should be:
 
-1. Add persisted generation-job models and store types.
-2. Make `queue_speech_file` create a durable job record before generation starts.
-3. Update generation operations to transition the job through `queued` -> `running` -> `completed` or `failed`.
-4. Store artifact references on the completed job record.
+1. Add persisted generation-job models and store types with explicit `jobKind`.
+2. Make `queue_speech_file` create a durable file-job record before generation starts.
+3. Update generation operations to transition the file job through `queued` -> `running` -> `completed` or `failed`.
+4. Store artifact references on the completed file job record.
 5. Add worker read operations for one job and many jobs.
 6. Keep the current artifact reads intact.
-7. Update README and roadmap wording so request id no longer claims to be the artifact id.
+7. Update README and roadmap wording so request id no longer claims to be the artifact id and batch jobs remain reserved for the many-files shape.
 
 That sequence deliberately avoids:
 

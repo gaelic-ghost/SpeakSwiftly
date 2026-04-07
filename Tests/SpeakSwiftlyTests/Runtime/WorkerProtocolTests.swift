@@ -166,6 +166,16 @@ import TextForSpeech
     #expect(list == .generatedFiles(id: "req-generated-files"))
 }
 
+@Test func decodesGenerationJobRequests() throws {
+    let job = try WorkerRequest.decode(
+        from: #"{"id":"req-generation-job","op":"generation_job","job_id":"job-file-1"}"#
+    )
+    #expect(job == .generationJob(id: "req-generation-job", jobID: "job-file-1"))
+
+    let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
+    #expect(list == .generationJobs(id: "req-generation-jobs"))
+}
+
 @Test func decodesRemoveProfileRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}"#)
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))

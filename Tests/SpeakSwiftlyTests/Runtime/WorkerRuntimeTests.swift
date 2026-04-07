@@ -575,6 +575,20 @@ private func makeSpeechBackendResolutionDependencies(
     })
     #expect(await waitUntil {
         output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-file-1",
+                let generationJob = $0["generation_job"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generationJob["job_id"] as? String == "req-file-1"
+                && generationJob["job_kind"] as? String == "file"
+                && generationJob["state"] as? String == "queued"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
             $0["id"] as? String == "req-file-1"
                 && $0["event"] as? String == "started"
                 && $0["op"] as? String == "queue_speech_file"
@@ -591,6 +605,7 @@ private func makeSpeechBackendResolutionDependencies(
         output.containsJSONObject {
             guard
                 $0["id"] as? String == "req-file-1",
+                let generationJob = $0["generation_job"] as? [String: Any],
                 let generatedFile = $0["generated_file"] as? [String: Any],
                 generatedFile["artifact_id"] as? String == "req-file-1",
                 generatedFile["profile_name"] as? String == "default-femme",
@@ -599,7 +614,8 @@ private func makeSpeechBackendResolutionDependencies(
                 return false
             }
 
-            return FileManager.default.fileExists(atPath: filePath)
+            return generationJob["state"] as? String == "completed"
+                && FileManager.default.fileExists(atPath: filePath)
         }
     })
     #expect(!output.containsJSONObject {
@@ -671,6 +687,77 @@ private func makeSpeechBackendResolutionDependencies(
     })
     #expect(!output.containsJSONObject {
         ($0["id"] as? String == "req-generated-file" || $0["id"] as? String == "req-generated-files")
+            && $0["event"] as? String == "queued"
+    })
+
+    await preloadGate.open()
+}
+
+@Test func generationJobReadOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+    let output = OutputRecorder()
+    let preloadGate = AsyncGate()
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
+    _ = try generationJobStore.createFileJob(
+        jobID: "job-file-lookup",
+        profileName: "default-femme",
+        textProfileName: nil,
+        speechBackend: .qwen3,
+        text: "Hello from a persisted file job.",
+        createdAt: Date(timeIntervalSince1970: 1_234)
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: rootURL,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in
+            await preloadGate.wait()
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+    await runtime.accept(line: #"{"id":"req-generation-job","op":"generation_job","job_id":"job-file-lookup"}"#)
+    await runtime.accept(line: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-generation-job"
+                && $0["event"] as? String == "started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-generation-job",
+                let generationJob = $0["generation_job"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generationJob["job_id"] as? String == "job-file-lookup"
+                && generationJob["job_kind"] as? String == "file"
+                && generationJob["state"] as? String == "queued"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-generation-jobs",
+                let generationJobs = $0["generation_jobs"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generationJobs.count == 1
+                && generationJobs.first?["job_id"] as? String == "job-file-lookup"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        ($0["id"] as? String == "req-generation-job" || $0["id"] as? String == "req-generation-jobs")
             && $0["event"] as? String == "queued"
     })
 
@@ -1247,6 +1334,44 @@ private func makeSpeechBackendResolutionDependencies(
 
             return generatedFiles.contains {
                 $0["artifact_id"] as? String == "req-file-helper"
+            }
+        }
+    })
+
+    let generationJobID = await runtime.generationJob(id: "req-file-helper", requestID: "req-job-read").id
+    #expect(generationJobID == "req-job-read")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-job-read",
+                $0["ok"] as? Bool == true,
+                let generationJob = $0["generation_job"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generationJob["job_id"] as? String == "req-file-helper"
+                && generationJob["job_kind"] as? String == "file"
+                && generationJob["state"] as? String == "completed"
+        }
+    })
+
+    let generationJobsID = await runtime.generationJobs(id: "req-job-list").id
+    #expect(generationJobsID == "req-job-list")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-job-list",
+                $0["ok"] as? Bool == true,
+                let generationJobs = $0["generation_jobs"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generationJobs.contains {
+                $0["job_id"] as? String == "req-file-helper"
+                    && $0["job_kind"] as? String == "file"
+                    && $0["state"] as? String == "completed"
             }
         }
     })
