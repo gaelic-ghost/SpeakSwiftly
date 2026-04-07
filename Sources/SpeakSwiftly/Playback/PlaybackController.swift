@@ -2081,7 +2081,7 @@ private func milliseconds(since start: Date) -> Int {
 
 struct WorkerDependencies {
     let fileManager: FileManager
-    let loadResidentModel: @Sendable () async throws -> AnySpeechModel
+    let loadResidentModel: @Sendable (_ backend: SpeakSwiftly.SpeechBackend) async throws -> AnySpeechModel
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel
     let loadCloneTranscriptionModel: @Sendable () async throws -> AnyCloneTranscriptionModel
     let makePlaybackController: @MainActor @Sendable () -> AnyPlaybackController
@@ -2098,7 +2098,7 @@ struct WorkerDependencies {
 
         return WorkerDependencies(
             fileManager: fileManager,
-            loadResidentModel: { try await ModelFactory.loadResidentModel() },
+            loadResidentModel: { backend in try await ModelFactory.loadResidentModel(for: backend) },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
             loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
             makePlaybackController: {

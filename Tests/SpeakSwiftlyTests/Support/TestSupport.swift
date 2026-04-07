@@ -457,10 +457,11 @@ func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
     playback: PlaybackSpy,
+    speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
     loadedCloneAudioSamples: [Float] = [],
-    residentModelLoader: @escaping @Sendable () async throws -> AnySpeechModel,
+    residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> AnySpeechModel,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
         makeProfileModel()
     },
@@ -502,6 +503,7 @@ func makeRuntime(
 
     let runtime = WorkerRuntime(
         dependencies: dependencies,
+        speechBackend: speechBackend,
         profileStore: store,
         generatedFileStore: generatedFileStore,
         normalizer: normalizer,

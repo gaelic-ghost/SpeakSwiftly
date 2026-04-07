@@ -83,6 +83,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             details: [
                 "path": .string(storedProfile.directoryURL.path),
+                "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )
@@ -178,6 +179,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             details: [
                 "path": .string(storedProfile.directoryURL.path),
+                "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )

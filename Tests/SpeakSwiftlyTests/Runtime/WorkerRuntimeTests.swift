@@ -3,6 +3,14 @@ import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeech
 
+private actor LoadedBackendRecorder {
+    private(set) var backends = [SpeakSwiftly.SpeechBackend]()
+
+    func record(_ backend: SpeakSwiftly.SpeechBackend) {
+        backends.append(backend)
+    }
+}
+
 // MARK: - Queueing and Preload
 
 @Test func requestsQueuedDuringPreloadEmitWaitingStatusThenProcess() async throws {
@@ -12,7 +20,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: playback,
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
         }
@@ -49,7 +57,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -74,13 +82,37 @@ import TextForSpeech
     })
 }
 
+@Test func runtimeUsesConfiguredSpeechBackendForResidentModelPreload() async throws {
+    let output = OutputRecorder()
+    let recorder = LoadedBackendRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        speechBackend: .marvis,
+        residentModelLoader: { backend in
+            await recorder.record(backend)
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+    #expect(await recorder.backends == [.marvis])
+}
+
 @Test func residentModelPreloadFailureFailsQueuedRequests() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await preloadGate.wait()
             throw WorkerError(
                 code: .modelGenerationFailed,
@@ -114,7 +146,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await preloadGate.wait()
             throw WorkerError(
                 code: .modelGenerationFailed,
@@ -157,7 +189,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
     try await firstRuntime.normalizer.storeProfile(
         TextForSpeech.Profile(
@@ -182,7 +214,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     #expect(await secondRuntime.normalizer.profile(named: "logs")?.replacements.map(\.id) == ["logs-rule"])
@@ -199,7 +231,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     let created = try await runtime.normalizer.createProfile(id: "logs", named: "Logs")
@@ -227,7 +259,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
     #expect(await reloaded.normalizer.profile(named: "logs")?.replacements.isEmpty == true)
 }
@@ -240,7 +272,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     let added = try await runtime.normalizer.addReplacement(
@@ -260,7 +292,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
     #expect(await reloaded.normalizer.activeProfile().replacements.isEmpty)
 }
@@ -274,7 +306,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.accept(
@@ -346,7 +378,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
         }
@@ -382,7 +414,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -453,7 +485,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -533,7 +565,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
         }
@@ -605,7 +637,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -699,7 +731,7 @@ import TextForSpeech
                 )
             )
         ),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -759,7 +791,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -819,7 +851,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -914,7 +946,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     let activeHandle = await runtime.submit(
@@ -980,7 +1012,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -1058,7 +1090,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1181,7 +1213,7 @@ import TextForSpeech
         output: output,
         playback: PlaybackSpy(),
         loadedCloneAudioSamples: [0.1, 0.2, 0.3],
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1231,7 +1263,7 @@ import TextForSpeech
         output: output,
         playback: PlaybackSpy(),
         loadedCloneAudioSamples: [0.4, 0.5, 0.6],
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         cloneTranscriptionModelLoader: {
             makeCloneTranscriptionModel(transcript: "Inferred transcript")
         }
@@ -1288,7 +1320,7 @@ import TextForSpeech
         output: output,
         playback: PlaybackSpy(),
         loadedCloneAudioSamples: [0.7, 0.8, 0.9],
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         cloneTranscriptionModelLoader: {
             makeCloneTranscriptionModel(transcript: "")
         }
@@ -1337,7 +1369,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     let statuses = await runtime.statusEvents()
@@ -1399,7 +1431,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel(recorder: recorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: recorder) }
     )
 
     await runtime.start()
@@ -1437,7 +1469,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1472,7 +1504,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: {
+        residentModelLoader: { _ in
             await loadCounter.increment()
             return makeResidentModel()
         }
@@ -1525,7 +1557,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1591,7 +1623,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1623,7 +1655,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -1698,7 +1730,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -1777,7 +1809,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1862,7 +1894,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -1920,7 +1952,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
                 await profileGate.wait()
@@ -1995,7 +2027,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -2020,7 +2052,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { makeResidentModel() },
+        residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             AnySpeechModel(
                 sampleRate: 24_000,

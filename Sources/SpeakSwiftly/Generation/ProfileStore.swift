@@ -2,7 +2,33 @@ import Foundation
 
 // MARK: - Voice & Clone Profile Models
 
+enum ProfileSourceKind: String, Codable, Sendable, Equatable {
+    case generated
+    case importedClone = "imported_clone"
+}
+
+struct ProfileMaterializationManifest: Codable, Sendable, Equatable {
+    let backend: SpeakSwiftly.SpeechBackend
+    let modelRepo: String
+    let createdAt: Date
+    let referenceAudioFile: String
+    let referenceText: String
+    let sampleRate: Int
+}
+
 struct ProfileManifest: Codable, Sendable, Equatable {
+    let version: Int
+    let profileName: String
+    let createdAt: Date
+    let sourceKind: ProfileSourceKind
+    let modelRepo: String
+    let voiceDescription: String
+    let sourceText: String
+    let sampleRate: Int
+    let backendMaterializations: [ProfileMaterializationManifest]
+}
+
+private struct LegacyProfileManifest: Codable, Sendable, Equatable {
     let version: Int
     let profileName: String
     let createdAt: Date
@@ -41,10 +67,40 @@ public extension SpeakSwiftly {
     }
 }
 
+struct ProfileMaterializationDraft: Sendable, Equatable {
+    let backend: SpeakSwiftly.SpeechBackend
+    let modelRepo: String
+    let referenceAudioFile: String
+    let referenceText: String
+    let sampleRate: Int
+    let audioData: Data
+}
+
+struct StoredProfileMaterialization: Sendable, Equatable {
+    let manifest: ProfileMaterializationManifest
+    let referenceAudioURL: URL
+}
+
 struct StoredProfile: Sendable, Equatable {
     let manifest: ProfileManifest
     let directoryURL: URL
-    let referenceAudioURL: URL
+    let materializations: [StoredProfileMaterialization]
+
+    var referenceAudioURL: URL {
+        materializations.first(where: { $0.manifest.backend == .qwen3 })?.referenceAudioURL
+            ?? materializations[0].referenceAudioURL
+    }
+
+    func materialization(for backend: SpeakSwiftly.SpeechBackend) throws -> StoredProfileMaterialization {
+        if let materialization = materializations.first(where: { $0.manifest.backend == backend }) {
+            return materialization
+        }
+
+        throw WorkerError(
+            code: .profileNotFound,
+            message: "Profile '\(manifest.profileName)' does not contain a stored '\(backend.rawValue)' materialization. Recreate the profile to prepare assets for that backend."
+        )
+    }
 }
 
 // MARK: - Profile Store
@@ -55,6 +111,7 @@ struct ProfileStore {
     static let textProfilesFileName = "text-profiles.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
+    static let manifestVersion = 2
 
     let rootURL: URL
     let fileManager: FileManager
@@ -97,8 +154,55 @@ struct ProfileStore {
         sampleRate: Int,
         canonicalAudioData: Data
     ) throws -> StoredProfile {
+        let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
+        let materializations = [
+            ProfileMaterializationDraft(
+                backend: .qwen3,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                referenceAudioFile: Self.audioFileName,
+                referenceText: sourceText,
+                sampleRate: sampleRate,
+                audioData: canonicalAudioData
+            ),
+            ProfileMaterializationDraft(
+                backend: .marvis,
+                modelRepo: ModelFactory.residentModelRepo(for: .marvis),
+                referenceAudioFile: Self.audioFileName,
+                referenceText: sourceText,
+                sampleRate: sampleRate,
+                audioData: canonicalAudioData
+            ),
+        ]
+
+        return try createProfile(
+            profileName: profileName,
+            sourceKind: sourceKind,
+            sourceModelRepo: modelRepo,
+            voiceDescription: voiceDescription,
+            sourceText: sourceText,
+            sampleRate: sampleRate,
+            materializations: materializations
+        )
+    }
+
+    func createProfile(
+        profileName: String,
+        sourceKind: ProfileSourceKind,
+        sourceModelRepo: String,
+        voiceDescription: String,
+        sourceText: String,
+        sampleRate: Int,
+        materializations: [ProfileMaterializationDraft]
+    ) throws -> StoredProfile {
         try ensureRootExists()
         try validateProfileName(profileName)
+
+        guard !materializations.isEmpty else {
+            throw WorkerError(
+                code: .internalError,
+                message: "Profile '\(profileName)' could not be created because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug."
+            )
+        }
 
         let directoryURL = profileDirectoryURL(for: profileName)
         guard !fileManager.fileExists(atPath: directoryURL.path) else {
@@ -110,31 +214,40 @@ struct ProfileStore {
 
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
 
+        let createdAt = Date()
         let manifest = ProfileManifest(
-            version: 1,
+            version: Self.manifestVersion,
             profileName: profileName,
-            createdAt: Date(),
-            modelRepo: modelRepo,
+            createdAt: createdAt,
+            sourceKind: sourceKind,
+            modelRepo: sourceModelRepo,
             voiceDescription: voiceDescription,
             sourceText: sourceText,
-            referenceAudioFile: Self.audioFileName,
-            sampleRate: sampleRate
+            sampleRate: sampleRate,
+            backendMaterializations: materializations.map {
+                ProfileMaterializationManifest(
+                    backend: $0.backend,
+                    modelRepo: $0.modelRepo,
+                    createdAt: createdAt,
+                    referenceAudioFile: $0.referenceAudioFile,
+                    referenceText: $0.referenceText,
+                    sampleRate: $0.sampleRate
+                )
+            }
         )
 
         do {
-            try canonicalAudioData.write(to: referenceAudioURL(for: directoryURL), options: .atomic)
-            let manifestData = try encoder.encode(manifest)
-            try manifestData.write(to: manifestURL(for: directoryURL), options: .atomic)
+            try writeMaterializationFiles(materializations, to: directoryURL)
+            try writeManifest(manifest, to: directoryURL)
         } catch {
             try? fileManager.removeItem(at: directoryURL)
-            throw WorkerError(code: .filesystemError, message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)")
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)"
+            )
         }
 
-        return StoredProfile(
-            manifest: manifest,
-            directoryURL: directoryURL,
-            referenceAudioURL: referenceAudioURL(for: directoryURL)
-        )
+        return try loadProfile(named: profileName)
     }
 
     func loadProfile(named profileName: String) throws -> StoredProfile {
@@ -150,12 +263,17 @@ struct ProfileStore {
         }
 
         do {
-            let manifestData = try Data(contentsOf: manifestURL(for: directoryURL))
-            let manifest = try decoder.decode(ProfileManifest.self, from: manifestData)
+            let manifest = try loadManifest(from: directoryURL)
+            let materializations = manifest.backendMaterializations.map {
+                StoredProfileMaterialization(
+                    manifest: $0,
+                    referenceAudioURL: referenceAudioURL(for: directoryURL, fileName: $0.referenceAudioFile)
+                )
+            }
             return StoredProfile(
                 manifest: manifest,
                 directoryURL: directoryURL,
-                referenceAudioURL: referenceAudioURL(for: directoryURL, fileName: manifest.referenceAudioFile)
+                materializations: materializations
             )
         } catch let workerError as WorkerError {
             throw workerError
@@ -184,15 +302,7 @@ struct ProfileStore {
                     return nil
                 }
 
-                do {
-                    let manifestData = try Data(contentsOf: manifestPath)
-                    return try decoder.decode(ProfileManifest.self, from: manifestData)
-                } catch {
-                    throw WorkerError(
-                        code: .filesystemError,
-                        message: "SpeakSwiftly could not list stored profiles because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)"
-                    )
-                }
+                return try loadManifest(from: directoryURL)
             }
 
         return manifests.map {
@@ -277,6 +387,84 @@ struct ProfileStore {
         return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(directoryName, isDirectory: true)
             .appendingPathComponent(profilesDirectoryName, isDirectory: true)
+    }
+
+    private func loadManifest(from directoryURL: URL) throws -> ProfileManifest {
+        let manifestPath = manifestURL(for: directoryURL)
+        let manifestData = try Data(contentsOf: manifestPath)
+
+        if let manifest = try? decoder.decode(ProfileManifest.self, from: manifestData) {
+            return manifest
+        }
+
+        if let legacyManifest = try? decoder.decode(LegacyProfileManifest.self, from: manifestData) {
+            let upgradedManifest = upgradeLegacyManifest(legacyManifest)
+            try writeManifest(upgradedManifest, to: directoryURL)
+            return upgradedManifest
+        }
+
+        throw WorkerError(
+            code: .filesystemError,
+            message: "SpeakSwiftly could not read the profile manifest at '\(manifestPath.path)' because the file is unreadable or corrupt."
+        )
+    }
+
+    private func upgradeLegacyManifest(_ legacyManifest: LegacyProfileManifest) -> ProfileManifest {
+        let sourceKind: ProfileSourceKind = legacyManifest.modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
+        let materializations = [
+            ProfileMaterializationManifest(
+                backend: .qwen3,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                createdAt: legacyManifest.createdAt,
+                referenceAudioFile: legacyManifest.referenceAudioFile,
+                referenceText: legacyManifest.sourceText,
+                sampleRate: legacyManifest.sampleRate
+            ),
+            ProfileMaterializationManifest(
+                backend: .marvis,
+                modelRepo: ModelFactory.residentModelRepo(for: .marvis),
+                createdAt: legacyManifest.createdAt,
+                referenceAudioFile: legacyManifest.referenceAudioFile,
+                referenceText: legacyManifest.sourceText,
+                sampleRate: legacyManifest.sampleRate
+            ),
+        ]
+
+        return ProfileManifest(
+            version: Self.manifestVersion,
+            profileName: legacyManifest.profileName,
+            createdAt: legacyManifest.createdAt,
+            sourceKind: sourceKind,
+            modelRepo: legacyManifest.modelRepo,
+            voiceDescription: legacyManifest.voiceDescription,
+            sourceText: legacyManifest.sourceText,
+            sampleRate: legacyManifest.sampleRate,
+            backendMaterializations: materializations
+        )
+    }
+
+    private func writeMaterializationFiles(
+        _ materializations: [ProfileMaterializationDraft],
+        to directoryURL: URL
+    ) throws {
+        var writtenFiles = Set<String>()
+
+        for materialization in materializations {
+            if writtenFiles.contains(materialization.referenceAudioFile) {
+                continue
+            }
+
+            try materialization.audioData.write(
+                to: referenceAudioURL(for: directoryURL, fileName: materialization.referenceAudioFile),
+                options: .atomic
+            )
+            writtenFiles.insert(materialization.referenceAudioFile)
+        }
+    }
+
+    private func writeManifest(_ manifest: ProfileManifest, to directoryURL: URL) throws {
+        let manifestData = try encoder.encode(manifest)
+        try manifestData.write(to: manifestURL(for: directoryURL), options: .atomic)
     }
 
     private static func makeEncoder() -> JSONEncoder {

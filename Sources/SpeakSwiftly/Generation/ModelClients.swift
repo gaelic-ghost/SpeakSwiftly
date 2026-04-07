@@ -223,7 +223,8 @@ enum GenerationPolicy {
 }
 
 enum ModelFactory {
-    static let residentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
     static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
     static let canonicalProfileSampleRate = 24_000
@@ -231,8 +232,12 @@ enum ModelFactory {
     static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
     static let importedCloneVoiceDescription = "Imported reference audio clone."
 
-    static func loadResidentModel() async throws -> AnySpeechModel {
-        try await loadModel(modelRepo: residentModelRepo)
+    static func loadResidentModel(for backend: SpeakSwiftly.SpeechBackend) async throws -> AnySpeechModel {
+        try await loadModel(modelRepo: residentModelRepo(for: backend))
+    }
+
+    static func residentModelRepo(for backend: SpeakSwiftly.SpeechBackend) -> String {
+        backend.residentModelRepo
     }
 
     static func loadProfileModel() async throws -> AnySpeechModel {
