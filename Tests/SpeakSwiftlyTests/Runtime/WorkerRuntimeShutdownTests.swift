@@ -3,6 +3,63 @@ import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeech
 
+final class BlockingFilesystemCoordinator: @unchecked Sendable {
+    private let enteredSemaphore = DispatchSemaphore(value: 0)
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+
+    func markEntered() {
+        enteredSemaphore.signal()
+    }
+
+    func waitUntilEntered(timeout: TimeInterval = 1.0) {
+        let result = enteredSemaphore.wait(timeout: .now() + timeout)
+        #expect(result == .success)
+    }
+
+    func blockUntilReleased() {
+        _ = releaseSemaphore.wait(timeout: .distantFuture)
+    }
+
+    func release() {
+        releaseSemaphore.signal()
+    }
+}
+
+final class CopyBlockingFileManager: FileManager, @unchecked Sendable {
+    let blockedDestinationPath: String
+    let coordinator: BlockingFilesystemCoordinator
+
+    init(blockedDestinationPath: String, coordinator: BlockingFilesystemCoordinator) {
+        self.blockedDestinationPath = blockedDestinationPath
+        self.coordinator = coordinator
+        super.init()
+    }
+
+    override func copyItem(at srcURL: URL, to dstURL: URL) throws {
+        if dstURL.path == blockedDestinationPath {
+            coordinator.markEntered()
+            coordinator.blockUntilReleased()
+        }
+
+        try super.copyItem(at: srcURL, to: dstURL)
+    }
+}
+
+final class LockedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValue = false
+
+    var value: Bool {
+        lock.withLock { storedValue }
+    }
+
+    func set() {
+        lock.withLock {
+            storedValue = true
+        }
+    }
+}
+
 // MARK: - Shutdown Behavior
 
 @Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
@@ -148,9 +205,7 @@ import TextForSpeech
 
 @Test func shutdownFailsTypedRequestStreamsForActiveAndQueuedRequests() async throws {
     let output = OutputRecorder()
-    let playbackDrain = AsyncGate()
-    let profileGate = AsyncGate()
-    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
@@ -171,7 +226,7 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             makeProfileModel {
-                await profileGate.wait()
+                try? await Task.sleep(for: .seconds(30))
             }
         }
     )
@@ -215,9 +270,13 @@ import TextForSpeech
         )
     )
     var queuedIterator = queuedHandle.events.makeAsyncIterator()
-
-    let queuedEvent = try await queuedIterator.next()
-    #expect(queuedEvent == .started(WorkerStartedEvent(id: "req-queued-shutdown-stream", op: "create_profile")))
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-queued-shutdown-stream"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "create_profile"
+        }
+    })
 
     await runtime.shutdown()
 
@@ -234,9 +293,6 @@ import TextForSpeech
     } catch let error as WorkerError {
         #expect(error.code == .requestCancelled)
     }
-
-    await profileGate.open()
-    await playbackDrain.open()
 }
 
 @Test func shutdownRejectsNewRequests() async throws {
@@ -315,4 +371,198 @@ import TextForSpeech
         }
     })
     #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-guide").path))
+}
+
+@Test func shutdownWaitsForActiveProfileCreationToUnwindBeforeEmittingCancellationDuringTempWAVWrite() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let writeCoordinator = BlockingFilesystemCoordinator()
+    let blockedRuntime = WorkerRuntime(
+        dependencies: WorkerDependencies(
+            fileManager: .default,
+            loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+            loadProfileModel: { makeProfileModel() },
+            loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
+            makePlaybackController: { AnyPlaybackController.silent() },
+            writeWAV: { samples, _, url in
+                writeCoordinator.markEntered()
+                writeCoordinator.blockUntilReleased()
+                let bytes = samples.map(\.bitPattern).flatMap { value in
+                    withUnsafeBytes(of: value.littleEndian, Array.init)
+                }
+                try Data(bytes).write(to: url, options: .atomic)
+            },
+            loadAudioSamples: { _, _ in nil },
+            loadAudioFloats: { _, _ in [] },
+            writeStdout: output.writeStdout,
+            writeStderr: output.writeStderr,
+            now: Date.init,
+            readRuntimeMemory: { nil }
+        ),
+        speechBackend: .qwen3,
+        profileStore: try makeProfileStore(rootURL: storeRoot),
+        generatedFileStore: try makeGeneratedFileStore(rootURL: storeRoot),
+        generationJobStore: try makeGenerationJobStore(rootURL: storeRoot),
+        normalizer: SpeakSwiftly.Normalizer(
+            persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
+        ),
+        playbackController: PlaybackController(driver: AnyPlaybackController.silent())
+    )
+    await blockedRuntime.installPlaybackHooks()
+    await blockedRuntime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await blockedRuntime.accept(
+        line: #"{"id":"req-write-gate","op":"create_profile","profile_name":"bright-gate","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-write-gate"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "create_profile"
+        }
+    })
+    writeCoordinator.waitUntilEntered()
+
+    let shutdownFinished = LockedFlag()
+    let shutdownTask = Task {
+        await blockedRuntime.shutdown()
+        shutdownFinished.set()
+    }
+
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(!shutdownFinished.value)
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-write-gate"
+            && $0["ok"] as? Bool == false
+            && $0["code"] as? String == "request_cancelled"
+    })
+
+    writeCoordinator.release()
+    await shutdownTask.value
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-write-gate"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+    #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-gate").path))
+}
+
+@Test func shutdownWaitsForActiveProfileExportToUnwindBeforeEmittingCancellation() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let exportURL = storeRoot.appendingPathComponent("exports/reference.wav")
+    let exportCoordinator = BlockingFilesystemCoordinator()
+    let fileManager = CopyBlockingFileManager(
+        blockedDestinationPath: exportURL.path,
+        coordinator: exportCoordinator
+    )
+
+    let profileStore = ProfileStore(rootURL: storeRoot, fileManager: fileManager)
+    let generatedFileStore = GeneratedFileStore(
+        rootURL: storeRoot.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
+        fileManager: fileManager
+    )
+    let generationJobStore = GenerationJobStore(
+        rootURL: storeRoot.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
+        fileManager: fileManager
+    )
+    try profileStore.ensureRootExists()
+    try generatedFileStore.ensureRootExists()
+    try generationJobStore.ensureRootExists()
+
+    let normalizer = SpeakSwiftly.Normalizer(
+        persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
+    )
+    try await normalizer.loadProfiles()
+
+    let dependencies = WorkerDependencies(
+        fileManager: fileManager,
+        loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+        loadProfileModel: { makeProfileModel() },
+        loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
+        makePlaybackController: { AnyPlaybackController.silent() },
+        writeWAV: { samples, _, url in
+            let bytes = samples.map(\.bitPattern).flatMap { value in
+                withUnsafeBytes(of: value.littleEndian, Array.init)
+            }
+            try Data(bytes).write(to: url, options: .atomic)
+        },
+        loadAudioSamples: { _, _ in nil },
+        loadAudioFloats: { _, _ in [] },
+        writeStdout: output.writeStdout,
+        writeStderr: output.writeStderr,
+        now: Date.init,
+        readRuntimeMemory: { nil }
+    )
+
+    let runtime = WorkerRuntime(
+        dependencies: dependencies,
+        speechBackend: .qwen3,
+        profileStore: profileStore,
+        generatedFileStore: generatedFileStore,
+        generationJobStore: generationJobStore,
+        normalizer: normalizer,
+        playbackController: PlaybackController(driver: AnyPlaybackController.silent())
+    )
+    await runtime.installPlaybackHooks()
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: """
+        {"id":"req-export-gate","op":"create_profile","profile_name":"bright-export","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"\(exportURL.path)"}
+        """
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-export-gate"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "exporting_profile_audio"
+        }
+    })
+    exportCoordinator.waitUntilEntered()
+
+    let shutdownFinished = LockedFlag()
+    let shutdownTask = Task {
+        await runtime.shutdown()
+        shutdownFinished.set()
+    }
+
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(!shutdownFinished.value)
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-export-gate"
+            && $0["ok"] as? Bool == false
+            && $0["code"] as? String == "request_cancelled"
+    })
+
+    exportCoordinator.release()
+    await shutdownTask.value
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-export-gate"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
 }

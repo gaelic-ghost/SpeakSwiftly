@@ -40,11 +40,8 @@ public extension SpeakSwiftly.Runtime {
         )
 
         if let activeGeneration {
-            self.activeGeneration = nil
             activeGeneration.task.cancel()
-            failRequestStream(for: activeGeneration.request.id, error: cancellationError)
-            requestAcceptedAt.removeValue(forKey: activeGeneration.request.id)
-            await emitFailure(id: activeGeneration.request.id, error: cancellationError)
+            await activeGeneration.task.value
         }
 
         await failQueuedRequests(with: cancellationError)

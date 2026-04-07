@@ -2079,7 +2079,7 @@ private func milliseconds(since start: Date) -> Int {
 
 // MARK: - Dependencies
 
-struct WorkerDependencies {
+struct WorkerDependencies: @unchecked Sendable {
     let fileManager: FileManager
     let loadResidentModels: @Sendable (_ backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel

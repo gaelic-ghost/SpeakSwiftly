@@ -63,22 +63,32 @@ extension SpeakSwiftly.Runtime {
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
 
+        try Task.checkCancellation()
         let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
-        try dependencies.writeWAV(audio, profileModel.sampleRate, tempWavURL)
-        let canonicalAudioData = try Data(contentsOf: tempWavURL)
+        let writeWAV = dependencies.writeWAV
+        try await runBlockingFilesystemOperation {
+            try writeWAV(audio, profileModel.sampleRate, tempWavURL)
+        }
+        try Task.checkCancellation()
+        let canonicalAudioData = try await runBlockingFilesystemOperation {
+            try Data(contentsOf: tempWavURL)
+        }
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
-        let storedProfile = try profileStore.createProfile(
-            profileName: profileName,
-            vibe: vibe,
-            modelRepo: ModelFactory.profileModelRepo,
-            voiceDescription: voiceDescription,
-            sourceText: text,
-            sampleRate: profileModel.sampleRate,
-            canonicalAudioData: canonicalAudioData
-        )
+        let profileStore = self.profileStore
+        let storedProfile = try await runBlockingFilesystemOperation {
+            try profileStore.createProfile(
+                profileName: profileName,
+                vibe: vibe,
+                modelRepo: ModelFactory.profileModelRepo,
+                voiceDescription: voiceDescription,
+                sourceText: text,
+                sampleRate: profileModel.sampleRate,
+                canonicalAudioData: canonicalAudioData
+            )
+        }
         await logRequestEvent(
             "profile_written",
             requestID: id,
@@ -90,11 +100,16 @@ extension SpeakSwiftly.Runtime {
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )
+        try Task.checkCancellation()
 
         if let outputPath {
+            try Task.checkCancellation()
             await emitProgress(id: id, stage: .exportingProfileAudio)
             let exportStartedAt = dependencies.now()
-            try profileStore.exportCanonicalAudio(for: storedProfile, to: outputPath)
+            try await runBlockingFilesystemOperation {
+                try profileStore.exportCanonicalAudio(for: storedProfile, to: outputPath)
+            }
+            try Task.checkCancellation()
             await logRequestEvent(
                 "profile_exported",
                 requestID: id,
@@ -164,20 +179,31 @@ extension SpeakSwiftly.Runtime {
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
 
+        try Task.checkCancellation()
         let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
-        try dependencies.writeWAV(canonicalAudio, ModelFactory.canonicalProfileSampleRate, tempWavURL)
-        let canonicalAudioData = try Data(contentsOf: tempWavURL)
+        let writeWAV = dependencies.writeWAV
+        try await runBlockingFilesystemOperation {
+            try writeWAV(canonicalAudio, ModelFactory.canonicalProfileSampleRate, tempWavURL)
+        }
+        try Task.checkCancellation()
+        let canonicalAudioData = try await runBlockingFilesystemOperation {
+            try Data(contentsOf: tempWavURL)
+        }
+        try Task.checkCancellation()
 
         let profileWriteStartedAt = dependencies.now()
-        let storedProfile = try profileStore.createProfile(
-            profileName: profileName,
-            vibe: vibe,
-            modelRepo: ModelFactory.importedCloneModelRepo,
-            voiceDescription: ModelFactory.importedCloneVoiceDescription,
-            sourceText: resolvedTranscript,
-            sampleRate: ModelFactory.canonicalProfileSampleRate,
-            canonicalAudioData: canonicalAudioData
-        )
+        let profileStore = self.profileStore
+        let storedProfile = try await runBlockingFilesystemOperation {
+            try profileStore.createProfile(
+                profileName: profileName,
+                vibe: vibe,
+                modelRepo: ModelFactory.importedCloneModelRepo,
+                voiceDescription: ModelFactory.importedCloneVoiceDescription,
+                sourceText: resolvedTranscript,
+                sampleRate: ModelFactory.canonicalProfileSampleRate,
+                canonicalAudioData: canonicalAudioData
+            )
+        }
         await logRequestEvent(
             "clone_profile_written",
             requestID: id,
@@ -189,8 +215,15 @@ extension SpeakSwiftly.Runtime {
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )
+        try Task.checkCancellation()
 
         return storedProfile
+    }
+
+    private func runBlockingFilesystemOperation<T: Sendable>(
+        _ operation: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try await Task.detached(operation: operation).value
     }
 
     func resolvedCloneTranscript(

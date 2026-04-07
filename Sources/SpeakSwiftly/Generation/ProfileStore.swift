@@ -121,7 +121,7 @@ struct StoredProfile: Sendable, Equatable {
 
 // MARK: - Profile Store
 
-struct ProfileStore {
+struct ProfileStore: @unchecked Sendable {
     static let directoryName = "SpeakSwiftly"
     static let profilesDirectoryName = "profiles"
     static let textProfilesFileName = "text-profiles.json"
