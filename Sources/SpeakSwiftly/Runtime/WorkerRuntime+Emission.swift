@@ -15,6 +15,8 @@ extension SpeakSwiftly.Runtime {
             )
             let success = WorkerSuccessResponse(
                 id: payload.id,
+                generatedFile: payload.generatedFile,
+                generatedFiles: payload.generatedFiles,
                 profileName: payload.profileName,
                 profilePath: payload.profilePath,
                 profiles: payload.profiles,
@@ -29,7 +31,7 @@ extension SpeakSwiftly.Runtime {
             )
             yieldRequestEvent(.completed(success), for: request.id)
             finishRequestStream(for: request.id)
-            if !request.acknowledgesEnqueueImmediately {
+            if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
                 await emit(success)
             }
 
@@ -155,6 +157,7 @@ extension SpeakSwiftly.Runtime {
     func submitRequest(
         id: String,
         op: String,
+        artifactID: String? = nil,
         text: String? = nil,
         profileName: String? = nil,
         textProfileName: String? = nil,
@@ -175,6 +178,7 @@ extension SpeakSwiftly.Runtime {
         let request = OutgoingWorkerRequest(
             id: id,
             op: op,
+            artifactID: artifactID,
             text: text,
             profileName: profileName,
             textProfileName: textProfileName,
@@ -222,6 +226,17 @@ extension SpeakSwiftly.Runtime {
                 textProfileName: textProfileName,
                 textContext: textContext,
                 sourceFormat: sourceFormat
+            )
+        case .generatedFile(let id, let artifactID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                artifactID: artifactID
+            )
+        case .generatedFiles(let id):
+            await submitRequest(
+                id: id,
+                op: request.opName
             )
         case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
             await submitRequest(

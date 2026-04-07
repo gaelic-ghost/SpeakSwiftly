@@ -36,6 +36,24 @@ import TextForSpeech
             id: id
         )
     }
+    let speakFile: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        text,
+        profileName,
+        textProfileName,
+        textContext,
+        sourceFormat,
+        id in
+        await runtime.speak(
+            text: text,
+            with: profileName,
+            as: .file,
+            textProfileName: textProfileName,
+            textContext: textContext,
+            sourceFormat: sourceFormat,
+            id: id
+        )
+    }
     let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
         runtime.normalizer
     }
@@ -155,6 +173,12 @@ import TextForSpeech
     let removeProfile: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, profileName, id in
         await runtime.removeProfile(named: profileName, id: id)
     }
+    let generatedFile: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, artifactID, requestID in
+        await runtime.generatedFile(id: artifactID, requestID: requestID)
+    }
+    let generatedFiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
+        await runtime.generatedFiles(id: requestID)
+    }
     let generationQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.generation)
     }
@@ -175,6 +199,7 @@ import TextForSpeech
     }
 
     _ = speak
+    _ = speakFile
     _ = normalizer
     _ = makeNormalizer
     _ = liveWithNormalizer
@@ -182,6 +207,8 @@ import TextForSpeech
     _ = createClone
     _ = profiles
     _ = removeProfile
+    _ = generatedFile
+    _ = generatedFiles
     _ = profile
     _ = profilesList
     _ = activeProfile
@@ -219,4 +246,20 @@ import TextForSpeech
     _ = operation
     _ = profileName
     _ = events
+}
+
+@Test func publicGeneratedFileSurfaceExposesStableMetadata() {
+    let artifactID: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.artifactID
+    let createdAt: KeyPath<SpeakSwiftly.GeneratedFile, Date> = \.createdAt
+    let profileName: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.profileName
+    let textProfileName: KeyPath<SpeakSwiftly.GeneratedFile, String?> = \.textProfileName
+    let sampleRate: KeyPath<SpeakSwiftly.GeneratedFile, Int> = \.sampleRate
+    let filePath: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.filePath
+
+    _ = artifactID
+    _ = createdAt
+    _ = profileName
+    _ = textProfileName
+    _ = sampleRate
+    _ = filePath
 }

@@ -431,6 +431,157 @@ import TextForSpeech
     await profileGate.open()
 }
 
+// MARK: - Generated File Queueing
+
+@Test func speakFileAcknowledgesQueueThenCompletesWithGeneratedFileMetadata() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let requestID = await runtime.speak(
+        text: "Hello from the generated file path.",
+        with: "default-femme",
+        as: .file,
+        id: "req-file-1"
+    ).id
+    #expect(requestID == "req-file-1")
+
+    #expect(await waitUntil {
+        output.countJSONObjects {
+            $0["id"] as? String == "req-file-1"
+                && $0["ok"] as? Bool == true
+        } == 2
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-file-1"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_file"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-file-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "writing_generated_file"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-file-1",
+                let generatedFile = $0["generated_file"] as? [String: Any],
+                generatedFile["artifact_id"] as? String == "req-file-1",
+                generatedFile["profile_name"] as? String == "default-femme",
+                let filePath = generatedFile["file_path"] as? String
+            else {
+                return false
+            }
+
+            return FileManager.default.fileExists(atPath: filePath)
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-file-1"
+            && $0["event"] as? String == "progress"
+            && $0["stage"] as? String == "playback_finished"
+    })
+}
+
+@Test func generatedFileReadOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+    let output = OutputRecorder()
+    let preloadGate = AsyncGate()
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
+    _ = try generatedFileStore.createGeneratedFile(
+        artifactID: "req-file-lookup",
+        profileName: "default-femme",
+        textProfileName: nil,
+        sampleRate: 24_000,
+        audioData: Data([0x01, 0x02, 0x03])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: rootURL,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: {
+            await preloadGate.wait()
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+    await runtime.accept(line: #"{"id":"req-generated-file","op":"generated_file","artifact_id":"req-file-lookup"}"#)
+    await runtime.accept(line: #"{"id":"req-generated-files","op":"generated_files"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-generated-file"
+                && $0["event"] as? String == "started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-generated-file",
+                let generatedFile = $0["generated_file"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generatedFile["artifact_id"] as? String == "req-file-lookup"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-generated-files",
+                let generatedFiles = $0["generated_files"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedFiles.count == 1
+                && generatedFiles.first?["artifact_id"] as? String == "req-file-lookup"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        ($0["id"] as? String == "req-generated-file" || $0["id"] as? String == "req-generated-files")
+            && $0["event"] as? String == "queued"
+    })
+
+    await preloadGate.open()
+}
+
 // MARK: - Live Playback Queueing
 
 @Test func speakLiveBackgroundAcknowledgesQueueBeforePlaybackStartsAndOnlySucceedsOnce() async throws {

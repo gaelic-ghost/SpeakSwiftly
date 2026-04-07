@@ -6,6 +6,7 @@ import TextForSpeech
 struct RawWorkerRequest: Decodable, Sendable {
     let id: String?
     let op: String?
+    let artifactID: String?
     let text: String?
     let profileName: String?
     let textProfileName: String?
@@ -29,6 +30,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case op
+        case artifactID = "artifact_id"
         case text
         case profileName = "profile_name"
         case textProfileName = "text_profile_name"
@@ -55,6 +57,7 @@ struct RawWorkerRequest: Decodable, Sendable {
 
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
+        artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
         textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
@@ -152,6 +155,8 @@ enum WorkerRequest: Sendable, Equatable {
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?
     )
+    case generatedFile(id: String, artifactID: String)
+    case generatedFiles(id: String)
     case createProfile(id: String, profileName: String, text: String, voiceDescription: String, outputPath: String?)
     case createClone(id: String, profileName: String, referenceAudioPath: String, transcript: String?)
     case listProfiles(id: String)
@@ -180,6 +185,8 @@ enum WorkerRequest: Sendable, Equatable {
     var id: String {
         switch self {
         case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+             .generatedFile(let id, _),
+             .generatedFiles(let id),
              .createProfile(let id, _, _, _, _),
              .createClone(let id, _, _, _),
              .listProfiles(let id),
@@ -212,6 +219,12 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
             "queue_speech_live"
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+            "queue_speech_file"
+        case .generatedFile:
+            "generated_file"
+        case .generatedFiles:
+            "generated_files"
         case .createProfile:
             "create_profile"
         case .createClone:
@@ -278,6 +291,15 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
+    var requiresPlayback: Bool {
+        switch self {
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+            return true
+        default:
+            return false
+        }
+    }
+
     var acknowledgesEnqueueImmediately: Bool {
         if case .queueSpeech = self {
             return true
@@ -285,9 +307,20 @@ enum WorkerRequest: Sendable, Equatable {
         return false
     }
 
+    var emitsTerminalSuccessAfterAcknowledgement: Bool {
+        switch self {
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+            return true
+        default:
+            return false
+        }
+    }
+
     var isImmediateControlOperation: Bool {
         switch self {
-        case .textProfileActive,
+        case .generatedFile,
+             .generatedFiles,
+             .textProfileActive,
              .textProfileBase,
              .textProfile,
              .textProfiles,
@@ -320,7 +353,9 @@ enum WorkerRequest: Sendable, Equatable {
              .createClone(_, let profileName, _, _),
              .removeProfile(_, let profileName):
             profileName
-        case .textProfileActive,
+        case .generatedFile,
+             .generatedFiles,
+             .textProfileActive,
              .textProfileBase,
              .textProfiles,
              .textProfilePersistence,
@@ -352,7 +387,9 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
             textProfileName
-        case .createProfile,
+        case .generatedFile,
+             .generatedFiles,
+             .createProfile,
              .createClone,
              .listProfiles,
              .removeProfile,
@@ -384,7 +421,9 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
             textContext
-        case .createProfile,
+        case .generatedFile,
+             .generatedFiles,
+             .createProfile,
              .createClone,
              .listProfiles,
              .removeProfile,
@@ -416,7 +455,9 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
             sourceFormat
-        case .createProfile,
+        case .generatedFile,
+             .generatedFiles,
+             .createProfile,
              .createClone,
              .listProfiles,
              .removeProfile,
@@ -493,6 +534,39 @@ enum WorkerRequest: Sendable, Equatable {
                 textContext: textContext,
                 sourceFormat: raw.sourceFormat
             )
+
+        case "queue_speech_file":
+            let text = try requireNonEmpty(raw.text, field: "text", id: id)
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            if raw.sourceFormat != nil && (raw.textFormat != nil || raw.nestedSourceFormat != nil) {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
+                )
+            }
+            let textContext = TextForSpeech.Context(
+                cwd: raw.cwd,
+                repoRoot: raw.repoRoot,
+                textFormat: raw.textFormat,
+                nestedSourceFormat: raw.nestedSourceFormat
+            ).nilIfEmpty
+            return .queueSpeech(
+                id: id,
+                text: text,
+                profileName: profileName,
+                textProfileName: textProfileName,
+                jobType: .file,
+                textContext: textContext,
+                sourceFormat: raw.sourceFormat
+            )
+
+        case "generated_file":
+            let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
+            return .generatedFile(id: id, artifactID: artifactID)
+
+        case "generated_files":
+            return .generatedFiles(id: id)
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
@@ -674,6 +748,8 @@ public extension SpeakSwiftly {
 
     enum ProgressStage: String, Codable, Sendable {
         case loadingProfile = "loading_profile"
+        case generatingFileAudio = "generating_file_audio"
+        case writingGeneratedFile = "writing_generated_file"
         case startingPlayback = "starting_playback"
         case bufferingAudio = "buffering_audio"
         case prerollReady = "preroll_ready"
@@ -746,6 +822,8 @@ public extension SpeakSwiftly {
     struct Success: Encodable, Sendable, Equatable {
         public let id: String
         public let ok = true
+        public let generatedFile: GeneratedFile?
+        public let generatedFiles: [GeneratedFile]?
         public let profileName: String?
         public let profilePath: String?
         public let profiles: [ProfileSummary]?
@@ -761,6 +839,8 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case id
             case ok
+            case generatedFile = "generated_file"
+            case generatedFiles = "generated_files"
             case profileName = "profile_name"
             case profilePath = "profile_path"
             case profiles
@@ -776,6 +856,8 @@ public extension SpeakSwiftly {
 
         public init(
             id: String,
+            generatedFile: GeneratedFile? = nil,
+            generatedFiles: [GeneratedFile]? = nil,
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
@@ -789,6 +871,8 @@ public extension SpeakSwiftly {
             cancelledRequestID: String? = nil
         ) {
             self.id = id
+            self.generatedFile = generatedFile
+            self.generatedFiles = generatedFiles
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
@@ -874,6 +958,8 @@ public extension SpeakSwiftly {
         case invalidJSON = "invalid_json"
         case invalidRequest = "invalid_request"
         case unknownOperation = "unknown_operation"
+        case generatedFileNotFound = "generated_file_not_found"
+        case generatedFileAlreadyExists = "generated_file_already_exists"
         case profileNotFound = "profile_not_found"
         case profileAlreadyExists = "profile_already_exists"
         case invalidProfileName = "invalid_profile_name"

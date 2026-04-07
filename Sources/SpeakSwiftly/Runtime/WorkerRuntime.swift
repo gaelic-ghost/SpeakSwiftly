@@ -29,6 +29,8 @@ public extension SpeakSwiftly {
 
     struct WorkerSuccessPayload: Sendable {
         let id: String
+        let generatedFile: SpeakSwiftly.GeneratedFile?
+        let generatedFiles: [SpeakSwiftly.GeneratedFile]?
         let profileName: String?
         let profilePath: String?
         let profiles: [ProfileSummary]?
@@ -43,6 +45,8 @@ public extension SpeakSwiftly {
 
         init(
             id: String,
+            generatedFile: SpeakSwiftly.GeneratedFile? = nil,
+            generatedFiles: [SpeakSwiftly.GeneratedFile]? = nil,
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
@@ -56,6 +60,8 @@ public extension SpeakSwiftly {
             cancelledRequestID: String? = nil
         ) {
             self.id = id
+            self.generatedFile = generatedFile
+            self.generatedFiles = generatedFiles
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
@@ -78,6 +84,7 @@ public extension SpeakSwiftly {
     struct OutgoingWorkerRequest: Encodable {
         let id: String
         let op: String
+        let artifactID: String?
         let text: String?
         let profileName: String?
         let textProfileName: String?
@@ -101,6 +108,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case id
             case op
+            case artifactID = "artifact_id"
             case text
             case profileName = "profile_name"
             case textProfileName = "text_profile_name"
@@ -177,6 +185,7 @@ public extension SpeakSwiftly {
     let encoder = JSONEncoder()
     let logEncoder = JSONEncoder()
     let profileStore: ProfileStore
+    let generatedFileStore: GeneratedFileStore
     let normalizerRef: SpeakSwiftly.Normalizer
     let playbackController: PlaybackController
     let generationController = GenerationController()
@@ -195,11 +204,13 @@ public extension SpeakSwiftly {
     init(
         dependencies: WorkerDependencies,
         profileStore: ProfileStore,
+        generatedFileStore: GeneratedFileStore,
         normalizer: SpeakSwiftly.Normalizer,
         playbackController: PlaybackController
     ) {
         self.dependencies = dependencies
         self.profileStore = profileStore
+        self.generatedFileStore = generatedFileStore
         normalizerRef = normalizer
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
@@ -221,6 +232,9 @@ public extension SpeakSwiftly {
         let normalizer = normalizer ?? SpeakSwiftly.Normalizer(
             persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
         )
+        let generatedFileStore = GeneratedFileStore(
+            rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true)
+        )
         do {
             try await normalizer.loadProfiles()
         } catch {
@@ -233,6 +247,7 @@ public extension SpeakSwiftly {
         let runtime = Runtime(
             dependencies: dependencies,
             profileStore: profileStore,
+            generatedFileStore: generatedFileStore,
             normalizer: normalizer,
             playbackController: playbackController
         )
@@ -435,7 +450,7 @@ public extension SpeakSwiftly {
             return
         }
 
-        if request.isSpeechRequest, await playbackController.jobCount() >= maxAcceptedSpeechJobs {
+        if request.requiresPlayback, await playbackController.jobCount() >= maxAcceptedSpeechJobs {
             let workerError = WorkerError(
                 code: .invalidRequest,
                 message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more."
@@ -455,7 +470,7 @@ public extension SpeakSwiftly {
             profileName: request.profileName,
             queueDepth: await generationQueueDepth()
         )
-        if request.isSpeechRequest {
+        if request.requiresPlayback {
             let speechJob = await makeSpeechJobState(for: request)
             await playbackController.enqueue(speechJob)
         }
@@ -517,7 +532,7 @@ public extension SpeakSwiftly {
             await self.processGeneration(job.request, token: job.token)
         }
         activeGeneration = ActiveRequest(token: job.token, request: job.request, task: task)
-        if case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _) = job.request {
+        if case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _) = job.request {
             await playbackController.setGenerationTask(task, for: id)
         }
     }
@@ -530,6 +545,31 @@ public extension SpeakSwiftly {
             case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
                 try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                 disposition = .requestStillPendingPlayback(id)
+
+            case .queueSpeech(
+                id: let id,
+                text: let text,
+                profileName: let profileName,
+                textProfileName: let textProfileName,
+                jobType: .file,
+                textContext: let textContext,
+                sourceFormat: let sourceFormat
+            ):
+                let generatedFile = try await handleQueueSpeechFileGeneration(
+                    id: id,
+                    op: request.opName,
+                    text: text,
+                    profileName: profileName,
+                    textProfileName: textProfileName,
+                    textContext: textContext,
+                    sourceFormat: sourceFormat
+                )
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generatedFile: generatedFile
+                    )
+                ))
 
             case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
                 let storedProfile = try await handleCreateProfile(
@@ -593,7 +633,9 @@ public extension SpeakSwiftly {
                 )
                 disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id, profileName: profileName)))
 
-            case .textProfileActive,
+            case .generatedFile,
+                 .generatedFiles,
+                 .textProfileActive,
                  .textProfileBase,
                  .textProfile,
                  .textProfiles,
@@ -640,6 +682,22 @@ public extension SpeakSwiftly {
 
         do {
             switch request {
+            case .generatedFile(let id, let artifactID):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generatedFile: try generatedFileStore.loadGeneratedFile(id: artifactID).summary
+                    )
+                )
+
+            case .generatedFiles(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generatedFiles: try generatedFileStore.listGeneratedFiles()
+                    )
+                )
+
             case .textProfileActive(let id):
                 result = .success(
                     WorkerSuccessPayload(
@@ -878,43 +936,18 @@ public extension SpeakSwiftly {
     }
 
     private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
-        let residentModel = try residentModelOrThrow()
         guard let speechJob = await playbackController.job(for: id) else {
             throw WorkerError(
                 code: .internalError,
                 message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug."
             )
         }
+        let (residentModel, profile, refAudio) = try await loadResidentSpeechInputs(
+            requestID: id,
+            op: op,
+            profileName: profileName
+        )
         speechJob.sampleRate = Double(residentModel.sampleRate)
-
-        await emitProgress(id: id, stage: .loadingProfile)
-        let profileLoadStartedAt = dependencies.now()
-        let profile = try profileStore.loadProfile(named: profileName)
-        await logRequestEvent(
-            "profile_loaded",
-            requestID: id,
-            op: op,
-            profileName: profileName,
-            details: [
-                "path": .string(profile.directoryURL.path),
-                "duration_ms": .int(elapsedMS(since: profileLoadStartedAt)),
-            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
-        )
-
-        let refAudioLoadStartedAt = dependencies.now()
-        let refAudio = try dependencies.loadAudioSamples(profile.referenceAudioURL, residentModel.sampleRate)
-        await logRequestEvent(
-            "reference_audio_loaded",
-            requestID: id,
-            op: op,
-            profileName: profileName,
-            details: [
-                "path": .string(profile.referenceAudioURL.path),
-                "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
-                "sample_rate": .int(residentModel.sampleRate),
-            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
-        )
-        try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentModel.generateSamplesStream(
@@ -993,7 +1026,7 @@ public extension SpeakSwiftly {
         )
     }
 
-    private func residentModelOrThrow() throws -> AnySpeechModel {
+    func residentModelOrThrow() throws -> AnySpeechModel {
         if isShuttingDown {
             throw WorkerError(
                 code: .workerShuttingDown,
@@ -1015,7 +1048,7 @@ public extension SpeakSwiftly {
         let queuedJobs = await generationController.clearQueued()
 
         for job in queuedJobs {
-            if job.request.isSpeechRequest {
+            if job.request.requiresPlayback {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
             failRequestStream(for: job.request.id, error: error)
