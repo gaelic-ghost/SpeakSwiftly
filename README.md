@@ -266,7 +266,11 @@ The test suite is organized to mirror the source tree:
 - `Tests/SpeakSwiftlyTests/Generation/ModelClientsTests.swift`
 - `Tests/SpeakSwiftlyTests/Generation/ProfileStoreTests.swift`
 - `Tests/SpeakSwiftlyTests/Runtime/WorkerProtocolTests.swift`
-- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeQueueingTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeGenerationTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimePlaybackTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeControlSurfaceTests.swift`
+- `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeShutdownTests.swift`
 - `Tests/SpeakSwiftlyTests/E2E/SpeakSwiftlyE2ETests.swift`
 
 The package also includes `TextForSpeech` coverage for normalization context, profile primitives, persistence, and effective-profile behavior.
@@ -430,11 +434,12 @@ Real MLX-backed validation should use a published Xcode-backed worker runtime. A
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
-Opt-in real-model e2e coverage is available for three main sequential workflows, and the harness now publishes and launches the shared Debug runtime automatically at [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug):
+Opt-in real-model e2e coverage is available for four main workflows, and the harness now publishes and launches the shared Debug runtime automatically at [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug):
 
 - VoiceDesign profile creation, then silent playback, then audible playback.
 - Clone profile creation from caller-provided reference audio plus transcript, then silent playback, then audible playback.
 - Clone profile creation from caller-provided reference audio with transcript inference, then silent playback, then audible playback. That third lane also checks that the inferred transcript stays meaningfully close to the known spoken source text used to generate the reference audio fixture inside the sandbox.
+- Generated batch submission, then `generated_batch` and `generated_batches` reads against the real worker with saved artifact files verified on disk.
 
 ```bash
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
