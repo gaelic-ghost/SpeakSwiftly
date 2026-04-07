@@ -524,6 +524,10 @@ extension SpeakSwiftlyE2ETests {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_PLAYBACK_TRACE"] == "1"
     }
 
+    static var isAudibleE2EEnabled: Bool {
+        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_AUDIBLE_E2E"] == "1"
+    }
+
     static var isForensicE2EEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_FORENSIC_E2E"] == "1"
     }
@@ -646,7 +650,7 @@ final class WorkerProcess: @unchecked Sendable {
         var environment = ProcessInfo.processInfo.environment
         environment[Environment.dyldFrameworkPath] = executableURL.deletingLastPathComponent().path
         environment[Environment.profileRoot] = profileRootURL.path
-        if silentPlayback {
+        if silentPlayback, !SpeakSwiftlyE2ETests.isAudibleE2EEnabled {
             environment[Environment.silentPlayback] = "1"
         }
         if playbackTrace {

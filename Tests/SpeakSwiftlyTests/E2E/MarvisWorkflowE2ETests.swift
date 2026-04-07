@@ -153,5 +153,92 @@ extension SpeakSwiftlyE2ETests {
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
+
+        @Test func marvisVoiceDesignProfilesRunAudibleLivePlaybackAcrossAllVibes() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            struct MarvisProfileLane {
+                let createID: String
+                let liveID: String
+                let profileName: String
+                let vibe: SpeakSwiftly.Vibe
+                let voiceDescription: String
+                let expectedVoice: String
+            }
+
+            let lanes = [
+                MarvisProfileLane(
+                    createID: "req-create-marvis-triplet-femme",
+                    liveID: "req-live-marvis-triplet-femme",
+                    profileName: "marvis-triplet-femme-profile",
+                    vibe: .femme,
+                    voiceDescription: "A warm, bright, feminine narrator voice.",
+                    expectedVoice: "conversational_a"
+                ),
+                MarvisProfileLane(
+                    createID: "req-create-marvis-triplet-masc",
+                    liveID: "req-live-marvis-triplet-masc",
+                    profileName: "marvis-triplet-masc-profile",
+                    vibe: .masc,
+                    voiceDescription: "A grounded, rich, masculine speaking voice.",
+                    expectedVoice: "conversational_b"
+                ),
+                MarvisProfileLane(
+                    createID: "req-create-marvis-triplet-androgenous",
+                    liveID: "req-live-marvis-triplet-androgenous",
+                    profileName: "marvis-triplet-androgenous-profile",
+                    vibe: .androgenous,
+                    voiceDescription: "A calm, balanced, and gentle speaking voice.",
+                    expectedVoice: "conversational_a"
+                ),
+            ]
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                speechBackend: .marvis
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+
+            for lane in lanes {
+                try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                    on: worker,
+                    id: lane.createID,
+                    profileName: lane.profileName,
+                    text: SpeakSwiftlyE2ETests.testingProfileText,
+                    vibe: lane.vibe,
+                    voiceDescription: lane.voiceDescription
+                )
+            }
+
+            let store = ProfileStore(rootURL: sandbox.profileRootURL)
+            for lane in lanes {
+                let storedProfile = try store.loadProfile(named: lane.profileName)
+                #expect(storedProfile.manifest.vibe == lane.vibe)
+            }
+
+            for lane in lanes {
+                try await SpeakSwiftlyE2ETests.runAudibleSpeech(
+                    on: worker,
+                    id: lane.liveID,
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: lane.profileName
+                )
+                try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
+                    on: worker,
+                    requestID: lane.liveID,
+                    expectedVoice: lane.expectedVoice
+                )
+            }
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
     }
 }

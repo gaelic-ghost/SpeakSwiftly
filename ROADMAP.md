@@ -530,10 +530,11 @@ Exit criteria:
 
 These findings came out of the latest live-service review pass and are duplicated here on purpose so they stay visible after the current chat context is gone.
 
-- [ ] Tighten shutdown so terminal cancellation is not emitted until in-flight work has actually unwound, especially around post-generation filesystem work during `create_profile`.
-- [ ] Add or document stronger cancellation checkpoints around temp WAV writing, profile persistence, and export so shutdown behavior is not only bounded but also truly quiescent.
+- [x] Tighten shutdown so terminal cancellation is not emitted until in-flight work has actually unwound, especially around post-generation filesystem work during `create_profile`.
+- [x] Add or document stronger cancellation checkpoints around temp WAV writing, profile persistence, and export so shutdown behavior is not only bounded but also truly quiescent.
 - [x] Make `list_profiles` resilient to stray files, partial directories, and one-off corrupt entries instead of poisoning the full operation on the first bad manifest.
+- [ ] Add a strict multi-request audible live-playback e2e lane that pre-queues several jobs on one worker; the current Marvis audible sweep covers the full vibe-to-voice routing path on one resident worker, but it still runs those audible jobs sequentially instead of validating queued drain behavior.
 - [ ] Revisit relative `output_path` resolution so exports do not silently depend on the worker process launch directory.
-- [ ] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
+- [x] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
 - [ ] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
 - [ ] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.
