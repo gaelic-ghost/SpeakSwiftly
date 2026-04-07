@@ -359,6 +359,7 @@ final class PlaybackSpy: @unchecked Sendable {
 final class ResidentModelRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private(set) var lastText: String?
+    private(set) var lastVoice: String?
     private(set) var lastRefText: String?
     private(set) var lastRefAudioWasProvided = false
     private(set) var audioLoadCallCount = 0
@@ -366,12 +367,14 @@ final class ResidentModelRecorder: @unchecked Sendable {
 
     func record(
         text: String,
+        voice: String?,
         refAudioWasProvided: Bool,
         refText: String?,
         generationParameters: GenerateParameters
     ) {
         lock.withLock {
             lastText = text
+            lastVoice = voice
             lastRefAudioWasProvided = refAudioWasProvided
             lastRefText = refText
             lastGenerationParameters = generationParameters
@@ -393,9 +396,10 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
         generate: { _, _, _, _, _, _ in
             [0.1, 0.2]
         },
-        generateSamplesStream: { text, _, refAudio, refText, _, generationParameters, _ in
+        generateSamplesStream: { text, voice, refAudio, refText, _, generationParameters, _ in
             recorder?.record(
                 text: text,
+                voice: voice,
                 refAudioWasProvided: refAudio != nil,
                 refText: refText,
                 generationParameters: generationParameters
@@ -410,6 +414,24 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
             }
         }
     )
+}
+
+func makeResidentModels(
+    for backend: SpeakSwiftly.SpeechBackend,
+    recorder: ResidentModelRecorder? = nil,
+    chunkCount: Int = 1
+) -> ResidentSpeechModels {
+    switch backend {
+    case .qwen3:
+        .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
+    case .marvis:
+        .marvis(
+            MarvisResidentModels(
+                conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
+                conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount)
+            )
+        )
+    }
 }
 
 func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -> AnySpeechModel {
@@ -453,14 +475,15 @@ func makeGeneratedFileStore(rootURL: URL) throws -> GeneratedFileStore {
     return store
 }
 
-func makeRuntime(
+func makeRuntime<ResidentModelResult>(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
     playback: PlaybackSpy,
+    speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
     loadedCloneAudioSamples: [Float] = [],
-    residentModelLoader: @escaping @Sendable () async throws -> AnySpeechModel,
+    residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> ResidentModelResult,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
         makeProfileModel()
     },
@@ -477,7 +500,26 @@ func makeRuntime(
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
         fileManager: .default,
-        loadResidentModel: residentModelLoader,
+        loadResidentModels: { backend in
+            let loaded = try await residentModelLoader(backend)
+            if let models = loaded as? ResidentSpeechModels {
+                return models
+            }
+            if let model = loaded as? AnySpeechModel {
+                switch backend {
+                case .qwen3:
+                    return .qwen3(model)
+                case .marvis:
+                    return .marvis(
+                        MarvisResidentModels(
+                            conversationalA: model,
+                            conversationalB: model
+                        )
+                    )
+                }
+            }
+            fatalError("Test support received an unexpected resident model loader result type: \(type(of: loaded))")
+        },
         loadProfileModel: profileModelLoader,
         loadCloneTranscriptionModel: cloneTranscriptionModelLoader,
         makePlaybackController: { playbackController },
@@ -502,6 +544,7 @@ func makeRuntime(
 
     let runtime = WorkerRuntime(
         dependencies: dependencies,
+        speechBackend: speechBackend,
         profileStore: store,
         generatedFileStore: generatedFileStore,
         normalizer: normalizer,
@@ -509,6 +552,72 @@ func makeRuntime(
     )
     await runtime.installPlaybackHooks()
     return runtime
+}
+
+extension ProfileStore {
+    func createProfile(
+        profileName: String,
+        modelRepo: String,
+        voiceDescription: String,
+        sourceText: String,
+        sampleRate: Int,
+        canonicalAudioData: Data
+    ) throws -> StoredProfile {
+        try createProfile(
+            profileName: profileName,
+            vibe: inferredTestVibe(profileName: profileName, voiceDescription: voiceDescription),
+            modelRepo: modelRepo,
+            voiceDescription: voiceDescription,
+            sourceText: sourceText,
+            sampleRate: sampleRate,
+            canonicalAudioData: canonicalAudioData
+        )
+    }
+}
+
+private func inferredTestVibe(profileName: String, voiceDescription: String) -> SpeakSwiftly.Vibe {
+    let signal = "\(profileName) \(voiceDescription)".lowercased()
+    if signal.contains("femme") || signal.contains("female") || signal.contains("feminine") {
+        return .femme
+    }
+    if signal.contains("masc") || signal.contains("male") || signal.contains("masculine") {
+        return .masc
+    }
+    return .androgenous
+}
+
+extension SpeakSwiftly.Runtime {
+    func createProfile(
+        named profileName: String,
+        from text: String,
+        voice voiceDescription: String,
+        outputPath: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await createProfile(
+            named: profileName,
+            from: text,
+            vibe: inferredTestVibe(profileName: profileName, voiceDescription: voiceDescription),
+            voice: voiceDescription,
+            outputPath: outputPath,
+            id: id
+        )
+    }
+
+    func createClone(
+        named profileName: String,
+        from referenceAudioURL: URL,
+        transcript: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await createClone(
+            named: profileName,
+            from: referenceAudioURL,
+            vibe: inferredTestVibe(profileName: profileName, voiceDescription: transcript ?? ""),
+            transcript: transcript,
+            id: id
+        )
+    }
 }
 
 func makeTempDirectoryURL() -> URL {

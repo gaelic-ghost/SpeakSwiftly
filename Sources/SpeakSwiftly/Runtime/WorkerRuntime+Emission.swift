@@ -170,6 +170,7 @@ extension SpeakSwiftly.Runtime {
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestID: String? = nil,
+        vibe: SpeakSwiftly.Vibe? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil,
         referenceAudioPath: String? = nil,
@@ -194,6 +195,7 @@ extension SpeakSwiftly.Runtime {
             nestedSourceFormat: textContext?.nestedSourceFormat,
             sourceFormat: sourceFormat,
             requestID: requestID,
+            vibe: vibe,
             voiceDescription: voiceDescription,
             outputPath: outputPath,
             referenceAudioPath: referenceAudioPath,
@@ -238,20 +240,22 @@ extension SpeakSwiftly.Runtime {
                 id: id,
                 op: request.opName
             )
-        case .createProfile(let id, let profileName, let text, let voiceDescription, let outputPath):
+        case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath):
             await submitRequest(
                 id: id,
                 op: request.opName,
                 text: text,
                 profileName: profileName,
+                vibe: vibe,
                 voiceDescription: voiceDescription,
                 outputPath: outputPath
             )
-        case .createClone(let id, let profileName, let referenceAudioPath, let transcript):
+        case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript):
             await submitRequest(
                 id: id,
                 op: request.opName,
                 profileName: profileName,
+                vibe: vibe,
                 referenceAudioPath: referenceAudioPath,
                 transcript: transcript
             )

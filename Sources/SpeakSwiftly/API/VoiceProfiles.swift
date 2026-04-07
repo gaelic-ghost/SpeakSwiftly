@@ -6,6 +6,7 @@ public extension SpeakSwiftly.Runtime {
     func createProfile(
         named profileName: String,
         from text: String,
+        vibe: SpeakSwiftly.Vibe,
         voice voiceDescription: String,
         outputPath: String? = nil,
         id: String = UUID().uuidString
@@ -15,6 +16,7 @@ public extension SpeakSwiftly.Runtime {
                 id: id,
                 profileName: profileName,
                 text: text,
+                vibe: vibe,
                 voiceDescription: voiceDescription,
                 outputPath: outputPath
             )
@@ -24,6 +26,7 @@ public extension SpeakSwiftly.Runtime {
     func createClone(
         named profileName: String,
         from referenceAudioURL: URL,
+        vibe: SpeakSwiftly.Vibe,
         transcript: String? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
@@ -32,6 +35,7 @@ public extension SpeakSwiftly.Runtime {
                 id: id,
                 profileName: profileName,
                 referenceAudioPath: referenceAudioURL.path,
+                vibe: vibe,
                 transcript: transcript
             )
         )

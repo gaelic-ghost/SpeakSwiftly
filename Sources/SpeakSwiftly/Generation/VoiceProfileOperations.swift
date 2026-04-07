@@ -7,6 +7,7 @@ extension SpeakSwiftly.Runtime {
         id: String,
         profileName: String,
         text: String,
+        vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
         outputPath: String?
     ) async throws -> StoredProfile {
@@ -14,6 +15,7 @@ extension SpeakSwiftly.Runtime {
             id: id,
             profileName: profileName,
             text: text,
+            vibe: vibe,
             voiceDescription: voiceDescription,
             outputPath: outputPath
         ).opName
@@ -70,6 +72,7 @@ extension SpeakSwiftly.Runtime {
         let profileWriteStartedAt = dependencies.now()
         let storedProfile = try profileStore.createProfile(
             profileName: profileName,
+            vibe: vibe,
             modelRepo: ModelFactory.profileModelRepo,
             voiceDescription: voiceDescription,
             sourceText: text,
@@ -83,6 +86,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             details: [
                 "path": .string(storedProfile.directoryURL.path),
+                "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )
@@ -110,12 +114,14 @@ extension SpeakSwiftly.Runtime {
         id: String,
         profileName: String,
         referenceAudioPath: String,
+        vibe: SpeakSwiftly.Vibe,
         transcript: String?
     ) async throws -> StoredProfile {
         let op = WorkerRequest.createClone(
             id: id,
             profileName: profileName,
             referenceAudioPath: referenceAudioPath,
+            vibe: vibe,
             transcript: transcript
         ).opName
         try profileStore.validateProfileName(profileName)
@@ -165,6 +171,7 @@ extension SpeakSwiftly.Runtime {
         let profileWriteStartedAt = dependencies.now()
         let storedProfile = try profileStore.createProfile(
             profileName: profileName,
+            vibe: vibe,
             modelRepo: ModelFactory.importedCloneModelRepo,
             voiceDescription: ModelFactory.importedCloneVoiceDescription,
             sourceText: resolvedTranscript,
@@ -178,6 +185,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             details: [
                 "path": .string(storedProfile.directoryURL.path),
+                "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
             ]
         )

@@ -213,7 +213,7 @@ import TextForSpeech
         output: output,
         playback: playback,
         audioLoadRecorder: residentRecorder,
-        residentModelLoader: {
+        residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
         }
     )
@@ -400,7 +400,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() }
     )
 
     await runtime.start()
@@ -454,7 +454,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .immediate),
-        residentModelLoader: { makeResidentModel(chunkCount: 3) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 3) }
     )
 
     await runtime.start()
@@ -526,7 +526,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .emitLowQueueThenStarve),
-        residentModelLoader: { makeResidentModel(chunkCount: 1) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 1) }
     )
 
     await runtime.start()
@@ -598,7 +598,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .emitObservabilityBurst),
-        residentModelLoader: { makeResidentModel(chunkCount: 2) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) }
     )
 
     await runtime.start()
@@ -679,7 +679,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         audioLoadRecorder: residentRecorder,
         loadedAudioSamples: .mlxNone,
-        residentModelLoader: {
+        residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
         }
     )
@@ -727,7 +727,7 @@ import TextForSpeech
         output: output,
         playback: PlaybackSpy(),
         audioLoadRecorder: residentRecorder,
-        residentModelLoader: {
+        residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
         }
     )
@@ -767,7 +767,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel(recorder: residentRecorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) }
     )
 
     let store = try makeProfileStore(rootURL: storeRoot)
@@ -815,7 +815,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { makeResidentModel(recorder: residentRecorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) }
     )
 
     let store = try makeProfileStore(rootURL: storeRoot)
