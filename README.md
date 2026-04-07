@@ -152,6 +152,9 @@ Example request shapes:
 {"id":"req-1c","op":"queue_speech_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
 {"id":"req-1d","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
 {"id":"req-1e","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
+{"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
+{"id":"req-1g","op":"generated_file","artifact_id":"req-1f"}
+{"id":"req-1h","op":"generated_files"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
@@ -174,6 +177,13 @@ Example response and event shapes:
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
+{"id":"req-1f","ok":true}
+{"id":"req-1f","event":"started","op":"queue_speech_file"}
+{"id":"req-1f","event":"progress","stage":"generating_file_audio"}
+{"id":"req-1f","event":"progress","stage":"writing_generated_file"}
+{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d3166/generated.wav"}}
+{"id":"req-1g","ok":true,"generated_file":{"artifact_id":"req-1f","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d3166/generated.wav"}}
+{"id":"req-1h","ok":true,"generated_files":[{"artifact_id":"req-1f","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d3166/generated.wav"}]}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
 {"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
 {"id":"req-6","ok":true,"text_profiles":[{"id":"logs","name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}],"text_profile_path":"/path/to/text-profiles.json"}
@@ -185,11 +195,14 @@ Queued events are only emitted for requests that will actually wait. Once the re
 
 `queue_speech_live` is the wire-level live playback operation. The worker acknowledges queue acceptance immediately through the request stream, then emits the usual `started`, `progress`, and terminal success or failure events later as playback advances.
 
-The `text_profile_*`, `load_text_profiles`, `save_text_profiles`, and `*_text_replacement` operations are immediate control operations. They do not wait for resident-model warmup and do not enter the serialized speech-generation queue.
+`queue_speech_file` uses the same resident generation queue, but it never enters the playback queue. It acknowledges queue acceptance immediately, renders and saves a managed WAV artifact under the runtime store, then emits a terminal success payload with `generated_file` metadata keyed by the original request id.
+
+`generated_file`, `generated_files`, `text_profile_*`, `load_text_profiles`, `save_text_profiles`, and `*_text_replacement` are immediate control operations. They do not wait for resident-model warmup and do not enter the serialized speech-generation queue.
 
 Current operation families are:
 
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
+- Resident `0.6B` startup warmup and generated-file rendering with managed artifact metadata and fetch/list reads.
 - On-demand `1.7B` VoiceDesign profile creation.
 - On-demand clone profile creation from caller-provided reference audio, with optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
@@ -248,14 +261,18 @@ Current `SpeakSwiftly.Normalizer` helpers are:
 
 `runtime.normalizer` remains available as a compatibility alias to the injected normalizer object when callers already have a runtime in hand.
 
-The current typed voice-profile creation helpers on `SpeakSwiftly.Runtime` are:
+The current typed generation and profile helpers on `SpeakSwiftly.Runtime` are:
 
+- `speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
 - `createProfile(named:from:voice:outputPath:id:)`
 - `createClone(named:from:transcript:id:)`
+- `generatedFile(id:requestID:)`
+- `generatedFiles(id:)`
 
 Current live-playback behavior is:
 
 - `queue_speech_live` loads the stored profile and reference audio first.
+- `queue_speech_file` loads the stored profile and reference audio first, then saves the completed WAV under the generated-file store instead of scheduling playback.
 - The resident `0.6B` model streams generated chunks at the current `0.18` cadence.
 - The resident and profile-generation paths now pass explicit local generation parameters instead of relying on whatever default values the current `mlx-audio-swift` dependency tip happens to expose, which helps keep short utterances from drifting back into runaway generation behavior.
 - Playback is now owned by a real `PlaybackController` actor in `Sources/SpeakSwiftly/Playback/PlaybackController.swift`, while the lower-level AVFoundation engine driver stays internal to the playback feature instead of living in `Runtime/`.
@@ -268,6 +285,14 @@ Current live-playback behavior is:
 - After generation finishes, playback drain uses a dynamic timeout based on queued audio plus padding, with a minimum of 5 seconds, so the worker does not fail long buffered requests with the same cutoff used for short ones.
 - If drain completion times out, the request fails with `audio_playback_timeout` and the worker stays alive for later requests.
 - For short forensic captures, set `SPEAKSWIFTLY_PLAYBACK_TRACE=1` to emit chunk-level trace JSONL events such as `playback_trace_chunk_received`, `playback_trace_buffer_scheduled`, and `playback_trace_buffer_played_back`. Leave that mode off for normal runs.
+
+Current generated-file behavior is:
+
+- The request id is the artifact id for the first saved file generated by that request.
+- Saved artifacts live in the runtime-managed generated-file store, not at a caller-provided output path.
+- `generated_file` returns one stored artifact by `artifact_id`.
+- `generated_files` returns the current artifact summaries known to the store.
+- `list_profiles` ignores generated-file directories, so artifact storage does not pollute the voice-profile surface.
 
 Current `stderr` observability is JSONL with fields such as:
 

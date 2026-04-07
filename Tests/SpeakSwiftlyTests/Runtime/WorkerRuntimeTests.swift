@@ -1049,7 +1049,7 @@ import TextForSpeech
     await profileGate.open()
 }
 
-@Test func libraryCreateListAndRemoveHelpersSubmitWorkerProtocolRequests() async throws {
+@Test func libraryHelpersSubmitProfileAndGeneratedFileWorkerProtocolRequests() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1098,6 +1098,61 @@ import TextForSpeech
             }
 
             return profiles.contains { $0["profile_name"] as? String == "bright-guide" }
+        }
+    })
+
+    let speakFileID = await runtime.speak(
+        text: "Save this request as an artifact.",
+        with: "bright-guide",
+        as: .file,
+        id: "req-file-helper"
+    ).id
+    #expect(speakFileID == "req-file-helper")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-file-helper",
+                $0["ok"] as? Bool == true,
+                let generatedFile = $0["generated_file"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generatedFile["artifact_id"] as? String == "req-file-helper"
+        }
+    })
+
+    let generatedFileID = await runtime.generatedFile(id: "req-file-helper", requestID: "req-file-read").id
+    #expect(generatedFileID == "req-file-read")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-file-read",
+                $0["ok"] as? Bool == true,
+                let generatedFile = $0["generated_file"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generatedFile["artifact_id"] as? String == "req-file-helper"
+        }
+    })
+
+    let generatedFilesID = await runtime.generatedFiles(id: "req-file-list").id
+    #expect(generatedFilesID == "req-file-list")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-file-list",
+                $0["ok"] as? Bool == true,
+                let generatedFiles = $0["generated_files"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedFiles.contains {
+                $0["artifact_id"] as? String == "req-file-helper"
+            }
         }
     })
 
