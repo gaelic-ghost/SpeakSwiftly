@@ -391,7 +391,7 @@ extension SpeakSwiftlyE2ETests {
                     return false
                 }
 
-                return generatedFile["artifact_id"] as? String == id
+                return generatedFile["artifact_id"] as? String == "\(id)-artifact-1"
             }
         )
 

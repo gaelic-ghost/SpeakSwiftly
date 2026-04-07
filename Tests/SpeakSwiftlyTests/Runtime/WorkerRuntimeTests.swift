@@ -585,6 +585,7 @@ private func makeSpeechBackendResolutionDependencies(
             return generationJob["job_id"] as? String == "req-file-1"
                 && generationJob["job_kind"] as? String == "file"
                 && generationJob["state"] as? String == "queued"
+                && (generationJob["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == "req-file-1-artifact-1"
         }
     })
     #expect(await waitUntil {
@@ -607,7 +608,7 @@ private func makeSpeechBackendResolutionDependencies(
                 $0["id"] as? String == "req-file-1",
                 let generationJob = $0["generation_job"] as? [String: Any],
                 let generatedFile = $0["generated_file"] as? [String: Any],
-                generatedFile["artifact_id"] as? String == "req-file-1",
+                generatedFile["artifact_id"] as? String == "req-file-1-artifact-1",
                 generatedFile["profile_name"] as? String == "default-femme",
                 let filePath = generatedFile["file_path"] as? String
             else {
@@ -705,7 +706,13 @@ private func makeSpeechBackendResolutionDependencies(
         profileName: "default-femme",
         textProfileName: nil,
         speechBackend: .qwen3,
-        text: "Hello from a persisted file job.",
+        item: SpeakSwiftly.GenerationJobItem(
+            artifactID: "job-file-lookup-artifact-1",
+            text: "Hello from a persisted file job.",
+            textProfileName: nil,
+            textContext: nil,
+            sourceFormat: nil
+        ),
         createdAt: Date(timeIntervalSince1970: 1_234)
     )
 
@@ -1289,6 +1296,7 @@ private func makeSpeechBackendResolutionDependencies(
         as: .file,
         id: "req-file-helper"
     ).id
+    let fileArtifactID = "req-file-helper-artifact-1"
     #expect(speakFileID == "req-file-helper")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1300,11 +1308,11 @@ private func makeSpeechBackendResolutionDependencies(
                 return false
             }
 
-            return generatedFile["artifact_id"] as? String == "req-file-helper"
+            return generatedFile["artifact_id"] as? String == fileArtifactID
         }
     })
 
-    let generatedFileID = await runtime.generatedFile(id: "req-file-helper", requestID: "req-file-read").id
+    let generatedFileID = await runtime.generatedFile(id: fileArtifactID, requestID: "req-file-read").id
     #expect(generatedFileID == "req-file-read")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1316,7 +1324,7 @@ private func makeSpeechBackendResolutionDependencies(
                 return false
             }
 
-            return generatedFile["artifact_id"] as? String == "req-file-helper"
+            return generatedFile["artifact_id"] as? String == fileArtifactID
         }
     })
 
@@ -1333,7 +1341,7 @@ private func makeSpeechBackendResolutionDependencies(
             }
 
             return generatedFiles.contains {
-                $0["artifact_id"] as? String == "req-file-helper"
+                $0["artifact_id"] as? String == fileArtifactID
             }
         }
     })
@@ -1353,6 +1361,7 @@ private func makeSpeechBackendResolutionDependencies(
             return generationJob["job_id"] as? String == "req-file-helper"
                 && generationJob["job_kind"] as? String == "file"
                 && generationJob["state"] as? String == "completed"
+                && (generationJob["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == fileArtifactID
         }
     })
 
@@ -1372,6 +1381,7 @@ private func makeSpeechBackendResolutionDependencies(
                 $0["job_id"] as? String == "req-file-helper"
                     && $0["job_kind"] as? String == "file"
                     && $0["state"] as? String == "completed"
+                    && ($0["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == fileArtifactID
             }
         }
     })
@@ -1383,6 +1393,139 @@ private func makeSpeechBackendResolutionDependencies(
             $0["id"] as? String == "req-remove"
                 && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "bright-guide"
+        }
+    })
+}
+
+@Test func generateBatchAcknowledgesQueueThenCompletesWithGeneratedBatchMetadata() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let batchID = await runtime.generateBatch(
+        [
+            SpeakSwiftly.BatchItem(text: "First generated file."),
+            SpeakSwiftly.BatchItem(
+                artifactID: "custom-batch-artifact",
+                text: "Second generated file.",
+                textProfileName: "logs"
+            ),
+        ],
+        with: "default-femme",
+        id: "req-batch-1"
+    ).id
+    #expect(batchID == "req-batch-1")
+
+    #expect(await waitUntil {
+        output.countJSONObjects {
+            $0["id"] as? String == "req-batch-1"
+                && $0["ok"] as? Bool == true
+        } == 2
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-batch-1",
+                let generationJob = $0["generation_job"] as? [String: Any],
+                let items = generationJob["items"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generationJob["job_id"] as? String == "req-batch-1"
+                && generationJob["job_kind"] as? String == "batch"
+                && generationJob["state"] as? String == "queued"
+                && items.count == 2
+                && items[0]["artifact_id"] as? String == "req-batch-1-artifact-1"
+                && items[1]["artifact_id"] as? String == "custom-batch-artifact"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-batch-1"
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_batch"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-batch-1",
+                let generatedBatch = $0["generated_batch"] as? [String: Any],
+                let generationJob = $0["generation_job"] as? [String: Any],
+                let artifacts = generatedBatch["artifacts"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedBatch["batch_id"] as? String == "req-batch-1"
+                && generatedBatch["state"] as? String == "completed"
+                && generationJob["job_kind"] as? String == "batch"
+                && generationJob["state"] as? String == "completed"
+                && artifacts.count == 2
+                && artifacts.contains { $0["artifact_id"] as? String == "req-batch-1-artifact-1" }
+                && artifacts.contains { $0["artifact_id"] as? String == "custom-batch-artifact" }
+        }
+    })
+
+    let generatedBatchID = await runtime.generatedBatch(id: "req-batch-1", requestID: "req-batch-read").id
+    #expect(generatedBatchID == "req-batch-read")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-batch-read",
+                let generatedBatch = $0["generated_batch"] as? [String: Any],
+                let artifacts = generatedBatch["artifacts"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedBatch["batch_id"] as? String == "req-batch-1"
+                && artifacts.count == 2
+        }
+    })
+
+    let generatedBatchesID = await runtime.generatedBatches(id: "req-batches-read").id
+    #expect(generatedBatchesID == "req-batches-read")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-batches-read",
+                let generatedBatches = $0["generated_batches"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedBatches.contains {
+                $0["batch_id"] as? String == "req-batch-1"
+                    && $0["state"] as? String == "completed"
+            }
         }
     })
 }

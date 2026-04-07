@@ -33,7 +33,8 @@ extension SpeakSwiftlyE2ETests {
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
                 profileName: SpeakSwiftlyE2ETests.testingProfileName
             )
-            #expect(generatedFile["artifact_id"] as? String == "req-generated-file-e2e")
+            let artifactID = "req-generated-file-e2e-artifact-1"
+            #expect(generatedFile["artifact_id"] as? String == artifactID)
             #expect(generatedFile["profile_name"] as? String == SpeakSwiftlyE2ETests.testingProfileName)
 
             let generatedFilePath = try #require(generatedFile["file_path"] as? String)
@@ -41,7 +42,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-generated-file-read","op":"generated_file","artifact_id":"req-generated-file-e2e"}
+                {"id":"req-generated-file-read","op":"generated_file","artifact_id":"\(artifactID)"}
                 """
             )
 
@@ -55,7 +56,7 @@ extension SpeakSwiftlyE2ETests {
                         return false
                     }
 
-                    return generatedFile["artifact_id"] as? String == "req-generated-file-e2e"
+                    return generatedFile["artifact_id"] as? String == artifactID
                 }
             )
             let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
@@ -77,7 +78,7 @@ extension SpeakSwiftlyE2ETests {
                 }
 
                 return generatedFiles.contains {
-                    $0["artifact_id"] as? String == "req-generated-file-e2e"
+                    $0["artifact_id"] as? String == artifactID
                         && $0["file_path"] as? String == generatedFilePath
                 }
             } != nil)

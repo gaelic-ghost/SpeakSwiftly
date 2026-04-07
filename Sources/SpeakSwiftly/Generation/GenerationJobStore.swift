@@ -32,7 +32,46 @@ struct GenerationJobStore {
         profileName: String,
         textProfileName: String?,
         speechBackend: SpeakSwiftly.SpeechBackend,
-        text: String,
+        item: SpeakSwiftly.GenerationJobItem,
+        createdAt: Date
+    ) throws -> SpeakSwiftly.GenerationJob {
+        try createJob(
+            jobID: jobID,
+            jobKind: .file,
+            profileName: profileName,
+            textProfileName: textProfileName,
+            speechBackend: speechBackend,
+            items: [item],
+            createdAt: createdAt
+        )
+    }
+
+    func createBatchJob(
+        jobID: String,
+        profileName: String,
+        textProfileName: String?,
+        speechBackend: SpeakSwiftly.SpeechBackend,
+        items: [SpeakSwiftly.GenerationJobItem],
+        createdAt: Date
+    ) throws -> SpeakSwiftly.GenerationJob {
+        try createJob(
+            jobID: jobID,
+            jobKind: .batch,
+            profileName: profileName,
+            textProfileName: textProfileName,
+            speechBackend: speechBackend,
+            items: items,
+            createdAt: createdAt
+        )
+    }
+
+    private func createJob(
+        jobID: String,
+        jobKind: SpeakSwiftly.GenerationJobKind,
+        profileName: String,
+        textProfileName: String?,
+        speechBackend: SpeakSwiftly.SpeechBackend,
+        items: [SpeakSwiftly.GenerationJobItem],
         createdAt: Date
     ) throws -> SpeakSwiftly.GenerationJob {
         try ensureRootExists()
@@ -49,14 +88,14 @@ struct GenerationJobStore {
 
         let job = SpeakSwiftly.GenerationJob(
             jobID: jobID,
-            jobKind: .file,
+            jobKind: jobKind,
             createdAt: createdAt,
             updatedAt: createdAt,
             profileName: profileName,
             textProfileName: textProfileName,
             speechBackend: speechBackend,
             state: .queued,
-            text: text,
+            items: items,
             artifacts: [],
             failure: nil,
             startedAt: nil,
@@ -142,7 +181,7 @@ struct GenerationJobStore {
                 textProfileName: job.textProfileName,
                 speechBackend: job.speechBackend,
                 state: .running,
-                text: job.text,
+                items: job.items,
                 artifacts: job.artifacts,
                 failure: nil,
                 startedAt: job.startedAt ?? startedAt,
@@ -169,7 +208,7 @@ struct GenerationJobStore {
                 textProfileName: job.textProfileName,
                 speechBackend: job.speechBackend,
                 state: .completed,
-                text: job.text,
+                items: job.items,
                 artifacts: artifacts,
                 failure: nil,
                 startedAt: job.startedAt,
@@ -196,7 +235,7 @@ struct GenerationJobStore {
                 textProfileName: job.textProfileName,
                 speechBackend: job.speechBackend,
                 state: .failed,
-                text: job.text,
+                items: job.items,
                 artifacts: job.artifacts,
                 failure: .init(code: error.code.rawValue, message: error.message),
                 startedAt: job.startedAt,

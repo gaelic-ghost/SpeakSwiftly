@@ -21,8 +21,9 @@ extension SpeakSwiftly.Runtime {
     }
 
     func handleQueueSpeechFileGeneration(
-        id: String,
+        requestID id: String,
         op: String,
+        artifactID: String,
         text: String,
         profileName: String,
         textProfileName: String?,
@@ -92,7 +93,7 @@ extension SpeakSwiftly.Runtime {
         await emitProgress(id: id, stage: .writingGeneratedFile)
         let writeStartedAt = dependencies.now()
         let generatedFile = try generatedFileStore.createGeneratedFile(
-            artifactID: id,
+            artifactID: artifactID,
             profileName: profileName,
             textProfileName: textProfileName,
             sampleRate: residentModel.sampleRate,

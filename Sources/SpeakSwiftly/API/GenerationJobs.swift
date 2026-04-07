@@ -1,8 +1,39 @@
 import Foundation
+import TextForSpeech
 
 // MARK: - Generation Job API
 
 public extension SpeakSwiftly {
+    struct GenerationJobItem: Codable, Sendable, Equatable {
+        public let artifactID: String
+        public let text: String
+        public let textProfileName: String?
+        public let textContext: TextForSpeech.Context?
+        public let sourceFormat: TextForSpeech.SourceFormat?
+
+        enum CodingKeys: String, CodingKey {
+            case artifactID = "artifact_id"
+            case text
+            case textProfileName = "text_profile_name"
+            case textContext = "text_context"
+            case sourceFormat = "source_format"
+        }
+
+        public init(
+            artifactID: String,
+            text: String,
+            textProfileName: String?,
+            textContext: TextForSpeech.Context?,
+            sourceFormat: TextForSpeech.SourceFormat?
+        ) {
+            self.artifactID = artifactID
+            self.text = text
+            self.textProfileName = textProfileName
+            self.textContext = textContext
+            self.sourceFormat = sourceFormat
+        }
+    }
+
     enum GenerationJobKind: String, Codable, Sendable, Equatable {
         case file
         case batch
@@ -86,7 +117,7 @@ public extension SpeakSwiftly {
         public let textProfileName: String?
         public let speechBackend: SpeechBackend
         public let state: GenerationJobState
-        public let text: String
+        public let items: [GenerationJobItem]
         public let artifacts: [GenerationArtifact]
         public let failure: GenerationJobFailure?
         public let startedAt: Date?
@@ -104,7 +135,7 @@ public extension SpeakSwiftly {
             case textProfileName = "text_profile_name"
             case speechBackend = "speech_backend"
             case state
-            case text
+            case items
             case artifacts
             case failure
             case startedAt = "started_at"
@@ -123,7 +154,7 @@ public extension SpeakSwiftly {
             textProfileName: String?,
             speechBackend: SpeechBackend,
             state: GenerationJobState,
-            text: String,
+            items: [GenerationJobItem],
             artifacts: [GenerationArtifact],
             failure: GenerationJobFailure?,
             startedAt: Date?,
@@ -140,7 +171,7 @@ public extension SpeakSwiftly {
             self.textProfileName = textProfileName
             self.speechBackend = speechBackend
             self.state = state
-            self.text = text
+            self.items = items
             self.artifacts = artifacts
             self.failure = failure
             self.startedAt = startedAt
