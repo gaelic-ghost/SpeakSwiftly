@@ -211,6 +211,11 @@ import TextForSpeech
 
     let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
     #expect(list == .generationJobs(id: "req-generation-jobs"))
+
+    let expire = try WorkerRequest.decode(
+        from: #"{"id":"req-expire-job","op":"expire_generation_job","job_id":"job-file-1"}"#
+    )
+    #expect(expire == .expireGenerationJob(id: "req-expire-job", jobID: "job-file-1"))
 }
 
 @Test func decodesRemoveProfileRequest() throws {

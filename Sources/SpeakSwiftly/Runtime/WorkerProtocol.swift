@@ -279,6 +279,7 @@ enum WorkerRequest: Sendable, Equatable {
     case generatedFiles(id: String)
     case generatedBatch(id: String, batchID: String)
     case generatedBatches(id: String)
+    case expireGenerationJob(id: String, jobID: String)
     case generationJob(id: String, jobID: String)
     case generationJobs(id: String)
     case createProfile(id: String, profileName: String, text: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)
@@ -314,6 +315,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles(let id),
              .generatedBatch(let id, _),
              .generatedBatches(let id),
+             .expireGenerationJob(let id, _),
              .generationJob(let id, _),
              .generationJobs(let id),
              .createProfile(let id, _, _, _, _, _),
@@ -360,6 +362,8 @@ enum WorkerRequest: Sendable, Equatable {
             "generated_batch"
         case .generatedBatches:
             "generated_batches"
+        case .expireGenerationJob:
+            "expire_generation_job"
         case .generationJob:
             "generation_job"
         case .generationJobs:
@@ -464,6 +468,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles,
              .generatedBatch,
              .generatedBatches,
+             .expireGenerationJob,
              .generationJob,
              .generationJobs,
              .textProfileActive,
@@ -504,6 +509,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles,
              .generatedBatch,
              .generatedBatches,
+             .expireGenerationJob,
              .generationJob,
              .generationJobs,
              .textProfileActive,
@@ -545,6 +551,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles,
              .generatedBatch,
              .generatedBatches,
+             .expireGenerationJob,
              .generationJob,
              .generationJobs,
              .createProfile,
@@ -585,6 +592,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles,
              .generatedBatch,
              .generatedBatches,
+             .expireGenerationJob,
              .generationJob,
              .generationJobs,
              .createProfile,
@@ -625,6 +633,7 @@ enum WorkerRequest: Sendable, Equatable {
              .generatedFiles,
              .generatedBatch,
              .generatedBatches,
+             .expireGenerationJob,
              .generationJob,
              .generationJobs,
              .createProfile,
@@ -741,6 +750,10 @@ enum WorkerRequest: Sendable, Equatable {
 
         case "generated_batches":
             return .generatedBatches(id: id)
+
+        case "expire_generation_job":
+            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+            return .expireGenerationJob(id: id, jobID: jobID)
 
         case "generation_job":
             let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
@@ -1177,6 +1190,7 @@ public extension SpeakSwiftly {
         case generatedFileAlreadyExists = "generated_file_already_exists"
         case generationJobNotFound = "generation_job_not_found"
         case generationJobAlreadyExists = "generation_job_already_exists"
+        case generationJobNotExpirable = "generation_job_not_expirable"
         case profileNotFound = "profile_not_found"
         case profileAlreadyExists = "profile_already_exists"
         case invalidProfileName = "invalid_profile_name"

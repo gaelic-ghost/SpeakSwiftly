@@ -797,6 +797,7 @@ public extension SpeakSwiftly {
                  .generatedFiles,
                  .generatedBatch,
                  .generatedBatches,
+                 .expireGenerationJob,
                  .generationJob,
                  .generationJobs,
                  .textProfileActive,
@@ -875,6 +876,14 @@ public extension SpeakSwiftly {
                     WorkerSuccessPayload(
                         id: id,
                         generatedBatches: try listGeneratedBatches()
+                    )
+                )
+
+            case .expireGenerationJob(let id, let jobID):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        generationJob: try expireGenerationJob(id: jobID)
                     )
                 )
 
@@ -1233,8 +1242,12 @@ public extension SpeakSwiftly {
             )
         }
 
-        let artifacts = try job.artifacts.map { artifact in
-            try generatedFileStore.loadGeneratedFile(id: artifact.artifactID).summary
+        let artifacts: [SpeakSwiftly.GeneratedFile] = if job.state == .expired {
+            []
+        } else {
+            try job.artifacts.map { artifact in
+                try generatedFileStore.loadGeneratedFile(id: artifact.artifactID).summary
+            }
         }
 
         return SpeakSwiftly.GeneratedBatch(
@@ -1254,6 +1267,24 @@ public extension SpeakSwiftly {
             expiresAt: job.expiresAt,
             retentionPolicy: job.retentionPolicy
         )
+    }
+
+    private func expireGenerationJob(
+        id jobID: String
+    ) throws -> SpeakSwiftly.GenerationJob {
+        let job = try generationJobStore.loadGenerationJob(id: jobID)
+        guard job.state != .queued, job.state != .running else {
+            throw WorkerError(
+                code: .generationJobNotExpirable,
+                message: "Generation job '\(jobID)' is still \(job.state.rawValue) and cannot be expired until its generation work has finished."
+            )
+        }
+
+        for artifact in job.artifacts {
+            _ = try generatedFileStore.removeGeneratedFile(id: artifact.artifactID)
+        }
+
+        return try generationJobStore.markExpired(id: jobID, expiredAt: dependencies.now())
     }
 
     func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {

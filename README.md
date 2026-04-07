@@ -195,6 +195,7 @@ Example request shapes:
 {"id":"req-1k","op":"generated_batches"}
 {"id":"req-1l","op":"generation_job","job_id":"req-1f"}
 {"id":"req-1m","op":"generation_jobs"}
+{"id":"req-1n","op":"expire_generation_job","job_id":"req-1g"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
 {"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
@@ -229,6 +230,7 @@ Example response and event shapes:
 {"id":"req-1i","ok":true,"generated_files":[{"artifact_id":"req-1f-artifact-1","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"}]}
 {"id":"req-1j","ok":true,"generated_batch":{"batch_id":"req-1g","profile_name":"default-femme","text_profile_name":null,"speech_backend":"marvis","state":"completed","items":[{"artifact_id":"req-1g-artifact-1","text":"First saved file.","text_profile_name":null,"text_context":null,"source_format":null},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs","text_context":null,"source_format":null}],"artifacts":[{"artifact_id":"req-1g-artifact-1","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:01Z","file_path":"/tmp/generated-files/7265712d31672d61727469666163742d31/generated.wav"},{"artifact_id":"custom-batch-artifact","profile_name":"default-femme","text_profile_name":"logs","sample_rate":24000,"created_at":"2026-04-07T18:22:02Z","file_path":"/tmp/generated-files/637573746f6d2d62617463682d6172746966616374/generated.wav"}]}}
 {"id":"req-1k","ok":true,"generated_batches":[{"batch_id":"req-1g","profile_name":"default-femme","text_profile_name":null,"speech_backend":"marvis","state":"completed","items":[{"artifact_id":"req-1g-artifact-1","text":"First saved file.","text_profile_name":null,"text_context":null,"source_format":null},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs","text_context":null,"source_format":null}],"artifacts":[{"artifact_id":"req-1g-artifact-1","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:01Z","file_path":"/tmp/generated-files/7265712d31672d61727469666163742d31/generated.wav"},{"artifact_id":"custom-batch-artifact","profile_name":"default-femme","text_profile_name":"logs","sample_rate":24000,"created_at":"2026-04-07T18:22:02Z","file_path":"/tmp/generated-files/637573746f6d2d62617463682d6172746966616374/generated.wav"}]}]}
+{"id":"req-1n","ok":true,"generation_job":{"job_id":"req-1g","job_kind":"batch","state":"expired","expires_at":"2026-04-07T18:40:00Z","items":[{"artifact_id":"req-1g-artifact-1","text":"First saved file.","text_profile_name":null,"text_context":null,"source_format":null},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs","text_context":null,"source_format":null}],"artifacts":[{"artifact_id":"req-1g-artifact-1","kind":"audio_wav","created_at":"2026-04-07T18:22:01Z","file_path":"/tmp/generated-files/7265712d31672d61727469666163742d31/generated.wav","sample_rate":24000,"profile_name":"default-femme","text_profile_name":null},{"artifact_id":"custom-batch-artifact","kind":"audio_wav","created_at":"2026-04-07T18:22:02Z","file_path":"/tmp/generated-files/637573746f6d2d62617463682d6172746966616374/generated.wav","sample_rate":24000,"profile_name":"default-femme","text_profile_name":"logs"}]}}
 {"id":"req-2","ok":true,"profile_name":"bright-guide","profile_path":"/path/to/profile"}
 {"id":"req-3","ok":true,"profiles":[{"profile_name":"bright-guide","vibe":"femme","created_at":"2026-04-01T12:00:00Z","voice_description":"A warm, bright, feminine narrator voice.","source_text":"Hello there"}]}
 {"id":"req-6","ok":true,"text_profiles":[{"id":"logs","name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}],"text_profile_path":"/path/to/text-profiles.json"}
@@ -244,7 +246,7 @@ Queued events are only emitted for requests that will actually wait. Once the re
 
 `queue_speech_batch` is the caller-facing many-files surface. One batch submission creates one batch job, resolves one durable artifact id per item up front, renders each file through the same resident generation path, and finishes with a `generated_batch` payload that lists the saved artifacts for that batch.
 
-`generated_file`, `generated_files`, `generated_batch`, `generated_batches`, `generation_job`, `generation_jobs`, `text_profile_*`, `load_text_profiles`, `save_text_profiles`, and `*_text_replacement` are immediate control operations. They do not wait for resident-model warmup and do not enter the serialized speech-generation queue.
+`generated_file`, `generated_files`, `generated_batch`, `generated_batches`, `generation_job`, `generation_jobs`, `expire_generation_job`, `text_profile_*`, `load_text_profiles`, `save_text_profiles`, and `*_text_replacement` are immediate control operations. They do not wait for resident-model warmup and do not enter the serialized speech-generation queue.
 
 Current operation families are:
 
@@ -351,6 +353,9 @@ Current generated-file behavior is:
 - `generated_batch` returns one caller-facing batch projection backed by a batch job.
 - `generated_batches` returns the current caller-facing batch projections backed by persisted batch jobs.
 - `generation_job` and `generation_jobs` expose the lower-level persisted job records directly, including their resolved generation items and artifact references.
+- `expire_generation_job` performs manual retention cleanup for one completed or failed generation job, removes any persisted artifact files it still owns, and leaves the job record behind in the `expired` state with `expires_at` stamped.
+- Expired batch reads stay inspectable through `generated_batch` and `generated_batches`, but they return an empty `artifacts` list because the saved files are intentionally gone.
+- Expired file and batch jobs keep their artifact references inside `generation_job` and `generation_jobs` so operators can still see what existed before cleanup ran.
 - `list_profiles` ignores generated-file directories, so artifact storage does not pollute the voice-profile surface.
 
 Current `stderr` observability is JSONL with fields such as:

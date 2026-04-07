@@ -247,6 +247,43 @@ struct GenerationJobStore {
         }
     }
 
+    func markExpired(
+        id jobID: String,
+        expiredAt: Date
+    ) throws -> SpeakSwiftly.GenerationJob {
+        try updateGenerationJob(id: jobID) { job in
+            guard job.state != .queued, job.state != .running else {
+                throw WorkerError(
+                    code: .generationJobNotExpirable,
+                    message: "Generation job '\(jobID)' is still \(job.state.rawValue) and cannot be expired until it has either completed or failed."
+                )
+            }
+
+            if job.state == .expired {
+                return job
+            }
+
+            return SpeakSwiftly.GenerationJob(
+                jobID: job.jobID,
+                jobKind: job.jobKind,
+                createdAt: job.createdAt,
+                updatedAt: expiredAt,
+                profileName: job.profileName,
+                textProfileName: job.textProfileName,
+                speechBackend: job.speechBackend,
+                state: .expired,
+                items: job.items,
+                artifacts: job.artifacts,
+                failure: job.failure,
+                startedAt: job.startedAt,
+                completedAt: job.completedAt,
+                failedAt: job.failedAt,
+                expiresAt: expiredAt,
+                retentionPolicy: job.retentionPolicy
+            )
+        }
+    }
+
     func generationJobDirectoryURL(for jobID: String) -> URL {
         rootURL.appendingPathComponent(encodedDirectoryName(for: jobID), isDirectory: true)
     }

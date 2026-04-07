@@ -112,3 +112,81 @@ import Testing
     let loaded = try store.loadGenerationJob(id: "job-batch-1")
     #expect(loaded == queued)
 }
+
+@Test func generationJobStoreExpiresCompletedJobsWithoutDroppingArtifactMetadata() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = try makeGenerationJobStore(rootURL: rootURL)
+    _ = try store.createFileJob(
+        jobID: "job-file-2",
+        profileName: "default-femme",
+        textProfileName: nil,
+        speechBackend: .marvis,
+        item: SpeakSwiftly.GenerationJobItem(
+            artifactID: "artifact-2",
+            text: "Hello from a completed file job.",
+            textProfileName: nil,
+            textContext: nil,
+            sourceFormat: nil
+        ),
+        createdAt: Date(timeIntervalSince1970: 2_100)
+    )
+
+    _ = try store.markCompleted(
+        id: "job-file-2",
+        artifacts: [
+            SpeakSwiftly.GenerationArtifact(
+                artifactID: "artifact-2",
+                kind: .audioWAV,
+                createdAt: Date(timeIntervalSince1970: 2_101),
+                filePath: "/tmp/artifact-2.wav",
+                sampleRate: 24_000,
+                profileName: "default-femme",
+                textProfileName: nil
+            )
+        ],
+        completedAt: Date(timeIntervalSince1970: 2_102)
+    )
+
+    let expired = try store.markExpired(
+        id: "job-file-2",
+        expiredAt: Date(timeIntervalSince1970: 2_103)
+    )
+
+    #expect(expired.state == .expired)
+    #expect(expired.expiresAt == Date(timeIntervalSince1970: 2_103))
+    #expect(expired.completedAt == Date(timeIntervalSince1970: 2_102))
+    #expect(expired.artifacts.count == 1)
+    #expect(expired.artifacts[0].artifactID == "artifact-2")
+}
+
+@Test func generationJobStoreRejectsExpiringQueuedJobs() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = try makeGenerationJobStore(rootURL: rootURL)
+    _ = try store.createFileJob(
+        jobID: "job-file-queued",
+        profileName: "default-femme",
+        textProfileName: nil,
+        speechBackend: .marvis,
+        item: SpeakSwiftly.GenerationJobItem(
+            artifactID: "artifact-queued",
+            text: "Queued",
+            textProfileName: nil,
+            textContext: nil,
+            sourceFormat: nil
+        ),
+        createdAt: Date(timeIntervalSince1970: 2_200)
+    )
+
+    #expect(
+        throws: WorkerError(
+            code: .generationJobNotExpirable,
+            message: "Generation job 'job-file-queued' is still queued and cannot be expired until it has either completed or failed."
+        )
+    ) {
+        _ = try store.markExpired(id: "job-file-queued", expiredAt: Date(timeIntervalSince1970: 2_201))
+    }
+}

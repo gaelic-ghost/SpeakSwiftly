@@ -184,6 +184,13 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Runtime {
+    func expireGenerationJob(
+        id jobID: String,
+        requestID: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await submit(.expireGenerationJob(id: requestID, jobID: jobID))
+    }
+
     func generationJob(
         id jobID: String,
         requestID: String = UUID().uuidString

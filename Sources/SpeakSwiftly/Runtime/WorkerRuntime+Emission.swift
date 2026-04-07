@@ -268,6 +268,12 @@ extension SpeakSwiftly.Runtime {
                 id: id,
                 op: request.opName
             )
+        case .expireGenerationJob(let id, let jobID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                jobID: jobID
+            )
         case .generationJob(let id, let jobID):
             await submitRequest(
                 id: id,

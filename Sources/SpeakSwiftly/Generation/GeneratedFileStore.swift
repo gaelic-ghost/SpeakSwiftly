@@ -201,6 +201,29 @@ struct GeneratedFileStore {
         return generatedFiles
     }
 
+    @discardableResult
+    func removeGeneratedFile(id artifactID: String) throws -> SpeakSwiftly.GeneratedFile? {
+        try ensureRootExists()
+
+        let directoryURL = generatedFileDirectoryURL(for: artifactID)
+        guard fileManager.fileExists(atPath: directoryURL.path) else {
+            return nil
+        }
+
+        let storedFile = try loadGeneratedFile(id: artifactID)
+
+        do {
+            try fileManager.removeItem(at: directoryURL)
+        } catch {
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Generated file '\(artifactID)' was found, but SpeakSwiftly could not remove its stored artifact directory at '\(directoryURL.path)'. \(error.localizedDescription)"
+            )
+        }
+
+        return storedFile.summary
+    }
+
     func generatedFileDirectoryURL(for artifactID: String) -> URL {
         rootURL.appendingPathComponent(encodedDirectoryName(for: artifactID), isDirectory: true)
     }

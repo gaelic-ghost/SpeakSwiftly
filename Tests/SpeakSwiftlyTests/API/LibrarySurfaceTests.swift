@@ -218,6 +218,9 @@ import TextForSpeech
     let generatedBatches: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
         await runtime.generatedBatches(id: requestID)
     }
+    let expireGenerationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
+        await runtime.expireGenerationJob(id: jobID, requestID: requestID)
+    }
     let generationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
         await runtime.generationJob(id: jobID, requestID: requestID)
     }
@@ -258,6 +261,7 @@ import TextForSpeech
     _ = generateBatch
     _ = generatedBatch
     _ = generatedBatches
+    _ = expireGenerationJob
     _ = generationJob
     _ = generationJobs
     _ = profile
