@@ -22,6 +22,9 @@ Official and primary sources consulted:
 Local implementation source consulted:
 
 - `mlx-audio-swift` pinned in this repository at `v0.1.2`
+- Marvis prompt assets from the published model:
+  - `https://huggingface.co/Marvis-AI/marvis-tts-250m-v0.2/resolve/main/prompts/conversational_a.txt`
+  - `https://huggingface.co/Marvis-AI/marvis-tts-250m-v0.2/resolve/main/prompts/conversational_b.txt`
 
 ## Findings
 
@@ -79,7 +82,20 @@ In the current `mlx-audio-swift` Marvis implementation:
 - the wrapper resolves each one to a packaged `.wav` prompt and matching `.txt` transcript
 - the code path after that is the same
 
-So these presets do not imply different user-profile schemas. They are backend-owned built-in prompt assets, not a reason to fork SpeakSwiftly's public profile API.
+But they are not arbitrary duplicates either.
+
+The Marvis authors describe them as two different expressive English presets:
+
+- `conversational_a` for female
+- `conversational_b` for male
+
+The published prompt assets back that up:
+
+- both presets use the same transcript text
+- both presets are about the same length, roughly `13.25` seconds at `24 kHz`
+- the difference therefore lives in the reference audio identity and delivery, not in the transcript or in a different schema
+
+So these presets do not imply different user-profile schemas. They are backend-owned built-in prompt assets that encode different English voice identities and performances, not a reason to fork SpeakSwiftly's public profile API.
 
 ### 5. Qwen and Marvis differ more in conditioning preference than in top-level API shape
 
@@ -153,6 +169,8 @@ Keep using:
 - canonical `refText`
 
 for both backends for now.
+
+For caller-provided clone imports, document `around 10 seconds` of clear source audio as the target profile-input length. That should be our stable operator-facing recommendation unless upstream guidance changes.
 
 But make the backend policy explicit in the materialization model:
 

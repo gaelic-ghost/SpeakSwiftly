@@ -97,7 +97,7 @@ The first intended runtime shape is:
 - Newline-delimited JSON over `stdin` and `stdout`.
 - A resident `Qwen3-TTS 0.6B` path that pre-warms on startup and stays alive for live streamed playback from this process.
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
-- A second on-demand clone path that imports caller-provided reference audio, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
+- A second on-demand clone path that imports caller-provided reference audio, targets around 10 seconds of clear source speech, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
 - A persisted runtime configuration file that can remember the preferred resident speech backend across launches.
 - A single-consumer priority queue for incoming requests, with waiting live playback work preferred over waiting non-playback work.
@@ -237,7 +237,7 @@ Current operation families are:
 - Resident `0.6B` startup warmup and live playback with named stored profiles.
 - Resident `0.6B` startup warmup and generated-file rendering with managed artifact metadata and fetch/list reads.
 - On-demand `1.7B` VoiceDesign profile creation.
-- On-demand clone profile creation from caller-provided reference audio, with optional transcript inference.
+- On-demand clone profile creation from caller-provided reference audio, with a documented target of around 10 seconds of clear source speech and optional transcript inference.
 - Immutable profile storage, selection, listing, and removal.
 - Immediate text-profile inspection, persistence, and replacement editing with JSONL and typed-library parity.
 - Playback-prioritized request handling with preload-aware queue status.
