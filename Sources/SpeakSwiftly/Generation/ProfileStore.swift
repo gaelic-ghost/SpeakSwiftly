@@ -109,6 +109,7 @@ struct ProfileStore {
     static let directoryName = "SpeakSwiftly"
     static let profilesDirectoryName = "profiles"
     static let textProfilesFileName = "text-profiles.json"
+    static let configurationFileName = "configuration.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
     static let manifestVersion = 2
@@ -380,13 +381,29 @@ struct ProfileStore {
     }
 
     static func defaultRootURL(fileManager: FileManager = .default, overridePath: String? = nil) -> URL {
-        if let overridePath, !overridePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: overridePath, isDirectory: true)
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: overridePath)
+            .appendingPathComponent(profilesDirectoryName, isDirectory: true)
+    }
+
+    static func defaultConfigurationURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil
+    ) -> URL {
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+            .appendingPathComponent(configurationFileName, isDirectory: false)
+    }
+
+    private static func defaultBaseURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil
+    ) -> URL {
+        if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
+                .deletingLastPathComponent()
         }
 
         return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(directoryName, isDirectory: true)
-            .appendingPathComponent(profilesDirectoryName, isDirectory: true)
     }
 
     private func loadManifest(from directoryURL: URL) throws -> ProfileManifest {

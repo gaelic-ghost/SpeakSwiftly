@@ -222,10 +222,17 @@ public extension SpeakSwiftly {
 
     public static func live(
         normalizer: SpeakSwiftly.Normalizer? = nil,
-        speechBackend: SpeakSwiftly.SpeechBackend = .qwen3
+        configuration: SpeakSwiftly.Configuration? = nil,
+        speechBackend: SpeakSwiftly.SpeechBackend? = nil
     ) async -> Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
+        let configuredSpeechBackend = resolvedSpeechBackend(
+            dependencies: dependencies,
+            environment: environment,
+            configuration: configuration,
+            explicitSpeechBackend: speechBackend
+        )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
                 fileManager: dependencies.fileManager,
@@ -250,7 +257,7 @@ public extension SpeakSwiftly {
 
         let runtime = Runtime(
             dependencies: dependencies,
-            speechBackend: speechBackend,
+            speechBackend: configuredSpeechBackend,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             normalizer: normalizer,
@@ -258,6 +265,43 @@ public extension SpeakSwiftly {
         )
         await runtime.installPlaybackHooks()
         return runtime
+    }
+
+    static func resolvedSpeechBackend(
+        dependencies: WorkerDependencies,
+        environment: [String: String],
+        configuration: SpeakSwiftly.Configuration?,
+        explicitSpeechBackend: SpeakSwiftly.SpeechBackend?
+    ) -> SpeakSwiftly.SpeechBackend {
+        if let explicitSpeechBackend {
+            return explicitSpeechBackend
+        }
+
+        if let configuration {
+            return configuration.speechBackend
+        }
+
+        if let environmentBackend = SpeakSwiftly.SpeechBackend.configured(in: environment) {
+            return environmentBackend
+        }
+
+        do {
+            if let persistedConfiguration = try SpeakSwiftly.Configuration.loadDefault(
+                fileManager: dependencies.fileManager,
+                profileRootOverride: environment[Environment.profileRootOverride]
+            ) {
+                return persistedConfiguration.speechBackend
+            }
+        } catch {
+            let configurationPath = SpeakSwiftly.Configuration.defaultPersistenceURL(
+                fileManager: dependencies.fileManager,
+                profileRootOverride: environment[Environment.profileRootOverride]
+            ).path
+            let message = "SpeakSwiftly could not load persisted runtime configuration from '\(configurationPath)'. Falling back to the default speech backend. \(error.localizedDescription)\n"
+            dependencies.writeStderr(message)
+        }
+
+        return .qwen3
     }
 
     func installPlaybackHooks() async {

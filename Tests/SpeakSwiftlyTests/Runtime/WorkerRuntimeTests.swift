@@ -11,6 +11,26 @@ private actor LoadedBackendRecorder {
     }
 }
 
+private func makeSpeechBackendResolutionDependencies(
+    fileManager: FileManager = .default,
+    stderrMessages: @escaping @Sendable (String) -> Void = { _ in }
+) -> WorkerDependencies {
+    WorkerDependencies(
+        fileManager: fileManager,
+        loadResidentModel: { _ in makeResidentModel() },
+        loadProfileModel: { makeProfileModel() },
+        loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
+        makePlaybackController: { AnyPlaybackController.silent() },
+        writeWAV: { _, _, _ in },
+        loadAudioSamples: { _, _ in nil },
+        loadAudioFloats: { _, _ in [] },
+        writeStdout: { _ in },
+        writeStderr: stderrMessages,
+        now: Date.init,
+        readRuntimeMemory: { nil }
+    )
+}
+
 // MARK: - Queueing and Preload
 
 @Test func requestsQueuedDuringPreloadEmitWaitingStatusThenProcess() async throws {
@@ -104,6 +124,49 @@ private actor LoadedBackendRecorder {
         }
     })
     #expect(await recorder.backends == [.marvis])
+}
+
+@Test func resolvedSpeechBackendPrefersExplicitConfigurationOverPersistedValue() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
+    let dependencies = makeSpeechBackendResolutionDependencies()
+    try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
+        profileRootOverride: profileRoot.path
+    )
+
+    let resolved = WorkerRuntime.resolvedSpeechBackend(
+        dependencies: dependencies,
+        environment: [ "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path ],
+        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis),
+        explicitSpeechBackend: nil
+    )
+
+    #expect(resolved == .marvis)
+}
+
+@Test func resolvedSpeechBackendPrefersEnvironmentOverPersistedConfiguration() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
+    let dependencies = makeSpeechBackendResolutionDependencies()
+    try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
+        profileRootOverride: profileRoot.path
+    )
+
+    let resolved = WorkerRuntime.resolvedSpeechBackend(
+        dependencies: dependencies,
+        environment: [
+            "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path,
+            SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.marvis.rawValue,
+        ],
+        configuration: nil,
+        explicitSpeechBackend: nil
+    )
+
+    #expect(resolved == .marvis)
 }
 
 @Test func residentModelPreloadFailureFailsQueuedRequests() async throws {

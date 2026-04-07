@@ -15,6 +15,25 @@ import TextForSpeech
     _ = normalizer
 }
 
+@Test func publicLibrarySurfaceConstructsConfiguration() {
+    let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+    #expect(configuration.speechBackend == .marvis)
+}
+
+@Test func publicConfigurationRoundTripsToDisk() throws {
+    let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let persistenceURL = rootURL.appendingPathComponent("configuration.json")
+    let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+
+    try configuration.save(to: persistenceURL)
+    let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
+
+    #expect(loaded == configuration)
+}
+
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
@@ -62,6 +81,9 @@ import TextForSpeech
     }
     let liveWithNormalizer: @Sendable (SpeakSwiftly.Normalizer) async -> SpeakSwiftly.Runtime = { normalizer in
         await SpeakSwiftly.live(normalizer: normalizer)
+    }
+    let liveWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
+        await SpeakSwiftly.live(configuration: configuration)
     }
     let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, name in
         await normalizer.profile(named: name)
@@ -203,6 +225,7 @@ import TextForSpeech
     _ = normalizer
     _ = makeNormalizer
     _ = liveWithNormalizer
+    _ = liveWithConfiguration
     _ = createProfile
     _ = createClone
     _ = profiles

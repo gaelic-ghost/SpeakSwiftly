@@ -22,7 +22,7 @@ The package also ships two reusable library products:
 - `SpeakSwiftlyCore` exposes the speech worker runtime as the namespaced `SpeakSwiftly` Swift API.
 - `TextForSpeech` exposes the reusable text-normalization core as the namespaced `TextForSpeech` Swift API.
 
-Library consumers can still submit raw JSONL lines through the process boundary, but they can also use the typed Swift surface directly: start a `SpeakSwiftly.Runtime`, observe `SpeakSwiftly.StatusEvent` updates from `statusEvents()`, and consume per-request output through `SpeakSwiftly.RequestHandle.events`. Once the runtime has started, new `statusEvents()` subscribers receive an immediate snapshot of the current worker state before later transitions continue through the stream.
+Library consumers can still submit raw JSONL lines through the process boundary, but they can also use the typed Swift surface directly: start a `SpeakSwiftly.Runtime`, observe `SpeakSwiftly.StatusEvent` updates from `statusEvents()`, consume per-request output through `SpeakSwiftly.RequestHandle.events`, and persist runtime preferences such as the resident speech backend through `SpeakSwiftly.Configuration`. Once the runtime has started, new `statusEvents()` subscribers receive an immediate snapshot of the current worker state before later transitions continue through the stream.
 
 For example:
 
@@ -76,6 +76,17 @@ let sourceHandle = await runtime.speak(
 
 Text shaping is its own typed surface too. `SpeakSwiftly.Normalizer` is a first-class object that owns text-profile state and persistence, and `SpeakSwiftly.Runtime` can consume an injected normalizer for speech work. `runtime.normalizer` still exists as a compatibility alias to the injected normalizer, but it is no longer the primary API to build around.
 
+Runtime preferences have a matching typed surface:
+
+```swift
+import SpeakSwiftlyCore
+
+let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+try configuration.saveDefault()
+
+let runtime = await SpeakSwiftly.live(configuration: configuration)
+```
+
 ### Motivation
 
 The point of this package is to keep the MLX and Apple-runtime concerns in one small Swift worker without forcing a larger app or service to reimplement `mlx-audio-swift` behavior. The worker should stay intentionally thin. Extra wrappers, managers, bridges, coordinators, or protocol layers would be very easy to over-add here and would risk overcomplicating a tool that is meant to be a boring process boundary.
@@ -88,6 +99,7 @@ The first intended runtime shape is:
 - An on-demand `Qwen3 VoiceDesign 1.7B` path that creates stored voice profiles from generated audio plus the source text used to create them.
 - A second on-demand clone path that imports caller-provided reference audio, infers a transcript when needed through `MLXAudioSTT`, and stores the result as a reusable named voice profile.
 - Immutable named voice profiles stored by this package and selected by name for `0.6B` playback requests.
+- A persisted runtime configuration file that can remember the preferred resident speech backend across launches.
 - A single-consumer priority queue for incoming requests, with waiting live playback work preferred over waiting non-playback work.
 - Requests accepted during resident-model preload, with structured status events that explain the model is still loading and when queued work begins processing.
 - Structured progress and lifecycle events written to `stdout`, with structured JSONL operator diagnostics on `stderr`.
@@ -128,6 +140,25 @@ Each published runtime includes:
 - the bundled `mlx-swift_Cmlx.bundle/.../default.metallib`
 - a metadata manifest at [`.local/xcode/SpeakSwiftly.debug.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.debug.json) or [`.local/xcode/SpeakSwiftly.release.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.release.json)
 
+### Runtime Configuration
+
+`SpeakSwiftly.Configuration` is the public typed runtime-preference surface. Right now it stores the resident `speechBackend`, and it is designed to widen as more user-facing runtime settings are added.
+
+The default persisted configuration path is:
+
+- macOS default: `~/Library/Application Support/SpeakSwiftly/configuration.json`
+- with `SPEAKSWIFTLY_PROFILE_ROOT=/custom/profiles`: `/custom/configuration.json`
+
+Backend resolution follows one rule everywhere:
+
+1. explicit `speechBackend:` passed to `SpeakSwiftly.live(...)`
+2. explicit `configuration:` passed to `SpeakSwiftly.live(...)`
+3. `SPEAKSWIFTLY_SPEECH_BACKEND`
+4. persisted `configuration.json`
+5. fallback `.qwen3`
+
+That means environment overrides are still useful for one-off runs, while persisted configuration is the stable “remember my preference” path.
+
 ## Usage
 
 Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, publish the runtime first, then run the product from the published runtime directory with `DYLD_FRAMEWORK_PATH` pointing at that same directory.
@@ -140,6 +171,8 @@ DYLD_FRAMEWORK_PATH="$PWD/.local/xcode/Debug" \
 ```
 
 At startup the worker begins preloading the resident `0.6B` model and emits JSONL status events on `stdout`.
+
+If you want to force a one-off backend without changing the persisted configuration, set `SPEAKSWIFTLY_SPEECH_BACKEND` to `qwen3` or `marvis` before launching the worker.
 
 ## Command Reference
 
