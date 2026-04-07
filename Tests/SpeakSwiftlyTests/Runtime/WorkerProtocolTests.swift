@@ -21,6 +21,24 @@ import TextForSpeech
     )
 }
 
+@Test func decodesSpeakFileRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-file","op":"queue_speech_file","text":"Hello","profile_name":"default-femme"}"#
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-file",
+            text: "Hello",
+            profileName: "default-femme",
+            textProfileName: nil,
+            jobType: .file,
+            textContext: nil,
+            sourceFormat: nil
+        )
+    )
+}
+
 @Test func decodesSpeakLiveRequestWithTextContextAndProfile() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#
@@ -134,6 +152,16 @@ import TextForSpeech
 @Test func decodesListProfilesRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-3","op":"list_profiles"}"#)
     #expect(request == .listProfiles(id: "req-3"))
+}
+
+@Test func decodesGeneratedFileRequests() throws {
+    let file = try WorkerRequest.decode(
+        from: #"{"id":"req-generated-file","op":"generated_file","artifact_id":"req-file"}"#
+    )
+    #expect(file == .generatedFile(id: "req-generated-file", artifactID: "req-file"))
+
+    let list = try WorkerRequest.decode(from: #"{"id":"req-generated-files","op":"generated_files"}"#)
+    #expect(list == .generatedFiles(id: "req-generated-files"))
 }
 
 @Test func decodesRemoveProfileRequest() throws {

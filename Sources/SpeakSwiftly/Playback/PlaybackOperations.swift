@@ -17,7 +17,7 @@ extension SpeakSwiftly.Runtime {
         )
 
         for job in queuedJobs {
-            if job.request.isSpeechRequest {
+            if job.request.requiresPlayback {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
             failRequestStream(for: job.request.id, error: cancellation)

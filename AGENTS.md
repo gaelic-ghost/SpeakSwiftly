@@ -137,12 +137,13 @@
 - Keep `xcodebuild` invocations explicit and reproducible (always pass scheme, destination or SDK, and configuration when relevant).
 - Prefer deterministic non-interactive CLI usage in automation/CI for both `swift package` and `xcodebuild`.
 - For this repository specifically, use an Xcode-built worker product for real MLX-backed command-line runs and real-model e2e coverage. Upstream `mlx-swift` does not make the Metal shader bundle available to the plain SwiftPM command-line build.
-- When launching the real worker from the shell, point `DYLD_FRAMEWORK_PATH` at the matching Xcode build products directory so `mlx-swift_Cmlx.bundle` and `default.metallib` are visible at runtime.
+- When launching the real worker from the shell, prefer the published local runtime directories under `.local/xcode/Debug` or `.local/xcode/Release`, and point `DYLD_FRAMEWORK_PATH` at the matching published runtime directory so `mlx-swift_Cmlx.bundle` and `default.metallib` are visible at runtime.
 - If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, treat that as a build-and-launch-path problem first, not as evidence that the worker runtime itself is broken.
 - For direct forensic worker captures, prefer the proven held-open stdin pattern instead of sending one JSONL file and allowing stdin to close immediately. A working shape is:
   - create or reuse a profile directory under `/tmp/.../profiles`
   - prepare an `input.jsonl` request file
-  - run `(cat input.jsonl; sleep 180) | env DYLD_FRAMEWORK_PATH=... SPEAKSWIFTLY_PLAYBACK_TRACE=1 <xcode-worker> --profiles-dir /tmp/.../profiles > /tmp/.../stdout.jsonl 2> /tmp/.../stderr.jsonl`
+  - run `sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug`
+  - then run `(cat input.jsonl; sleep 180) | env DYLD_FRAMEWORK_PATH="$PWD/.local/xcode/Debug" SPEAKSWIFTLY_PLAYBACK_TRACE=1 "$PWD/.local/xcode/Debug/SpeakSwiftly" --profiles-dir /tmp/.../profiles > /tmp/.../stdout.jsonl 2> /tmp/.../stderr.jsonl`
   - inspect `stdout.jsonl` for worker lifecycle and request completion
   - inspect `stderr.jsonl` for `playback_rebuffer_started`, `playback_rebuffer_resumed`, `playback_starved`, `playback_schedule_gap_warning`, and final `playback_finished` details
 - Important current behavior: if stdin closes before queued work is drained, the worker can cancel queued requests, including requests still waiting behind resident-model warmup. Do not treat that as normal playback failure; it is a current worker shutdown/queue-handling quirk that should be fixed soon.

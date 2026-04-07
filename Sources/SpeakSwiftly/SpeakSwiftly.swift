@@ -6,6 +6,7 @@ import TextForSpeech
 public enum SpeakSwiftly {
     public enum Job: Sendable, Equatable {
         case live
+        case file
     }
 
     public enum Queue: Sendable, Equatable {

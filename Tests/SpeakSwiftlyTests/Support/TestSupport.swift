@@ -444,6 +444,15 @@ func makeProfileStore(rootURL: URL) throws -> ProfileStore {
     return store
 }
 
+func makeGeneratedFileStore(rootURL: URL) throws -> GeneratedFileStore {
+    let store = GeneratedFileStore(
+        rootURL: rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
+        fileManager: .default
+    )
+    try store.ensureRootExists()
+    return store
+}
+
 func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
@@ -460,6 +469,7 @@ func makeRuntime(
     }
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
+    let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     let normalizer = SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
     )
@@ -493,6 +503,7 @@ func makeRuntime(
     let runtime = WorkerRuntime(
         dependencies: dependencies,
         profileStore: store,
+        generatedFileStore: generatedFileStore,
         normalizer: normalizer,
         playbackController: PlaybackController(driver: playbackController)
     )

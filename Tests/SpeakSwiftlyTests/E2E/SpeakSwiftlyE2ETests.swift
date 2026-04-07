@@ -316,6 +316,86 @@ struct SpeakSwiftlyE2ETests {
         }
     }
 
+    @Test func generatedFileLaneRunsEndToEndAndSupportsManagedArtifactReads() async throws {
+        guard Self.isE2EEnabled else { return }
+
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: true
+        )
+        defer { Task { await worker.stop() } }
+
+        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
+        try await Self.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-generated-file-profile",
+            profileName: Self.testingProfileName,
+            text: Self.testingProfileText,
+            voiceDescription: Self.testingProfileVoiceDescription
+        )
+
+        let generatedFile = try await Self.runGeneratedFileSpeech(
+            on: worker,
+            id: "req-generated-file-e2e",
+            text: Self.testingPlaybackText,
+            profileName: Self.testingProfileName
+        )
+        #expect(generatedFile["artifact_id"] as? String == "req-generated-file-e2e")
+        #expect(generatedFile["profile_name"] as? String == Self.testingProfileName)
+
+        let generatedFilePath = try #require(generatedFile["file_path"] as? String)
+        #expect(FileManager.default.fileExists(atPath: generatedFilePath))
+
+        try worker.sendJSON(
+            """
+            {"id":"req-generated-file-read","op":"generated_file","artifact_id":"req-generated-file-e2e"}
+            """
+        )
+
+        let fetchedGeneratedFile = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["id"] as? String == "req-generated-file-read",
+                    $0["ok"] as? Bool == true,
+                    let generatedFile = $0["generated_file"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return generatedFile["artifact_id"] as? String == "req-generated-file-e2e"
+            }
+        )
+        let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
+        #expect(fetchedGeneratedFilePayload["file_path"] as? String == generatedFilePath)
+
+        try worker.sendJSON(
+            """
+            {"id":"req-generated-files-read","op":"generated_files"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            guard
+                $0["id"] as? String == "req-generated-files-read",
+                $0["ok"] as? Bool == true,
+                let generatedFiles = $0["generated_files"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return generatedFiles.contains {
+                $0["artifact_id"] as? String == "req-generated-file-e2e"
+                    && $0["file_path"] as? String == generatedFilePath
+            }
+        } != nil)
+
+        try worker.closeInput()
+        try await worker.waitForExit(timeout: .seconds(30))
+    }
+
     // MARK: Audible Playback and Tracing
 
     @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
@@ -993,6 +1073,56 @@ struct SpeakSwiftlyE2ETests {
         } != nil)
     }
 
+    private static func runGeneratedFileSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String
+    ) async throws -> [String: Any] {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"queue_speech_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+                && $0["generated_file"] == nil
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_file"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "generating_file_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "writing_generated_file"
+        } != nil)
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+                guard
+                    $0["id"] as? String == id,
+                    $0["ok"] as? Bool == true,
+                    let generatedFile = $0["generated_file"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return generatedFile["artifact_id"] as? String == id
+            }
+        )
+
+        return try #require(success["generated_file"] as? [String: Any])
+    }
+
     private static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
         let expectedTokens = normalizedTranscriptTokens(from: Self.testingCloneSourceText)
         let actualTokens = normalizedTranscriptTokens(from: transcript)
@@ -1317,19 +1447,10 @@ private final class WorkerProcess: @unchecked Sendable {
 
     private static func computeWorkerExecutableURL() throws -> URL {
         let packageRootURL = try packageRootURL()
-        let derivedDataURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-dd", isDirectory: true)
-        let sourcePackagesURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e-spm", isDirectory: true)
+        try publishWorkerRuntime(packageRootURL: packageRootURL, configuration: "Debug")
 
-        try buildWorkerProduct(
-            packageRootURL: packageRootURL,
-            derivedDataURL: derivedDataURL,
-            sourcePackagesURL: sourcePackagesURL
-        )
-
-        let productsURL = derivedDataURL
-            .appendingPathComponent("Build/Products/Debug", isDirectory: true)
+        let productsURL = packageRootURL
+            .appendingPathComponent(".local/xcode/Debug", isDirectory: true)
         let executableURL = productsURL.appendingPathComponent("SpeakSwiftly", isDirectory: false)
         let metallibURL = productsURL
             .appendingPathComponent("mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib", isDirectory: false)
@@ -1372,24 +1493,24 @@ private final class WorkerProcess: @unchecked Sendable {
 
     private static func buildWorkerProduct(
         packageRootURL: URL,
-        derivedDataURL: URL,
-        sourcePackagesURL: URL
+        configuration: String
     ) throws {
         let process = Process()
-        let logURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("SpeakSwiftly-xcodebuild-e2e.log", isDirectory: false)
+        let logURL = packageRootURL
+            .appendingPathComponent(".local/xcode/SpeakSwiftly-e2e-publish-\(configuration.lowercased()).log", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: packageRootURL.appendingPathComponent(".local/xcode", isDirectory: true),
+            withIntermediateDirectories: true
+        )
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let logHandle = try FileHandle(forWritingTo: logURL)
         defer { try? logHandle.close() }
 
         process.currentDirectoryURL = packageRootURL
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [
-            "build",
-            "-scheme", "SpeakSwiftly",
-            "-destination", "platform=macOS",
-            "-derivedDataPath", derivedDataURL.path,
-            "-clonedSourcePackagesDirPath", sourcePackagesURL.path,
+            "scripts/repo-maintenance/publish-runtime.sh",
+            "--configuration", configuration,
         ]
         process.standardOutput = logHandle
         process.standardError = logHandle
@@ -1401,9 +1522,19 @@ private final class WorkerProcess: @unchecked Sendable {
             let outputData = try Data(contentsOf: logURL)
             let output = String(decoding: outputData, as: UTF8.self)
             throw WorkerProcessError(
-                "The Xcode-backed SpeakSwiftly build failed with status \(process.terminationStatus). `xcodebuild` output:\n\(output)"
+                "The SpeakSwiftly runtime publisher failed with status \(process.terminationStatus). Publisher output:\n\(output)"
             )
         }
+    }
+
+    private static func publishWorkerRuntime(
+        packageRootURL: URL,
+        configuration: String
+    ) throws {
+        try buildWorkerProduct(
+            packageRootURL: packageRootURL,
+            configuration: configuration
+        )
     }
 }
 

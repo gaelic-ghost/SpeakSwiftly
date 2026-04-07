@@ -178,9 +178,13 @@ struct ProfileStore {
 
         let manifests = try urls
             .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
-            .map { directoryURL in
+            .compactMap { directoryURL -> ProfileManifest? in
+                let manifestPath = manifestURL(for: directoryURL)
+                guard fileManager.fileExists(atPath: manifestPath.path) else {
+                    return nil
+                }
+
                 do {
-                    let manifestPath = manifestURL(for: directoryURL)
                     let manifestData = try Data(contentsOf: manifestPath)
                     return try decoder.decode(ProfileManifest.self, from: manifestData)
                 } catch {
