@@ -34,6 +34,7 @@
 - [ ] Milestone 16: `mlx-audio-swift` upgrade review
 - [ ] Milestone 17: Notification-linked priority playback
 - [ ] Milestone 18: Package docs and distribution polish
+- [ ] Milestone 19: Persisted async generation jobs and batch artifacts
 
 ## Milestone 0: Bootstrap
 
@@ -496,6 +497,31 @@ Exit criteria:
 - [ ] The project has one explicit design for notification-linked priority playback and job triggering, with queue semantics that are documented and testable.
 - [ ] The design makes clear whether the existing request queue was extended or a distinct playback queue was justified after review.
 - [ ] The implementation path avoids unnecessary new layers and keeps playback, generation, and notification ownership easy to reason about.
+
+## Milestone 19: Persisted async generation jobs and batch artifacts
+
+Scope:
+
+- [ ] Evolve managed generated-file output into a durable async job surface that can support later batch-oriented generation work cleanly.
+- [ ] Let callers reconnect to generation state, inspect saved artifacts, and fetch completed output without relying on one live request stream staying attached forever.
+- [ ] Keep the first expansion grounded in the current worker and typed-library model, and avoid introducing a broader service subsystem until the batch and multi-client use cases truly require it.
+
+Tickets:
+
+- [ ] Define a persisted generation-job record shape that can represent queued, running, completed, failed, and expired generated-file requests.
+- [ ] Decide which parts of job state belong in the immediate worker contract versus a later service or MCP resource surface.
+- [ ] Add first-class stored artifact metadata for generated files so callers can list, inspect, fetch, and eventually garbage-collect output intentionally.
+- [ ] Define the retention, cleanup, and expiry rules for generated files and their job metadata without making single-file generation harder to reason about.
+- [ ] Decide whether request id remains the durable artifact id, the durable job id, or both when batch generation introduces one-to-many outputs.
+- [ ] Design the batch-generation shape explicitly, including a future `generated_batch(id:)` and `generated_batches()` surface that can sit on top of the same persisted-job model.
+- [ ] Add reconnectable inspection semantics for completed and in-flight generation jobs so callers do not have to keep one typed stream or stdio session attached for long-running work.
+- [ ] Document the point at which this milestone should become a true service or subscription surface rather than an extension of the current worker contract.
+
+Exit criteria:
+
+- [ ] The repository has one documented direction for persisted async generation jobs that clearly composes from single-file generation into future batch generation.
+- [ ] Generated-file metadata, retention rules, and later batch identifiers are explicit enough that future implementation work does not need a second naming or ownership reset.
+- [ ] The roadmap distinguishes the near-term managed `.file` generation path from the later heavier async-job-service expansion.
 
 ## Current Review Findings To Address
 
