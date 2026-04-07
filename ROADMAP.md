@@ -34,7 +34,7 @@
 - [ ] Milestone 16: `mlx-audio-swift` upgrade review
 - [ ] Milestone 17: Notification-linked priority playback
 - [ ] Milestone 18: Package docs and distribution polish
-- [ ] Milestone 19: Persisted async generation jobs and batch artifacts
+- [x] Milestone 19: Persisted async generation jobs and batch artifacts
 
 ## Milestone 0: Bootstrap
 
@@ -164,7 +164,7 @@ Tickets:
 
 - [x] Replace lingering FIFO wording with playback-priority wording in the docs.
 - [x] Ensure queued events are emitted only for requests that actually wait.
-- [x] Make `list_profiles` corrupt-manifest failures surface as `filesystem_error`.
+- [x] Make `list_profiles` skip one-off corrupt entries so one bad manifest does not poison the full listing.
 - [x] Add runtime tests for immediate-start requests, queued-event semantics, and filesystem failure mapping.
 - [x] Add an opt-in serialized Swift Testing e2e suite gated by `SPEAKSWIFTLY_E2E=1`.
 - [x] Add real `create_profile` and `speak_live` subprocess e2e coverage using isolated profile storage.
@@ -177,7 +177,7 @@ Exit criteria:
 
 - [x] The docs describe the real playback-priority queue instead of FIFO behavior.
 - [x] Immediate-start requests do not emit misleading queued events.
-- [x] Corrupt stored-profile manifests returned through `list_profiles` surface as `filesystem_error`.
+- [x] `list_profiles` returns healthy profiles even when one stored-profile entry is damaged or incomplete.
 - [x] Opt-in serialized real-model e2e coverage exists for both the `1.7B` profile-creation path and the resident `0.6B` live path.
 - [x] The fast test suite also covers the remaining profile-conditioning edge assertions.
 
@@ -502,29 +502,29 @@ Exit criteria:
 
 Scope:
 
-- [ ] Source of truth design note: `docs/maintainers/persisted-generation-jobs-and-batch-plan-2026-04-07.md`
-- [ ] Evolve managed generated-file output into a durable async job surface that can support later batch-oriented generation work cleanly.
-- [ ] Let callers reconnect to generation state, inspect saved artifacts, and fetch completed output without relying on one live request stream staying attached forever.
-- [ ] Keep the first expansion grounded in the current worker and typed-library model, and avoid introducing a broader service subsystem until the batch and multi-client use cases truly require it.
+- [x] Source of truth design note: `docs/maintainers/persisted-generation-jobs-and-batch-plan-2026-04-07.md`
+- [x] Evolve managed generated-file output into a durable async job surface that can support later batch-oriented generation work cleanly.
+- [x] Let callers reconnect to generation state, inspect saved artifacts, and fetch completed output without relying on one live request stream staying attached forever.
+- [x] Keep the first expansion grounded in the current worker and typed-library model, and avoid introducing a broader service subsystem until the batch and multi-client use cases truly require it.
 
 Tickets:
 
-- [ ] Define a persisted generation-job record shape that can represent queued, running, completed, failed, and expired generated-file requests.
-- [ ] Make job kind explicit in the contract from the start: file jobs for one-file generation and batch jobs for many-file generation.
-- [ ] Split durable identifiers intentionally into `jobID` for generation work and `artifactID` for saved outputs so later batch generation does not force a naming reset.
-- [ ] Decide which parts of job state belong in the immediate worker contract versus a later service or MCP resource surface.
-- [ ] Add first-class stored artifact metadata for generated files so callers can list, inspect, fetch, and eventually garbage-collect output intentionally.
-- [ ] Define the retention, cleanup, and expiry rules for generated files and their job metadata without making single-file generation harder to reason about.
-- [ ] Reconcile current request-id behavior with the new durable identifier split so `queue_speech_file` no longer implies that one request id is the saved artifact id.
-- [ ] Design the batch-generation shape explicitly, including a future `generated_batch(id:)` and `generated_batches()` surface where a batch is the many-files unit and is backed by a batch job in the persisted-job model.
-- [ ] Add reconnectable inspection semantics for completed and in-flight generation jobs so callers do not have to keep one typed stream or stdio session attached for long-running work.
-- [ ] Document the point at which this milestone should become a true service or subscription surface rather than an extension of the current worker contract.
+- [x] Define a persisted generation-job record shape that can represent queued, running, completed, failed, and expired generated-file requests.
+- [x] Make job kind explicit in the contract from the start: file jobs for one-file generation and batch jobs for many-file generation.
+- [x] Split durable identifiers intentionally into `jobID` for generation work and `artifactID` for saved outputs so later batch generation does not force a naming reset.
+- [x] Decide which parts of job state belong in the immediate worker contract versus a later service or MCP resource surface.
+- [x] Add first-class stored artifact metadata for generated files so callers can list, inspect, fetch, and eventually garbage-collect output intentionally.
+- [x] Define the retention, cleanup, and expiry rules for generated files and their job metadata without making single-file generation harder to reason about.
+- [x] Reconcile current request-id behavior with the new durable identifier split so `queue_speech_file` no longer implies that one request id is the saved artifact id.
+- [x] Design the batch-generation shape explicitly, including a future `generated_batch(id:)` and `generated_batches()` surface where a batch is the many-files unit and is backed by a batch job in the persisted-job model.
+- [x] Add reconnectable inspection semantics for completed and in-flight generation jobs so callers do not have to keep one typed stream or stdio session attached for long-running work.
+- [x] Document the point at which this milestone should become a true service or subscription surface rather than an extension of the current worker contract.
 
 Exit criteria:
 
-- [ ] The repository has one documented direction for persisted async generation jobs that clearly composes from single-file generation into future batch generation.
-- [ ] Generated-file metadata, retention rules, and later batch identifiers are explicit enough that future implementation work does not need a second naming or ownership reset.
-- [ ] The roadmap distinguishes the near-term managed `.file` generation path from the later heavier async-job-service expansion.
+- [x] The repository has one documented direction for persisted async generation jobs that clearly composes from single-file generation into future batch generation.
+- [x] Generated-file metadata, retention rules, and later batch identifiers are explicit enough that future implementation work does not need a second naming or ownership reset.
+- [x] The roadmap distinguishes the near-term managed `.file` generation path from the later heavier async-job-service expansion.
 
 ## Current Review Findings To Address
 
@@ -532,7 +532,7 @@ These findings came out of the latest live-service review pass and are duplicate
 
 - [ ] Tighten shutdown so terminal cancellation is not emitted until in-flight work has actually unwound, especially around post-generation filesystem work during `create_profile`.
 - [ ] Add or document stronger cancellation checkpoints around temp WAV writing, profile persistence, and export so shutdown behavior is not only bounded but also truly quiescent.
-- [ ] Make `list_profiles` resilient to stray files, partial directories, and one-off corrupt entries instead of poisoning the full operation on the first bad manifest.
+- [x] Make `list_profiles` resilient to stray files, partial directories, and one-off corrupt entries instead of poisoning the full operation on the first bad manifest.
 - [ ] Revisit relative `output_path` resolution so exports do not silently depend on the worker process launch directory.
 - [ ] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
 - [ ] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.

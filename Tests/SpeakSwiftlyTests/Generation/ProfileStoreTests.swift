@@ -134,7 +134,7 @@ import Testing
     #expect(listed.map(\.profileName) == ["alpha", "zeta"])
 }
 
-@Test func listProfilesFailsWhenManifestIsCorrupt() throws {
+@Test func listProfilesSkipsCorruptManifestInsteadOfFailingWholeListing() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -142,13 +142,50 @@ import Testing
     let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
     try store.ensureRootExists()
 
+    _ = try store.createProfile(
+        profileName: "healthy",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Healthy voice.",
+        sourceText: "Healthy transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01])
+    )
+
     let profileDirectory = store.profileDirectoryURL(for: "broken")
     try fileManager.createDirectory(at: profileDirectory, withIntermediateDirectories: false)
     try Data("not-json".utf8).write(to: store.manifestURL(for: profileDirectory))
 
-    #expect(throws: WorkerError.self) {
-        _ = try store.listProfiles()
-    }
+    let listed = try store.listProfiles()
+    #expect(listed.map(\.profileName) == ["healthy"])
+}
+
+@Test func listProfilesSkipsStrayFilesAndPartialDirectories() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    try store.ensureRootExists()
+
+    _ = try store.createProfile(
+        profileName: "healthy",
+        vibe: .androgenous,
+        modelRepo: "test-model",
+        voiceDescription: "Healthy voice.",
+        sourceText: "Healthy transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01])
+    )
+
+    try Data("junk".utf8).write(to: tempRoot.appendingPathComponent("README.txt"))
+    try fileManager.createDirectory(
+        at: tempRoot.appendingPathComponent("partial-profile", isDirectory: true),
+        withIntermediateDirectories: false
+    )
+
+    let listed = try store.listProfiles()
+    #expect(listed.map(\.profileName) == ["healthy"])
 }
 
 @Test func upgradesLegacyManifestIntoBackendMaterializations() throws {

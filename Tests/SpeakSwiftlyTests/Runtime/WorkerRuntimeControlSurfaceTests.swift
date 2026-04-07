@@ -1019,12 +1019,21 @@ import TextForSpeech
     #expect(sawCompletion)
 }
 
-@Test func corruptListProfilesManifestBecomesFilesystemFailureResponse() async throws {
+@Test func listProfilesSkipsCorruptEntriesAndStillReturnsHealthyProfiles() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
     let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "healthy",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Healthy transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01])
+    )
+
     let brokenDirectory = store.profileDirectoryURL(for: "broken")
     try FileManager.default.createDirectory(at: brokenDirectory, withIntermediateDirectories: false)
     try Data("not-json".utf8).write(to: store.manifestURL(for: brokenDirectory))
@@ -1048,9 +1057,16 @@ import TextForSpeech
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-1"
-                && $0["ok"] as? Bool == false
-                && $0["code"] as? String == "filesystem_error"
+            guard
+                $0["id"] as? String == "req-1",
+                $0["ok"] as? Bool == true,
+                let profiles = $0["profiles"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            return profiles.count == 1
+                && profiles[0]["profile_name"] as? String == "healthy"
         }
     })
 }
@@ -1196,4 +1212,3 @@ import TextForSpeech
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_profile", "req-2:queue_speech_live", "req-3:list_profiles"])
 }
-

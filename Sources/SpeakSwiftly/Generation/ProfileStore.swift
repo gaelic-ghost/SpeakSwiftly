@@ -310,12 +310,16 @@ struct ProfileStore {
         let manifests = try urls
             .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
             .compactMap { directoryURL -> ProfileManifest? in
+                guard try isDirectory(directoryURL) else {
+                    return nil
+                }
+
                 let manifestPath = manifestURL(for: directoryURL)
                 guard fileManager.fileExists(atPath: manifestPath.path) else {
                     return nil
                 }
 
-                return try loadManifest(from: directoryURL)
+                return try? loadManifest(from: directoryURL)
             }
 
         return manifests.map {
@@ -558,6 +562,11 @@ struct ProfileStore {
     private func writeManifest(_ manifest: ProfileManifest, to directoryURL: URL) throws {
         let manifestData = try encoder.encode(manifest)
         try manifestData.write(to: manifestURL(for: directoryURL), options: .atomic)
+    }
+
+    private func isDirectory(_ url: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [.isDirectoryKey])
+        return values.isDirectory == true
     }
 
     private static func makeEncoder() -> JSONEncoder {

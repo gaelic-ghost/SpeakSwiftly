@@ -360,7 +360,7 @@ Current generated-file behavior is:
 - `expire_generation_job` performs manual retention cleanup for one completed or failed generation job, removes any persisted artifact files it still owns, and leaves the job record behind in the `expired` state with `expires_at` stamped.
 - Expired batch reads stay inspectable through `generated_batch` and `generated_batches`, but they return an empty `artifacts` list because the saved files are intentionally gone.
 - Expired file and batch jobs keep their artifact references inside `generation_job` and `generation_jobs` so operators can still see what existed before cleanup ran.
-- `list_profiles` ignores generated-file directories, so artifact storage does not pollute the voice-profile surface.
+- `list_profiles` ignores stray files, partial directories, generated-artifact directories, and one-off corrupt profile entries so one bad entry does not poison the whole voice-profile surface.
 
 Current `stderr` observability is JSONL with fields such as:
 
