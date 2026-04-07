@@ -3,19 +3,915 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 @Suite(.serialized)
-struct SpeakSwiftlyE2ETests {
-    // MARK: Test Fixtures
+enum SpeakSwiftlyE2ETests {}
 
-    private static let testingProfileName = "testing-profile"
-    private static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
-    private static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
-    private static let testingCloneSourceText = """
+extension SpeakSwiftlyE2ETests {
+    @Suite("Qwen Workflow E2E")
+    struct QwenWorkflowSuite {
+        @Test func voiceDesignLaneRunsSequentialSilentAndAudibleCoverage() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let profileName = "voice-design-profile"
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: true
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                    on: worker,
+                    id: "req-create-voice-design",
+                    profileName: profileName,
+                    text: SpeakSwiftlyE2ETests.testingProfileText,
+                    vibe: .masc,
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                )
+                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                    on: worker,
+                    id: "req-live-voice-design-silent",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: profileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: false,
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.runAudibleSpeech(
+                    on: worker,
+                    id: "req-live-voice-design-audible",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: profileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+        }
+
+        @Test func cloneLaneWithProvidedTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let fixtureProfileName = "clone-source-profile"
+            let cloneProfileName = "provided-transcript-clone-profile"
+            let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/provided-clone-reference.wav")
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: true
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                    on: worker,
+                    id: "req-create-clone-fixture",
+                    profileName: fixtureProfileName,
+                    text: SpeakSwiftlyE2ETests.testingCloneSourceText,
+                    vibe: .masc,
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                    outputURL: referenceAudioURL
+                )
+                #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
+
+                try await SpeakSwiftlyE2ETests.createCloneProfile(
+                    on: worker,
+                    id: "req-create-clone-provided-transcript",
+                    profileName: cloneProfileName,
+                    referenceAudioURL: referenceAudioURL,
+                    vibe: .masc,
+                    transcript: SpeakSwiftlyE2ETests.testingCloneSourceText,
+                    expectTranscription: false
+                )
+
+                let store = ProfileStore(rootURL: sandbox.profileRootURL)
+                let storedProfile = try store.loadProfile(named: cloneProfileName)
+                #expect(storedProfile.manifest.sourceText == SpeakSwiftlyE2ETests.testingCloneSourceText)
+                #expect(storedProfile.manifest.vibe == .masc)
+
+                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                    on: worker,
+                    id: "req-live-clone-provided-transcript-silent",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: cloneProfileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: false,
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.runAudibleSpeech(
+                    on: worker,
+                    id: "req-live-clone-provided-transcript-audible",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: cloneProfileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+        }
+
+        @Test func cloneLaneWithInferredTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let fixtureProfileName = "inferred-clone-source-profile"
+            let cloneProfileName = "inferred-transcript-clone-profile"
+            let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/inferred-clone-reference.wav")
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: true
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                    on: worker,
+                    id: "req-create-inferred-clone-fixture",
+                    profileName: fixtureProfileName,
+                    text: SpeakSwiftlyE2ETests.testingCloneSourceText,
+                    vibe: .masc,
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                    outputURL: referenceAudioURL
+                )
+                #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
+
+                try await SpeakSwiftlyE2ETests.createCloneProfile(
+                    on: worker,
+                    id: "req-create-clone-inferred-transcript",
+                    profileName: cloneProfileName,
+                    referenceAudioURL: referenceAudioURL,
+                    vibe: .masc,
+                    transcript: nil,
+                    expectTranscription: true
+                )
+
+                let store = ProfileStore(rootURL: sandbox.profileRootURL)
+                let storedProfile = try store.loadProfile(named: cloneProfileName)
+                let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+                #expect(storedProfile.manifest.vibe == .masc)
+                #expect(!inferredTranscript.isEmpty)
+                #expect(SpeakSwiftlyE2ETests.transcriptLooksCloseToCloneSource(inferredTranscript))
+
+                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                    on: worker,
+                    id: "req-live-clone-inferred-transcript-silent",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: cloneProfileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: false,
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.runAudibleSpeech(
+                    on: worker,
+                    id: "req-live-clone-inferred-transcript-audible",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: cloneProfileName
+                )
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+        }
+    }
+
+    @Suite("Generated File E2E")
+    struct GeneratedFileSuite {
+        @Test func generatedFileLaneRunsEndToEndAndSupportsManagedArtifactReads() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-generated-file-profile",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            let generatedFile = try await SpeakSwiftlyE2ETests.runGeneratedFileSpeech(
+                on: worker,
+                id: "req-generated-file-e2e",
+                text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                profileName: SpeakSwiftlyE2ETests.testingProfileName
+            )
+            #expect(generatedFile["artifact_id"] as? String == "req-generated-file-e2e")
+            #expect(generatedFile["profile_name"] as? String == SpeakSwiftlyE2ETests.testingProfileName)
+
+            let generatedFilePath = try #require(generatedFile["file_path"] as? String)
+            #expect(FileManager.default.fileExists(atPath: generatedFilePath))
+
+            try worker.sendJSON(
+                """
+                {"id":"req-generated-file-read","op":"generated_file","artifact_id":"req-generated-file-e2e"}
+                """
+            )
+
+            let fetchedGeneratedFile = try #require(
+                try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["id"] as? String == "req-generated-file-read",
+                        $0["ok"] as? Bool == true,
+                        let generatedFile = $0["generated_file"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return generatedFile["artifact_id"] as? String == "req-generated-file-e2e"
+                }
+            )
+            let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
+            #expect(fetchedGeneratedFilePayload["file_path"] as? String == generatedFilePath)
+
+            try worker.sendJSON(
+                """
+                {"id":"req-generated-files-read","op":"generated_files"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["id"] as? String == "req-generated-files-read",
+                    $0["ok"] as? Bool == true,
+                    let generatedFiles = $0["generated_files"] as? [[String: Any]]
+                else {
+                    return false
+                }
+
+                return generatedFiles.contains {
+                    $0["artifact_id"] as? String == "req-generated-file-e2e"
+                        && $0["file_path"] as? String == generatedFilePath
+                }
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+    }
+
+    @Suite("Playback Trace E2E")
+    struct PlaybackTraceSuite {
+        @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isPlaybackTraceEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: true
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-trace",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-trace","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.testingPlaybackText)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["event"] as? String == "playback_trace_chunk_received"
+                    && $0["request_id"] as? String == "req-live-trace"
+            } != nil)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["event"] as? String == "playback_trace_buffer_scheduled"
+                    && $0["request_id"] as? String == "req-live-trace"
+            } != nil)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["event"] as? String == "playback_trace_buffer_played_back"
+                    && $0["request_id"] as? String == "req-live-trace"
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-trace"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+    }
+
+    @Suite("Forensic Playback E2E")
+    struct ForensicPlaybackSuite {
+        @Test func forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-forensic",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-forensic","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.forensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-forensic"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "buffering_audio"
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-forensic"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+
+            let playbackFinished = try #require(
+                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["event"] as? String == "playback_finished",
+                        $0["request_id"] as? String == "req-live-forensic",
+                        let details = $0["details"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return details["chunk_count"] as? Int != nil
+                        && details["sample_count"] as? Int != nil
+                        && details["time_to_first_chunk_ms"] as? Int != nil
+                        && details["time_to_preroll_ready_ms"] as? Int != nil
+                        && details["schedule_callback_count"] as? Int != nil
+                        && details["played_back_callback_count"] as? Int != nil
+                }
+            )
+
+            let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+            #expect((playbackDetails["chunk_count"] as? Int ?? 0) > 1)
+            #expect((playbackDetails["sample_count"] as? Int ?? 0) > 0)
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-forensic"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-segmented",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-segmented"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+
+            let playbackFinished = try #require(
+                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["event"] as? String == "playback_finished",
+                        $0["request_id"] as? String == "req-live-segmented",
+                        let details = $0["details"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                        && (details["url_count"] as? Int ?? 0) >= 1
+                        && (details["file_path_count"] as? Int ?? 0) >= 1
+                        && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
+                        && (details["camel_case_token_count"] as? Int ?? 0) >= 1
+                        && (details["snake_case_token_count"] as? Int ?? 0) >= 1
+                        && (details["objc_symbol_count"] as? Int ?? 0) >= 1
+                        && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
+                }
+            )
+
+            let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+            #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+            #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+            #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_section_window",
+                    $0["request_id"] as? String == "req-live-segmented",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["section_title"] as? String == "Section Two"
+                    && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                    && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-segmented"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedWeirdTextRequest() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-reversed-segmented",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-reversed-segmented"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+
+            let playbackFinished = try #require(
+                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["event"] as? String == "playback_finished",
+                        $0["request_id"] as? String == "req-live-reversed-segmented",
+                        let details = $0["details"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                        && (details["url_count"] as? Int ?? 0) >= 1
+                        && (details["file_path_count"] as? Int ?? 0) >= 1
+                        && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
+                        && (details["camel_case_token_count"] as? Int ?? 0) >= 1
+                        && (details["snake_case_token_count"] as? Int ?? 0) >= 1
+                        && (details["objc_symbol_count"] as? Int ?? 0) >= 1
+                        && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
+                }
+            )
+
+            let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+            #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+            #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+            #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_section_window",
+                    $0["request_id"] as? String == "req-live-reversed-segmented",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["section_title"] as? String == "Footer"
+                    && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                    && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-reversed-segmented"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func forensicSpeakLiveRunsEndToEndWithSegmentedConversationalProseRequest() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-conversational",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-conversational","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-conversational"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+
+            let playbackFinished = try #require(
+                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["event"] as? String == "playback_finished",
+                        $0["request_id"] as? String == "req-live-conversational",
+                        let details = $0["details"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                        && (details["file_path_count"] as? Int ?? 0) == 0
+                        && (details["dotted_identifier_count"] as? Int ?? 0) == 0
+                        && (details["camel_case_token_count"] as? Int ?? 0) == 0
+                        && (details["snake_case_token_count"] as? Int ?? 0) == 0
+                        && (details["objc_symbol_count"] as? Int ?? 0) == 0
+                        && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
+                }
+            )
+
+            let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+            #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+            #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+            #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_section_window",
+                    $0["request_id"] as? String == "req-live-conversational",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["section_title"] as? String == "Section Two"
+                    && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                    && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-conversational"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: false,
+                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-reversed-conversational",
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+            )
+
+            try worker.sendJSON(
+                """
+                {"id":"req-live-reversed-conversational","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                """
+            )
+
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-reversed-conversational"
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+
+            let playbackFinished = try #require(
+                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                    guard
+                        $0["event"] as? String == "playback_finished",
+                        $0["request_id"] as? String == "req-live-reversed-conversational",
+                        let details = $0["details"] as? [String: Any]
+                    else {
+                        return false
+                    }
+
+                    return (details["markdown_header_count"] as? Int ?? 0) >= 5
+                        && (details["file_path_count"] as? Int ?? 0) == 0
+                        && (details["dotted_identifier_count"] as? Int ?? 0) == 0
+                        && (details["camel_case_token_count"] as? Int ?? 0) == 0
+                        && (details["snake_case_token_count"] as? Int ?? 0) == 0
+                        && (details["objc_symbol_count"] as? Int ?? 0) == 0
+                        && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
+                }
+            )
+
+            let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
+            #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
+            #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
+            #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_section_window",
+                    $0["request_id"] as? String == "req-live-reversed-conversational",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["section_title"] as? String == "Footer"
+                    && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
+                    && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == "req-live-reversed-conversational"
+                    && $0["ok"] as? Bool == true
+            } != nil)
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+    }
+
+    @Suite("Marvis Workflow E2E")
+    struct MarvisWorkflowSuite {
+        @Test func marvisVoiceDesignProfilesRouteFemmeToConversationalA() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let profileName = "marvis-femme-profile"
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true,
+                speechBackend: .marvis
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-marvis-femme",
+                profileName: profileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .femme,
+                voiceDescription: "A warm, bright, feminine narrator voice."
+            )
+
+            try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                on: worker,
+                id: "req-live-marvis-femme",
+                text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                profileName: profileName
+            )
+            try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
+                on: worker,
+                requestID: "req-live-marvis-femme",
+                expectedVoice: "conversational_a"
+            )
+
+            _ = try await SpeakSwiftlyE2ETests.runGeneratedFileSpeech(
+                on: worker,
+                id: "req-file-marvis-femme",
+                text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                profileName: profileName
+            )
+            try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
+                on: worker,
+                requestID: "req-file-marvis-femme",
+                expectedVoice: "conversational_a"
+            )
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func marvisCloneProfilesRouteMascToConversationalB() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let fixtureProfileName = "marvis-clone-source"
+            let cloneProfileName = "marvis-masc-clone-profile"
+            let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/marvis-clone-reference.wav")
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true,
+                speechBackend: .marvis
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-marvis-clone-fixture",
+                profileName: fixtureProfileName,
+                text: SpeakSwiftlyE2ETests.testingCloneSourceText,
+                vibe: .masc,
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                outputURL: referenceAudioURL
+            )
+
+            try await SpeakSwiftlyE2ETests.createCloneProfile(
+                on: worker,
+                id: "req-create-marvis-clone",
+                profileName: cloneProfileName,
+                referenceAudioURL: referenceAudioURL,
+                vibe: .masc,
+                transcript: SpeakSwiftlyE2ETests.testingCloneSourceText,
+                expectTranscription: false
+            )
+
+            let store = ProfileStore(rootURL: sandbox.profileRootURL)
+            let storedProfile = try store.loadProfile(named: cloneProfileName)
+            #expect(storedProfile.manifest.vibe == .masc)
+
+            try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                on: worker,
+                id: "req-live-marvis-masc",
+                text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                profileName: cloneProfileName
+            )
+            try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
+                on: worker,
+                requestID: "req-live-marvis-masc",
+                expectedVoice: "conversational_b"
+            )
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+
+        @Test func marvisVoiceDesignProfilesRouteAndrogenousToConversationalA() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let profileName = "marvis-androgenous-profile"
+
+            let worker = try WorkerProcess(
+                profileRootURL: sandbox.profileRootURL,
+                silentPlayback: true,
+                speechBackend: .marvis
+            )
+            defer { Task { await worker.stop() } }
+
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                on: worker,
+                id: "req-create-marvis-androgenous",
+                profileName: profileName,
+                text: SpeakSwiftlyE2ETests.testingProfileText,
+                vibe: .androgenous,
+                voiceDescription: "A calm, balanced, and gentle speaking voice."
+            )
+
+            try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                on: worker,
+                id: "req-live-marvis-androgenous",
+                text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                profileName: profileName
+            )
+            try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
+                on: worker,
+                requestID: "req-live-marvis-androgenous",
+                expectedVoice: "conversational_a"
+            )
+
+            try worker.closeInput()
+            try await worker.waitForExit(timeout: .seconds(30))
+        }
+    }
+}
+
+extension SpeakSwiftlyE2ETests {
+    static let testingProfileName = "testing-profile"
+    static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
+    static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
+    static let testingCloneSourceText = """
     This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.
     """
-    private static let testingPlaybackText = """
+    static let testingPlaybackText = """
     Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
     """
-    private static let forensicPlaybackText = """
+    static let forensicPlaybackText = """
     Forensic playback probe begins now. Please read this exactly once and do not repeat yourself.
     The path `/Users/galew/Workspace/speak-to-user-mcp/src/speak_to_user_mcp/speakswiftly.py` contains a helper named `SpeakSwiftlyOwner.speak_live`.
     The config file `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should be spoken as plain speech rather than spiraling into code noise.
@@ -29,7 +925,7 @@ struct SpeakSwiftlyE2ETests {
     Also read these oddly spelled words once each: quizzaciously, xylophonic, cwmfjord, lophophore, phthalo, zyzzyva.
     Finish with this sentence exactly once. End of forensic playback probe.
     """
-    private static let segmentedForensicPlaybackText = """
+    static let segmentedForensicPlaybackText = """
     # Section One
 
     Please read this paragraph once and keep a natural tone. The path `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should sound like speech, not code noise.
@@ -53,7 +949,7 @@ struct SpeakSwiftlyE2ETests {
 
     End this segmented forensic playback probe once, clearly, and without looping.
     """
-    private static let reversedSegmentedForensicPlaybackText = """
+    static let reversedSegmentedForensicPlaybackText = """
     # Footer
 
     End this segmented forensic playback probe once, clearly, and without looping.
@@ -77,7 +973,7 @@ struct SpeakSwiftlyE2ETests {
 
     Please read this paragraph once and keep a natural tone. The path `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should sound like speech, not code noise.
     """
-    private static let segmentedConversationalPlaybackText = """
+    static let segmentedConversationalPlaybackText = """
     # Section One
 
     Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
@@ -98,7 +994,7 @@ struct SpeakSwiftlyE2ETests {
 
     End this conversational forensic playback probe once, clearly, and without looping.
     """
-    private static let reversedSegmentedConversationalPlaybackText = """
+    static let reversedSegmentedConversationalPlaybackText = """
     # Footer
 
     End this conversational forensic playback probe once, clearly, and without looping.
@@ -120,742 +1016,18 @@ struct SpeakSwiftlyE2ETests {
     Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
     """
 
-    // MARK: Sequential End-to-End Workflows
-
-    @Test func voiceDesignLaneRunsSequentialSilentAndAudibleCoverage() async throws {
-        guard Self.isE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-        let profileName = "voice-design-profile"
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
-            try await Self.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-voice-design",
-                profileName: profileName,
-                text: Self.testingProfileText,
-                voiceDescription: Self.testingProfileVoiceDescription
-            )
-            try await Self.runSilentSpeech(
-                on: worker,
-                id: "req-live-voice-design-silent",
-                text: Self.testingPlaybackText,
-                profileName: profileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: false,
-                playbackTrace: Self.isPlaybackTraceEnabled
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-            try await Self.runAudibleSpeech(
-                on: worker,
-                id: "req-live-voice-design-audible",
-                text: Self.testingPlaybackText,
-                profileName: profileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-    }
-
-    @Test func cloneLaneWithProvidedTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
-        guard Self.isE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-        let fixtureProfileName = "clone-source-profile"
-        let cloneProfileName = "provided-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/provided-clone-reference.wav")
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
-            try await Self.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-clone-fixture",
-                profileName: fixtureProfileName,
-                text: Self.testingCloneSourceText,
-                voiceDescription: Self.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL
-            )
-            #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
-
-            try await Self.createCloneProfile(
-                on: worker,
-                id: "req-create-clone-provided-transcript",
-                profileName: cloneProfileName,
-                referenceAudioURL: referenceAudioURL,
-                transcript: Self.testingCloneSourceText,
-                expectTranscription: false
-            )
-
-            let store = ProfileStore(rootURL: sandbox.profileRootURL)
-            let storedProfile = try store.loadProfile(named: cloneProfileName)
-            #expect(storedProfile.manifest.sourceText == Self.testingCloneSourceText)
-
-            try await Self.runSilentSpeech(
-                on: worker,
-                id: "req-live-clone-provided-transcript-silent",
-                text: Self.testingPlaybackText,
-                profileName: cloneProfileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: false,
-                playbackTrace: Self.isPlaybackTraceEnabled
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-            try await Self.runAudibleSpeech(
-                on: worker,
-                id: "req-live-clone-provided-transcript-audible",
-                text: Self.testingPlaybackText,
-                profileName: cloneProfileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-    }
-
-    @Test func cloneLaneWithInferredTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
-        guard Self.isE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-        let fixtureProfileName = "inferred-clone-source-profile"
-        let cloneProfileName = "inferred-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/inferred-clone-reference.wav")
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
-            try await Self.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-inferred-clone-fixture",
-                profileName: fixtureProfileName,
-                text: Self.testingCloneSourceText,
-                voiceDescription: Self.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL
-            )
-            #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
-
-            try await Self.createCloneProfile(
-                on: worker,
-                id: "req-create-clone-inferred-transcript",
-                profileName: cloneProfileName,
-                referenceAudioURL: referenceAudioURL,
-                transcript: nil,
-                expectTranscription: true
-            )
-
-            let store = ProfileStore(rootURL: sandbox.profileRootURL)
-            let storedProfile = try store.loadProfile(named: cloneProfileName)
-            let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-            #expect(!inferredTranscript.isEmpty)
-            #expect(Self.transcriptLooksCloseToCloneSource(inferredTranscript))
-
-            try await Self.runSilentSpeech(
-                on: worker,
-                id: "req-live-clone-inferred-transcript-silent",
-                text: Self.testingPlaybackText,
-                profileName: cloneProfileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: false,
-                playbackTrace: Self.isPlaybackTraceEnabled
-            )
-            defer { Task { await worker.stop() } }
-
-            try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-            try await Self.runAudibleSpeech(
-                on: worker,
-                id: "req-live-clone-inferred-transcript-audible",
-                text: Self.testingPlaybackText,
-                profileName: cloneProfileName
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-    }
-
-    @Test func generatedFileLaneRunsEndToEndAndSupportsManagedArtifactReads() async throws {
-        guard Self.isE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: true
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: false)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-generated-file-profile",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        let generatedFile = try await Self.runGeneratedFileSpeech(
-            on: worker,
-            id: "req-generated-file-e2e",
-            text: Self.testingPlaybackText,
-            profileName: Self.testingProfileName
-        )
-        #expect(generatedFile["artifact_id"] as? String == "req-generated-file-e2e")
-        #expect(generatedFile["profile_name"] as? String == Self.testingProfileName)
-
-        let generatedFilePath = try #require(generatedFile["file_path"] as? String)
-        #expect(FileManager.default.fileExists(atPath: generatedFilePath))
-
-        try worker.sendJSON(
-            """
-            {"id":"req-generated-file-read","op":"generated_file","artifact_id":"req-generated-file-e2e"}
-            """
-        )
-
-        let fetchedGeneratedFile = try #require(
-            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["id"] as? String == "req-generated-file-read",
-                    $0["ok"] as? Bool == true,
-                    let generatedFile = $0["generated_file"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return generatedFile["artifact_id"] as? String == "req-generated-file-e2e"
-            }
-        )
-        let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
-        #expect(fetchedGeneratedFilePayload["file_path"] as? String == generatedFilePath)
-
-        try worker.sendJSON(
-            """
-            {"id":"req-generated-files-read","op":"generated_files"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["id"] as? String == "req-generated-files-read",
-                $0["ok"] as? Bool == true,
-                let generatedFiles = $0["generated_files"] as? [[String: Any]]
-            else {
-                return false
-            }
-
-            return generatedFiles.contains {
-                $0["artifact_id"] as? String == "req-generated-file-e2e"
-                    && $0["file_path"] as? String == generatedFilePath
-            }
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    // MARK: Audible Playback and Tracing
-
-    @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
-        guard Self.isE2EEnabled, Self.isPlaybackTraceEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: true
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-trace",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-trace","op":"queue_speech_live","text":"\(Self.testingPlaybackText)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "playback_trace_chunk_received"
-                && $0["request_id"] as? String == "req-live-trace"
-        } != nil)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "playback_trace_buffer_scheduled"
-                && $0["request_id"] as? String == "req-live-trace"
-        } != nil)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            $0["event"] as? String == "playback_trace_buffer_played_back"
-                && $0["request_id"] as? String == "req-live-trace"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-trace"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    // MARK: Forensic Playback Probes
-
-    @Test func forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest() async throws {
-        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: Self.isPlaybackTraceEnabled
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-forensic",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-forensic","op":"queue_speech_live","text":"\(Self.forensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-forensic"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "buffering_audio"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-forensic"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-forensic",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return details["chunk_count"] as? Int != nil
-                    && details["sample_count"] as? Int != nil
-                    && details["time_to_first_chunk_ms"] as? Int != nil
-                    && details["time_to_preroll_ready_ms"] as? Int != nil
-                    && details["schedule_callback_count"] as? Int != nil
-                    && details["played_back_callback_count"] as? Int != nil
-            }
-        )
-
-        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
-        #expect((playbackDetails["chunk_count"] as? Int ?? 0) > 1)
-        #expect((playbackDetails["sample_count"] as? Int ?? 0) > 0)
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-forensic"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    @Test func forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest() async throws {
-        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: Self.isPlaybackTraceEnabled
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-segmented",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-segmented","op":"queue_speech_live","text":"\(Self.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-segmented"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-segmented",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return (details["markdown_header_count"] as? Int ?? 0) >= 5
-                    && (details["url_count"] as? Int ?? 0) >= 1
-                    && (details["file_path_count"] as? Int ?? 0) >= 1
-                    && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
-                    && (details["camel_case_token_count"] as? Int ?? 0) >= 1
-                    && (details["snake_case_token_count"] as? Int ?? 0) >= 1
-                    && (details["objc_symbol_count"] as? Int ?? 0) >= 1
-                    && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
-            }
-        )
-
-        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
-        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
-        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
-        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_section_window",
-                $0["request_id"] as? String == "req-live-segmented",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["section_title"] as? String == "Section Two"
-                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
-                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-segmented"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedWeirdTextRequest() async throws {
-        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: Self.isPlaybackTraceEnabled
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-reversed-segmented",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(Self.reversedSegmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-reversed-segmented"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-reversed-segmented",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return (details["markdown_header_count"] as? Int ?? 0) >= 5
-                    && (details["url_count"] as? Int ?? 0) >= 1
-                    && (details["file_path_count"] as? Int ?? 0) >= 1
-                    && (details["dotted_identifier_count"] as? Int ?? 0) >= 2
-                    && (details["camel_case_token_count"] as? Int ?? 0) >= 1
-                    && (details["snake_case_token_count"] as? Int ?? 0) >= 1
-                    && (details["objc_symbol_count"] as? Int ?? 0) >= 1
-                    && (details["repeated_letter_run_count"] as? Int ?? 0) >= 2
-            }
-        )
-
-        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
-        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
-        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
-        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_section_window",
-                $0["request_id"] as? String == "req-live-reversed-segmented",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["section_title"] as? String == "Footer"
-                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
-                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-reversed-segmented"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    @Test func forensicSpeakLiveRunsEndToEndWithSegmentedConversationalProseRequest() async throws {
-        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: Self.isPlaybackTraceEnabled
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-conversational",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-conversational","op":"queue_speech_live","text":"\(Self.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-conversational"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-conversational",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return (details["markdown_header_count"] as? Int ?? 0) >= 5
-                    && (details["file_path_count"] as? Int ?? 0) == 0
-                    && (details["dotted_identifier_count"] as? Int ?? 0) == 0
-                    && (details["camel_case_token_count"] as? Int ?? 0) == 0
-                    && (details["snake_case_token_count"] as? Int ?? 0) == 0
-                    && (details["objc_symbol_count"] as? Int ?? 0) == 0
-                    && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
-            }
-        )
-
-        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
-        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
-        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
-        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_section_window",
-                $0["request_id"] as? String == "req-live-conversational",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["section_title"] as? String == "Section Two"
-                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
-                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-conversational"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest() async throws {
-        guard Self.isE2EEnabled, Self.isForensicE2EEnabled else { return }
-
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: false,
-            playbackTrace: Self.isPlaybackTraceEnabled
-        )
-        defer { Task { await worker.stop() } }
-
-        try await Self.awaitWorkerReady(worker, expectPlaybackEngine: true)
-        try await Self.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-reversed-conversational",
-            profileName: Self.testingProfileName,
-            text: Self.testingProfileText,
-            voiceDescription: Self.testingProfileVoiceDescription
-        )
-
-        try worker.sendJSON(
-            """
-            {"id":"req-live-reversed-conversational","op":"queue_speech_live","text":"\(Self.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(Self.testingProfileName)"}
-            """
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-reversed-conversational"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        } != nil)
-
-        let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-                guard
-                    $0["event"] as? String == "playback_finished",
-                    $0["request_id"] as? String == "req-live-reversed-conversational",
-                    let details = $0["details"] as? [String: Any]
-                else {
-                    return false
-                }
-
-                return (details["markdown_header_count"] as? Int ?? 0) >= 5
-                    && (details["file_path_count"] as? Int ?? 0) == 0
-                    && (details["dotted_identifier_count"] as? Int ?? 0) == 0
-                    && (details["camel_case_token_count"] as? Int ?? 0) == 0
-                    && (details["snake_case_token_count"] as? Int ?? 0) == 0
-                    && (details["objc_symbol_count"] as? Int ?? 0) == 0
-                    && (details["repeated_letter_run_count"] as? Int ?? 0) == 0
-            }
-        )
-
-        let playbackDetails = try #require(playbackFinished["details"] as? [String: Any])
-        #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
-        #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
-        #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_section_window",
-                $0["request_id"] as? String == "req-live-reversed-conversational",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["section_title"] as? String == "Footer"
-                && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
-                && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
-            $0["id"] as? String == "req-live-reversed-conversational"
-                && $0["ok"] as? Bool == true
-        } != nil)
-
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    // MARK: Workflow Helpers
-
-    private static func awaitWorkerReady(
+    static func awaitWorkerReady(
         _ worker: WorkerProcess,
         expectPlaybackEngine: Bool
     ) async throws {
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
         } != nil)
 
         guard expectPlaybackEngine else { return }
 
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
             guard
                 $0["event"] as? String == "playback_engine_ready",
                 let details = $0["details"] as? [String: Any]
@@ -871,11 +1043,12 @@ struct SpeakSwiftlyE2ETests {
         } != nil)
     }
 
-    private static func createVoiceDesignProfile(
+    static func createVoiceDesignProfile(
         on worker: WorkerProcess,
         id: String,
         profileName: String,
         text: String,
+        vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
         outputURL: URL? = nil
     ) async throws {
@@ -889,23 +1062,23 @@ struct SpeakSwiftlyE2ETests {
         let outputPathFragment = outputURL.map { #","output_path":"\#($0.path)""# } ?? ""
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"create_profile","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
+            {"id":"\(id)","op":"create_profile","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","vibe":"\(vibe.rawValue)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
             """
         )
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "loading_profile_model"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "generating_profile_audio"
         } != nil)
 
         let success = try #require(
-            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["ok"] as? Bool == true
             }
@@ -917,28 +1090,29 @@ struct SpeakSwiftlyE2ETests {
         }
     }
 
-    private static func createCloneProfile(
+    static func createCloneProfile(
         on worker: WorkerProcess,
         id: String,
         profileName: String,
         referenceAudioURL: URL,
+        vibe: SpeakSwiftly.Vibe,
         transcript: String?,
         expectTranscription: Bool
     ) async throws {
         let transcriptFragment = transcript.map { #","transcript":"\#($0.jsonEscaped)""# } ?? ""
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"create_clone","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)"\(transcriptFragment)}
+            {"id":"\(id)","op":"create_clone","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)","vibe":"\(vibe.rawValue)"\(transcriptFragment)}
             """
         )
 
         if expectTranscription {
-            #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "loading_clone_transcription_model"
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "transcribing_clone_audio"
@@ -946,7 +1120,7 @@ struct SpeakSwiftlyE2ETests {
         }
 
         let success = try #require(
-            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["ok"] as? Bool == true
             }
@@ -955,7 +1129,7 @@ struct SpeakSwiftlyE2ETests {
         #expect(success["profile_name"] as? String == profileName)
     }
 
-    private static func runSilentSpeech(
+    static func runSilentSpeech(
         on worker: WorkerProcess,
         id: String,
         text: String,
@@ -967,28 +1141,28 @@ struct SpeakSwiftlyE2ETests {
             """
         )
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "started"
                 && $0["op"] as? String == "queue_speech_live"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "buffering_audio"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "playback_finished"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
         } != nil)
     }
 
-    private static func runAudibleSpeech(
+    static func runAudibleSpeech(
         on worker: WorkerProcess,
         id: String,
         text: String,
@@ -1000,17 +1174,17 @@ struct SpeakSwiftlyE2ETests {
             """
         )
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "buffering_audio"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         } != nil)
-        #expect(try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
             guard
                 $0["event"] as? String == "playback_started",
                 $0["request_id"] as? String == id,
@@ -1032,7 +1206,7 @@ struct SpeakSwiftlyE2ETests {
         } != nil)
 
         let playbackFinished = try #require(
-            try await worker.waitForStderrJSONObject(timeout: Self.e2eTimeout) {
+            try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
                 guard
                     $0["event"] as? String == "playback_finished",
                     $0["request_id"] as? String == id,
@@ -1067,13 +1241,13 @@ struct SpeakSwiftlyE2ETests {
         )
 
         #expect(playbackFinished["event"] as? String == "playback_finished")
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
         } != nil)
     }
 
-    private static func runGeneratedFileSpeech(
+    static func runGeneratedFileSpeech(
         on worker: WorkerProcess,
         id: String,
         text: String,
@@ -1085,29 +1259,29 @@ struct SpeakSwiftlyE2ETests {
             """
         )
 
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
                 && $0["generated_file"] == nil
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "started"
                 && $0["op"] as? String == "queue_speech_file"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "generating_file_audio"
         } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "writing_generated_file"
         } != nil)
 
         let success = try #require(
-            try await worker.waitForJSONObject(timeout: Self.e2eTimeout) {
+            try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 guard
                     $0["id"] as? String == id,
                     $0["ok"] as? Bool == true,
@@ -1123,8 +1297,27 @@ struct SpeakSwiftlyE2ETests {
         return try #require(success["generated_file"] as? [String: Any])
     }
 
-    private static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
-        let expectedTokens = normalizedTranscriptTokens(from: Self.testingCloneSourceText)
+    static func expectMarvisVoiceSelection(
+        on worker: WorkerProcess,
+        requestID: String,
+        expectedVoice: String
+    ) async throws {
+        #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
+            guard
+                $0["event"] as? String == "marvis_voice_selected",
+                $0["request_id"] as? String == requestID,
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["speech_backend"] as? String == "marvis"
+                && details["marvis_voice"] as? String == expectedVoice
+        } != nil)
+    }
+
+    static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
+        let expectedTokens = normalizedTranscriptTokens(from: testingCloneSourceText)
         let actualTokens = normalizedTranscriptTokens(from: transcript)
 
         guard !expectedTokens.isEmpty, !actualTokens.isEmpty else {
@@ -1138,7 +1331,7 @@ struct SpeakSwiftlyE2ETests {
         return recall >= 0.7 && precision >= 0.6
     }
 
-    private static func normalizedTranscriptTokens(from text: String) -> Set<String> {
+    static func normalizedTranscriptTokens(from text: String) -> Set<String> {
         let scalars = text.lowercased().unicodeScalars.map { scalar -> Character in
             if CharacterSet.alphanumerics.contains(scalar) {
                 return Character(scalar)
@@ -1154,24 +1347,24 @@ struct SpeakSwiftlyE2ETests {
         )
     }
 
-    private static var e2eTimeout: Duration {
+    static var e2eTimeout: Duration {
         .seconds(1_200)
     }
 
-    private static var isE2EEnabled: Bool {
+    static var isE2EEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_E2E"] == "1"
     }
 
-    private static var isPlaybackTraceEnabled: Bool {
+    static var isPlaybackTraceEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_PLAYBACK_TRACE"] == "1"
     }
 
-    private static var isForensicE2EEnabled: Bool {
+    static var isForensicE2EEnabled: Bool {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_FORENSIC_E2E"] == "1"
     }
 }
 
-private struct E2ESandbox {
+struct E2ESandbox {
     let rootURL: URL
     let profileRootURL: URL
 
@@ -1188,15 +1381,7 @@ private struct E2ESandbox {
     }
 }
 
-private extension NSLock {
-    func withLock<T>(_ body: () throws -> T) rethrows -> T {
-        lock()
-        defer { unlock() }
-        return try body()
-    }
-}
-
-private final class JSONLineRecorder: @unchecked Sendable {
+final class JSONLineRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var stdoutObjects = [[String: Any]]()
     private var stderrObjects = [[String: Any]]()
@@ -1248,12 +1433,13 @@ private final class JSONLineRecorder: @unchecked Sendable {
     }
 }
 
-private final class WorkerProcess: @unchecked Sendable {
+final class WorkerProcess: @unchecked Sendable {
     private enum Environment {
         static let dyldFrameworkPath = "DYLD_FRAMEWORK_PATH"
         static let profileRoot = "SPEAKSWIFTLY_PROFILE_ROOT"
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
         static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
+        static let speechBackend = "SPEAKSWIFTLY_SPEECH_BACKEND"
     }
 
     private static let executableURLResult = Result(catching: {
@@ -1266,7 +1452,12 @@ private final class WorkerProcess: @unchecked Sendable {
     private let stdoutTask: Task<Void, Never>
     private let stderrTask: Task<Void, Never>
 
-    init(profileRootURL: URL, silentPlayback: Bool, playbackTrace: Bool = false) throws {
+    init(
+        profileRootURL: URL,
+        silentPlayback: Bool,
+        playbackTrace: Bool = false,
+        speechBackend: SpeakSwiftly.SpeechBackend? = nil
+    ) throws {
         process = Process()
         stdinPipe = Pipe()
         let recorder = JSONLineRecorder()
@@ -1289,6 +1480,9 @@ private final class WorkerProcess: @unchecked Sendable {
         }
         if playbackTrace {
             environment[Environment.playbackTrace] = "1"
+        }
+        if let speechBackend {
+            environment[Environment.speechBackend] = speechBackend.rawValue
         }
         process.environment = environment
 
@@ -1538,7 +1732,7 @@ private final class WorkerProcess: @unchecked Sendable {
     }
 }
 
-private struct WorkerProcessError: Error, CustomStringConvertible {
+struct WorkerProcessError: Error, CustomStringConvertible {
     let description: String
 
     init(_ description: String) {
@@ -1546,7 +1740,7 @@ private struct WorkerProcessError: Error, CustomStringConvertible {
     }
 }
 
-private extension String {
+extension String {
     var jsonEscaped: String {
         let data = (try? JSONSerialization.data(withJSONObject: [self])) ?? Data("[\"\"]".utf8)
         let encoded = String(decoding: data, as: UTF8.self)
