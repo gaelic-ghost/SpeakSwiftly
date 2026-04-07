@@ -39,6 +39,35 @@ import TextForSpeech
     )
 }
 
+@Test func decodesSpeakBatchRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-batch","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_name":"logs","source_format":"swift_source"}]}"#
+    )
+
+    #expect(
+        request == .queueBatch(
+            id: "req-batch",
+            profileName: "default-femme",
+            items: [
+                SpeakSwiftly.GenerationJobItem(
+                    artifactID: "req-batch-artifact-1",
+                    text: "First file",
+                    textProfileName: nil,
+                    textContext: nil,
+                    sourceFormat: nil
+                ),
+                SpeakSwiftly.GenerationJobItem(
+                    artifactID: "custom-artifact",
+                    text: "Second file",
+                    textProfileName: "logs",
+                    textContext: nil,
+                    sourceFormat: .swift
+                ),
+            ]
+        )
+    )
+}
+
 @Test func decodesSpeakLiveRequestWithTextContextAndProfile() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#
@@ -164,6 +193,29 @@ import TextForSpeech
 
     let list = try WorkerRequest.decode(from: #"{"id":"req-generated-files","op":"generated_files"}"#)
     #expect(list == .generatedFiles(id: "req-generated-files"))
+
+    let batch = try WorkerRequest.decode(
+        from: #"{"id":"req-generated-batch","op":"generated_batch","batch_id":"batch-job-1"}"#
+    )
+    #expect(batch == .generatedBatch(id: "req-generated-batch", batchID: "batch-job-1"))
+
+    let batchList = try WorkerRequest.decode(from: #"{"id":"req-generated-batches","op":"generated_batches"}"#)
+    #expect(batchList == .generatedBatches(id: "req-generated-batches"))
+}
+
+@Test func decodesGenerationJobRequests() throws {
+    let job = try WorkerRequest.decode(
+        from: #"{"id":"req-generation-job","op":"generation_job","job_id":"job-file-1"}"#
+    )
+    #expect(job == .generationJob(id: "req-generation-job", jobID: "job-file-1"))
+
+    let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
+    #expect(list == .generationJobs(id: "req-generation-jobs"))
+
+    let expire = try WorkerRequest.decode(
+        from: #"{"id":"req-expire-job","op":"expire_generation_job","job_id":"job-file-1"}"#
+    )
+    #expect(expire == .expireGenerationJob(id: "req-expire-job", jobID: "job-file-1"))
 }
 
 @Test func decodesRemoveProfileRequest() throws {

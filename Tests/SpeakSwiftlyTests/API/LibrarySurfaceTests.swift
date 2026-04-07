@@ -205,6 +205,28 @@ import TextForSpeech
     let generatedFiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
         await runtime.generatedFiles(id: requestID)
     }
+    let generateBatch: @Sendable (SpeakSwiftly.Runtime, [SpeakSwiftly.BatchItem], String, String) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        items,
+        profileName,
+        id in
+        await runtime.generateBatch(items, with: profileName, id: id)
+    }
+    let generatedBatch: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, batchID, requestID in
+        await runtime.generatedBatch(id: batchID, requestID: requestID)
+    }
+    let generatedBatches: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
+        await runtime.generatedBatches(id: requestID)
+    }
+    let expireGenerationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
+        await runtime.expireGenerationJob(id: jobID, requestID: requestID)
+    }
+    let generationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
+        await runtime.generationJob(id: jobID, requestID: requestID)
+    }
+    let generationJobs: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
+        await runtime.generationJobs(id: requestID)
+    }
     let generationQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.generation)
     }
@@ -236,6 +258,12 @@ import TextForSpeech
     _ = removeProfile
     _ = generatedFile
     _ = generatedFiles
+    _ = generateBatch
+    _ = generatedBatch
+    _ = generatedBatches
+    _ = expireGenerationJob
+    _ = generationJob
+    _ = generationJobs
     _ = profile
     _ = profilesList
     _ = activeProfile

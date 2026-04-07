@@ -3,10 +3,35 @@ import TextForSpeech
 
 // MARK: - Request Envelope
 
+struct RawBatchItem: Decodable, Sendable {
+    let artifactID: String?
+    let text: String?
+    let textProfileName: String?
+    let cwd: String?
+    let repoRoot: String?
+    let textFormat: TextForSpeech.TextFormat?
+    let nestedSourceFormat: TextForSpeech.SourceFormat?
+    let sourceFormat: TextForSpeech.SourceFormat?
+
+    enum CodingKeys: String, CodingKey {
+        case artifactID = "artifact_id"
+        case text
+        case textProfileName = "text_profile_name"
+        case cwd
+        case repoRoot = "repo_root"
+        case textFormat = "text_format"
+        case nestedSourceFormat = "nested_source_format"
+        case sourceFormat = "source_format"
+    }
+}
+
 struct RawWorkerRequest: Decodable, Sendable {
     let id: String?
     let op: String?
     let artifactID: String?
+    let batchID: String?
+    let jobID: String?
+    let items: [RawBatchItem]?
     let text: String?
     let profileName: String?
     let textProfileName: String?
@@ -32,6 +57,9 @@ struct RawWorkerRequest: Decodable, Sendable {
         case id
         case op
         case artifactID = "artifact_id"
+        case batchID = "batch_id"
+        case jobID = "job_id"
+        case items
         case text
         case profileName = "profile_name"
         case textProfileName = "text_profile_name"
@@ -60,6 +88,9 @@ struct RawWorkerRequest: Decodable, Sendable {
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
+        batchID = try container.decodeIfPresent(String.self, forKey: .batchID)
+        jobID = try container.decodeIfPresent(String.self, forKey: .jobID)
+        items = try container.decodeIfPresent([RawBatchItem].self, forKey: .items)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
         textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
@@ -146,6 +177,87 @@ struct RawWorkerRequest: Decodable, Sendable {
         case .rust: (nil, .rust)
         }
     }
+
+    static func resolveSpeechTextInput(
+        id: String,
+        text: String?,
+        textProfileName: String?,
+        cwd: String?,
+        repoRoot: String?,
+        textFormat: TextForSpeech.TextFormat?,
+        nestedSourceFormat: TextForSpeech.SourceFormat?,
+        sourceFormat: TextForSpeech.SourceFormat?
+    ) throws -> (
+        text: String,
+        textProfileName: String?,
+        textContext: TextForSpeech.Context?,
+        sourceFormat: TextForSpeech.SourceFormat?
+    ) {
+        let resolvedText = try WorkerRequest.requireNonEmpty(text, field: "text", id: id)
+        let resolvedTextProfileName = textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        if sourceFormat != nil && (textFormat != nil || nestedSourceFormat != nil) {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
+            )
+        }
+        let textContext = TextForSpeech.Context(
+            cwd: cwd,
+            repoRoot: repoRoot,
+            textFormat: textFormat,
+            nestedSourceFormat: nestedSourceFormat
+        ).nilIfEmpty
+
+        return (
+            text: resolvedText,
+            textProfileName: resolvedTextProfileName,
+            textContext: textContext,
+            sourceFormat: sourceFormat
+        )
+    }
+
+    static func resolveBatchItems(
+        id: String,
+        rawItems: [RawBatchItem]?
+    ) throws -> [SpeakSwiftly.GenerationJobItem] {
+        guard let rawItems, !rawItems.isEmpty else {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Request '\(id)' must include a non-empty 'items' array for batch generation."
+            )
+        }
+
+        var seenArtifactIDs = Set<String>()
+        return try rawItems.enumerated().map { index, rawItem in
+            let itemID = "\(id).items[\(index)]"
+            let resolved = try resolveSpeechTextInput(
+                id: itemID,
+                text: rawItem.text,
+                textProfileName: rawItem.textProfileName,
+                cwd: rawItem.cwd,
+                repoRoot: rawItem.repoRoot,
+                textFormat: rawItem.textFormat,
+                nestedSourceFormat: rawItem.nestedSourceFormat,
+                sourceFormat: rawItem.sourceFormat
+            )
+            let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                ?? "\(id)-artifact-\(index + 1)"
+            guard seenArtifactIDs.insert(artifactID).inserted else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' contains duplicate batch artifact id '\(artifactID)'. Each batch item must resolve to a unique artifact id."
+                )
+            }
+
+            return SpeakSwiftly.GenerationJobItem(
+                artifactID: artifactID,
+                text: resolved.text,
+                textProfileName: resolved.textProfileName,
+                textContext: resolved.textContext,
+                sourceFormat: resolved.sourceFormat
+            )
+        }
+    }
 }
 
 enum WorkerRequest: Sendable, Equatable {
@@ -158,8 +270,18 @@ enum WorkerRequest: Sendable, Equatable {
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?
     )
+    case queueBatch(
+        id: String,
+        profileName: String,
+        items: [SpeakSwiftly.GenerationJobItem]
+    )
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
+    case generatedBatch(id: String, batchID: String)
+    case generatedBatches(id: String)
+    case expireGenerationJob(id: String, jobID: String)
+    case generationJob(id: String, jobID: String)
+    case generationJobs(id: String)
     case createProfile(id: String, profileName: String, text: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)
     case createClone(id: String, profileName: String, referenceAudioPath: String, vibe: SpeakSwiftly.Vibe, transcript: String?)
     case listProfiles(id: String)
@@ -188,8 +310,14 @@ enum WorkerRequest: Sendable, Equatable {
     var id: String {
         switch self {
         case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+             .queueBatch(id: let id, profileName: _, items: _),
              .generatedFile(let id, _),
              .generatedFiles(let id),
+             .generatedBatch(let id, _),
+             .generatedBatches(let id),
+             .expireGenerationJob(let id, _),
+             .generationJob(let id, _),
+             .generationJobs(let id),
              .createProfile(let id, _, _, _, _, _),
              .createClone(let id, _, _, _, _),
              .listProfiles(let id),
@@ -224,10 +352,22 @@ enum WorkerRequest: Sendable, Equatable {
             "queue_speech_live"
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
             "queue_speech_file"
+        case .queueBatch:
+            "queue_speech_batch"
         case .generatedFile:
             "generated_file"
         case .generatedFiles:
             "generated_files"
+        case .generatedBatch:
+            "generated_batch"
+        case .generatedBatches:
+            "generated_batches"
+        case .expireGenerationJob:
+            "expire_generation_job"
+        case .generationJob:
+            "generation_job"
+        case .generationJobs:
+            "generation_jobs"
         case .createProfile:
             "create_profile"
         case .createClone:
@@ -287,7 +427,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var isSpeechRequest: Bool {
         switch self {
-        case .queueSpeech:
+        case .queueSpeech, .queueBatch:
             return true
         default:
             return false
@@ -304,15 +444,18 @@ enum WorkerRequest: Sendable, Equatable {
     }
 
     var acknowledgesEnqueueImmediately: Bool {
-        if case .queueSpeech = self {
+        switch self {
+        case .queueSpeech, .queueBatch:
             return true
+        default:
+            return false
         }
-        return false
     }
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
+             .queueBatch:
             return true
         default:
             return false
@@ -323,6 +466,11 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .generatedFile,
              .generatedFiles,
+             .generatedBatch,
+             .generatedBatches,
+             .expireGenerationJob,
+             .generationJob,
+             .generationJobs,
              .textProfileActive,
              .textProfileBase,
              .textProfile,
@@ -352,12 +500,18 @@ enum WorkerRequest: Sendable, Equatable {
     var profileName: String? {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+             .queueBatch(id: _, profileName: let profileName, items: _),
              .createProfile(_, let profileName, _, _, _, _),
              .createClone(_, let profileName, _, _, _),
              .removeProfile(_, let profileName):
             profileName
         case .generatedFile,
              .generatedFiles,
+             .generatedBatch,
+             .generatedBatches,
+             .expireGenerationJob,
+             .generationJob,
+             .generationJobs,
              .textProfileActive,
              .textProfileBase,
              .textProfiles,
@@ -389,9 +543,17 @@ enum WorkerRequest: Sendable, Equatable {
     var textProfileName: String? {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
-            textProfileName
+            return textProfileName
+        case .queueBatch(id: _, profileName: _, items: let items):
+            let names = Set(items.compactMap(\.textProfileName))
+            return names.count == 1 ? names.first : nil
         case .generatedFile,
              .generatedFiles,
+             .generatedBatch,
+             .generatedBatches,
+             .expireGenerationJob,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -416,7 +578,7 @@ enum WorkerRequest: Sendable, Equatable {
              .playback,
              .clearQueue,
              .cancelRequest:
-            nil
+            return nil
         }
     }
 
@@ -424,8 +586,15 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
             textContext
+        case .queueBatch:
+            nil
         case .generatedFile,
              .generatedFiles,
+             .generatedBatch,
+             .generatedBatches,
+             .expireGenerationJob,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -458,8 +627,15 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
             sourceFormat
+        case .queueBatch:
+            nil
         case .generatedFile,
              .generatedFiles,
+             .generatedBatch,
+             .generatedBatches,
+             .expireGenerationJob,
+             .generationJob,
+             .generationJobs,
              .createProfile,
              .createClone,
              .listProfiles,
@@ -513,56 +689,53 @@ enum WorkerRequest: Sendable, Equatable {
 
         switch op {
         case "queue_speech_live":
-            let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            if raw.sourceFormat != nil && (raw.textFormat != nil || raw.nestedSourceFormat != nil) {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
-                )
-            }
-            let textContext = TextForSpeech.Context(
+            let resolved = try RawWorkerRequest.resolveSpeechTextInput(
+                id: id,
+                text: raw.text,
+                textProfileName: raw.textProfileName,
                 cwd: raw.cwd,
                 repoRoot: raw.repoRoot,
                 textFormat: raw.textFormat,
-                nestedSourceFormat: raw.nestedSourceFormat
-            ).nilIfEmpty
+                nestedSourceFormat: raw.nestedSourceFormat,
+                sourceFormat: raw.sourceFormat
+            )
             return .queueSpeech(
                 id: id,
-                text: text,
+                text: resolved.text,
                 profileName: profileName,
-                textProfileName: textProfileName,
+                textProfileName: resolved.textProfileName,
                 jobType: .live,
-                textContext: textContext,
-                sourceFormat: raw.sourceFormat
+                textContext: resolved.textContext,
+                sourceFormat: resolved.sourceFormat
             )
 
         case "queue_speech_file":
-            let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            if raw.sourceFormat != nil && (raw.textFormat != nil || raw.nestedSourceFormat != nil) {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
-                )
-            }
-            let textContext = TextForSpeech.Context(
+            let resolved = try RawWorkerRequest.resolveSpeechTextInput(
+                id: id,
+                text: raw.text,
+                textProfileName: raw.textProfileName,
                 cwd: raw.cwd,
                 repoRoot: raw.repoRoot,
                 textFormat: raw.textFormat,
-                nestedSourceFormat: raw.nestedSourceFormat
-            ).nilIfEmpty
-            return .queueSpeech(
-                id: id,
-                text: text,
-                profileName: profileName,
-                textProfileName: textProfileName,
-                jobType: .file,
-                textContext: textContext,
+                nestedSourceFormat: raw.nestedSourceFormat,
                 sourceFormat: raw.sourceFormat
             )
+            return .queueSpeech(
+                id: id,
+                text: resolved.text,
+                profileName: profileName,
+                textProfileName: resolved.textProfileName,
+                jobType: .file,
+                textContext: resolved.textContext,
+                sourceFormat: resolved.sourceFormat
+            )
+
+        case "queue_speech_batch":
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
+            return .queueBatch(id: id, profileName: profileName, items: items)
 
         case "generated_file":
             let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
@@ -570,6 +743,24 @@ enum WorkerRequest: Sendable, Equatable {
 
         case "generated_files":
             return .generatedFiles(id: id)
+
+        case "generated_batch":
+            let batchID = try requireNonEmpty(raw.batchID ?? raw.jobID, field: "batch_id", id: id)
+            return .generatedBatch(id: id, batchID: batchID)
+
+        case "generated_batches":
+            return .generatedBatches(id: id)
+
+        case "expire_generation_job":
+            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+            return .expireGenerationJob(id: id, jobID: jobID)
+
+        case "generation_job":
+            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+            return .generationJob(id: id, jobID: jobID)
+
+        case "generation_jobs":
+            return .generationJobs(id: id)
 
         case "create_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
@@ -723,14 +914,14 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
-    private static func requireNonEmpty(_ value: String?, field: String, id: String) throws -> String {
+    static func requireNonEmpty(_ value: String?, field: String, id: String) throws -> String {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
         }
         return trimmed
     }
 
-    private static func require<T>(_ value: T?, field: String, id: String) throws -> T {
+    static func require<T>(_ value: T?, field: String, id: String) throws -> T {
         guard let value else {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a '\(field)' field.")
         }
@@ -844,6 +1035,10 @@ public extension SpeakSwiftly {
         public let ok = true
         public let generatedFile: GeneratedFile?
         public let generatedFiles: [GeneratedFile]?
+        public let generatedBatch: GeneratedBatch?
+        public let generatedBatches: [GeneratedBatch]?
+        public let generationJob: GenerationJob?
+        public let generationJobs: [GenerationJob]?
         public let profileName: String?
         public let profilePath: String?
         public let profiles: [ProfileSummary]?
@@ -861,6 +1056,10 @@ public extension SpeakSwiftly {
             case ok
             case generatedFile = "generated_file"
             case generatedFiles = "generated_files"
+            case generatedBatch = "generated_batch"
+            case generatedBatches = "generated_batches"
+            case generationJob = "generation_job"
+            case generationJobs = "generation_jobs"
             case profileName = "profile_name"
             case profilePath = "profile_path"
             case profiles
@@ -878,6 +1077,10 @@ public extension SpeakSwiftly {
             id: String,
             generatedFile: GeneratedFile? = nil,
             generatedFiles: [GeneratedFile]? = nil,
+            generatedBatch: GeneratedBatch? = nil,
+            generatedBatches: [GeneratedBatch]? = nil,
+            generationJob: GenerationJob? = nil,
+            generationJobs: [GenerationJob]? = nil,
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
@@ -893,6 +1096,10 @@ public extension SpeakSwiftly {
             self.id = id
             self.generatedFile = generatedFile
             self.generatedFiles = generatedFiles
+            self.generatedBatch = generatedBatch
+            self.generatedBatches = generatedBatches
+            self.generationJob = generationJob
+            self.generationJobs = generationJobs
             self.profileName = profileName
             self.profilePath = profilePath
             self.profiles = profiles
@@ -979,7 +1186,11 @@ public extension SpeakSwiftly {
         case invalidRequest = "invalid_request"
         case unknownOperation = "unknown_operation"
         case generatedFileNotFound = "generated_file_not_found"
+        case generatedBatchNotFound = "generated_batch_not_found"
         case generatedFileAlreadyExists = "generated_file_already_exists"
+        case generationJobNotFound = "generation_job_not_found"
+        case generationJobAlreadyExists = "generation_job_already_exists"
+        case generationJobNotExpirable = "generation_job_not_expirable"
         case profileNotFound = "profile_not_found"
         case profileAlreadyExists = "profile_already_exists"
         case invalidProfileName = "invalid_profile_name"

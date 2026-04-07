@@ -17,6 +17,10 @@ extension SpeakSwiftly.Runtime {
                 id: payload.id,
                 generatedFile: payload.generatedFile,
                 generatedFiles: payload.generatedFiles,
+                generatedBatch: payload.generatedBatch,
+                generatedBatches: payload.generatedBatches,
+                generationJob: payload.generationJob,
+                generationJobs: payload.generationJobs,
                 profileName: payload.profileName,
                 profilePath: payload.profilePath,
                 profiles: payload.profiles,
@@ -158,6 +162,9 @@ extension SpeakSwiftly.Runtime {
         id: String,
         op: String,
         artifactID: String? = nil,
+        batchID: String? = nil,
+        jobID: String? = nil,
+        items: [SpeakSwiftly.GenerationJobItem]? = nil,
         text: String? = nil,
         profileName: String? = nil,
         textProfileName: String? = nil,
@@ -180,6 +187,9 @@ extension SpeakSwiftly.Runtime {
             id: id,
             op: op,
             artifactID: artifactID,
+            batchID: batchID,
+            jobID: jobID,
+            items: items,
             text: text,
             profileName: profileName,
             textProfileName: textProfileName,
@@ -229,6 +239,13 @@ extension SpeakSwiftly.Runtime {
                 textContext: textContext,
                 sourceFormat: sourceFormat
             )
+        case .queueBatch(let id, let profileName, let items):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                items: items,
+                profileName: profileName
+            )
         case .generatedFile(let id, let artifactID):
             await submitRequest(
                 id: id,
@@ -236,6 +253,34 @@ extension SpeakSwiftly.Runtime {
                 artifactID: artifactID
             )
         case .generatedFiles(let id):
+            await submitRequest(
+                id: id,
+                op: request.opName
+            )
+        case .generatedBatch(let id, let batchID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                batchID: batchID
+            )
+        case .generatedBatches(let id):
+            await submitRequest(
+                id: id,
+                op: request.opName
+            )
+        case .expireGenerationJob(let id, let jobID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                jobID: jobID
+            )
+        case .generationJob(let id, let jobID):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                jobID: jobID
+            )
+        case .generationJobs(let id):
             await submitRequest(
                 id: id,
                 op: request.opName

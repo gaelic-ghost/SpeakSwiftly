@@ -391,11 +391,75 @@ extension SpeakSwiftlyE2ETests {
                     return false
                 }
 
-                return generatedFile["artifact_id"] as? String == id
+                return generatedFile["artifact_id"] as? String == "\(id)-artifact-1"
             }
         )
 
         return try #require(success["generated_file"] as? [String: Any])
+    }
+
+    static func runGeneratedBatchSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        profileName: String,
+        itemsJSON: String
+    ) async throws -> [String: Any] {
+        let batchTimeout: Duration = .seconds(180)
+        let compactItemsJSON = try compactJSONArrayString(itemsJSON)
+
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"queue_speech_batch","profile_name":"\(profileName)","items":\(compactItemsJSON)}
+            """
+        )
+
+        #expect(try await worker.waitForJSONObject(timeout: batchTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+                && $0["generated_batch"] == nil
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: batchTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "queue_speech_batch"
+        } != nil)
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: batchTimeout) {
+                guard
+                    $0["id"] as? String == id,
+                    $0["ok"] as? Bool == true,
+                    let generatedBatch = $0["generated_batch"] as? [String: Any],
+                    let artifacts = generatedBatch["artifacts"] as? [[String: Any]]
+                else {
+                    return false
+                }
+
+                return generatedBatch["batch_id"] as? String == id
+                    && generatedBatch["state"] as? String == "completed"
+                    && artifacts.count >= 1
+            }
+        )
+
+        return try #require(success["generated_batch"] as? [String: Any])
+    }
+
+    static func compactJSONArrayString(_ source: String) throws -> String {
+        guard let data = source.data(using: .utf8) else {
+            throw WorkerProcessError(
+                "The batch items payload could not be encoded as UTF-8 before sending it to the SpeakSwiftly worker."
+            )
+        }
+
+        let object = try JSONSerialization.jsonObject(with: data)
+        guard JSONSerialization.isValidJSONObject(object) else {
+            throw WorkerProcessError(
+                "The batch items payload is not valid JSON and cannot be compacted into a single-line worker request."
+            )
+        }
+
+        let compactData = try JSONSerialization.data(withJSONObject: object)
+        return String(decoding: compactData, as: UTF8.self)
     }
 
     static func expectMarvisVoiceSelection(
@@ -518,6 +582,12 @@ final class JSONLineRecorder: @unchecked Sendable {
     func firstMatchingJSONObject(_ predicate: ([String: Any]) -> Bool) -> [String: Any]? {
         lock.withLock {
             stdoutObjects.first(where: predicate)
+        }
+    }
+
+    func recentStdoutObjects(limit: Int = 10) -> [[String: Any]] {
+        lock.withLock {
+            Array(stdoutObjects.suffix(limit))
         }
     }
 
@@ -652,8 +722,16 @@ final class WorkerProcess: @unchecked Sendable {
         }
 
         let stderr = recorder.stderrText()
+        let stdoutTail = recorder.recentStdoutObjects()
         throw WorkerProcessError(
-            "Timed out waiting for a matching worker JSON event. Current stderr:\n\(stderr)"
+            """
+            Timed out waiting for a matching worker JSON event.
+            Recent stdout JSON objects:
+            \(stdoutTail)
+
+            Current stderr:
+            \(stderr)
+            """
         )
     }
 
