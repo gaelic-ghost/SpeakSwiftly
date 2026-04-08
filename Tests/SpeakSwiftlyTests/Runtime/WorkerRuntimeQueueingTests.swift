@@ -356,7 +356,7 @@ import TextForSpeech
     })
 
     await runtime.accept(
-        line: #"{"id":"req-add-text","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
+        line: #"{"id":"req-add-text","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -372,7 +372,7 @@ import TextForSpeech
     )
     let activeProfileJSON = try String(decoding: JSONEncoder().encode(activeProfile), as: UTF8.self)
     await runtime.accept(
-        line: #"{"id":"req-use-text","op":"use_text_profile","text_profile":"# + activeProfileJSON + #"}"#
+        line: #"{"id":"req-use-text","op":"replace_active_text_profile","text_profile":"# + activeProfileJSON + #"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -381,7 +381,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-text-active","op":"text_profile_active"}"#)
+    await runtime.accept(line: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-text-active"
@@ -389,7 +389,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-text-list","op":"text_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-text-list"
@@ -420,7 +420,7 @@ import TextForSpeech
     )
 
     await runtime.start()
-    await runtime.accept(line: #"{"id":"req-text-list","op":"text_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {

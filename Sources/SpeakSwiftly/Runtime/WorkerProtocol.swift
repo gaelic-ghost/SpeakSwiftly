@@ -381,19 +381,19 @@ enum WorkerRequest: Sendable, Equatable {
         case .queueBatch:
             "queue_speech_batch"
         case .generatedFile:
-            "generated_file"
+            "get_generated_file"
         case .generatedFiles:
-            "generated_files"
+            "list_generated_files"
         case .generatedBatch:
-            "generated_batch"
+            "get_generated_batch"
         case .generatedBatches:
-            "generated_batches"
+            "list_generated_batches"
         case .expireGenerationJob:
             "expire_generation_job"
         case .generationJob:
-            "generation_job"
+            "get_generation_job"
         case .generationJobs:
-            "generation_jobs"
+            "list_generation_jobs"
         case .createProfile:
             "create_profile"
         case .createClone:
@@ -401,19 +401,19 @@ enum WorkerRequest: Sendable, Equatable {
         case .listProfiles:
             "list_profiles"
         case .removeProfile:
-            "remove_profile"
+            "delete_profile"
         case .textProfileActive:
-            "text_profile_active"
+            "get_active_text_profile"
         case .textProfileBase:
-            "text_profile_base"
+            "get_base_text_profile"
         case .textProfile:
-            "text_profile"
+            "get_text_profile"
         case .textProfiles:
-            "text_profiles"
+            "list_text_profiles"
         case .textProfileEffective:
-            "text_profile_effective"
+            "get_effective_text_profile"
         case .textProfilePersistence:
-            "text_profile_persistence"
+            "get_text_profile_persistence"
         case .loadTextProfiles:
             "load_text_profiles"
         case .saveTextProfiles:
@@ -421,25 +421,25 @@ enum WorkerRequest: Sendable, Equatable {
         case .createTextProfile:
             "create_text_profile"
         case .storeTextProfile:
-            "store_text_profile"
+            "replace_text_profile"
         case .useTextProfile:
-            "use_text_profile"
+            "replace_active_text_profile"
         case .removeTextProfile:
-            "remove_text_profile"
+            "delete_text_profile"
         case .resetTextProfile:
             "reset_text_profile"
         case .addTextReplacement:
-            "add_text_replacement"
+            "create_text_replacement"
         case .replaceTextReplacement:
             "replace_text_replacement"
         case .removeTextReplacement:
-            "remove_text_replacement"
+            "delete_text_replacement"
         case .listQueue(_, .generation):
-            "list_queue_generation"
+            "list_generation_queue"
         case .listQueue(_, .playback):
-            "list_queue_playback"
+            "list_playback_queue"
         case .status:
-            "status"
+            "get_status"
         case .switchSpeechBackend:
             "set_speech_backend"
         case .reloadModels:
@@ -451,7 +451,7 @@ enum WorkerRequest: Sendable, Equatable {
         case .playback(_, .resume):
             "playback_resume"
         case .playback(_, .state):
-            "playback_state"
+            "get_playback_state"
         case .clearQueue:
             "clear_queue"
         case .cancelRequest:
@@ -826,29 +826,29 @@ enum WorkerRequest: Sendable, Equatable {
             let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
             return .queueBatch(id: id, profileName: profileName, items: items)
 
-        case "generated_file":
+        case "get_generated_file":
             let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
             return .generatedFile(id: id, artifactID: artifactID)
 
-        case "generated_files":
+        case "list_generated_files":
             return .generatedFiles(id: id)
 
-        case "generated_batch":
+        case "get_generated_batch":
             let batchID = try requireNonEmpty(raw.batchID ?? raw.jobID, field: "batch_id", id: id)
             return .generatedBatch(id: id, batchID: batchID)
 
-        case "generated_batches":
+        case "list_generated_batches":
             return .generatedBatches(id: id)
 
         case "expire_generation_job":
             let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
             return .expireGenerationJob(id: id, jobID: jobID)
 
-        case "generation_job":
+        case "get_generation_job":
             let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
             return .generationJob(id: id, jobID: jobID)
 
-        case "generation_jobs":
+        case "list_generation_jobs":
             return .generationJobs(id: id)
 
         case "create_profile":
@@ -884,28 +884,28 @@ enum WorkerRequest: Sendable, Equatable {
         case "list_profiles":
             return .listProfiles(id: id)
 
-        case "remove_profile":
+        case "delete_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
 
-        case "text_profile_active":
+        case "get_active_text_profile":
             return .textProfileActive(id: id)
 
-        case "text_profile_base":
+        case "get_base_text_profile":
             return .textProfileBase(id: id)
 
-        case "text_profile":
+        case "get_text_profile":
             let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
             return .textProfile(id: id, name: textProfileName)
 
-        case "text_profiles":
+        case "list_text_profiles":
             return .textProfiles(id: id)
 
-        case "text_profile_effective":
+        case "get_effective_text_profile":
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .textProfileEffective(id: id, name: textProfileName)
 
-        case "text_profile_persistence":
+        case "get_text_profile_persistence":
             return .textProfilePersistence(id: id)
 
         case "load_text_profiles":
@@ -928,7 +928,7 @@ enum WorkerRequest: Sendable, Equatable {
                 replacements: raw.replacements ?? []
             )
 
-        case "store_text_profile":
+        case "replace_text_profile":
             guard let textProfile = raw.textProfile else {
                 throw WorkerError(
                     code: .invalidRequest,
@@ -937,7 +937,7 @@ enum WorkerRequest: Sendable, Equatable {
             }
             return .storeTextProfile(id: id, profile: textProfile)
 
-        case "use_text_profile":
+        case "replace_active_text_profile":
             guard let textProfile = raw.textProfile else {
                 throw WorkerError(
                     code: .invalidRequest,
@@ -946,14 +946,14 @@ enum WorkerRequest: Sendable, Equatable {
             }
             return .useTextProfile(id: id, profile: textProfile)
 
-        case "remove_text_profile":
+        case "delete_text_profile":
             let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
             return .removeTextProfile(id: id, profileName: textProfileName)
 
         case "reset_text_profile":
             return .resetTextProfile(id: id)
 
-        case "add_text_replacement":
+        case "create_text_replacement":
             guard let replacement = raw.replacement else {
                 throw WorkerError(
                     code: .invalidRequest,
@@ -973,18 +973,18 @@ enum WorkerRequest: Sendable, Equatable {
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .replaceTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
 
-        case "remove_text_replacement":
+        case "delete_text_replacement":
             let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
 
-        case "list_queue_generation":
+        case "list_generation_queue":
             return .listQueue(id: id, queueType: .generation)
 
-        case "list_queue_playback":
+        case "list_playback_queue":
             return .listQueue(id: id, queueType: .playback)
 
-        case "status":
+        case "get_status":
             return .status(id: id)
 
         case "set_speech_backend":
@@ -1003,7 +1003,7 @@ enum WorkerRequest: Sendable, Equatable {
         case "playback_resume":
             return .playback(id: id, action: .resume)
 
-        case "playback_state":
+        case "get_playback_state":
             return .playback(id: id, action: .state)
 
         case "clear_queue":

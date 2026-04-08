@@ -42,7 +42,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-generated-file-read","op":"generated_file","artifact_id":"\(artifactID)"}
+                {"id":"req-generated-file-read","op":"get_generated_file","artifact_id":"\(artifactID)"}
                 """
             )
 
@@ -64,7 +64,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-generated-files-read","op":"generated_files"}
+                {"id":"req-generated-files-read","op":"list_generated_files"}
                 """
             )
 

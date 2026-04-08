@@ -1590,7 +1590,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"remove_profile","profile_name":"remove-me"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"delete_profile","profile_name":"remove-me"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
 
     await profileGate.open()
@@ -1606,12 +1606,12 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "remove_profile"
+                && $0["op"] as? String == "delete_profile"
         }
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_profile", "req-3:queue_speech_live", "req-2:remove_profile"])
+    #expect(startedOps == ["req-1:create_profile", "req-3:queue_speech_live", "req-2:delete_profile"])
 }
 
 @Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {

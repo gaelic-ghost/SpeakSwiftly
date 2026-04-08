@@ -129,8 +129,8 @@ import TextForSpeech
     )
 
     await runtime.start()
-    await runtime.accept(line: #"{"id":"req-generated-file","op":"generated_file","artifact_id":"req-file-lookup"}"#)
-    await runtime.accept(line: #"{"id":"req-generated-files","op":"generated_files"}"#)
+    await runtime.accept(line: #"{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-file-lookup"}"#)
+    await runtime.accept(line: #"{"id":"req-generated-files","op":"list_generated_files"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -204,8 +204,8 @@ import TextForSpeech
     )
 
     await runtime.start()
-    await runtime.accept(line: #"{"id":"req-generation-job","op":"generation_job","job_id":"job-file-lookup"}"#)
-    await runtime.accept(line: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
+    await runtime.accept(line: #"{"id":"req-generation-job","op":"get_generation_job","job_id":"job-file-lookup"}"#)
+    await runtime.accept(line: #"{"id":"req-generation-jobs","op":"list_generation_jobs"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -305,8 +305,8 @@ import TextForSpeech
 
     await runtime.start()
     await runtime.accept(line: #"{"id":"req-expire-job","op":"expire_generation_job","job_id":"job-expire-file"}"#)
-    await runtime.accept(line: #"{"id":"req-job-after-expire","op":"generation_job","job_id":"job-expire-file"}"#)
-    await runtime.accept(line: #"{"id":"req-generated-files-after-expire","op":"generated_files"}"#)
+    await runtime.accept(line: #"{"id":"req-job-after-expire","op":"get_generation_job","job_id":"job-expire-file"}"#)
+    await runtime.accept(line: #"{"id":"req-generated-files-after-expire","op":"list_generated_files"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -422,7 +422,7 @@ import TextForSpeech
 
     await runtime.start()
     await runtime.accept(line: #"{"id":"req-expire-batch","op":"expire_generation_job","job_id":"job-expire-batch"}"#)
-    await runtime.accept(line: #"{"id":"req-generated-batch-after-expire","op":"generated_batch","batch_id":"job-expire-batch"}"#)
+    await runtime.accept(line: #"{"id":"req-generated-batch-after-expire","op":"get_generated_batch","batch_id":"job-expire-batch"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {

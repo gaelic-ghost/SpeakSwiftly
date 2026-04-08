@@ -224,29 +224,29 @@ import TextForSpeech
 
 @Test func decodesGeneratedFileRequests() throws {
     let file = try WorkerRequest.decode(
-        from: #"{"id":"req-generated-file","op":"generated_file","artifact_id":"req-file"}"#
+        from: #"{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-file"}"#
     )
     #expect(file == .generatedFile(id: "req-generated-file", artifactID: "req-file"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-generated-files","op":"generated_files"}"#)
+    let list = try WorkerRequest.decode(from: #"{"id":"req-generated-files","op":"list_generated_files"}"#)
     #expect(list == .generatedFiles(id: "req-generated-files"))
 
     let batch = try WorkerRequest.decode(
-        from: #"{"id":"req-generated-batch","op":"generated_batch","batch_id":"batch-job-1"}"#
+        from: #"{"id":"req-generated-batch","op":"get_generated_batch","batch_id":"batch-job-1"}"#
     )
     #expect(batch == .generatedBatch(id: "req-generated-batch", batchID: "batch-job-1"))
 
-    let batchList = try WorkerRequest.decode(from: #"{"id":"req-generated-batches","op":"generated_batches"}"#)
+    let batchList = try WorkerRequest.decode(from: #"{"id":"req-generated-batches","op":"list_generated_batches"}"#)
     #expect(batchList == .generatedBatches(id: "req-generated-batches"))
 }
 
 @Test func decodesGenerationJobRequests() throws {
     let job = try WorkerRequest.decode(
-        from: #"{"id":"req-generation-job","op":"generation_job","job_id":"job-file-1"}"#
+        from: #"{"id":"req-generation-job","op":"get_generation_job","job_id":"job-file-1"}"#
     )
     #expect(job == .generationJob(id: "req-generation-job", jobID: "job-file-1"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"generation_jobs"}"#)
+    let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"list_generation_jobs"}"#)
     #expect(list == .generationJobs(id: "req-generation-jobs"))
 
     let expire = try WorkerRequest.decode(
@@ -256,27 +256,27 @@ import TextForSpeech
 }
 
 @Test func decodesRemoveProfileRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"delete_profile","profile_name":"bright-guide"}"#)
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))
 }
 
 @Test func decodesTextProfileReadRequests() throws {
-    let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"text_profile_active"}"#)
+    let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(active == .textProfileActive(id: "req-text-active"))
 
-    let base = try WorkerRequest.decode(from: #"{"id":"req-text-base","op":"text_profile_base"}"#)
+    let base = try WorkerRequest.decode(from: #"{"id":"req-text-base","op":"get_base_text_profile"}"#)
     #expect(base == .textProfileBase(id: "req-text-base"))
 
     let named = try WorkerRequest.decode(
-        from: #"{"id":"req-text-one","op":"text_profile","text_profile_name":"logs"}"#
+        from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_name":"logs"}"#
     )
     #expect(named == .textProfile(id: "req-text-one", name: "logs"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-text-list","op":"text_profiles"}"#)
+    let list = try WorkerRequest.decode(from: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
     #expect(list == .textProfiles(id: "req-text-list"))
 
     let effective = try WorkerRequest.decode(
-        from: #"{"id":"req-text-effective","op":"text_profile_effective","text_profile_name":"logs"}"#
+        from: #"{"id":"req-text-effective","op":"get_effective_text_profile","text_profile_name":"logs"}"#
     )
     #expect(effective == .textProfileEffective(id: "req-text-effective", name: "logs"))
 }
@@ -303,12 +303,12 @@ import TextForSpeech
     )
     let storePayload = try String(decoding: JSONEncoder().encode(profile), as: UTF8.self)
     let store = try WorkerRequest.decode(
-        from: #"{"id":"req-text-store","op":"store_text_profile","text_profile":"# + storePayload + #"}"#
+        from: #"{"id":"req-text-store","op":"replace_text_profile","text_profile":"# + storePayload + #"}"#
     )
     #expect(store == .storeTextProfile(id: "req-text-store", profile: profile))
 
     let add = try WorkerRequest.decode(
-        from: #"{"id":"req-text-add","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
+        from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
     )
     #expect(
         add == .addTextReplacement(
@@ -319,7 +319,7 @@ import TextForSpeech
     )
 
     let remove = try WorkerRequest.decode(
-        from: #"{"id":"req-text-remove-replacement","op":"remove_text_replacement","replacement_id":"logs-rule","text_profile_name":"logs"}"#
+        from: #"{"id":"req-text-remove-replacement","op":"delete_text_replacement","replacement_id":"logs-rule","text_profile_name":"logs"}"#
     )
     #expect(
         remove == .removeTextReplacement(
@@ -331,12 +331,12 @@ import TextForSpeech
 }
 
 @Test func decodesListQueueRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_queue_generation"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_generation_queue"}"#)
     #expect(request == .listQueue(id: "req-5", queueType: .generation))
 }
 
 @Test func decodesStatusRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-status","op":"status"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-status","op":"get_status"}"#)
     #expect(request == .status(id: "req-status"))
 }
 
@@ -358,7 +358,7 @@ import TextForSpeech
 }
 
 @Test func decodesPlaybackQueueRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-5b","op":"list_queue_playback"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-5b","op":"list_playback_queue"}"#)
     #expect(request == .listQueue(id: "req-5b", queueType: .playback))
 }
 

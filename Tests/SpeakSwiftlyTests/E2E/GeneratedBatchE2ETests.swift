@@ -56,7 +56,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-generated-batch-read","op":"generated_batch","batch_id":"req-generated-batch-e2e"}
+                {"id":"req-generated-batch-read","op":"get_generated_batch","batch_id":"req-generated-batch-e2e"}
                 """
             )
 
@@ -81,7 +81,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-generated-batches-read","op":"generated_batches"}
+                {"id":"req-generated-batches-read","op":"list_generated_batches"}
                 """
             )
 
