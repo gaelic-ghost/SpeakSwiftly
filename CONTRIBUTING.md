@@ -73,6 +73,25 @@ The intent behind this shape is:
 - explicit enough to read well at the call site
 - aligned with the runtime concept being controlled, not the JSON transport name
 
+The broader typed runtime surface is now moving toward one root startup result plus stored concern handles:
+
+- `SpeakSwiftly.live(...)` returns `SpeakSwiftly.Runtime`
+- `runtime.generate`
+- `runtime.player`
+- `runtime.voices`
+- `runtime.normalizer`
+- `runtime.jobs`
+- `runtime.artifacts`
+
+Those concern handles should stay lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
+
+`SpeakSwiftly.Name` is the intended semantic name type for stable operator-facing resource names in the library surface.
+
+For voice-profile creation, the intended Swift shape is one overloaded `Voices.create(...)` entry point:
+
+- `create(design named: Name, from: String, vibe: SpeakSwiftly.Vibe, voice: String, outputPath: String?, id: String)`
+- `create(clone named: Name, from: URL, vibe: SpeakSwiftly.Vibe, transcript: String?, id: String)`
+
 ### JSONL Wire API
 
 The JSONL worker surface uses stable snake_case, verb-first operation names.
@@ -157,18 +176,32 @@ Current resident-status stages:
 
 ## Typed Swift Notes
 
-The typed `SpeakSwiftly.Runtime` generation and profile helpers currently include:
+The typed runtime now uses concern-specific stored handles on the shared runtime object instead of one monolithic `SpeakSwiftly.Runtime` method surface.
 
-- `speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
-- `createProfile(named:from:vibe:voice:outputPath:id:)`
-- `createClone(named:from:vibe:transcript:id:)`
-- `generatedFile(id:requestID:)`
-- `generatedFiles(id:)`
-- `generateBatch(_:with:id:)`
-- `generatedBatch(id:requestID:)`
-- `generatedBatches(id:)`
-- `generationJob(id:requestID:)`
-- `generationJobs(id:)`
+The intended concern split is:
+
+- generation work under `runtime.generate`
+- playback and queue work under `runtime.player`
+- voice-profile work under `runtime.voices`
+- text-normalization work under `runtime.normalizer`
+- generation-job reads and retention under `runtime.jobs`
+- generated-file and generated-batch reads under `runtime.artifacts`
+
+The intended library-caller shape is:
+
+- `runtime.generate.speak(...)`
+- `runtime.generate.batch(...)`
+- `runtime.voices.create(design named: ...)`
+- `runtime.voices.create(clone named: ...)`
+- `runtime.voices.list(...)`
+- `runtime.voices.delete(named: ...)`
+- `runtime.jobs.expire(...)`
+- `runtime.jobs.job(...)`
+- `runtime.jobs.list(...)`
+- `runtime.artifacts.file(...)`
+- `runtime.artifacts.files(...)`
+- `runtime.artifacts.batch(...)`
+- `runtime.artifacts.batches(...)`
 
 The typed text-normalization helpers live on `SpeakSwiftly.Normalizer`:
 
@@ -192,7 +225,7 @@ The typed text-normalization helpers live on `SpeakSwiftly.Normalizer`:
 - `removeReplacement(id:)`
 - `removeReplacement(id:fromStoredProfileNamed:)`
 
-`runtime.normalizer` remains available as a compatibility alias to the injected normalizer object when callers already have a runtime in hand.
+`runtime.normalizer` remains the intended way to reach the injected normalizer object when callers already have a runtime in hand.
 
 ## JSONL Reference
 

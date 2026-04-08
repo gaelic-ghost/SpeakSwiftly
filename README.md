@@ -72,7 +72,7 @@ import TextForSpeech
 let runtime = await SpeakSwiftly.live()
 await runtime.start()
 
-let handle = await runtime.speak(
+let handle = await runtime.generate.speak(
     text: "Hello there.",
     with: "default-femme",
     as: .live
@@ -86,13 +86,22 @@ for try await event in handle.events {
 When the whole input is source code rather than prose with embedded code, use `sourceFormat`:
 
 ```swift
-let sourceHandle = await runtime.speak(
+let sourceHandle = await runtime.generate.speak(
     text: "struct WorkerRuntime { let sampleRate: Int }",
     with: "default-femme",
     as: .live,
     sourceFormat: .swift
 )
 ```
+
+The typed runtime is organized around stored concern handles that callers can keep and reuse:
+
+- `runtime.generate`
+- `runtime.player`
+- `runtime.voices`
+- `runtime.normalizer`
+- `runtime.jobs`
+- `runtime.artifacts`
 
 Runtime preferences have a matching typed surface:
 
@@ -125,20 +134,30 @@ The package currently publishes:
 
 Key typed runtime entry points include:
 
-- `speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
-- `createProfile(named:from:vibe:voice:outputPath:id:)`
-- `createClone(named:from:vibe:transcript:id:)`
-- `status(id:)`
-- `switchSpeechBackend(to:id:)`
-- `reloadModels(id:)`
-- `unloadModels(id:)`
-- `generatedFile(id:requestID:)`
-- `generatedFiles(id:)`
-- `generateBatch(_:with:id:)`
-- `generatedBatch(id:requestID:)`
-- `generatedBatches(id:)`
-- `generationJob(id:requestID:)`
-- `generationJobs(id:)`
+- `runtime.generate.speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
+- `runtime.generate.batch(_:with:id:)`
+- `runtime.voices.create(design named:from:vibe:voice:outputPath:id:)`
+- `runtime.voices.create(clone named:from:vibe:transcript:id:)`
+- `runtime.voices.list(id:)`
+- `runtime.voices.delete(named:id:)`
+- `runtime.player.generationQueue(id:)`
+- `runtime.player.playbackQueue(id:)`
+- `runtime.player.pause(id:)`
+- `runtime.player.resume(id:)`
+- `runtime.player.state(id:)`
+- `runtime.player.clearQueue(id:)`
+- `runtime.player.cancelRequest(_:requestID:)`
+- `runtime.jobs.expire(id:requestID:)`
+- `runtime.jobs.job(id:requestID:)`
+- `runtime.jobs.list(id:)`
+- `runtime.artifacts.file(id:requestID:)`
+- `runtime.artifacts.files(id:)`
+- `runtime.artifacts.batch(id:requestID:)`
+- `runtime.artifacts.batches(id:)`
+- `runtime.status(id:)`
+- `runtime.switchSpeechBackend(to:id:)`
+- `runtime.reloadModels(id:)`
+- `runtime.unloadModels(id:)`
 
 The typed Swift library and the JSONL worker surface intentionally use different naming styles:
 

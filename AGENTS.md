@@ -32,7 +32,7 @@
 
 ## Repository Structure
 
-- Keep `Sources/SpeakSwiftly/API` as the single home for public `SpeakSwiftly.Runtime` API entry points and other operator-facing library surface declarations.
+- Keep `Sources/SpeakSwiftly/API` as the single home for public `SpeakSwiftly.Runtime` concern-handle accessors, `SpeakSwiftly.Name`, and other operator-facing library surface declarations.
 - Keep feature logic in its feature directory, not in `Runtime/`. For example, text-normalization logic belongs in `Normalization/`, generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
 - Keep `Sources/SpeakSwiftly/Runtime` for runtime-only internals such as worker request handling, queue orchestration, lifecycle management, event emission, and other machinery that is genuinely part of the worker runtime itself.
 - Do not split one feature across three places when two will do. For any given feature, prefer one API file in `API/` plus one logic file in the relevant feature directory.
@@ -42,6 +42,10 @@
 - For JSONL writes, prefer CRUD verbs where they fit the actual semantics: `create_*`, `update_*`, `replace_*`, and `delete_*`.
 - Keep literal lifecycle and control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
 - When adding or renaming a JSONL operation, update both `README.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented.
+- For the typed Swift library surface, prefer one startup entry point that returns `SpeakSwiftly.Runtime`, then expose stored concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts` from that root object instead of growing one monolithic `Runtime` method namespace.
+- Keep those concern handles lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
+- Use `SpeakSwiftly.Name` as the operator-facing semantic name type for stored voice-profile names and similar stable user-named resources when the public API benefits from carrying that meaning explicitly.
+- For the voice-profile library surface, prefer one `Voices.create(...)` verb with overloaded first labels that keep the call site explicit, such as `create(design named: Name, ...)` and `create(clone named: Name, ...)`, instead of multiplying unrelated creation verbs.
 
 ## Swift Coding Preferences
 

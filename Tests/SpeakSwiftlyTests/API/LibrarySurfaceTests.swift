@@ -37,15 +37,15 @@ import TextForSpeech
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let speak: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
-        runtime,
+    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+        generate,
         text,
         profileName,
         textProfileName,
         textContext,
         sourceFormat,
         id in
-        await runtime.speak(
+        await generate.speak(
             text: text,
             with: profileName,
             as: .live,
@@ -55,15 +55,15 @@ import TextForSpeech
             id: id
         )
     }
-    let speakFile: @Sendable (SpeakSwiftly.Runtime, String, String, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
-        runtime,
+    let speakFile: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+        generate,
         text,
         profileName,
         textProfileName,
         textContext,
         sourceFormat,
         id in
-        await runtime.speak(
+        await generate.speak(
             text: text,
             with: profileName,
             as: .file,
@@ -72,6 +72,21 @@ import TextForSpeech
             sourceFormat: sourceFormat,
             id: id
         )
+    }
+    let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
+        runtime.generate
+    }
+    let playerHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Player = { runtime in
+        runtime.player
+    }
+    let voicesHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Voices = { runtime in
+        runtime.voices
+    }
+    let jobsHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Jobs = { runtime in
+        runtime.jobs
+    }
+    let artifactsHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Artifacts = { runtime in
+        runtime.artifacts
     }
     let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
         runtime.normalizer
@@ -161,16 +176,16 @@ import TextForSpeech
         name in
         try await normalizer.removeReplacement(id: replacementID, fromStoredProfileNamed: name)
     }
-    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, SpeakSwiftly.Vibe, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
-        runtime,
+    let createProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
+        voices,
         profileName,
         text,
         vibe,
         voiceDescription,
         outputPath,
         id in
-        await runtime.createProfile(
-            named: profileName,
+        await voices.create(
+            design: profileName,
             from: text,
             vibe: vibe,
             voice: voiceDescription,
@@ -178,57 +193,57 @@ import TextForSpeech
             id: id
         )
     }
-    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, SpeakSwiftly.Vibe, String?, String) async -> SpeakSwiftly.RequestHandle = {
-        runtime,
+    let createClone: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, URL, SpeakSwiftly.Vibe, String?, String) async -> SpeakSwiftly.RequestHandle = {
+        voices,
         profileName,
         referenceAudioURL,
         vibe,
         transcript,
         id in
-        await runtime.createClone(
-            named: profileName,
+        await voices.create(
+            clone: profileName,
             from: referenceAudioURL,
             vibe: vibe,
             transcript: transcript,
             id: id
         )
     }
-    let profiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, id in
-        await runtime.profiles(id: id)
+    let profiles: @Sendable (SpeakSwiftly.Voices, String) async -> SpeakSwiftly.RequestHandle = { voices, id in
+        await voices.list(id: id)
     }
-    let removeProfile: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, profileName, id in
-        await runtime.removeProfile(named: profileName, id: id)
+    let removeProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String) async -> SpeakSwiftly.RequestHandle = { voices, profileName, id in
+        await voices.delete(named: profileName, id: id)
     }
-    let generatedFile: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, artifactID, requestID in
-        await runtime.generatedFile(id: artifactID, requestID: requestID)
+    let generatedFile: @Sendable (SpeakSwiftly.Artifacts, String, String) async -> SpeakSwiftly.RequestHandle = { artifacts, artifactID, requestID in
+        await artifacts.file(id: artifactID, requestID: requestID)
     }
-    let generatedFiles: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
-        await runtime.generatedFiles(id: requestID)
+    let generatedFiles: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, requestID in
+        await artifacts.files(id: requestID)
     }
-    let generateBatch: @Sendable (SpeakSwiftly.Runtime, [SpeakSwiftly.BatchItem], String, String) async -> SpeakSwiftly.RequestHandle = {
-        runtime,
+    let generateBatch: @Sendable (SpeakSwiftly.Generate, [SpeakSwiftly.BatchItem], SpeakSwiftly.Name, String) async -> SpeakSwiftly.RequestHandle = {
+        generate,
         items,
         profileName,
         id in
-        await runtime.generateBatch(items, with: profileName, id: id)
+        await generate.batch(items, with: profileName, id: id)
     }
-    let generatedBatch: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, batchID, requestID in
-        await runtime.generatedBatch(id: batchID, requestID: requestID)
+    let generatedBatch: @Sendable (SpeakSwiftly.Artifacts, String, String) async -> SpeakSwiftly.RequestHandle = { artifacts, batchID, requestID in
+        await artifacts.batch(id: batchID, requestID: requestID)
     }
-    let generatedBatches: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
-        await runtime.generatedBatches(id: requestID)
+    let generatedBatches: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, requestID in
+        await artifacts.batches(id: requestID)
     }
-    let expireGenerationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
-        await runtime.expireGenerationJob(id: jobID, requestID: requestID)
+    let expireGenerationJob: @Sendable (SpeakSwiftly.Jobs, String, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID, requestID in
+        await jobs.expire(id: jobID, requestID: requestID)
     }
-    let generationJob: @Sendable (SpeakSwiftly.Runtime, String, String) async -> SpeakSwiftly.RequestHandle = { runtime, jobID, requestID in
-        await runtime.generationJob(id: jobID, requestID: requestID)
+    let generationJob: @Sendable (SpeakSwiftly.Jobs, String, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID, requestID in
+        await jobs.job(id: jobID, requestID: requestID)
     }
-    let generationJobs: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, requestID in
-        await runtime.generationJobs(id: requestID)
+    let generationJobs: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, requestID in
+        await jobs.list(id: requestID)
     }
-    let generationQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.queue(.generation)
+    let generationQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
+        await player.generationQueue()
     }
     let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.status()
@@ -244,17 +259,17 @@ import TextForSpeech
     let unloadModels: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.unloadModels()
     }
-    let playbackQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.queue(.playback)
+    let playbackQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
+        await player.playbackQueue()
     }
-    let playbackPause: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.playback(.pause)
+    let playbackPause: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
+        await player.pause()
     }
-    let clearQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.clearQueue()
+    let clearQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
+        await player.clearQueue()
     }
-    let cancelRequest: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, id in
-        await runtime.cancelRequest(id)
+    let cancelRequest: @Sendable (SpeakSwiftly.Player, String) async -> SpeakSwiftly.RequestHandle = { player, id in
+        await player.cancelRequest(id)
     }
     let statusEvents: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.StatusEvent> = { runtime in
         await runtime.statusEvents()
@@ -262,6 +277,11 @@ import TextForSpeech
 
     _ = speak
     _ = speakFile
+    _ = generateHandle
+    _ = playerHandle
+    _ = voicesHandle
+    _ = jobsHandle
+    _ = artifactsHandle
     _ = normalizer
     _ = makeNormalizer
     _ = liveWithNormalizer

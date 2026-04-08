@@ -105,34 +105,22 @@ public extension SpeakSwiftly {
     }
 }
 
-public extension SpeakSwiftly.Runtime {
-    func generateBatch(
-        _ items: [SpeakSwiftly.BatchItem],
-        with profileName: String,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(
-            .queueBatch(
-                id: id,
-                profileName: profileName,
-                items: SpeakSwiftly.Runtime.resolveBatchItems(items, batchID: id)
-            )
-        )
-    }
-
-    func generatedBatch(
+public extension SpeakSwiftly.Artifacts {
+    func batch(
         id batchID: String,
         requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generatedBatch(id: requestID, batchID: batchID))
+        await runtime.submit(.generatedBatch(id: requestID, batchID: batchID))
     }
 
-    func generatedBatches(
+    func batches(
         id requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generatedBatches(id: requestID))
+        await runtime.submit(.generatedBatches(id: requestID))
     }
+}
 
+public extension SpeakSwiftly.Runtime {
     static func resolveBatchItems(
         _ items: [SpeakSwiftly.BatchItem],
         batchID: String

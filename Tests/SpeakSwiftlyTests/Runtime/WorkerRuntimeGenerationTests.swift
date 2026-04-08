@@ -36,7 +36,7 @@ import TextForSpeech
         }
     })
 
-    let requestID = await runtime.speak(
+    let requestID = await runtime.generate.speak(
         text: "Hello from the generated file path.",
         with: "default-femme",
         as: .file,

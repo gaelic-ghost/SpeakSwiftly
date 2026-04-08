@@ -4,6 +4,8 @@ import TextForSpeech
 // MARK: - Public Library Streams
 
 public enum SpeakSwiftly {
+    public typealias Name = String
+
     public enum Job: Sendable, Equatable {
         case live
         case file

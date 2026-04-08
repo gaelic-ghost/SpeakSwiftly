@@ -37,7 +37,7 @@ import TextForSpeech
         }
     })
 
-    let activeID = await runtime.speak(
+    let activeID = await runtime.generate.speak(
         text: "Hello there",
         with: "default-femme",
         as: .live,
@@ -52,7 +52,7 @@ import TextForSpeech
         }
     })
 
-    let backgroundID = await runtime.speak(
+    let backgroundID = await runtime.generate.speak(
         text: "Hi there",
         with: "default-femme",
         as: .live,
@@ -124,7 +124,7 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.speak(
+    _ = await runtime.generate.speak(
         text: "Hello there",
         with: "default-femme",
         as: .live,
@@ -207,7 +207,7 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.speak(
+    _ = await runtime.generate.speak(
         text: "Hello there",
         with: "default-femme",
         as: .live,

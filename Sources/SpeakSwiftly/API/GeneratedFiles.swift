@@ -2,17 +2,29 @@ import Foundation
 
 // MARK: - Generated File API
 
+public extension SpeakSwiftly {
+    struct Artifacts: Sendable {
+        let runtime: SpeakSwiftly.Runtime
+    }
+}
+
 public extension SpeakSwiftly.Runtime {
-    func generatedFile(
+    nonisolated var artifacts: SpeakSwiftly.Artifacts {
+        SpeakSwiftly.Artifacts(runtime: self)
+    }
+}
+
+public extension SpeakSwiftly.Artifacts {
+    func file(
         id artifactID: String,
         requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generatedFile(id: requestID, artifactID: artifactID))
+        await runtime.submit(.generatedFile(id: requestID, artifactID: artifactID))
     }
 
-    func generatedFiles(
+    func files(
         id requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generatedFiles(id: requestID))
+        await runtime.submit(.generatedFiles(id: requestID))
     }
 }

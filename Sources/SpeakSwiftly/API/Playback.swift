@@ -2,32 +2,52 @@ import Foundation
 
 // MARK: - Playback API
 
+public extension SpeakSwiftly {
+    struct Player: Sendable {
+        let runtime: SpeakSwiftly.Runtime
+    }
+}
+
 public extension SpeakSwiftly.Runtime {
-    func queue(
-        _ queueType: SpeakSwiftly.Queue,
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.listQueue(id: requestID, queueType: queueType))
+    nonisolated var player: SpeakSwiftly.Player {
+        SpeakSwiftly.Player(runtime: self)
+    }
+}
+
+public extension SpeakSwiftly.Player {
+    func generationQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: requestID, queueType: .generation))
     }
 
-    func playback(
-        _ action: SpeakSwiftly.PlaybackAction,
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.playback(id: requestID, action: action))
+    func playbackQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: requestID, queueType: .playback))
+    }
+
+    func pause(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: requestID, action: .pause))
+    }
+
+    func resume(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: requestID, action: .resume))
+    }
+
+    func state(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: requestID, action: .state))
     }
 
     func clearQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await submit(.clearQueue(id: requestID))
+        await runtime.submit(.clearQueue(id: requestID))
     }
 
     func cancelRequest(
         _ id: String,
         requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.cancelRequest(id: requestID, requestID: id))
+        await runtime.submit(.cancelRequest(id: requestID, requestID: id))
     }
+}
 
+public extension SpeakSwiftly.Runtime {
     func shutdown() async {
         guard !isShuttingDown else { return }
 

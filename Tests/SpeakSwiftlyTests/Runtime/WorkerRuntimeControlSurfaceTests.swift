@@ -53,7 +53,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -62,9 +62,9 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.speak(text: "Hi there", with: "default-femme", as: .live, id: "req-queued-1")
+    _ = await runtime.generate.speak(text: "Hi there", with: "default-femme", as: .live, id: "req-queued-1")
 
-    let listID = await runtime.queue(.playback, id: "req-list-queue").id
+    let listID = await runtime.player.playbackQueue(id: "req-list-queue").id
     #expect(listID == "req-list-queue")
 
     #expect(await waitUntil {
@@ -232,7 +232,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let queuedFileID = await runtime.speak(
+    let queuedFileID = await runtime.generate.speak(
         text: "Save this request once the resident models are back.",
         with: "default-femme",
         as: .file,
@@ -323,7 +323,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -334,7 +334,7 @@ private actor BackendLoadRecorder {
 
     let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch-busy").id
     #expect(switchID == "req-switch-busy")
-    let queuedFileID = await runtime.speak(
+    let queuedFileID = await runtime.generate.speak(
         text: "Save this request after the backend switch barrier.",
         with: "default-femme",
         as: .file,
@@ -393,7 +393,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generationJobID = await runtime.generationJob(id: "req-after-switch", requestID: "req-after-switch-job").id
+    let generationJobID = await runtime.jobs.job(id: "req-after-switch", requestID: "req-after-switch-job").id
     #expect(generationJobID == "req-after-switch-job")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -434,8 +434,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.createProfile(
-        named: "bright-guide",
+    _ = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
         voice: "Warm and bright",
         id: "req-active"
@@ -460,7 +459,7 @@ private actor BackendLoadRecorder {
         )
     )
 
-    let clearID = await runtime.clearQueue(id: "req-clear").id
+    let clearID = await runtime.player.clearQueue(id: "req-clear").id
     #expect(clearID == "req-clear")
 
     #expect(await waitUntil {
@@ -543,7 +542,7 @@ private actor BackendLoadRecorder {
         }
     }
 
-    let cancelID = await runtime.cancelRequest("req-active", requestID: "req-cancel").id
+    let cancelID = await runtime.player.cancelRequest("req-active", requestID: "req-cancel").id
     #expect(cancelID == "req-cancel")
 
     #expect(await waitUntil {
@@ -595,8 +594,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.createProfile(
-        named: "bright-guide",
+    _ = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
         voice: "Warm and bright",
         id: "req-active"
@@ -621,7 +619,7 @@ private actor BackendLoadRecorder {
         )
     )
 
-    let cancelID = await runtime.cancelRequest("req-queued", requestID: "req-cancel").id
+    let cancelID = await runtime.player.cancelRequest("req-queued", requestID: "req-cancel").id
     #expect(cancelID == "req-cancel")
 
     #expect(await waitUntil {
@@ -668,8 +666,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.createProfile(
-        named: "bright-guide",
+    let createID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
         voice: "Warm and bright",
         outputPath: nil,
@@ -684,7 +681,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let listID = await runtime.profiles(id: "req-list").id
+    let listID = await runtime.voices.list(id: "req-list").id
     #expect(listID == "req-list")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -700,7 +697,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let speakFileID = await runtime.speak(
+    let speakFileID = await runtime.generate.speak(
         text: "Save this request as an artifact.",
         with: "bright-guide",
         as: .file,
@@ -722,7 +719,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedFileID = await runtime.generatedFile(id: fileArtifactID, requestID: "req-file-read").id
+    let generatedFileID = await runtime.artifacts.file(id: fileArtifactID, requestID: "req-file-read").id
     #expect(generatedFileID == "req-file-read")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -738,7 +735,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedFilesID = await runtime.generatedFiles(id: "req-file-list").id
+    let generatedFilesID = await runtime.artifacts.files(id: "req-file-list").id
     #expect(generatedFilesID == "req-file-list")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -756,7 +753,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generationJobID = await runtime.generationJob(id: "req-file-helper", requestID: "req-job-read").id
+    let generationJobID = await runtime.jobs.job(id: "req-file-helper", requestID: "req-job-read").id
     #expect(generationJobID == "req-job-read")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -775,7 +772,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generationJobsID = await runtime.generationJobs(id: "req-job-list").id
+    let generationJobsID = await runtime.jobs.list(id: "req-job-list").id
     #expect(generationJobsID == "req-job-list")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -796,7 +793,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let removeID = await runtime.removeProfile(named: "bright-guide", id: "req-remove").id
+    let removeID = await runtime.voices.delete(named: "bright-guide", id: "req-remove").id
     #expect(removeID == "req-remove")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -911,7 +908,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let batchID = await runtime.generateBatch(
+    let batchID = await runtime.generate.batch(
         [
             SpeakSwiftly.BatchItem(text: "First generated file."),
             SpeakSwiftly.BatchItem(
@@ -977,7 +974,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedBatchID = await runtime.generatedBatch(id: "req-batch-1", requestID: "req-batch-read").id
+    let generatedBatchID = await runtime.artifacts.batch(id: "req-batch-1", requestID: "req-batch-read").id
     #expect(generatedBatchID == "req-batch-read")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -994,7 +991,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedBatchesID = await runtime.generatedBatches(id: "req-batches-read").id
+    let generatedBatchesID = await runtime.artifacts.batches(id: "req-batches-read").id
     #expect(generatedBatchesID == "req-batches-read")
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1038,8 +1035,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.createClone(
-        named: "ghost-copy",
+    let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
         transcript: "Provided transcript",
         id: "req-clone"
@@ -1134,8 +1130,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.createClone(
-        named: "ghost-copy",
+    let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
         transcript: nil,
         id: "req-clone"
@@ -1191,8 +1186,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.createClone(
-        named: "ghost-copy",
+    let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
         transcript: nil,
         id: "req-clone"
@@ -1300,7 +1294,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.speak(
+    _ = await runtime.generate.speak(
         text: "Hello there, galew.",
         with: "default-femme",
         as: .live,
@@ -1446,7 +1440,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"

@@ -598,34 +598,34 @@ private func inferredTestVibe(profileName: String, voiceDescription: String) -> 
     return .androgenous
 }
 
-extension SpeakSwiftly.Runtime {
-    func createProfile(
-        named profileName: String,
+extension SpeakSwiftly.Voices {
+    func create(
+        design named: SpeakSwiftly.Name,
         from text: String,
         voice voiceDescription: String,
         outputPath: String? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await createProfile(
-            named: profileName,
+        await create(
+            design: named,
             from: text,
-            vibe: inferredTestVibe(profileName: profileName, voiceDescription: voiceDescription),
+            vibe: inferredTestVibe(profileName: named, voiceDescription: voiceDescription),
             voice: voiceDescription,
             outputPath: outputPath,
             id: id
         )
     }
 
-    func createClone(
-        named profileName: String,
+    func create(
+        clone named: SpeakSwiftly.Name,
         from referenceAudioURL: URL,
         transcript: String? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await createClone(
-            named: profileName,
+        await create(
+            clone: named,
             from: referenceAudioURL,
-            vibe: inferredTestVibe(profileName: profileName, voiceDescription: transcript ?? ""),
+            vibe: inferredTestVibe(profileName: named, voiceDescription: transcript ?? ""),
             transcript: transcript,
             id: id
         )

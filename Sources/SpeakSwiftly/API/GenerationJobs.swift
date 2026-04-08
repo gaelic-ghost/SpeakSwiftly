@@ -183,24 +183,36 @@ public extension SpeakSwiftly {
     }
 }
 
+public extension SpeakSwiftly {
+    struct Jobs: Sendable {
+        let runtime: SpeakSwiftly.Runtime
+    }
+}
+
 public extension SpeakSwiftly.Runtime {
-    func expireGenerationJob(
+    nonisolated var jobs: SpeakSwiftly.Jobs {
+        SpeakSwiftly.Jobs(runtime: self)
+    }
+}
+
+public extension SpeakSwiftly.Jobs {
+    func expire(
         id jobID: String,
         requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.expireGenerationJob(id: requestID, jobID: jobID))
+        await runtime.submit(.expireGenerationJob(id: requestID, jobID: jobID))
     }
 
-    func generationJob(
+    func job(
         id jobID: String,
         requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generationJob(id: requestID, jobID: jobID))
+        await runtime.submit(.generationJob(id: requestID, jobID: jobID))
     }
 
-    func generationJobs(
+    func list(
         id requestID: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(.generationJobs(id: requestID))
+        await runtime.submit(.generationJobs(id: requestID))
     }
 }
