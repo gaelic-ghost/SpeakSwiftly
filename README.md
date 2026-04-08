@@ -132,31 +132,31 @@ The package currently publishes:
 
 Key typed runtime entry points include:
 
-- `runtime.generate.speech(text:with:textProfileName:textContext:sourceFormat:id:)`
-- `runtime.generate.audio(text:with:textProfileName:textContext:sourceFormat:id:)`
-- `runtime.generate.batch(_:with:id:)`
-- `runtime.voices.create(design named:from:vibe:voice:outputPath:id:)`
-- `runtime.voices.create(clone named:from:vibe:transcript:id:)`
-- `runtime.voices.list(id:)`
-- `runtime.voices.delete(named:id:)`
-- `runtime.player.list(id:)`
-- `runtime.player.pause(id:)`
-- `runtime.player.resume(id:)`
-- `runtime.player.state(id:)`
-- `runtime.player.clearQueue(id:)`
-- `runtime.player.cancelRequest(_:requestID:)`
-- `runtime.jobs.expire(id:requestID:)`
-- `runtime.jobs.generationQueue(id:)`
-- `runtime.jobs.job(id:requestID:)`
-- `runtime.jobs.list(id:)`
-- `runtime.artifacts.file(id:requestID:)`
-- `runtime.artifacts.files(id:)`
-- `runtime.artifacts.batch(id:requestID:)`
-- `runtime.artifacts.batches(id:)`
-- `runtime.status(id:)`
-- `runtime.switchSpeechBackend(to:id:)`
-- `runtime.reloadModels(id:)`
-- `runtime.unloadModels(id:)`
+- `runtime.generate.speech(text:with:textProfileName:textContext:sourceFormat:)`
+- `runtime.generate.audio(text:with:textProfileName:textContext:sourceFormat:)`
+- `runtime.generate.batch(_:with:)`
+- `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
+- `runtime.voices.create(clone named:from:vibe:transcript:)`
+- `runtime.voices.list()`
+- `runtime.voices.delete(named:)`
+- `runtime.player.list()`
+- `runtime.player.pause()`
+- `runtime.player.resume()`
+- `runtime.player.state()`
+- `runtime.player.clearQueue()`
+- `runtime.player.cancelRequest(_:)`
+- `runtime.jobs.expire(id:)`
+- `runtime.jobs.generationQueue()`
+- `runtime.jobs.job(id:)`
+- `runtime.jobs.list()`
+- `runtime.artifacts.file(id:)`
+- `runtime.artifacts.files()`
+- `runtime.artifacts.batch(id:)`
+- `runtime.artifacts.batches()`
+- `runtime.status()`
+- `runtime.switchSpeechBackend(to:)`
+- `runtime.reloadModels()`
+- `runtime.unloadModels()`
 
 The typed Swift library and the JSONL worker surface intentionally use different naming styles:
 

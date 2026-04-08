@@ -946,7 +946,7 @@ public extension SpeakSwiftly {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.profile(named: name),
+                        textProfile: await normalizerRef.profile(id: name),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -964,7 +964,7 @@ public extension SpeakSwiftly {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.effectiveProfile(named: name),
+                        textProfile: await normalizerRef.effectiveProfile(id: name),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -1032,7 +1032,7 @@ public extension SpeakSwiftly {
                 )
 
             case .removeTextProfile(let id, let profileName):
-                try await normalizerRef.removeProfile(named: profileName)
+                try await normalizerRef.removeProfile(id: profileName)
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
@@ -1054,7 +1054,7 @@ public extension SpeakSwiftly {
                 let profile = if let profileName {
                     try await normalizerRef.addReplacement(
                         replacement,
-                        toStoredProfileNamed: profileName
+                        toStoredProfileID: profileName
                     )
                 } else {
                     try await normalizerRef.addReplacement(replacement)
@@ -1071,7 +1071,7 @@ public extension SpeakSwiftly {
                 let profile = if let profileName {
                     try await normalizerRef.replaceReplacement(
                         replacement,
-                        inStoredProfileNamed: profileName
+                        inStoredProfileID: profileName
                     )
                 } else {
                     try await normalizerRef.replaceReplacement(replacement)
@@ -1088,7 +1088,7 @@ public extension SpeakSwiftly {
                 let profile = if let profileName {
                     try await normalizerRef.removeReplacement(
                         id: replacementID,
-                        fromStoredProfileNamed: profileName
+                        fromStoredProfileID: profileName
                     )
                 } else {
                     try await normalizerRef.removeReplacement(id: replacementID)
@@ -1702,7 +1702,7 @@ public extension SpeakSwiftly {
         let textProfileName = request.textProfileName
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
-        let textProfile = await normalizerRef.effectiveProfile(named: textProfileName)
+        let textProfile = await normalizerRef.effectiveProfile(id: textProfileName)
         let normalizedText = if let sourceFormat {
             TextForSpeech.normalizeSource(
                 text,

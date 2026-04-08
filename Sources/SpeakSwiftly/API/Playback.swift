@@ -15,31 +15,28 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Player {
-    func list(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.listQueue(id: requestID, queueType: .playback))
+    func list() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .playback))
     }
 
-    func pause(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.playback(id: requestID, action: .pause))
+    func pause() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: UUID().uuidString, action: .pause))
     }
 
-    func resume(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.playback(id: requestID, action: .resume))
+    func resume() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: UUID().uuidString, action: .resume))
     }
 
-    func state(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.playback(id: requestID, action: .state))
+    func state() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: UUID().uuidString, action: .state))
     }
 
-    func clearQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.clearQueue(id: requestID))
+    func clearQueue() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.clearQueue(id: UUID().uuidString))
     }
 
-    func cancelRequest(
-        _ id: String,
-        requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.cancelRequest(id: requestID, requestID: id))
+    func cancelRequest(_ requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.cancelRequest(id: UUID().uuidString, requestID: requestID))
     }
 }
 

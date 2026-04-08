@@ -37,7 +37,7 @@ extension SpeakSwiftly.Runtime {
         )
         let residentModel = residentInputs.model
 
-        let textProfile = await normalizerRef.effectiveProfile(named: textProfileName)
+        let textProfile = await normalizerRef.effectiveProfile(id: textProfileName)
         let normalizedText = if let sourceFormat {
             TextForSpeech.normalizeSource(
                 text,

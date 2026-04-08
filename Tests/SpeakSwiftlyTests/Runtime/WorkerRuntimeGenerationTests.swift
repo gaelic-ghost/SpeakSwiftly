@@ -38,42 +38,40 @@ import TextForSpeech
 
     let requestID = await runtime.generate.audio(
         text: "Hello from the generated file path.",
-        with: "default-femme",
-        id: "req-file-1"
+        with: "default-femme"
     ).id
-    #expect(requestID == "req-file-1")
 
     #expect(await waitUntil {
         output.countJSONObjects {
-            $0["id"] as? String == "req-file-1"
+            $0["id"] as? String == requestID
                 && $0["ok"] as? Bool == true
         } == 2
     })
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-file-1",
+                $0["id"] as? String == requestID,
                 let generationJob = $0["generation_job"] as? [String: Any]
             else {
                 return false
             }
 
-            return generationJob["job_id"] as? String == "req-file-1"
+            return generationJob["job_id"] as? String == requestID
                 && generationJob["job_kind"] as? String == "file"
                 && generationJob["state"] as? String == "queued"
-                && (generationJob["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == "req-file-1-artifact-1"
+                && (generationJob["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == "\(requestID)-artifact-1"
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-file-1"
+            $0["id"] as? String == requestID
                 && $0["event"] as? String == "started"
                 && $0["op"] as? String == "queue_speech_file"
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-file-1"
+            $0["id"] as? String == requestID
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "writing_generated_file"
         }
@@ -81,10 +79,10 @@ import TextForSpeech
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-file-1",
+                $0["id"] as? String == requestID,
                 let generationJob = $0["generation_job"] as? [String: Any],
                 let generatedFile = $0["generated_file"] as? [String: Any],
-                generatedFile["artifact_id"] as? String == "req-file-1-artifact-1",
+                generatedFile["artifact_id"] as? String == "\(requestID)-artifact-1",
                 generatedFile["profile_name"] as? String == "default-femme",
                 let filePath = generatedFile["file_path"] as? String
             else {
@@ -96,7 +94,7 @@ import TextForSpeech
         }
     })
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-file-1"
+        $0["id"] as? String == requestID
             && $0["event"] as? String == "progress"
             && $0["stage"] as? String == "playback_finished"
     })

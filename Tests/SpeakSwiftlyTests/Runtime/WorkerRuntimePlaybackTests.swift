@@ -39,13 +39,11 @@ import TextForSpeech
 
     let activeID = await runtime.generate.speech(
         text: "Hello there",
-        with: "default-femme",
-        id: "req-1"
+        with: "default-femme"
     ).id
-    #expect(activeID == "req-1")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-1"
+            $0["id"] as? String == activeID
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
@@ -53,19 +51,17 @@ import TextForSpeech
 
     let backgroundID = await runtime.generate.speech(
         text: "Hi there",
-        with: "default-femme",
-        id: "req-2"
+        with: "default-femme"
     ).id
-    #expect(backgroundID == "req-2")
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-2"
+            $0["id"] as? String == backgroundID
                 && $0["ok"] as? Bool == true
         }
     })
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-2"
+        $0["id"] as? String == backgroundID
             && $0["event"] as? String == "progress"
             && $0["stage"] as? String == "playback_finished"
     })
@@ -74,13 +70,13 @@ import TextForSpeech
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-2"
+            $0["id"] as? String == backgroundID
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "playback_finished"
         }
     })
     #expect(output.countJSONObjects {
-        $0["id"] as? String == "req-2"
+        $0["id"] as? String == backgroundID
             && $0["ok"] as? Bool == true
     } == 1)
 }
@@ -122,27 +118,26 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.generate.speech(
+    let failedID = await runtime.generate.speech(
         text: "Hello there",
-        with: "default-femme",
-        id: "req-fail"
-    )
+        with: "default-femme"
+    ).id
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-fail"
+            $0["id"] as? String == failedID
                 && $0["ok"] as? Bool == true
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-fail"
+            $0["id"] as? String == failedID
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "audio_playback_failed"
         }
     })
     #expect(output.countJSONObjects {
-        $0["id"] as? String == "req-fail"
+        $0["id"] as? String == failedID
             && $0["ok"] as? Bool == true
     } == 1)
 }
@@ -204,16 +199,15 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.generate.speech(
+    let metricsID = await runtime.generate.speech(
         text: "Hello there",
-        with: "default-femme",
-        id: "req-metrics"
-    )
+        with: "default-femme"
+    ).id
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             guard
-                $0["request_id"] as? String == "req-metrics",
+                $0["request_id"] as? String == metricsID,
                 $0["event"] as? String == "playback_finished",
                 let details = $0["details"] as? [String: Any]
             else {

@@ -101,8 +101,8 @@ Treat this as a durable building-block cleanup, not as a compatibility layer. Do
 
 For voice-profile creation, the intended Swift shape is one overloaded `Voices.create(...)` entry point:
 
-- `create(design named: Name, from: String, vibe: SpeakSwiftly.Vibe, voice: String, outputPath: String?, id: String)`
-- `create(clone named: Name, from: URL, vibe: SpeakSwiftly.Vibe, transcript: String?, id: String)`
+- `create(design named: Name, from: String, vibe: SpeakSwiftly.Vibe, voice: String, outputPath: String?)`
+- `create(clone named: Name, from: URL, vibe: SpeakSwiftly.Vibe, transcript: String?)`
 
 ### JSONL Wire API
 
@@ -221,23 +221,22 @@ The typed text-normalization helpers live on `SpeakSwiftly.Normalizer`:
 
 - `activeProfile()`
 - `baseProfile()`
-- `profile(named:)`
+- `profile(id:)`
 - `profiles()`
-- `effectiveProfile(named:)`
-- `persistenceURL()`
+- `effectiveProfile(id:)`
 - `loadProfiles()`
 - `saveProfiles()`
 - `createProfile(id:named:replacements:)`
 - `storeProfile(_:)`
 - `useProfile(_:)`
-- `removeProfile(named:)`
+- `removeProfile(id:)`
 - `reset()`
 - `addReplacement(_:)`
-- `addReplacement(_:toStoredProfileNamed:)`
+- `addReplacement(_:toStoredProfileID:)`
 - `replaceReplacement(_:)`
-- `replaceReplacement(_:inStoredProfileNamed:)`
+- `replaceReplacement(_:inStoredProfileID:)`
 - `removeReplacement(id:)`
-- `removeReplacement(id:fromStoredProfileNamed:)`
+- `removeReplacement(id:fromStoredProfileID:)`
 
 `runtime.normalizer` remains the intended way to reach the injected normalizer object when callers already have a runtime in hand.
 

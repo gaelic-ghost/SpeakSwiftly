@@ -21,12 +21,11 @@ public extension SpeakSwiftly.Generate {
         with profileName: SpeakSwiftly.Name,
         textProfileName: String? = nil,
         textContext: TextForSpeech.Context? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
-        id: String = UUID().uuidString
+        sourceFormat: TextForSpeech.SourceFormat? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .queueSpeech(
-                id: id,
+                id: UUID().uuidString,
                 text: text,
                 profileName: profileName,
                 textProfileName: textProfileName,
@@ -42,12 +41,11 @@ public extension SpeakSwiftly.Generate {
         with profileName: SpeakSwiftly.Name,
         textProfileName: String? = nil,
         textContext: TextForSpeech.Context? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
-        id: String = UUID().uuidString
+        sourceFormat: TextForSpeech.SourceFormat? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .queueSpeech(
-                id: id,
+                id: UUID().uuidString,
                 text: text,
                 profileName: profileName,
                 textProfileName: textProfileName,
@@ -60,14 +58,14 @@ public extension SpeakSwiftly.Generate {
 
     func batch(
         _ items: [SpeakSwiftly.BatchItem],
-        with profileName: SpeakSwiftly.Name,
-        id: String = UUID().uuidString
+        with profileName: SpeakSwiftly.Name
     ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(
+        let requestID = UUID().uuidString
+        return await runtime.submit(
             .queueBatch(
-                id: id,
+                id: requestID,
                 profileName: profileName,
-                items: SpeakSwiftly.Runtime.resolveBatchItems(items, batchID: id)
+                items: SpeakSwiftly.Runtime.resolveBatchItems(items, batchID: requestID)
             )
         )
     }

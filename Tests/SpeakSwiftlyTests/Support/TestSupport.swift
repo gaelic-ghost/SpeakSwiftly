@@ -603,31 +603,27 @@ extension SpeakSwiftly.Voices {
         design named: SpeakSwiftly.Name,
         from text: String,
         voice voiceDescription: String,
-        outputPath: String? = nil,
-        id: String = UUID().uuidString
+        outputPath: String? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await create(
             design: named,
             from: text,
             vibe: inferredTestVibe(profileName: named, voiceDescription: voiceDescription),
             voice: voiceDescription,
-            outputPath: outputPath,
-            id: id
+            outputPath: outputPath
         )
     }
 
     func create(
         clone named: SpeakSwiftly.Name,
         from referenceAudioURL: URL,
-        transcript: String? = nil,
-        id: String = UUID().uuidString
+        transcript: String? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await create(
             clone: named,
             from: referenceAudioURL,
             vibe: inferredTestVibe(profileName: named, voiceDescription: transcript ?? ""),
-            transcript: transcript,
-            id: id
+            transcript: transcript
         )
     }
 }

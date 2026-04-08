@@ -15,16 +15,11 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Artifacts {
-    func file(
-        id artifactID: String,
-        requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedFile(id: requestID, artifactID: artifactID))
+    func file(id artifactID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generatedFile(id: UUID().uuidString, artifactID: artifactID))
     }
 
-    func files(
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedFiles(id: requestID))
+    func files() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generatedFiles(id: UUID().uuidString))
     }
 }

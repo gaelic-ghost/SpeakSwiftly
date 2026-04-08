@@ -53,24 +53,23 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-active"
+                $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
 
-    _ = await runtime.generate.speech(text: "Hi there", with: "default-femme", id: "req-queued-1")
+    let queuedHandle = await runtime.generate.speech(text: "Hi there", with: "default-femme")
 
-    let listID = await runtime.player.list(id: "req-list-queue").id
-    #expect(listID == "req-list-queue")
+    let listID = await runtime.player.list().id
 
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-list-queue",
+                $0["id"] as? String == listID,
                 $0["ok"] as? Bool == true,
                 let active = $0["active_request"] as? [String: Any],
                 let queue = $0["queue"] as? [[String: Any]]
@@ -78,9 +77,9 @@ private actor BackendLoadRecorder {
                 return false
             }
 
-            return active["id"] as? String == "req-active"
+            return active["id"] as? String == activeHandle.id
                 && queue.count == 1
-                && queue[0]["id"] as? String == "req-queued-1"
+                && queue[0]["id"] as? String == queuedHandle.id
                 && queue[0]["queue_position"] as? Int == 1
         }
     })
@@ -106,12 +105,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let statusID = await runtime.status(id: "req-status").id
-    #expect(statusID == "req-status")
+    let statusID = await runtime.status().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-status",
+                $0["id"] as? String == statusID,
                 $0["ok"] as? Bool == true,
                 $0["speech_backend"] as? String == "qwen3",
                 let status = $0["status"] as? [String: Any]
@@ -144,12 +142,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch").id
-    #expect(switchID == "req-switch")
+    let switchID = await runtime.switchSpeechBackend(to: .marvis).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-switch",
+                $0["id"] as? String == switchID,
                 $0["ok"] as? Bool == true,
                 $0["speech_backend"] as? String == "marvis",
                 let status = $0["status"] as? [String: Any]
@@ -206,12 +203,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let unloadID = await runtime.unloadModels(id: "req-unload").id
-    #expect(unloadID == "req-unload")
+    let unloadID = await runtime.unloadModels().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-unload",
+                $0["id"] as? String == unloadID,
                 $0["ok"] as? Bool == true,
                 let status = $0["status"] as? [String: Any]
             else {
@@ -234,24 +230,21 @@ private actor BackendLoadRecorder {
 
     let queuedFileID = await runtime.generate.audio(
         text: "Save this request once the resident models are back.",
-        with: "default-femme",
-        id: "req-after-unload"
+        with: "default-femme"
     ).id
-    #expect(queuedFileID == "req-after-unload")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-after-unload"
+            $0["id"] as? String == queuedFileID
                 && $0["event"] as? String == "queued"
                 && $0["reason"] as? String == "waiting_for_resident_models"
         }
     })
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-after-unload"
+        $0["id"] as? String == queuedFileID
             && $0["event"] as? String == "started"
     })
 
-    let reloadID = await runtime.reloadModels(id: "req-reload").id
-    #expect(reloadID == "req-reload")
+    let reloadID = await runtime.reloadModels().id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
@@ -263,7 +256,7 @@ private actor BackendLoadRecorder {
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-reload",
+                $0["id"] as? String == reloadID,
                 $0["ok"] as? Bool == true,
                 let status = $0["status"] as? [String: Any]
             else {
@@ -277,7 +270,7 @@ private actor BackendLoadRecorder {
     })
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-after-unload"
+            $0["id"] as? String == queuedFileID
                 && $0["ok"] as? Bool == true
                 && $0["generated_file"] != nil
         }
@@ -322,26 +315,23 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-active"
+                $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
 
-    let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch-busy").id
-    #expect(switchID == "req-switch-busy")
+    let switchID = await runtime.switchSpeechBackend(to: .marvis).id
     let queuedFileID = await runtime.generate.audio(
         text: "Save this request after the backend switch barrier.",
-        with: "default-femme",
-        id: "req-after-switch"
+        with: "default-femme"
     ).id
-    #expect(queuedFileID == "req-after-switch")
 
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-after-switch"
+        $0["id"] as? String == queuedFileID
             && $0["ok"] as? Bool == true
             && $0["generated_file"] != nil
     })
@@ -365,7 +355,7 @@ private actor BackendLoadRecorder {
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-switch-busy",
+                $0["id"] as? String == switchID,
                 $0["ok"] as? Bool == true,
                 $0["speech_backend"] as? String == "marvis",
                 let status = $0["status"] as? [String: Any]
@@ -380,23 +370,22 @@ private actor BackendLoadRecorder {
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-after-switch",
+                $0["id"] as? String == queuedFileID,
                 $0["ok"] as? Bool == true,
                 let generatedFile = $0["generated_file"] as? [String: Any]
             else {
                 return false
             }
 
-            return generatedFile["artifact_id"] as? String == "req-after-switch-artifact-1"
+            return generatedFile["artifact_id"] as? String == "\(queuedFileID)-artifact-1"
         }
     })
 
-    let generationJobID = await runtime.jobs.job(id: "req-after-switch", requestID: "req-after-switch-job").id
-    #expect(generationJobID == "req-after-switch-job")
+    let generationJobID = await runtime.jobs.job(id: queuedFileID).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-after-switch-job",
+                $0["id"] as? String == generationJobID,
                 $0["ok"] as? Bool == true,
                 let generationJob = $0["generation_job"] as? [String: Any]
             else {
@@ -432,14 +421,13 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.voices.create(design: "bright-guide",
+    let activeCreateID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
-        voice: "Warm and bright",
-        id: "req-active"
-    )
+        voice: "Warm and bright"
+    ).id
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-active"
+            $0["id"] as? String == activeCreateID
                 && $0["event"] as? String == "started"
         }
     })
@@ -457,12 +445,11 @@ private actor BackendLoadRecorder {
         )
     )
 
-    let clearID = await runtime.player.clearQueue(id: "req-clear").id
-    #expect(clearID == "req-clear")
+    let clearID = await runtime.player.clearQueue().id
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-clear"
+            $0["id"] as? String == clearID
                 && $0["ok"] as? Bool == true
                 && $0["cleared_count"] as? Int == 1
         }
@@ -483,7 +470,7 @@ private actor BackendLoadRecorder {
     }
 
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-active"
+        $0["id"] as? String == activeCreateID
             && $0["ok"] as? Bool == false
     })
     await profileGate.open()
@@ -540,12 +527,11 @@ private actor BackendLoadRecorder {
         }
     }
 
-    let cancelID = await runtime.player.cancelRequest("req-active", requestID: "req-cancel").id
-    #expect(cancelID == "req-cancel")
+    let cancelID = await runtime.player.cancelRequest("req-active").id
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-cancel"
+            $0["id"] as? String == cancelID
                 && $0["ok"] as? Bool == true
                 && $0["cancelled_request_id"] as? String == "req-active"
         }
@@ -592,14 +578,13 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.voices.create(design: "bright-guide",
+    let activeCreateID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
-        voice: "Warm and bright",
-        id: "req-active"
-    )
+        voice: "Warm and bright"
+    ).id
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-active"
+            $0["id"] as? String == activeCreateID
                 && $0["event"] as? String == "started"
         }
     })
@@ -617,12 +602,11 @@ private actor BackendLoadRecorder {
         )
     )
 
-    let cancelID = await runtime.player.cancelRequest("req-queued", requestID: "req-cancel").id
-    #expect(cancelID == "req-cancel")
+    let cancelID = await runtime.player.cancelRequest("req-queued").id
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-cancel"
+            $0["id"] as? String == cancelID
                 && $0["ok"] as? Bool == true
                 && $0["cancelled_request_id"] as? String == "req-queued"
         }
@@ -667,24 +651,21 @@ private actor BackendLoadRecorder {
     let createID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
         voice: "Warm and bright",
-        outputPath: nil,
-        id: "req-create"
+        outputPath: nil
     ).id
-    #expect(createID == "req-create")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-create"
+            $0["id"] as? String == createID
                 && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "bright-guide"
         }
     })
 
-    let listID = await runtime.voices.list(id: "req-list").id
-    #expect(listID == "req-list")
+    let listID = await runtime.voices.list().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-list",
+                $0["id"] as? String == listID,
                 $0["ok"] as? Bool == true,
                 let profiles = $0["profiles"] as? [[String: Any]]
             else {
@@ -697,15 +678,13 @@ private actor BackendLoadRecorder {
 
     let speakFileID = await runtime.generate.audio(
         text: "Save this request as an artifact.",
-        with: "bright-guide",
-        id: "req-file-helper"
+        with: "bright-guide"
     ).id
-    let fileArtifactID = "req-file-helper-artifact-1"
-    #expect(speakFileID == "req-file-helper")
+    let fileArtifactID = "\(speakFileID)-artifact-1"
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-file-helper",
+                $0["id"] as? String == speakFileID,
                 $0["ok"] as? Bool == true,
                 let generatedFile = $0["generated_file"] as? [String: Any]
             else {
@@ -716,12 +695,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedFileID = await runtime.artifacts.file(id: fileArtifactID, requestID: "req-file-read").id
-    #expect(generatedFileID == "req-file-read")
+    let generatedFileID = await runtime.artifacts.file(id: fileArtifactID).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-file-read",
+                $0["id"] as? String == generatedFileID,
                 $0["ok"] as? Bool == true,
                 let generatedFile = $0["generated_file"] as? [String: Any]
             else {
@@ -732,12 +710,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generatedFilesID = await runtime.artifacts.files(id: "req-file-list").id
-    #expect(generatedFilesID == "req-file-list")
+    let generatedFilesID = await runtime.artifacts.files().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-file-list",
+                $0["id"] as? String == generatedFilesID,
                 $0["ok"] as? Bool == true,
                 let generatedFiles = $0["generated_files"] as? [[String: Any]]
             else {
@@ -750,31 +727,29 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let generationJobID = await runtime.jobs.job(id: "req-file-helper", requestID: "req-job-read").id
-    #expect(generationJobID == "req-job-read")
+    let generationJobID = await runtime.jobs.job(id: speakFileID).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-job-read",
+                $0["id"] as? String == generationJobID,
                 $0["ok"] as? Bool == true,
                 let generationJob = $0["generation_job"] as? [String: Any]
             else {
                 return false
             }
 
-            return generationJob["job_id"] as? String == "req-file-helper"
+            return generationJob["job_id"] as? String == speakFileID
                 && generationJob["job_kind"] as? String == "file"
                 && generationJob["state"] as? String == "completed"
                 && (generationJob["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == fileArtifactID
         }
     })
 
-    let generationJobsID = await runtime.jobs.list(id: "req-job-list").id
-    #expect(generationJobsID == "req-job-list")
+    let generationJobsID = await runtime.jobs.list().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-job-list",
+                $0["id"] as? String == generationJobsID,
                 $0["ok"] as? Bool == true,
                 let generationJobs = $0["generation_jobs"] as? [[String: Any]]
             else {
@@ -782,7 +757,7 @@ private actor BackendLoadRecorder {
             }
 
             return generationJobs.contains {
-                $0["job_id"] as? String == "req-file-helper"
+                $0["job_id"] as? String == speakFileID
                     && $0["job_kind"] as? String == "file"
                     && $0["state"] as? String == "completed"
                     && ($0["items"] as? [[String: Any]])?.first?["artifact_id"] as? String == fileArtifactID
@@ -790,11 +765,10 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let removeID = await runtime.voices.delete(named: "bright-guide", id: "req-remove").id
-    #expect(removeID == "req-remove")
+    let removeID = await runtime.voices.delete(named: "bright-guide").id
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-remove"
+            $0["id"] as? String == removeID
                 && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "bright-guide"
         }
@@ -914,38 +888,36 @@ private actor BackendLoadRecorder {
                 textProfileName: "logs"
             ),
         ],
-        with: "default-femme",
-        id: "req-batch-1"
+        with: "default-femme"
     ).id
-    #expect(batchID == "req-batch-1")
 
     #expect(await waitUntil {
         output.countJSONObjects {
-            $0["id"] as? String == "req-batch-1"
+            $0["id"] as? String == batchID
                 && $0["ok"] as? Bool == true
         } == 2
     })
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-batch-1",
+                $0["id"] as? String == batchID,
                 let generationJob = $0["generation_job"] as? [String: Any],
                 let items = generationJob["items"] as? [[String: Any]]
             else {
                 return false
             }
 
-            return generationJob["job_id"] as? String == "req-batch-1"
+            return generationJob["job_id"] as? String == batchID
                 && generationJob["job_kind"] as? String == "batch"
                 && generationJob["state"] as? String == "queued"
                 && items.count == 2
-                && items[0]["artifact_id"] as? String == "req-batch-1-artifact-1"
+                && items[0]["artifact_id"] as? String == "\(batchID)-artifact-1"
                 && items[1]["artifact_id"] as? String == "custom-batch-artifact"
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-batch-1"
+            $0["id"] as? String == batchID
                 && $0["event"] as? String == "started"
                 && $0["op"] as? String == "queue_speech_batch"
         }
@@ -953,7 +925,7 @@ private actor BackendLoadRecorder {
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-batch-1",
+                $0["id"] as? String == batchID,
                 let generatedBatch = $0["generated_batch"] as? [String: Any],
                 let generationJob = $0["generation_job"] as? [String: Any],
                 let artifacts = generatedBatch["artifacts"] as? [[String: Any]]
@@ -961,46 +933,44 @@ private actor BackendLoadRecorder {
                 return false
             }
 
-            return generatedBatch["batch_id"] as? String == "req-batch-1"
+            return generatedBatch["batch_id"] as? String == batchID
                 && generatedBatch["state"] as? String == "completed"
                 && generationJob["job_kind"] as? String == "batch"
                 && generationJob["state"] as? String == "completed"
                 && artifacts.count == 2
-                && artifacts.contains { $0["artifact_id"] as? String == "req-batch-1-artifact-1" }
+                && artifacts.contains { $0["artifact_id"] as? String == "\(batchID)-artifact-1" }
                 && artifacts.contains { $0["artifact_id"] as? String == "custom-batch-artifact" }
         }
     })
 
-    let generatedBatchID = await runtime.artifacts.batch(id: "req-batch-1", requestID: "req-batch-read").id
-    #expect(generatedBatchID == "req-batch-read")
+    let generatedBatchID = await runtime.artifacts.batch(id: batchID).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-batch-read",
+                $0["id"] as? String == generatedBatchID,
                 let generatedBatch = $0["generated_batch"] as? [String: Any],
                 let artifacts = generatedBatch["artifacts"] as? [[String: Any]]
             else {
                 return false
             }
 
-            return generatedBatch["batch_id"] as? String == "req-batch-1"
+            return generatedBatch["batch_id"] as? String == batchID
                 && artifacts.count == 2
         }
     })
 
-    let generatedBatchesID = await runtime.artifacts.batches(id: "req-batches-read").id
-    #expect(generatedBatchesID == "req-batches-read")
+    let generatedBatchesID = await runtime.artifacts.batches().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
-                $0["id"] as? String == "req-batches-read",
+                $0["id"] as? String == generatedBatchesID,
                 let generatedBatches = $0["generated_batches"] as? [[String: Any]]
             else {
                 return false
             }
 
             return generatedBatches.contains {
-                $0["batch_id"] as? String == "req-batch-1"
+                $0["batch_id"] as? String == batchID
                     && $0["state"] as? String == "completed"
             }
         }
@@ -1034,19 +1004,17 @@ private actor BackendLoadRecorder {
 
     let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
-        transcript: "Provided transcript",
-        id: "req-clone"
+        transcript: "Provided transcript"
     ).id
-    #expect(createID == "req-clone")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-clone"
+            $0["id"] as? String == createID
                 && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "ghost-copy"
         }
     })
     #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-clone"
+        $0["id"] as? String == createID
             && $0["stage"] as? String == "transcribing_clone_audio"
     })
 
@@ -1129,24 +1097,22 @@ private actor BackendLoadRecorder {
 
     let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
-        transcript: nil,
-        id: "req-clone"
+        transcript: nil
     ).id
-    #expect(createID == "req-clone")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-clone"
+            $0["id"] as? String == createID
                 && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "ghost-copy"
         }
     })
     #expect(output.containsJSONObject {
-        $0["id"] as? String == "req-clone"
+        $0["id"] as? String == createID
             && $0["event"] as? String == "progress"
             && $0["stage"] as? String == "loading_clone_transcription_model"
     })
     #expect(output.containsJSONObject {
-        $0["id"] as? String == "req-clone"
+        $0["id"] as? String == createID
             && $0["event"] as? String == "progress"
             && $0["stage"] as? String == "transcribing_clone_audio"
     })
@@ -1185,13 +1151,11 @@ private actor BackendLoadRecorder {
 
     let createID = await runtime.voices.create(clone: "ghost-copy",
         from: referenceAudioURL,
-        transcript: nil,
-        id: "req-clone"
+        transcript: nil
     ).id
-    #expect(createID == "req-clone")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-clone"
+            $0["id"] as? String == createID
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "model_generation_failed"
         }
@@ -1291,15 +1255,14 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speech(
+    let requestID = await runtime.generate.speech(
         text: "Hello there, galew.",
-        with: "default-femme",
-        id: "req-generation-params"
-    )
+        with: "default-femme"
+    ).id
 
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-generation-params"
+            $0["id"] as? String == requestID
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
@@ -1436,10 +1399,10 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-active"
+                $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }

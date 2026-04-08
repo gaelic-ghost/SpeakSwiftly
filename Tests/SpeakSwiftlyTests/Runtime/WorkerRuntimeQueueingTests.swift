@@ -250,10 +250,10 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() }
     )
 
-    #expect(await secondRuntime.normalizer.profile(named: "logs")?.replacements.map(\.id) == ["logs-rule"])
+    #expect(await secondRuntime.normalizer.profile(id: "logs")?.replacements.map(\.id) == ["logs-rule"])
     #expect(await secondRuntime.normalizer.activeProfile().id == "ops")
     #expect(await secondRuntime.normalizer.activeProfile().replacements.map(\.id) == ["ops-rule"])
-    #expect(await secondRuntime.normalizer.effectiveProfile(named: "logs").replacements.map(\.id) == ["logs-rule"])
+    #expect(await secondRuntime.normalizer.effectiveProfile(id: "logs").replacements.map(\.id) == ["logs-rule"])
 }
 
 @Test func textProfileEditingHelpersMutateAndPersistStoredProfiles() async throws {
@@ -272,19 +272,19 @@ import TextForSpeech
 
     let added = try await runtime.normalizer.addReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
-        toStoredProfileNamed: "logs"
+        toStoredProfileID: "logs"
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
     let replaced = try await runtime.normalizer.replaceReplacement(
         TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
-        inStoredProfileNamed: "logs"
+        inStoredProfileID: "logs"
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
 
     let emptied = try await runtime.normalizer.removeReplacement(
         id: "stderr-rule",
-        fromStoredProfileNamed: "logs"
+        fromStoredProfileID: "logs"
     )
     #expect(emptied.replacements.isEmpty)
 
@@ -294,7 +294,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() }
     )
-    #expect(await reloaded.normalizer.profile(named: "logs")?.replacements.isEmpty == true)
+    #expect(await reloaded.normalizer.profile(id: "logs")?.replacements.isEmpty == true)
 }
 
 @Test func activeTextProfileEditingHelpersMutateAndPersistCustomProfile() async throws {

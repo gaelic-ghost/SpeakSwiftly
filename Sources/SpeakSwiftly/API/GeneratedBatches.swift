@@ -106,17 +106,12 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Artifacts {
-    func batch(
-        id batchID: String,
-        requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedBatch(id: requestID, batchID: batchID))
+    func batch(id batchID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generatedBatch(id: UUID().uuidString, batchID: batchID))
     }
 
-    func batches(
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedBatches(id: requestID))
+    func batches() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generatedBatches(id: UUID().uuidString))
     }
 }
 

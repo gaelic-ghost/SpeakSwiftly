@@ -20,12 +20,11 @@ public extension SpeakSwiftly.Voices {
         from text: String,
         vibe: SpeakSwiftly.Vibe,
         voice voiceDescription: String,
-        outputPath: String? = nil,
-        id: String = UUID().uuidString
+        outputPath: String? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .createProfile(
-                id: id,
+                id: UUID().uuidString,
                 profileName: named,
                 text: text,
                 vibe: vibe,
@@ -40,12 +39,11 @@ public extension SpeakSwiftly.Voices {
         clone named: SpeakSwiftly.Name,
         from referenceAudioURL: URL,
         vibe: SpeakSwiftly.Vibe,
-        transcript: String? = nil,
-        id: String = UUID().uuidString
+        transcript: String? = nil
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .createClone(
-                id: id,
+                id: UUID().uuidString,
                 profileName: named,
                 referenceAudioPath: referenceAudioURL.path,
                 vibe: vibe,
@@ -55,14 +53,11 @@ public extension SpeakSwiftly.Voices {
         )
     }
 
-    func list(id: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.listProfiles(id: id))
+    func list() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listProfiles(id: UUID().uuidString))
     }
 
-    func delete(
-        named profileName: SpeakSwiftly.Name,
-        id: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.removeProfile(id: id, profileName: profileName))
+    func delete(named profileName: SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.removeProfile(id: UUID().uuidString, profileName: profileName))
     }
 }

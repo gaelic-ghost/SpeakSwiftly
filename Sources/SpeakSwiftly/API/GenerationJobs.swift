@@ -196,29 +196,19 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Jobs {
-    func generationQueue(
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.listQueue(id: requestID, queueType: .generation))
+    func generationQueue() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .generation))
     }
 
-    func expire(
-        id jobID: String,
-        requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.expireGenerationJob(id: requestID, jobID: jobID))
+    func expire(id jobID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.expireGenerationJob(id: UUID().uuidString, jobID: jobID))
     }
 
-    func job(
-        id jobID: String,
-        requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generationJob(id: requestID, jobID: jobID))
+    func job(id jobID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generationJob(id: UUID().uuidString, jobID: jobID))
     }
 
-    func list(
-        id requestID: String = UUID().uuidString
-    ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generationJobs(id: requestID))
+    func list() async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.generationJobs(id: UUID().uuidString))
     }
 }

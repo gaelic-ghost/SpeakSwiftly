@@ -12,19 +12,19 @@ public extension SpeakSwiftly.Normalizer {
         textRuntime.baseProfile
     }
 
-    func profile(named name: String) -> TextForSpeech.Profile? {
-        textRuntime.profile(named: name)
+    func profile(id: String) -> TextForSpeech.Profile? {
+        textRuntime.profile(named: id)
     }
 
     func profiles() -> [TextForSpeech.Profile] {
         textRuntime.storedProfiles()
     }
 
-    func effectiveProfile(named name: String? = nil) -> TextForSpeech.Profile {
-        textRuntime.snapshot(named: name)
+    func effectiveProfile(id: String? = nil) -> TextForSpeech.Profile {
+        textRuntime.snapshot(named: id)
     }
 
-    func persistenceURL() -> URL? {
+    package func persistenceURL() -> URL? {
         textRuntime.persistenceURL
     }
 
@@ -60,8 +60,8 @@ public extension SpeakSwiftly.Normalizer {
         try textRuntime.save()
     }
 
-    func removeProfile(named name: String) throws {
-        textRuntime.removeProfile(named: name)
+    func removeProfile(id: String) throws {
+        textRuntime.removeProfile(named: id)
         try textRuntime.save()
     }
 
@@ -80,9 +80,9 @@ public extension SpeakSwiftly.Normalizer {
 
     func addReplacement(
         _ replacement: TextForSpeech.Replacement,
-        toStoredProfileNamed name: String
+        toStoredProfileID profileID: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: name)
+        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: profileID)
         try textRuntime.save()
         return profile
     }
@@ -97,9 +97,9 @@ public extension SpeakSwiftly.Normalizer {
 
     func replaceReplacement(
         _ replacement: TextForSpeech.Replacement,
-        inStoredProfileNamed name: String
+        inStoredProfileID profileID: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: name)
+        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: profileID)
         try textRuntime.save()
         return profile
     }
@@ -114,11 +114,11 @@ public extension SpeakSwiftly.Normalizer {
 
     func removeReplacement(
         id replacementID: String,
-        fromStoredProfileNamed name: String
+        fromStoredProfileID profileID: String
     ) throws -> TextForSpeech.Profile {
         let profile = try textRuntime.removeReplacement(
             id: replacementID,
-            fromStoredProfileNamed: name
+            fromStoredProfileNamed: profileID
         )
         try textRuntime.save()
         return profile

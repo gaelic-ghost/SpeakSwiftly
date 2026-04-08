@@ -36,6 +36,16 @@ import TextForSpeech
     #expect(loaded.textNormalizer == nil)
 }
 
+@Test func publicConfigurationLoadThrowsTypedErrorWhenFileIsMissing() throws {
+    let missingURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        .appendingPathComponent("missing-configuration.json")
+
+    #expect(throws: SpeakSwiftly.Configuration.LoadError.self) {
+        try SpeakSwiftly.Configuration.load(from: missingURL)
+    }
+}
+
 @Test func publicConfigurationCanCarryATextNormalizer() {
     let normalizer = SpeakSwiftly.Normalizer()
     let configuration = SpeakSwiftly.Configuration(
@@ -50,38 +60,34 @@ import TextForSpeech
 // MARK: - Runtime Helpers
 
 @Test func publicLibrarySurfaceExposesQueueingHelpers() {
-    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
         textProfileName,
         textContext,
-        sourceFormat,
-        id in
+        sourceFormat in
         await generate.speech(
             text: text,
             with: profileName,
             textProfileName: textProfileName,
             textContext: textContext,
-            sourceFormat: sourceFormat,
-            id: id
+            sourceFormat: sourceFormat
         )
     }
-    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
         textProfileName,
         textContext,
-        sourceFormat,
-        id in
+        sourceFormat in
         await generate.audio(
             text: text,
             with: profileName,
             textProfileName: textProfileName,
             textContext: textContext,
-            sourceFormat: sourceFormat,
-            id: id
+            sourceFormat: sourceFormat
         )
     }
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
@@ -111,8 +117,8 @@ import TextForSpeech
     let liftoffWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
         await SpeakSwiftly.liftoff(configuration: configuration)
     }
-    let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, name in
-        await normalizer.profile(named: name)
+    let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, id in
+        await normalizer.profile(id: id)
     }
     let profilesList: @Sendable (SpeakSwiftly.Normalizer) async -> [TextForSpeech.Profile] = { normalizer in
         await normalizer.profiles()
@@ -123,11 +129,8 @@ import TextForSpeech
     let baseProfile: @Sendable (SpeakSwiftly.Normalizer) async -> TextForSpeech.Profile = { normalizer in
         await normalizer.baseProfile()
     }
-    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer, String?) async -> TextForSpeech.Profile = { normalizer, name in
-        await normalizer.effectiveProfile(named: name)
-    }
-    let persistenceURL: @Sendable (SpeakSwiftly.Normalizer) async -> URL? = { normalizer in
-        await normalizer.persistenceURL()
+    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer, String?) async -> TextForSpeech.Profile = { normalizer, id in
+        await normalizer.effectiveProfile(id: id)
     }
     let loadProfiles: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
         try await normalizer.loadProfiles()
@@ -148,8 +151,8 @@ import TextForSpeech
     let useProfile: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Profile) async throws -> Void = { normalizer, profile in
         try await normalizer.useProfile(profile)
     }
-    let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> Void = { normalizer, name in
-        try await normalizer.removeProfile(named: name)
+    let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> Void = { normalizer, id in
+        try await normalizer.removeProfile(id: id)
     }
     let reset: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
         try await normalizer.reset()
@@ -162,8 +165,8 @@ import TextForSpeech
     let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
         normalizer,
         replacement,
-        name in
-        try await normalizer.addReplacement(replacement, toStoredProfileNamed: name)
+        profileID in
+        try await normalizer.addReplacement(replacement, toStoredProfileID: profileID)
     }
     let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
         normalizer,
@@ -173,8 +176,8 @@ import TextForSpeech
     let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
         normalizer,
         replacement,
-        name in
-        try await normalizer.replaceReplacement(replacement, inStoredProfileNamed: name)
+        profileID in
+        try await normalizer.replaceReplacement(replacement, inStoredProfileID: profileID)
     }
     let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> TextForSpeech.Profile = {
         normalizer,
@@ -184,74 +187,69 @@ import TextForSpeech
     let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, String, String) async throws -> TextForSpeech.Profile = {
         normalizer,
         replacementID,
-        name in
-        try await normalizer.removeReplacement(id: replacementID, fromStoredProfileNamed: name)
+        profileID in
+        try await normalizer.removeReplacement(id: replacementID, fromStoredProfileID: profileID)
     }
-    let createProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, String?) async -> SpeakSwiftly.RequestHandle = {
         voices,
         profileName,
         text,
         vibe,
         voiceDescription,
-        outputPath,
-        id in
+        outputPath in
         await voices.create(
             design: profileName,
             from: text,
             vibe: vibe,
             voice: voiceDescription,
-            outputPath: outputPath,
-            id: id
+            outputPath: outputPath
         )
     }
-    let createClone: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, URL, SpeakSwiftly.Vibe, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createClone: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, URL, SpeakSwiftly.Vibe, String?) async -> SpeakSwiftly.RequestHandle = {
         voices,
         profileName,
         referenceAudioURL,
         vibe,
-        transcript,
-        id in
+        transcript in
         await voices.create(
             clone: profileName,
             from: referenceAudioURL,
             vibe: vibe,
-            transcript: transcript,
-            id: id
+            transcript: transcript
         )
     }
-    let profiles: @Sendable (SpeakSwiftly.Voices, String) async -> SpeakSwiftly.RequestHandle = { voices, id in
-        await voices.list(id: id)
+    let profiles: @Sendable (SpeakSwiftly.Voices) async -> SpeakSwiftly.RequestHandle = { voices in
+        await voices.list()
     }
-    let removeProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String) async -> SpeakSwiftly.RequestHandle = { voices, profileName, id in
-        await voices.delete(named: profileName, id: id)
+    let removeProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = { voices, profileName in
+        await voices.delete(named: profileName)
     }
-    let generatedFile: @Sendable (SpeakSwiftly.Artifacts, String, String) async -> SpeakSwiftly.RequestHandle = { artifacts, artifactID, requestID in
-        await artifacts.file(id: artifactID, requestID: requestID)
+    let generatedFile: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, artifactID in
+        await artifacts.file(id: artifactID)
     }
-    let generatedFiles: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, requestID in
-        await artifacts.files(id: requestID)
+    let generatedFiles: @Sendable (SpeakSwiftly.Artifacts) async -> SpeakSwiftly.RequestHandle = { artifacts in
+        await artifacts.files()
     }
-    let generateBatch: @Sendable (SpeakSwiftly.Generate, [SpeakSwiftly.BatchItem], SpeakSwiftly.Name, String) async -> SpeakSwiftly.RequestHandle = {
+    let generateBatch: @Sendable (SpeakSwiftly.Generate, [SpeakSwiftly.BatchItem], SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = {
         generate,
         items,
-        profileName,
-        id in
-        await generate.batch(items, with: profileName, id: id)
+        profileName in
+        await generate.batch(items, with: profileName)
     }
-    let generatedBatch: @Sendable (SpeakSwiftly.Artifacts, String, String) async -> SpeakSwiftly.RequestHandle = { artifacts, batchID, requestID in
-        await artifacts.batch(id: batchID, requestID: requestID)
+    let generatedBatch: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, batchID in
+        await artifacts.batch(id: batchID)
     }
-    let generatedBatches: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, requestID in
-        await artifacts.batches(id: requestID)
+    let generatedBatches: @Sendable (SpeakSwiftly.Artifacts) async -> SpeakSwiftly.RequestHandle = { artifacts in
+        await artifacts.batches()
     }
-    let expireGenerationJob: @Sendable (SpeakSwiftly.Jobs, String, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID, requestID in
-        await jobs.expire(id: jobID, requestID: requestID)
+    let expireGenerationJob: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID in
+        await jobs.expire(id: jobID)
     }
-    let generationJob: @Sendable (SpeakSwiftly.Jobs, String, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID, requestID in
-        await jobs.job(id: jobID, requestID: requestID)
+    let generationJob: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID in
+        await jobs.job(id: jobID)
     }
-    let generationJobs: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, requestID in
-        await jobs.list(id: requestID)
+    let generationJobs: @Sendable (SpeakSwiftly.Jobs) async -> SpeakSwiftly.RequestHandle = { jobs in
+        await jobs.list()
     }
     let generationQueue: @Sendable (SpeakSwiftly.Jobs) async -> SpeakSwiftly.RequestHandle = { jobs in
         await jobs.generationQueue()
@@ -279,8 +277,8 @@ import TextForSpeech
     let clearQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
         await player.clearQueue()
     }
-    let cancelRequest: @Sendable (SpeakSwiftly.Player, String) async -> SpeakSwiftly.RequestHandle = { player, id in
-        await player.cancelRequest(id)
+    let cancelRequest: @Sendable (SpeakSwiftly.Player, String) async -> SpeakSwiftly.RequestHandle = { player, requestID in
+        await player.cancelRequest(requestID)
     }
     let statusEvents: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.StatusEvent> = { runtime in
         await runtime.statusEvents()
@@ -314,7 +312,6 @@ import TextForSpeech
     _ = activeProfile
     _ = baseProfile
     _ = effectiveProfile
-    _ = persistenceURL
     _ = loadProfiles
     _ = saveProfiles
     _ = createProfileObject
