@@ -11,4 +11,6 @@ if [ "${REPO_MAINTENANCE_DRY_RUN:-false}" = "true" ]; then
 fi
 
 sh "$REPO_MAINTENANCE_ROOT/publish-runtime.sh" --configuration Debug
+sh "$REPO_MAINTENANCE_ROOT/verify-runtime.sh" --configuration Debug
 sh "$REPO_MAINTENANCE_ROOT/publish-runtime.sh" --configuration Release
+sh "$REPO_MAINTENANCE_ROOT/verify-runtime.sh" --configuration Release

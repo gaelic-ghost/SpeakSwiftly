@@ -538,3 +538,13 @@ These findings came out of the latest live-service review pass and are duplicate
 - [x] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
 - [ ] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
 - [ ] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.
+
+## Pre-v1 Release Hardening
+
+Before the first full `v1.0.0` release, finish the release-hardening pass in [pre-v1-release-hardening-2026-04-07.md](/Users/galew/Workspace/SpeakSwiftly/docs/maintainers/pre-v1-release-hardening-2026-04-07.md).
+
+- [x] Persist real e2e worker stdout and stderr artifacts plus compact per-run summaries so memory and later CPU telemetry can be inspected after a run finishes.
+- [ ] Add CPU accounting to the retained real e2e run summaries when we can do so through the same unprivileged process-accounting path used for current memory snapshots.
+- [x] Enforce Debug and Release runtime publication and verification on tagged prereleases and final releases, not only through the local repo-maintenance release script.
+- [ ] Publish launcher scripts, stable runtime aliases, and manifest-first consumption helpers so local consumers stop reconstructing executable and `default.metallib` paths by hand.
+- [ ] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.

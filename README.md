@@ -434,6 +434,13 @@ Real MLX-backed validation should use a published Xcode-backed worker runtime. A
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
+You can verify a published local runtime directly with:
+
+```bash
+sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
+sh scripts/repo-maintenance/verify-runtime.sh --configuration Release
+```
+
 Opt-in real-model e2e coverage is available for five main workflows, and the harness now publishes and launches the shared Debug runtime automatically at [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug):
 
 - VoiceDesign profile creation, then silent playback, then audible playback.
@@ -451,6 +458,8 @@ If you want that full suite to force real audible playback even for lanes that u
 ```bash
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_AUDIBLE_E2E=1 swift test --filter SpeakSwiftlyE2ETests
 ```
+
+Real-model e2e worker runs now retain durable artifacts under [`.local/e2e-runs`](/Users/galew/Workspace/SpeakSwiftly/.local/e2e-runs). Each run writes `stdout.jsonl`, `stderr.jsonl`, and a compact `summary.json` so playback and runtime-memory evidence can be inspected after the test finishes.
 
 If you want chunk-level playback trace logs during that real run, add the trace env flag:
 
