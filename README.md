@@ -135,12 +135,14 @@ That command publishes stable local Xcode-backed runtime directories here:
 
 - Debug: [`.local/xcode/Debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Debug)
 - Release: [`.local/xcode/Release`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/Release)
+- Stable aliases: [`.local/xcode/current-debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/current-debug) and [`.local/xcode/current-release`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/current-release)
 
 Each published runtime includes:
 
 - the `SpeakSwiftly` executable
+- a `run-speakswiftly` launcher that sets `DYLD_FRAMEWORK_PATH` for the matching published runtime directory
 - the bundled `mlx-swift_Cmlx.bundle/.../default.metallib`
-- a metadata manifest at [`.local/xcode/SpeakSwiftly.debug.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.debug.json) or [`.local/xcode/SpeakSwiftly.release.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.release.json)
+- a metadata manifest at [`.local/xcode/SpeakSwiftly.debug.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.debug.json) or [`.local/xcode/SpeakSwiftly.release.json`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/SpeakSwiftly.release.json) with the executable, launcher, bundle, metallib, and stable alias paths
 
 ### Runtime Configuration
 
@@ -163,13 +165,12 @@ That means environment overrides are still useful for one-off runs, while persis
 
 ## Usage
 
-Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, publish the runtime first, then run the product from the published runtime directory with `DYLD_FRAMEWORK_PATH` pointing at that same directory.
+Use `swift run` only for fast package-local development that does not need the real MLX Metal runtime. For the real worker executable, publish the runtime first, then launch it through the published runtime launcher or the stable alias.
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 
-DYLD_FRAMEWORK_PATH="$PWD/.local/xcode/Debug" \
-  "$PWD/.local/xcode/Debug/SpeakSwiftly"
+"$PWD/.local/xcode/current-debug/run-speakswiftly"
 ```
 
 At startup the worker begins preloading the resident `0.6B` model and emits JSONL status events on `stdout`.
@@ -489,7 +490,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swi
 
 The real-model e2e coverage uses a shared profile convention named `testing-profile` with the voice description `A generic, warm, masculine, slow speaking voice.` Each workflow still runs inside its own isolated profile root, but using the same profile shape keeps downstream app e2e coverage aligned with this package.
 
-If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime, then run the executable with `DYLD_FRAMEWORK_PATH` pointed at the matching published runtime directory.
+If a real worker run fails with a message about `default.metallib` or `mlx-swift_Cmlx.bundle`, the executable was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime, verify it with `verify-runtime.sh`, then launch through the published `run-speakswiftly` script or the stable alias.
 
 ## License
 

@@ -47,11 +47,14 @@ published_products_path="$runtime_root/$configuration"
 temporary_products_path="$runtime_root/.publish-$configuration.$$"
 lower_configuration=$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')
 metadata_path="$runtime_root/SpeakSwiftly.$lower_configuration.json"
+alias_path="$runtime_root/current-$lower_configuration"
 products_path="$derived_data_path/Build/Products/$configuration"
 binary_path="$products_path/SpeakSwiftly"
 metallib_path="$products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 published_binary_path="$published_products_path/SpeakSwiftly"
 published_metallib_path="$published_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+published_bundle_path="$published_products_path/mlx-swift_Cmlx.bundle"
+published_launcher_path="$published_products_path/run-speakswiftly"
 source_commit=$(git -C "$REPO_ROOT" rev-parse HEAD)
 exact_tag=$(git -C "$REPO_ROOT" describe --tags --exact-match HEAD 2>/dev/null || true)
 source_dirty="false"
@@ -86,18 +89,33 @@ rm -rf "$temporary_products_path"
 mkdir -p "$temporary_products_path"
 cp -R "$products_path"/. "$temporary_products_path"/
 
+cat > "$temporary_products_path/run-speakswiftly" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec env DYLD_FRAMEWORK_PATH="$SELF_DIR" "$SELF_DIR/SpeakSwiftly" "$@"
+EOF
+chmod +x "$temporary_products_path/run-speakswiftly"
+
 [ -x "$temporary_products_path/SpeakSwiftly" ] || die "The published runtime staging directory does not contain an executable SpeakSwiftly binary."
 [ -f "$temporary_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" ] || die "The published runtime staging directory does not contain default.metallib."
+[ -x "$temporary_products_path/run-speakswiftly" ] || die "The published runtime staging directory does not contain the runtime launcher script."
 
 rm -rf "$published_products_path"
 mv "$temporary_products_path" "$published_products_path"
+rm -f "$alias_path"
+ln -s "$published_products_path" "$alias_path"
 
 cat > "$metadata_path" <<EOF
 {
   "build_configuration": "$configuration",
   "products_path": "$published_products_path",
+  "bundle_path": "$published_bundle_path",
   "executable_path": "$published_binary_path",
+  "launcher_path": "$published_launcher_path",
   "metallib_path": "$published_metallib_path",
+  "alias_path": "$alias_path",
   "source_root": "$REPO_ROOT",
   "source_commit": "$source_commit",
   "source_dirty": $source_dirty,
@@ -108,6 +126,8 @@ EOF
 
 log "Published SpeakSwiftly $configuration runtime:"
 log "  products: $published_products_path"
+log "  alias:    $alias_path"
 log "  binary:   $published_binary_path"
+log "  launcher: $published_launcher_path"
 log "  metallib: $published_metallib_path"
 log "  metadata: $metadata_path"

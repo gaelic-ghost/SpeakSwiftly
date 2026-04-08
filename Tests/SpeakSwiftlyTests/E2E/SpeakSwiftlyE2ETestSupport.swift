@@ -898,25 +898,56 @@ final class WorkerProcess: @unchecked Sendable {
         packageRootURL: URL,
         configuration: String
     ) throws -> URL {
-        let productsURL = packageRootURL
-            .appendingPathComponent(".local/xcode/\(configuration)", isDirectory: true)
-        let executableURL = productsURL.appendingPathComponent("SpeakSwiftly", isDirectory: false)
-        let metallibURL = productsURL
-            .appendingPathComponent("mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib", isDirectory: false)
+        let runtime = try loadPublishedRuntime(
+            packageRootURL: packageRootURL,
+            configuration: configuration
+        )
 
-        guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+        guard FileManager.default.isExecutableFile(atPath: runtime.executableURL.path) else {
             throw WorkerProcessError(
-                "The Xcode-built SpeakSwiftly worker was expected at '\(executableURL.path)', but no executable was found after `xcodebuild` finished."
+                "The published SpeakSwiftly worker executable recorded in '\(runtime.metadataURL.path)' was expected at '\(runtime.executableURL.path)', but no executable was found there."
             )
         }
 
-        guard FileManager.default.fileExists(atPath: metallibURL.path) else {
+        guard FileManager.default.fileExists(atPath: runtime.metallibURL.path) else {
             throw WorkerProcessError(
-                "The MLX Metal shader bundle was not found at '\(metallibURL.path)' after `xcodebuild` completed. The worker cannot run real MLX-backed e2e tests without `default.metallib`."
+                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its MLX Metal shader bundle at '\(runtime.metallibURL.path)'. The worker cannot run real MLX-backed e2e tests without `default.metallib`."
             )
         }
 
-        return executableURL
+        guard FileManager.default.isExecutableFile(atPath: runtime.launcherURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its launcher script at '\(runtime.launcherURL.path)'."
+            )
+        }
+
+        return runtime.launcherURL
+    }
+
+    private static func loadPublishedRuntime(
+        packageRootURL: URL,
+        configuration: String
+    ) throws -> PublishedRuntime {
+        let metadataURL = packageRootURL
+            .appendingPathComponent(".local/xcode/SpeakSwiftly.\(configuration.lowercased()).json", isDirectory: false)
+
+        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly runtime metadata manifest was expected at '\(metadataURL.path)', but no manifest was found there."
+            )
+        }
+
+        let data = try Data(contentsOf: metadataURL)
+        let manifest = try JSONDecoder().decode(PublishedRuntimeManifest.self, from: data)
+
+        return PublishedRuntime(
+            metadataURL: metadataURL,
+            productsURL: URL(fileURLWithPath: manifest.productsPath),
+            executableURL: URL(fileURLWithPath: manifest.executablePath),
+            launcherURL: URL(fileURLWithPath: manifest.launcherPath),
+            metallibURL: URL(fileURLWithPath: manifest.metallibPath),
+            aliasURL: URL(fileURLWithPath: manifest.aliasPath)
+        )
     }
 
     private static func packageRootURL() throws -> URL {
@@ -985,6 +1016,31 @@ final class WorkerProcess: @unchecked Sendable {
             configuration: configuration
         )
     }
+}
+
+private struct PublishedRuntimeManifest: Decodable {
+    let productsPath: String
+    let executablePath: String
+    let launcherPath: String
+    let metallibPath: String
+    let aliasPath: String
+
+    private enum CodingKeys: String, CodingKey {
+        case productsPath = "products_path"
+        case executablePath = "executable_path"
+        case launcherPath = "launcher_path"
+        case metallibPath = "metallib_path"
+        case aliasPath = "alias_path"
+    }
+}
+
+private struct PublishedRuntime {
+    let metadataURL: URL
+    let productsURL: URL
+    let executableURL: URL
+    let launcherURL: URL
+    let metallibURL: URL
+    let aliasURL: URL
 }
 
 struct WorkerProcessError: Error, CustomStringConvertible {

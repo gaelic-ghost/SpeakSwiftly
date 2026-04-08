@@ -77,7 +77,7 @@ This is a release-hardening change, not a new runtime architecture.
 
 ### 3. Make published runtimes easier to consume correctly
 
-Status: still pending.
+Status: done on 2026-04-07 for launcher scripts, stable aliases, and manifest-first consumption inside this repository.
 
 The current `.local/xcode/<Configuration>` layout is much better than relying on raw DerivedData paths, but downstream local consumers still have to reconstruct too much launch wiring manually.
 
