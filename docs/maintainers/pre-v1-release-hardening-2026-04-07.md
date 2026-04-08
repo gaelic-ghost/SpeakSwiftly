@@ -29,7 +29,7 @@ Today we already have:
 - a local release flow that publishes both Debug and Release runtimes through `scripts/repo-maintenance/release.sh`
 - a stable published runtime directory layout under `.local/xcode/<Configuration>` with a metadata manifest and the copied `mlx-swift_Cmlx.bundle/.../default.metallib`
 
-This release-hardening pass is complete inside this repository. The only explicitly deferred item from this note is the separate queued-playback audible e2e lane listed at the end.
+This release-hardening pass is complete inside this repository.
 
 ## Required Before Full v1.0.0
 
@@ -110,10 +110,10 @@ Target behavior:
 
 This should stay a concrete cleanup of the existing published-runtime model, not a new packaging layer.
 
-## Explicit Deferred Item
+## Follow-Through Note
 
-This note does not replace the existing queued-playback test gap:
+The previously deferred queued-playback audible e2e gap is now closed too:
 
-- the strict multi-request audible live-playback e2e lane is now in place and validates queued drain behavior directly on one worker
+- the strict multi-request audible live-playback e2e lane now pre-queues several jobs on one worker and validates queued drain behavior directly
 
-That remains separate from the release-hardening items above.
+That work was tracked separately from the release-hardening items above, but it is now complete as well.

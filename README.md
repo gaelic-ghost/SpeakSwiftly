@@ -331,6 +331,7 @@ The current typed generation and profile helpers on `SpeakSwiftly.Runtime` are:
 Current live-playback behavior is:
 
 - `queue_speech_live` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses the stored profile reference audio and transcript, while `marvis` uses the stored profile vibe to select the already-warm built-in preset voice.
+- Live playback remains a single-speaker path on one worker. When one audible `queue_speech_live` request is already playing, later live requests can still be accepted and queued immediately, but their generation now waits until the active live playback drains before the next live request starts.
 - `queue_speech_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
 - Marvis resident warmup keeps both `conversational_a` and `conversational_b` loaded at once because the model is small enough that per-request preset switching does not need another preload cycle.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.androgenous` -> `conversational_a`, `.masc` -> `conversational_b`.
