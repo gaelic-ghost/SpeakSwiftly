@@ -1,6 +1,6 @@
-# CONTRIBUTORS
+# CONTRIBUTING
 
-Contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](/Users/galew/Workspace/SpeakSwiftly/README.md) too dense.
+Contribution guide and contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](/Users/galew/Workspace/SpeakSwiftly/README.md) too dense.
 
 ## Purpose
 

@@ -30,7 +30,7 @@ SpeakSwiftly currently supports:
 - Resident model unload and reload controls
 - Managed generated-file and generated-batch artifacts
 
-For deeper contributor-facing architecture notes, runtime behavior details, development guidance, and full verification workflows, see [CONTRIBUTORS.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTORS.md).
+For deeper contributor-facing architecture notes, runtime behavior details, development guidance, and full verification workflows, see [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
 
 ## Setup
 
@@ -177,11 +177,11 @@ Representative response and event shapes:
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. The typed Swift helpers populate caller working-directory context automatically.
 
-For the full wire examples, detailed event flow, and operator-facing behavior notes, see [CONTRIBUTORS.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTORS.md).
+For the full wire examples, detailed event flow, and operator-facing behavior notes, see [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
 
 ## Development
 
-Use this repository as the primary development home for SpeakSwiftly. Keep the public README focused on product and usage information, and put contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTORS.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTORS.md).
+Use this repository as the primary development home for SpeakSwiftly. Keep the public README focused on product and usage information, and put contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
 
 For package-focused development, prefer:
 
@@ -190,7 +190,7 @@ swift build
 swift test
 ```
 
-For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTORS.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTORS.md).
+For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
 
 ## Verification
 
@@ -208,7 +208,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 ```
 
-Extended e2e and forensic workflows are documented in [CONTRIBUTORS.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTORS.md).
+Extended e2e and forensic workflows are documented in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
 
 ## License
 
