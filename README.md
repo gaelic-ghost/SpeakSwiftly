@@ -30,7 +30,7 @@ SpeakSwiftly currently supports:
 - Resident model unload and reload controls
 - Managed generated-file and generated-batch artifacts
 
-For deeper contributor-facing architecture notes, runtime behavior details, development guidance, and full verification workflows, see [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
+For deeper contributor-facing architecture notes, runtime behavior details, development guidance, and full verification workflows, see [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 ## Setup
 
@@ -59,7 +59,7 @@ For real MLX-backed local worker runs, publish the Xcode-backed runtime first:
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
-That produces stable local runtime launchers under [`.local/xcode/current-debug`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/current-debug) and [`.local/xcode/current-release`](/Users/galew/Workspace/SpeakSwiftly/.local/xcode/current-release).
+That produces stable local runtime launchers under `.local/xcode/current-debug` and `.local/xcode/current-release`.
 
 ## Usage
 
@@ -177,11 +177,11 @@ Representative response and event shapes:
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. The typed Swift helpers populate caller working-directory context automatically.
 
-For the full wire examples, detailed event flow, and operator-facing behavior notes, see [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
+For the full wire examples, detailed event flow, and operator-facing behavior notes, see [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 ## Development
 
-Use this repository as the primary development home for SpeakSwiftly. Keep the public README focused on product and usage information, and put contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
+Use this repository as the primary development home for SpeakSwiftly. Keep the public README focused on product and usage information, and put contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 For package-focused development, prefer:
 
@@ -190,7 +190,7 @@ swift build
 swift test
 ```
 
-For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
+For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 ## Verification
 
@@ -208,7 +208,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 ```
 
-Extended e2e and forensic workflows are documented in [CONTRIBUTING.md](/Users/galew/Workspace/SpeakSwiftly/CONTRIBUTING.md).
+Extended e2e and forensic workflows are documented in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 ## License
 

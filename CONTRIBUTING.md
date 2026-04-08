@@ -1,6 +1,6 @@
 # CONTRIBUTING
 
-Contribution guide and contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](/Users/galew/Workspace/SpeakSwiftly/README.md) too dense.
+Contribution guide and contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/README.md) too dense.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ The repository tries to keep those two public surfaces aligned without forcing e
 
 ## Public Surface Split
 
-The public-facing [README.md](/Users/galew/Workspace/SpeakSwiftly/README.md) should stay focused on:
+The public-facing [README.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/README.md) should stay focused on:
 
 - what the project is
 - why it exists
@@ -320,7 +320,7 @@ Force audible playback in the e2e suite:
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_AUDIBLE_E2E=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
-Retained real-model run artifacts live under [`.local/e2e-runs`](/Users/galew/Workspace/SpeakSwiftly/.local/e2e-runs).
+Retained real-model run artifacts live under `.local/e2e-runs`.
 
 Chunk-level trace during e2e:
 
