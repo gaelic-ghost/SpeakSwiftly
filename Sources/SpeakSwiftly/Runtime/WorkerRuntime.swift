@@ -18,6 +18,7 @@ public extension SpeakSwiftly {
     enum ResidentState: Sendable {
         case warming
         case ready(ResidentSpeechModels)
+        case unloaded
         case failed(WorkerError)
     }
 
@@ -504,10 +505,14 @@ public extension SpeakSwiftly {
             return
         }
 
-        if case .failed(let error) = residentState {
-            failRequestStream(for: request.id, error: error)
+        if case .failed(let error) = residentState, request.requiresResidentModels {
+            let workerError = WorkerError(
+                code: error.code,
+                message: "Request '\(request.id)' cannot start because the resident model state is failed. Queue `reload_models` or `set_speech_backend` first, then retry the generation request."
+            )
+            failRequestStream(for: request.id, error: workerError)
             requestAcceptedAt.removeValue(forKey: request.id)
-            await emitFailure(id: request.id, error: error)
+            await emitFailure(id: request.id, error: workerError)
             return
         }
 
@@ -587,24 +592,32 @@ public extension SpeakSwiftly {
 
     func startNextGenerationIfPossible() async throws {
         guard !isShuttingDown else { return }
+        let hasActivePlayback = await playbackController.hasActivePlayback()
+        let residentState = self.residentState
+        let queueDisposition: @Sendable (GenerationController.Job) -> GenerationController.RunDisposition = { job in
+            let request = job.request
+            if request.requiresPlaybackDrainBeforeStart && hasActivePlayback {
+                return .park
+            }
 
-        switch residentState {
-        case .warming:
-            return
-        case .failed(let error):
-            await failQueuedRequests(with: error)
-            return
-        case .ready:
-            break
+            switch residentState {
+            case .warming:
+                return .park
+            case .ready:
+                return .run
+            case .unloaded:
+                return request.requiresResidentModels ? .park : .run
+            case .failed:
+                if request.mutatesResidentState {
+                    return .run
+                }
+                return request.requiresResidentModels ? .park : .run
+            }
         }
 
-        guard let nextJob = await generationController.nextQueuedJob(residentReady: true) else { return }
-        if (nextJob.request.requiresPlayback || nextJob.request.requiresPlaybackDrainBeforeStart),
-           await playbackController.hasActivePlayback() {
-            return
-        }
-
-        guard let job = await generationController.beginNextIfPossible(residentReady: true) else { return }
+        guard let nextJob = await generationController.nextQueuedJob(queueDisposition) else { return }
+        guard let job = await generationController.beginNextIfPossible(queueDisposition) else { return }
+        guard nextJob.token == job.token else { return }
 
         try? markGenerationJobRunningIfNeeded(for: job.request)
 
@@ -714,6 +727,26 @@ public extension SpeakSwiftly {
 
             case .switchSpeechBackend(id: let id, speechBackend: let requestedSpeechBackend):
                 let status = try await performOrderedSpeechBackendSwitch(to: requestedSpeechBackend)
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        status: status,
+                        speechBackend: speechBackend
+                    )
+                ))
+
+            case .reloadModels(id: let id):
+                let status = try await performOrderedModelReload()
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        status: status,
+                        speechBackend: speechBackend
+                    )
+                ))
+
+            case .unloadModels(id: let id):
+                let status = await performOrderedModelUnload()
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
@@ -1120,6 +1153,8 @@ public extension SpeakSwiftly {
             case .queueSpeech,
                  .queueBatch,
                  .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels,
                  .createProfile,
                  .createClone,
                  .listProfiles,
@@ -1358,6 +1393,7 @@ public extension SpeakSwiftly {
         to requestedSpeechBackend: SpeakSwiftly.SpeechBackend
     ) async throws -> WorkerStatusEvent? {
         preloadTask?.cancel()
+        preloadTask = nil
         speechBackend = requestedSpeechBackend
         residentState = .warming
         startResidentPreload()
@@ -1366,9 +1402,35 @@ public extension SpeakSwiftly {
         switch residentState {
         case .ready, .warming:
             return currentStatusSnapshot()
+        case .unloaded:
+            return currentStatusSnapshot()
         case .failed(let error):
             throw error
         }
+    }
+
+    func performOrderedModelReload() async throws -> WorkerStatusEvent? {
+        preloadTask?.cancel()
+        preloadTask = nil
+        residentState = .warming
+        startResidentPreload()
+        await preloadTask?.value
+
+        switch residentState {
+        case .ready, .warming, .unloaded:
+            return currentStatusSnapshot()
+        case .failed(let error):
+            throw error
+        }
+    }
+
+    func performOrderedModelUnload() async -> WorkerStatusEvent? {
+        preloadTask?.cancel()
+        preloadTask = nil
+        residentPreloadToken = nil
+        residentState = .unloaded
+        await emitStatus(.residentModelsUnloaded)
+        return currentStatusSnapshot()
     }
 
     func primaryResidentSampleRate(for models: ResidentSpeechModels) -> Int {
@@ -1398,6 +1460,11 @@ public extension SpeakSwiftly {
             )
         case .warming:
             throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
+        case .unloaded:
+            throw WorkerError(
+                code: .modelLoading,
+                message: "The resident models for the '\(speechBackend.rawValue)' backend are currently unloaded. Queue `reload_models` and retry this generation request after the runtime reports resident_model_ready."
+            )
         case .failed(let error):
             throw error
         }
@@ -1423,6 +1490,11 @@ public extension SpeakSwiftly {
             )
         case .warming:
             throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
+        case .unloaded:
+            throw WorkerError(
+                code: .modelLoading,
+                message: "The resident models for the '\(speechBackend.rawValue)' backend are currently unloaded. Queue `reload_models` and retry this generation request after the runtime reports resident_model_ready."
+            )
         case .failed(let error):
             throw error
         }

@@ -238,6 +238,12 @@ import TextForSpeech
         speechBackend in
         await runtime.switchSpeechBackend(to: speechBackend)
     }
+    let reloadModels: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
+        await runtime.reloadModels()
+    }
+    let unloadModels: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
+        await runtime.unloadModels()
+    }
     let playbackQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.playback)
     }
@@ -294,6 +300,8 @@ import TextForSpeech
     _ = generationQueue
     _ = status
     _ = switchSpeechBackend
+    _ = reloadModels
+    _ = unloadModels
     _ = playbackQueue
     _ = playbackPause
     _ = clearQueue
@@ -331,10 +339,12 @@ import TextForSpeech
 
 @Test func publicStatusSurfaceExposesStableMetadata() {
     let speechBackend: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.SpeechBackend> = \.speechBackend
+    let residentState: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.ResidentModelState> = \.residentState
     let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
     let successSpeechBackend: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.SpeechBackend?> = \.speechBackend
 
     _ = speechBackend
+    _ = residentState
     _ = successStatus
     _ = successSpeechBackend
 }

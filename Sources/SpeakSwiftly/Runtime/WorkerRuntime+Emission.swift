@@ -71,6 +71,13 @@ extension SpeakSwiftly.Runtime {
         switch residentState {
         case .warming:
             reason = .waitingForResidentModel
+        case .unloaded:
+            if job.request.requiresResidentModels {
+                reason = .waitingForResidentModels
+            } else {
+                guard await generationController.activeJob() != nil else { return nil }
+                reason = .waitingForActiveRequest
+            }
         case .failed:
             return nil
         case .ready:
@@ -142,7 +149,11 @@ extension SpeakSwiftly.Runtime {
     }
 
     func emitStatus(_ stage: WorkerStatusStage) async {
-        let status = WorkerStatusEvent(stage: stage, speechBackend: speechBackend)
+        let status = WorkerStatusEvent(
+            stage: stage,
+            residentState: residentStateSummary,
+            speechBackend: speechBackend
+        )
         await emit(status)
         broadcastStatus(status)
     }
@@ -364,6 +375,10 @@ extension SpeakSwiftly.Runtime {
             await submitRequest(id: id, op: request.opName)
         case .switchSpeechBackend(let id, let speechBackend):
             await submitRequest(id: id, op: request.opName, speechBackend: speechBackend)
+        case .reloadModels(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .unloadModels(let id):
+            await submitRequest(id: id, op: request.opName)
         case .playback(let id, _):
             await submitRequest(id: id, op: request.opName)
         case .clearQueue(let id):
@@ -517,11 +532,42 @@ extension SpeakSwiftly.Runtime {
         switch residentState {
         case .warming:
             guard preloadTask != nil else { return nil }
-            return WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: speechBackend)
+            return WorkerStatusEvent(
+                stage: .warmingResidentModel,
+                residentState: residentStateSummary,
+                speechBackend: speechBackend
+            )
         case .ready:
-            return WorkerStatusEvent(stage: .residentModelReady, speechBackend: speechBackend)
+            return WorkerStatusEvent(
+                stage: .residentModelReady,
+                residentState: residentStateSummary,
+                speechBackend: speechBackend
+            )
+        case .unloaded:
+            return WorkerStatusEvent(
+                stage: .residentModelsUnloaded,
+                residentState: residentStateSummary,
+                speechBackend: speechBackend
+            )
         case .failed:
-            return WorkerStatusEvent(stage: .residentModelFailed, speechBackend: speechBackend)
+            return WorkerStatusEvent(
+                stage: .residentModelFailed,
+                residentState: residentStateSummary,
+                speechBackend: speechBackend
+            )
+        }
+    }
+
+    var residentStateSummary: SpeakSwiftly.ResidentModelState {
+        switch residentState {
+        case .warming:
+            .warming
+        case .ready:
+            .ready
+        case .unloaded:
+            .unloaded
+        case .failed:
+            .failed
         }
     }
 

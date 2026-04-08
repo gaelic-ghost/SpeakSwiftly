@@ -347,6 +347,16 @@ import TextForSpeech
     #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .marvis))
 }
 
+@Test func decodesReloadModelsRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-reload","op":"reload_models"}"#)
+    #expect(request == .reloadModels(id: "req-reload"))
+}
+
+@Test func decodesUnloadModelsRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-unload","op":"unload_models"}"#)
+    #expect(request == .unloadModels(id: "req-unload"))
+}
+
 @Test func decodesPlaybackQueueRequest() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-5b","op":"list_queue_playback"}"#)
     #expect(request == .listQueue(id: "req-5b", queueType: .playback))
@@ -425,11 +435,13 @@ import TextForSpeech
     let status = try jsonObject(
         SpeakSwiftly.StatusEvent(
             stage: .residentModelReady,
+            residentState: .ready,
             speechBackend: .marvis
         )
     )
     #expect(status["event"] as? String == "worker_status")
     #expect(status["stage"] as? String == "resident_model_ready")
+    #expect(status["resident_state"] as? String == "ready")
     #expect(status["speech_backend"] as? String == "marvis")
 
     let success = try jsonObject(
@@ -440,7 +452,7 @@ import TextForSpeech
             profiles: nil,
             activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
             queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
-            status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, speechBackend: .qwen3),
+            status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,
             clearedCount: 2,
             cancelledRequestID: "req-queued"
@@ -451,6 +463,7 @@ import TextForSpeech
     #expect(success["profile_path"] as? String == "/tmp/default-femme")
     #expect((success["active_request"] as? [String: Any])?["id"] as? String == "req-active")
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
+    #expect((success["status"] as? [String: Any])?["resident_state"] as? String == "ready")
     #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
     #expect(success["speech_backend"] as? String == "qwen3")
     #expect(success["cleared_count"] as? Int == 2)

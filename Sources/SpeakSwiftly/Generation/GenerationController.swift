@@ -3,6 +3,12 @@ import Foundation
 // MARK: - Generation Queue
 
 actor GenerationController {
+    enum RunDisposition: Sendable, Equatable {
+        case run
+        case skip
+        case park
+    }
+
     struct Job: Sendable, Equatable {
         let token: UUID
         let request: WorkerRequest
@@ -27,19 +33,21 @@ actor GenerationController {
         return job
     }
 
-    func beginNextIfPossible(residentReady: Bool) -> Job? {
-        guard residentReady else { return nil }
+    func beginNextIfPossible(
+        _ disposition: @escaping (Job) -> RunDisposition
+    ) -> Job? {
         guard active == nil else { return nil }
-        guard let index = nextQueueIndex() else { return nil }
+        guard let index = nextQueueIndex(disposition) else { return nil }
         let job = queue.remove(at: index)
         active = job
         return job
     }
 
-    func nextQueuedJob(residentReady: Bool) -> Job? {
-        guard residentReady else { return nil }
+    func nextQueuedJob(
+        _ disposition: @escaping (Job) -> RunDisposition
+    ) -> Job? {
         guard active == nil else { return nil }
-        guard let index = nextQueueIndex() else { return nil }
+        guard let index = nextQueueIndex(disposition) else { return nil }
         return queue[index]
     }
 
@@ -87,10 +95,32 @@ actor GenerationController {
         orderedWaitingQueue(in: queue)
     }
 
-    private func nextQueueIndex() -> Int? {
+    private func nextQueueIndex(_ disposition: @escaping (Job) -> RunDisposition) -> Int? {
         let prioritizedJobs = orderedWaitingQueue()
+        var sawParkedResidentDependentWork = false
 
         for job in prioritizedJobs where !isBlockedByProfileCreation(job) {
+            if sawParkedResidentDependentWork && !job.request.canBypassParkedResidentWork {
+                return nil
+            }
+
+            let runDisposition = disposition(job)
+            if job.request.formsOrderedControlBarrier && runDisposition != .run {
+                return nil
+            }
+
+            switch runDisposition {
+            case .run:
+                break
+            case .skip:
+                continue
+            case .park:
+                if job.request.requiresResidentModels {
+                    sawParkedResidentDependentWork = true
+                }
+                continue
+            }
+
             if let index = queue.firstIndex(where: { $0.token == job.token }) {
                 return index
             }

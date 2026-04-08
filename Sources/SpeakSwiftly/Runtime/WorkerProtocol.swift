@@ -323,6 +323,8 @@ enum WorkerRequest: Sendable, Equatable {
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)
     case switchSpeechBackend(id: String, speechBackend: SpeakSwiftly.SpeechBackend)
+    case reloadModels(id: String)
+    case unloadModels(id: String)
     case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String)
     case cancelRequest(id: String, requestID: String)
@@ -361,6 +363,8 @@ enum WorkerRequest: Sendable, Equatable {
              .listQueue(let id, _),
              .status(let id),
              .switchSpeechBackend(let id, _),
+             .reloadModels(let id),
+             .unloadModels(let id),
              .playback(let id, _),
              .clearQueue(let id),
              .cancelRequest(let id, _):
@@ -438,6 +442,10 @@ enum WorkerRequest: Sendable, Equatable {
             "status"
         case .switchSpeechBackend:
             "set_speech_backend"
+        case .reloadModels:
+            "reload_models"
+        case .unloadModels:
+            "unload_models"
         case .playback(_, .pause):
             "playback_pause"
         case .playback(_, .resume):
@@ -460,6 +468,24 @@ enum WorkerRequest: Sendable, Equatable {
         }
     }
 
+    var requiresResidentModels: Bool {
+        switch self {
+        case .queueSpeech, .queueBatch:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var mutatesResidentState: Bool {
+        switch self {
+        case .switchSpeechBackend, .reloadModels, .unloadModels:
+            return true
+        default:
+            return false
+        }
+    }
+
     var requiresPlayback: Bool {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
@@ -471,7 +497,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var acknowledgesEnqueueImmediately: Bool {
         switch self {
-        case .queueSpeech, .queueBatch, .switchSpeechBackend:
+        case .queueSpeech, .queueBatch, .switchSpeechBackend, .reloadModels, .unloadModels:
             return true
         default:
             return false
@@ -482,7 +508,9 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
              .queueBatch,
-             .switchSpeechBackend:
+             .switchSpeechBackend,
+             .reloadModels,
+             .unloadModels:
             return true
         default:
             return false
@@ -527,11 +555,19 @@ enum WorkerRequest: Sendable, Equatable {
 
     var requiresPlaybackDrainBeforeStart: Bool {
         switch self {
-        case .switchSpeechBackend:
+        case .switchSpeechBackend, .reloadModels, .unloadModels:
             return true
         default:
             return false
         }
+    }
+
+    var formsOrderedControlBarrier: Bool {
+        mutatesResidentState
+    }
+
+    var canBypassParkedResidentWork: Bool {
+        mutatesResidentState
     }
 
     var profileName: String? {
@@ -562,6 +598,8 @@ enum WorkerRequest: Sendable, Equatable {
              .listQueue,
              .status,
              .switchSpeechBackend,
+             .reloadModels,
+             .unloadModels,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -616,6 +654,8 @@ enum WorkerRequest: Sendable, Equatable {
              .listQueue,
              .status,
              .switchSpeechBackend,
+             .reloadModels,
+             .unloadModels,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -659,6 +699,8 @@ enum WorkerRequest: Sendable, Equatable {
              .listQueue,
              .status,
              .switchSpeechBackend,
+             .reloadModels,
+             .unloadModels,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -702,6 +744,8 @@ enum WorkerRequest: Sendable, Equatable {
              .listQueue,
              .status,
              .switchSpeechBackend,
+             .reloadModels,
+             .unloadModels,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -947,6 +991,12 @@ enum WorkerRequest: Sendable, Equatable {
             let speechBackend = try require(raw.speechBackend, field: "speech_backend", id: id)
             return .switchSpeechBackend(id: id, speechBackend: speechBackend)
 
+        case "reload_models":
+            return .reloadModels(id: id)
+
+        case "unload_models":
+            return .unloadModels(id: id)
+
         case "playback_pause":
             return .playback(id: id, action: .pause)
 
@@ -1002,7 +1052,15 @@ public extension SpeakSwiftly {
     enum StatusStage: String, Codable, Sendable {
         case warmingResidentModel = "warming_resident_model"
         case residentModelReady = "resident_model_ready"
+        case residentModelsUnloaded = "resident_models_unloaded"
         case residentModelFailed = "resident_model_failed"
+    }
+
+    enum ResidentModelState: String, Codable, Sendable {
+        case warming
+        case ready
+        case unloaded
+        case failed
     }
 
     enum RequestEventName: String, Codable, Sendable {
@@ -1030,22 +1088,26 @@ public extension SpeakSwiftly {
 
     enum QueuedReason: String, Codable, Sendable {
         case waitingForResidentModel = "waiting_for_resident_model"
+        case waitingForResidentModels = "waiting_for_resident_models"
         case waitingForActiveRequest = "waiting_for_active_request"
     }
 
     struct StatusEvent: Encodable, Sendable, Equatable {
         public let event = "worker_status"
         public let stage: StatusStage
+        public let residentState: ResidentModelState
         public let speechBackend: SpeechBackend
 
         enum CodingKeys: String, CodingKey {
             case event
             case stage
+            case residentState = "resident_state"
             case speechBackend = "speech_backend"
         }
 
-        public init(stage: StatusStage, speechBackend: SpeechBackend) {
+        public init(stage: StatusStage, residentState: ResidentModelState, speechBackend: SpeechBackend) {
             self.stage = stage
+            self.residentState = residentState
             self.speechBackend = speechBackend
         }
     }

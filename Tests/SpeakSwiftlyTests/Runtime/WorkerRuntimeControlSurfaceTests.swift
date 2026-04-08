@@ -120,6 +120,7 @@ private actor BackendLoadRecorder {
             }
 
             return status["stage"] as? String == "resident_model_ready"
+                && status["resident_state"] as? String == "ready"
                 && status["speech_backend"] as? String == "qwen3"
         }
     })
@@ -167,6 +168,122 @@ private actor BackendLoadRecorder {
                 && $0["speech_backend"] as? String == "marvis"
         }
     })
+}
+
+@Test func unloadAndReloadModelsParkResidentGenerationUntilResidencyReturns() async throws {
+    let output = OutputRecorder()
+    let backendLoads = BackendLoadRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        speechBackend: .qwen3,
+        residentModelLoader: { backend in
+            await backendLoads.record(backend)
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["resident_state"] as? String == "ready"
+        }
+    })
+
+    let unloadID = await runtime.unloadModels(id: "req-unload").id
+    #expect(unloadID == "req-unload")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-unload",
+                $0["ok"] as? Bool == true,
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "resident_models_unloaded"
+                && status["resident_state"] as? String == "unloaded"
+                && status["speech_backend"] as? String == "qwen3"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_models_unloaded"
+                && $0["resident_state"] as? String == "unloaded"
+                && $0["speech_backend"] as? String == "qwen3"
+        }
+    })
+
+    let queuedFileID = await runtime.speak(
+        text: "Save this request once the resident models are back.",
+        with: "default-femme",
+        as: .file,
+        id: "req-after-unload"
+    ).id
+    #expect(queuedFileID == "req-after-unload")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-after-unload"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_resident_models"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-after-unload"
+            && $0["event"] as? String == "started"
+    })
+
+    let reloadID = await runtime.reloadModels(id: "req-reload").id
+    #expect(reloadID == "req-reload")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "warming_resident_model"
+                && $0["resident_state"] as? String == "warming"
+                && $0["speech_backend"] as? String == "qwen3"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-reload",
+                $0["ok"] as? Bool == true,
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "resident_model_ready"
+                && status["resident_state"] as? String == "ready"
+                && status["speech_backend"] as? String == "qwen3"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-after-unload"
+                && $0["ok"] as? Bool == true
+                && $0["generated_file"] != nil
+        }
+    })
+    #expect(await backendLoads.values() == [.qwen3, .qwen3])
 }
 
 @Test func switchSpeechBackendActsAsAnOrderedBarrierWhilePlaybackDrains() async throws {
@@ -1119,8 +1236,8 @@ private actor BackendLoadRecorder {
 
     let firstStatus = await statusIterator.next()
     let secondStatus = await statusIterator.next()
-    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: .qwen3))
-    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, residentState: .warming, speechBackend: .qwen3))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
 
     let handle = await runtime.submit(
         .listProfiles(id: "req-stream")
@@ -1224,7 +1341,7 @@ private actor BackendLoadRecorder {
     let statuses = await runtime.statusEvents()
     var iterator = statuses.makeAsyncIterator()
 
-    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
+    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
 }
 
 @Test func droppingStatusSubscriptionDoesNotRetainRuntime() async throws {
@@ -1280,8 +1397,8 @@ private actor BackendLoadRecorder {
     let firstStatus = await iterator.next()
     let secondStatus = await iterator.next()
 
-    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: .qwen3))
-    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, residentState: .warming, speechBackend: .qwen3))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
     #expect(await loadCounter.value() == 1)
     #expect(
         output.countJSONObjects {

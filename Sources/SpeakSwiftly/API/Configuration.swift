@@ -87,4 +87,12 @@ public extension SpeakSwiftly.Runtime {
     ) async -> SpeakSwiftly.RequestHandle {
         await submit(.switchSpeechBackend(id: requestID, speechBackend: speechBackend))
     }
+
+    func reloadModels(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await submit(.reloadModels(id: requestID))
+    }
+
+    func unloadModels(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await submit(.unloadModels(id: requestID))
+    }
 }
