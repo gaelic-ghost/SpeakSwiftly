@@ -471,7 +471,7 @@ enum WorkerRequest: Sendable, Equatable {
 
     var acknowledgesEnqueueImmediately: Bool {
         switch self {
-        case .queueSpeech, .queueBatch:
+        case .queueSpeech, .queueBatch, .switchSpeechBackend:
             return true
         default:
             return false
@@ -481,7 +481,8 @@ enum WorkerRequest: Sendable, Equatable {
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
-             .queueBatch:
+             .queueBatch,
+             .switchSpeechBackend:
             return true
         default:
             return false
@@ -515,10 +516,18 @@ enum WorkerRequest: Sendable, Equatable {
              .removeTextReplacement,
              .listQueue,
              .status,
-             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var requiresPlaybackDrainBeforeStart: Bool {
+        switch self {
+        case .switchSpeechBackend:
             return true
         default:
             return false

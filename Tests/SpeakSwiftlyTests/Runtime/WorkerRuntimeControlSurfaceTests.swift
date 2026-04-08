@@ -9,6 +9,18 @@ private final class WeakRuntimeBox: @unchecked Sendable {
     weak var value: WorkerRuntime?
 }
 
+private actor BackendLoadRecorder {
+    private var backends = [SpeakSwiftly.SpeechBackend]()
+
+    func record(_ backend: SpeakSwiftly.SpeechBackend) {
+        backends.append(backend)
+    }
+
+    func values() -> [SpeakSwiftly.SpeechBackend] {
+        backends
+    }
+}
+
 @Test func listQueueReturnsActiveAndQueuedRequestsWithoutWaitingForActivePlayback() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
@@ -144,7 +156,7 @@ private final class WeakRuntimeBox: @unchecked Sendable {
                 return false
             }
 
-            return status["stage"] as? String == "warming_resident_model"
+            return status["stage"] as? String == "resident_model_ready"
                 && status["speech_backend"] as? String == "marvis"
         }
     })
@@ -157,10 +169,11 @@ private final class WeakRuntimeBox: @unchecked Sendable {
     })
 }
 
-@Test func switchSpeechBackendRejectsWhilePlaybackWorkIsActive() async throws {
+@Test func switchSpeechBackendActsAsAnOrderedBarrierWhilePlaybackDrains() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let backendLoads = BackendLoadRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
@@ -179,7 +192,10 @@ private final class WeakRuntimeBox: @unchecked Sendable {
         output: output,
         playback: playback,
         speechBackend: .qwen3,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { backend in
+            await backendLoads.record(backend)
+            return makeResidentModel()
+        }
     )
 
     await runtime.start()
@@ -201,15 +217,81 @@ private final class WeakRuntimeBox: @unchecked Sendable {
 
     let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch-busy").id
     #expect(switchID == "req-switch-busy")
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-switch-busy"
-                && $0["ok"] as? Bool == false
-                && $0["code"] as? String == "invalid_request"
-        }
+    let queuedFileID = await runtime.speak(
+        text: "Save this request after the backend switch barrier.",
+        with: "default-femme",
+        as: .file,
+        id: "req-after-switch"
+    ).id
+    #expect(queuedFileID == "req-after-switch")
+
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-after-switch"
+            && $0["ok"] as? Bool == true
+            && $0["generated_file"] != nil
     })
 
     await playbackDrain.open()
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "warming_resident_model"
+                && $0["speech_backend"] as? String == "marvis"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "marvis"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-switch-busy",
+                $0["ok"] as? Bool == true,
+                $0["speech_backend"] as? String == "marvis",
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "resident_model_ready"
+                && status["speech_backend"] as? String == "marvis"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-after-switch",
+                $0["ok"] as? Bool == true,
+                let generatedFile = $0["generated_file"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generatedFile["artifact_id"] as? String == "req-after-switch-artifact-1"
+        }
+    })
+
+    let generationJobID = await runtime.generationJob(id: "req-after-switch", requestID: "req-after-switch-job").id
+    #expect(generationJobID == "req-after-switch-job")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-after-switch-job",
+                $0["ok"] as? Bool == true,
+                let generationJob = $0["generation_job"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return generationJob["speech_backend"] as? String == "marvis"
+        }
+    })
+    #expect(await backendLoads.values() == [.qwen3, .marvis])
 }
 
 @Test func clearQueueFailsQueuedRequestsWhenGenerationQueueHasWaitingWork() async throws {

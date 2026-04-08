@@ -84,20 +84,32 @@ actor GenerationController {
     }
 
     private func orderedWaitingQueue() -> [Job] {
-        let speechJobs = queue.filter(\.request.isSpeechRequest)
-        let otherJobs = queue.filter { !$0.request.isSpeechRequest }
-        return speechJobs + otherJobs
+        orderedWaitingQueue(in: queue)
     }
 
     private func nextQueueIndex() -> Int? {
-        let prioritizedIndices = queue.indices.filter { queue[$0].request.isSpeechRequest }
-            + queue.indices.filter { !queue[$0].request.isSpeechRequest }
+        let prioritizedJobs = orderedWaitingQueue()
 
-        for index in prioritizedIndices where !isBlockedByProfileCreation(queue[index]) {
-            return index
+        for job in prioritizedJobs where !isBlockedByProfileCreation(job) {
+            if let index = queue.firstIndex(where: { $0.token == job.token }) {
+                return index
+            }
         }
 
         return nil
+    }
+
+    private func orderedWaitingQueue(in jobs: [Job]) -> [Job] {
+        guard let barrierIndex = jobs.firstIndex(where: { $0.request.requiresPlaybackDrainBeforeStart }) else {
+            let speechJobs = jobs.filter(\.request.isSpeechRequest)
+            let otherJobs = jobs.filter { !$0.request.isSpeechRequest }
+            return speechJobs + otherJobs
+        }
+
+        let prefix = Array(jobs[..<barrierIndex])
+        let barrier = jobs[barrierIndex]
+        let suffix = Array(jobs[(barrierIndex + 1)...])
+        return orderedWaitingQueue(in: prefix) + [barrier] + orderedWaitingQueue(in: suffix)
     }
 
     private func isBlockedByProfileCreation(_ job: Job) -> Bool {

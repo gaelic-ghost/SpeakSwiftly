@@ -599,7 +599,8 @@ public extension SpeakSwiftly {
         }
 
         guard let nextJob = await generationController.nextQueuedJob(residentReady: true) else { return }
-        if nextJob.request.requiresPlayback, await playbackController.hasActivePlayback() {
+        if (nextJob.request.requiresPlayback || nextJob.request.requiresPlaybackDrainBeforeStart),
+           await playbackController.hasActivePlayback() {
             return
         }
 
@@ -711,6 +712,16 @@ public extension SpeakSwiftly {
                     )
                 ))
 
+            case .switchSpeechBackend(id: let id, speechBackend: let requestedSpeechBackend):
+                let status = try await performOrderedSpeechBackendSwitch(to: requestedSpeechBackend)
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        status: status,
+                        speechBackend: speechBackend
+                    )
+                ))
+
             case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath, let cwd):
                 let storedProfile = try await handleCreateProfile(
                     id: id,
@@ -802,7 +813,6 @@ public extension SpeakSwiftly {
                  .removeTextReplacement,
                  .listQueue,
                  .status,
-                 .switchSpeechBackend,
                  .playback,
                  .clearQueue,
                  .cancelRequest:
@@ -1084,15 +1094,6 @@ public extension SpeakSwiftly {
                     )
                 )
 
-            case .switchSpeechBackend(let id, let requestedSpeechBackend):
-                result = .success(
-                    WorkerSuccessPayload(
-                        id: id,
-                        status: try await switchSpeechBackendNow(to: requestedSpeechBackend),
-                        speechBackend: speechBackend
-                    )
-                )
-
             case .playback(let id, let action):
                 _ = await playbackController.handle(action)
                 result = .success(
@@ -1118,6 +1119,7 @@ public extension SpeakSwiftly {
 
             case .queueSpeech,
                  .queueBatch,
+                 .switchSpeechBackend,
                  .createProfile,
                  .createClone,
                  .listProfiles,
@@ -1352,23 +1354,21 @@ public extension SpeakSwiftly {
         residentPreloadToken == token && speechBackend == backend
     }
 
-    func switchSpeechBackendNow(
+    func performOrderedSpeechBackendSwitch(
         to requestedSpeechBackend: SpeakSwiftly.SpeechBackend
     ) async throws -> WorkerStatusEvent? {
-        let hasQueuedGenerationWork = !((await generationController.queuedJobsOrdered()).isEmpty)
-        let playbackJobCount = await playbackController.jobCount()
-        if activeGeneration != nil || hasQueuedGenerationWork || playbackJobCount > 0 {
-            throw WorkerError(
-                code: .invalidRequest,
-                message: "SpeakSwiftly cannot switch the resident speech backend to '\(requestedSpeechBackend.rawValue)' while generation or playback work is still active or queued. Let the worker go idle, or clear or cancel the pending work first."
-            )
-        }
-
         preloadTask?.cancel()
         speechBackend = requestedSpeechBackend
         residentState = .warming
         startResidentPreload()
-        return currentStatusSnapshot()
+        await preloadTask?.value
+
+        switch residentState {
+        case .ready, .warming:
+            return currentStatusSnapshot()
+        case .failed(let error):
+            throw error
+        }
     }
 
     func primaryResidentSampleRate(for models: ResidentSpeechModels) -> Int {
@@ -1523,7 +1523,11 @@ public extension SpeakSwiftly {
             sourceFormat: _
         ),
         .queueBatch(id: let id, profileName: _, items: _):
-            _ = try generationJobStore.markRunning(id: id, startedAt: dependencies.now())
+            _ = try generationJobStore.markRunning(
+                id: id,
+                speechBackend: speechBackend,
+                startedAt: dependencies.now()
+            )
         default:
             return
         }

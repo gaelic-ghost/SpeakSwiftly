@@ -170,7 +170,11 @@ struct GenerationJobStore {
         }
     }
 
-    func markRunning(id jobID: String, startedAt: Date) throws -> SpeakSwiftly.GenerationJob {
+    func markRunning(
+        id jobID: String,
+        speechBackend: SpeakSwiftly.SpeechBackend,
+        startedAt: Date
+    ) throws -> SpeakSwiftly.GenerationJob {
         try updateGenerationJob(id: jobID) { job in
             SpeakSwiftly.GenerationJob(
                 jobID: job.jobID,
@@ -179,7 +183,7 @@ struct GenerationJobStore {
                 updatedAt: startedAt,
                 profileName: job.profileName,
                 textProfileName: job.textProfileName,
-                speechBackend: job.speechBackend,
+                speechBackend: speechBackend,
                 state: .running,
                 items: job.items,
                 artifacts: job.artifacts,
@@ -191,6 +195,15 @@ struct GenerationJobStore {
                 retentionPolicy: job.retentionPolicy
             )
         }
+    }
+
+    func markRunning(id jobID: String, startedAt: Date) throws -> SpeakSwiftly.GenerationJob {
+        let current = try loadGenerationJob(id: jobID)
+        return try markRunning(
+            id: jobID,
+            speechBackend: current.speechBackend,
+            startedAt: startedAt
+        )
     }
 
     func markCompleted(
