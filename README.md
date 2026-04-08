@@ -140,11 +140,20 @@ Key typed runtime entry points include:
 - `generationJob(id:requestID:)`
 - `generationJobs(id:)`
 
-Resident runtime controls intentionally use Cocoa-style names in Swift and snake_case names on the JSONL wire:
+The typed Swift library and the JSONL worker surface intentionally use different naming styles:
+
+- Swift keeps Cocoa-style method names that read naturally at the call site.
+- JSONL keeps snake_case, verb-first operation names.
+- JSONL read-one operations use `get_*`.
+- JSONL collection and queue reads use `list_*`.
+- JSONL CRUD-style writes use `create_*`, `replace_*`, and `delete_*`.
+- JSONL lifecycle and control operations keep literal verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
+
+Resident runtime controls currently map like this:
 
 | Typed Swift API | JSONL `op` | Notes |
 | --- | --- | --- |
-| `status(id:)` | `"status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
+| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
 | `switchSpeechBackend(to:id:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
 | `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
 | `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
@@ -159,7 +168,9 @@ Representative request shapes:
 {"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
 {"id":"req-batch","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
-{"id":"req-status","op":"status"}
+{"id":"req-status","op":"get_status"}
+{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
+{"id":"req-generated-files","op":"list_generated_files"}
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
 {"id":"req-reload","op":"reload_models"}
 {"id":"req-unload","op":"unload_models"}

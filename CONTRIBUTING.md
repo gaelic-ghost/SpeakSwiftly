@@ -75,14 +75,36 @@ The intent behind this shape is:
 
 ### JSONL Wire API
 
-Current JSONL operation names use stable snake_case:
+The JSONL worker surface uses stable snake_case, verb-first operation names.
 
-- `"status"`
+Use these naming rules for new wire operations:
+
+- read one resource or snapshot: `get_*`
+- read many resources or a queue snapshot: `list_*`
+- create a new resource: `create_*`
+- partially mutate a resource: `update_*`
+- replace a whole resource payload: `replace_*`
+- delete a resource: `delete_*`
+- keep literal lifecycle or control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best described as CRUD
+
+Current resident runtime controls on the wire are:
+
+- `"get_status"`
 - `"set_speech_backend"`
 - `"reload_models"`
 - `"unload_models"`
 
-The wire shape is intentionally more literal and transport-oriented than the Swift surface.
+Current examples of the broader convention are:
+
+- `get_generated_file`
+- `list_generated_files`
+- `get_active_text_profile`
+- `list_text_profiles`
+- `create_text_replacement`
+- `replace_text_profile`
+- `delete_profile`
+
+The wire shape is intentionally more literal and transport-oriented than the Swift surface, and it should stay mechanically consistent enough that a caller can often guess an operation name correctly before looking it up.
 
 ## Runtime Configuration
 
@@ -183,22 +205,22 @@ Representative request shapes:
 {"id":"req-1e","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
 {"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
 {"id":"req-1g","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
-{"id":"req-1h","op":"generated_file","artifact_id":"req-1f-artifact-1"}
-{"id":"req-1i","op":"generated_files"}
-{"id":"req-1j","op":"generated_batch","batch_id":"req-1g"}
-{"id":"req-1k","op":"generated_batches"}
-{"id":"req-1l","op":"generation_job","job_id":"req-1f"}
-{"id":"req-1m","op":"generation_jobs"}
+{"id":"req-1h","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
+{"id":"req-1i","op":"list_generated_files"}
+{"id":"req-1j","op":"get_generated_batch","batch_id":"req-1g"}
+{"id":"req-1k","op":"list_generated_batches"}
+{"id":"req-1l","op":"get_generation_job","job_id":"req-1f"}
+{"id":"req-1m","op":"list_generation_jobs"}
 {"id":"req-1n","op":"expire_generation_job","job_id":"req-1g"}
 {"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
 {"id":"req-3","op":"list_profiles"}
-{"id":"req-4","op":"remove_profile","profile_name":"bright-guide"}
-{"id":"req-5","op":"text_profile_active"}
-{"id":"req-6","op":"text_profiles"}
+{"id":"req-4","op":"delete_profile","profile_name":"bright-guide"}
+{"id":"req-5","op":"get_active_text_profile"}
+{"id":"req-6","op":"list_text_profiles"}
 {"id":"req-7","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
-{"id":"req-8","op":"add_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
-{"id":"req-9","op":"use_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
-{"id":"req-status","op":"status"}
+{"id":"req-8","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-9","op":"replace_active_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
+{"id":"req-status","op":"get_status"}
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
 {"id":"req-reload","op":"reload_models"}
 {"id":"req-unload","op":"unload_models"}
@@ -242,8 +264,8 @@ Current generated-file behavior:
 - single-file generation resolves its saved artifact id as `<jobID>-artifact-1`
 - batch generation resolves one saved artifact id per item, using caller-provided `artifact_id` when present and `<batchID>-artifact-N` otherwise
 - saved artifacts live in the runtime-managed generated-file store, not at a caller-provided output path
-- expired batch reads stay inspectable through `generated_batch` and `generated_batches`, but return an empty `artifacts` list because the saved files are intentionally gone
-- expired file and batch jobs keep artifact references inside `generation_job` and `generation_jobs` so operators can still see what existed before cleanup
+- expired batch reads stay inspectable through `get_generated_batch` and `list_generated_batches`, but return an empty `artifacts` list because the saved files are intentionally gone
+- expired file and batch jobs keep artifact references inside `get_generation_job` and `list_generation_jobs` so operators can still see what existed before cleanup
 
 ## Repository Layout
 

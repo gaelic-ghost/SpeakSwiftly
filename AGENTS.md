@@ -37,6 +37,11 @@
 - Keep `Sources/SpeakSwiftly/Runtime` for runtime-only internals such as worker request handling, queue orchestration, lifecycle management, event emission, and other machinery that is genuinely part of the worker runtime itself.
 - Do not split one feature across three places when two will do. For any given feature, prefer one API file in `API/` plus one logic file in the relevant feature directory.
 - When reorganizing tests, mirror the source tree by feature area so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find.
+- For the JSONL worker surface, keep operation names snake_case and verb-first.
+- For JSONL reads, use `get_*` for one resource or snapshot and `list_*` for collections and queue snapshots.
+- For JSONL writes, prefer CRUD verbs where they fit the actual semantics: `create_*`, `update_*`, `replace_*`, and `delete_*`.
+- Keep literal lifecycle and control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
+- When adding or renaming a JSONL operation, update both `README.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented.
 
 ## Swift Coding Preferences
 
