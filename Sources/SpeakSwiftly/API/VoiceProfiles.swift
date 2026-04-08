@@ -9,6 +9,7 @@ public extension SpeakSwiftly.Runtime {
         vibe: SpeakSwiftly.Vibe,
         voice voiceDescription: String,
         outputPath: String? = nil,
+        cwd: String? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
         await submit(
@@ -19,7 +20,27 @@ public extension SpeakSwiftly.Runtime {
                 vibe: vibe,
                 voiceDescription: voiceDescription,
                 outputPath: outputPath,
-                cwd: FileManager.default.currentDirectoryPath
+                cwd: cwd ?? FileManager.default.currentDirectoryPath
+            )
+        )
+    }
+
+    func createClone(
+        named profileName: String,
+        from referenceAudioPath: String,
+        vibe: SpeakSwiftly.Vibe,
+        transcript: String? = nil,
+        cwd: String? = nil,
+        id: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await submit(
+            .createClone(
+                id: id,
+                profileName: profileName,
+                referenceAudioPath: referenceAudioPath,
+                vibe: vibe,
+                transcript: transcript,
+                cwd: cwd ?? FileManager.default.currentDirectoryPath
             )
         )
     }
@@ -29,17 +50,16 @@ public extension SpeakSwiftly.Runtime {
         from referenceAudioURL: URL,
         vibe: SpeakSwiftly.Vibe,
         transcript: String? = nil,
+        cwd: String? = nil,
         id: String = UUID().uuidString
     ) async -> SpeakSwiftly.RequestHandle {
-        await submit(
-            .createClone(
-                id: id,
-                profileName: profileName,
-                referenceAudioPath: referenceAudioURL.path,
-                vibe: vibe,
-                transcript: transcript,
-                cwd: FileManager.default.currentDirectoryPath
-            )
+        await createClone(
+            named: profileName,
+            from: referenceAudioURL.path,
+            vibe: vibe,
+            transcript: transcript,
+            cwd: cwd,
+            id: id
         )
     }
 

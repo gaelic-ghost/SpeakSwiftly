@@ -161,13 +161,14 @@ import TextForSpeech
         name in
         try await normalizer.removeReplacement(id: replacementID, fromStoredProfileNamed: name)
     }
-    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, SpeakSwiftly.Vibe, String, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createProfile: @Sendable (SpeakSwiftly.Runtime, String, String, SpeakSwiftly.Vibe, String, String?, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         profileName,
         text,
         vibe,
         voiceDescription,
         outputPath,
+        cwd,
         id in
         await runtime.createProfile(
             named: profileName,
@@ -175,21 +176,41 @@ import TextForSpeech
             vibe: vibe,
             voice: voiceDescription,
             outputPath: outputPath,
+            cwd: cwd,
             id: id
         )
     }
-    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, SpeakSwiftly.Vibe, String?, String) async -> SpeakSwiftly.RequestHandle = {
+    let createClone: @Sendable (SpeakSwiftly.Runtime, String, URL, SpeakSwiftly.Vibe, String?, String?, String) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         profileName,
         referenceAudioURL,
         vibe,
         transcript,
+        cwd,
         id in
         await runtime.createClone(
             named: profileName,
             from: referenceAudioURL,
             vibe: vibe,
             transcript: transcript,
+            cwd: cwd,
+            id: id
+        )
+    }
+    let createCloneFromPath: @Sendable (SpeakSwiftly.Runtime, String, String, SpeakSwiftly.Vibe, String?, String?, String) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        profileName,
+        referenceAudioPath,
+        vibe,
+        transcript,
+        cwd,
+        id in
+        await runtime.createClone(
+            named: profileName,
+            from: referenceAudioPath,
+            vibe: vibe,
+            transcript: transcript,
+            cwd: cwd,
             id: id
         )
     }
@@ -254,6 +275,7 @@ import TextForSpeech
     _ = liveWithConfiguration
     _ = createProfile
     _ = createClone
+    _ = createCloneFromPath
     _ = profiles
     _ = removeProfile
     _ = generatedFile
