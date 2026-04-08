@@ -159,7 +159,26 @@ import TextForSpeech
             text: "Hello",
             vibe: .femme,
             voiceDescription: "Warm and bright",
-            outputPath: "./voice.wav"
+            outputPath: "./voice.wav",
+            cwd: nil
+        )
+    )
+}
+
+@Test func decodesCreateProfileRequestWithCallerWorkingDirectory() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-2b","op":"create_profile","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav","cwd":"/tmp/export-base"}"#
+    )
+
+    #expect(
+        request == .createProfile(
+            id: "req-2b",
+            profileName: "bright-guide",
+            text: "Hello",
+            vibe: .femme,
+            voiceDescription: "Warm and bright",
+            outputPath: "./voice.wav",
+            cwd: "/tmp/export-base"
         )
     )
 }
@@ -175,7 +194,25 @@ import TextForSpeech
             profileName: "ghost-copy",
             referenceAudioPath: "./voice.m4a",
             vibe: .masc,
-            transcript: "Hello from imported audio"
+            transcript: "Hello from imported audio",
+            cwd: nil
+        )
+    )
+}
+
+@Test func decodesCreateCloneRequestWithCallerWorkingDirectory() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-clone-cwd","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio","cwd":"file:///tmp/clone-base"}"#
+    )
+
+    #expect(
+        request == .createClone(
+            id: "req-clone-cwd",
+            profileName: "ghost-copy",
+            referenceAudioPath: "./voice.m4a",
+            vibe: .masc,
+            transcript: "Hello from imported audio",
+            cwd: "file:///tmp/clone-base"
         )
     )
 }

@@ -180,6 +180,7 @@ extension SpeakSwiftly.Runtime {
         vibe: SpeakSwiftly.Vibe? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil,
+        cwd: String? = nil,
         referenceAudioPath: String? = nil,
         transcript: String? = nil
     ) async {
@@ -199,7 +200,7 @@ extension SpeakSwiftly.Runtime {
             replacements: replacements,
             replacement: replacement,
             replacementID: replacementID,
-            cwd: textContext?.cwd,
+            cwd: cwd ?? textContext?.cwd,
             repoRoot: textContext?.repoRoot,
             textFormat: textContext?.textFormat,
             nestedSourceFormat: textContext?.nestedSourceFormat,
@@ -285,7 +286,7 @@ extension SpeakSwiftly.Runtime {
                 id: id,
                 op: request.opName
             )
-        case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath):
+        case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath, let cwd):
             await submitRequest(
                 id: id,
                 op: request.opName,
@@ -293,14 +294,16 @@ extension SpeakSwiftly.Runtime {
                 profileName: profileName,
                 vibe: vibe,
                 voiceDescription: voiceDescription,
-                outputPath: outputPath
+                outputPath: outputPath,
+                cwd: cwd
             )
-        case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript):
+        case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript, let cwd):
             await submitRequest(
                 id: id,
                 op: request.opName,
                 profileName: profileName,
                 vibe: vibe,
+                cwd: cwd,
                 referenceAudioPath: referenceAudioPath,
                 transcript: transcript
             )
@@ -620,12 +623,12 @@ extension SpeakSwiftly.Runtime {
         )
 
         do {
-            let data = try logEncoder.encode(logEvent)
-            dependencies.writeStderr(String(decoding: data, as: UTF8.self))
+            dependencies.writeStderr(try WorkerStructuredLogSupport.encode(logEvent))
         } catch {
-            dependencies.writeStderr(
-                #"{"event":"worker_error","level":"error","ts":"\#(logTimestampFormatter.string(from: dependencies.now()))","details":{"message":"SpeakSwiftly could not encode a stderr log event.","error":"\#(error.localizedDescription)"}}"#
-            )
+            dependencies.writeStderr(WorkerStructuredLogSupport.encodingFailureLine(
+                timestamp: logTimestampFormatter.string(from: dependencies.now()),
+                errorDescription: error.localizedDescription
+            ))
         }
     }
 

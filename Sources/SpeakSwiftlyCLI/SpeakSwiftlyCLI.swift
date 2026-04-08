@@ -14,7 +14,31 @@ enum SpeakSwiftlyCLI {
                 await runtime.accept(line: line)
             }
         } catch {
-            fputs("SpeakSwiftly stopped reading stdin because the standard input stream failed unexpectedly. \(error.localizedDescription)\n", stderr)
+            let timestamp = ISO8601DateFormatter().string(from: Date())
+            let details = [
+                "message": WorkerLogValue.string(
+                    "SpeakSwiftly stopped reading stdin because the standard input stream failed unexpectedly."
+                ),
+                "error": WorkerLogValue.string(error.localizedDescription),
+            ]
+            let event = WorkerLogEvent(
+                event: "stdin_read_failed",
+                level: .error,
+                ts: timestamp,
+                requestID: nil,
+                op: nil,
+                profileName: nil,
+                queueDepth: nil,
+                elapsedMS: nil,
+                details: details
+            )
+
+            let line = (try? WorkerStructuredLogSupport.encode(event))
+                ?? WorkerStructuredLogSupport.encodingFailureLine(
+                    timestamp: timestamp,
+                    errorDescription: error.localizedDescription
+                )
+            try? FileHandle.standardError.write(contentsOf: Data((line + "\n").utf8))
         }
 
         await runtime.shutdown()

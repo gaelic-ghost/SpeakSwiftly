@@ -475,6 +475,79 @@ import TextForSpeech
     })
 }
 
+@Test func createProfileResolvesRelativeOutputPathAgainstExplicitCallerWorkingDirectory() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    let callerWorkingDirectory = makeTempDirectoryURL()
+    defer {
+        try? FileManager.default.removeItem(at: storeRoot)
+        try? FileManager.default.removeItem(at: callerWorkingDirectory)
+    }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let exportURL = callerWorkingDirectory.appendingPathComponent("exports/voice.wav")
+    await runtime.accept(
+        line: #"{"id":"req-relative-export","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav","cwd":"\#(callerWorkingDirectory.path)"}"#
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-relative-export"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "bright-guide"
+        }
+    })
+    #expect(FileManager.default.fileExists(atPath: exportURL.path))
+}
+
+@Test func createProfileRejectsRelativeOutputPathWithoutExplicitCallerWorkingDirectory() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-relative-export-missing-cwd","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav"}"#
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            ($0["id"] as? String) == "req-relative-export-missing-cwd"
+                && ($0["ok"] as? Bool) == false
+                && ($0["code"] as? String) == "invalid_request"
+                && (($0["message"] as? String)?.contains("did not provide 'cwd'") ?? false)
+        }
+    })
+}
+
 @Test func generateBatchAcknowledgesQueueThenCompletesWithGeneratedBatchMetadata() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
@@ -656,6 +729,49 @@ import TextForSpeech
     #expect(storedProfile.manifest.sourceText == "Provided transcript")
     #expect(storedProfile.manifest.voiceDescription == ModelFactory.importedCloneVoiceDescription)
     #expect(storedProfile.manifest.modelRepo == ModelFactory.importedCloneModelRepo)
+}
+
+@Test func createCloneResolvesRelativeReferenceAudioAgainstExplicitCallerWorkingDirectory() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    let callerWorkingDirectory = makeTempDirectoryURL()
+    defer {
+        try? FileManager.default.removeItem(at: storeRoot)
+        try? FileManager.default.removeItem(at: callerWorkingDirectory)
+    }
+    try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: callerWorkingDirectory, withIntermediateDirectories: true)
+
+    let referenceAudioURL = callerWorkingDirectory.appendingPathComponent("reference.wav")
+    try Data([0x01]).write(to: referenceAudioURL, options: .atomic)
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        loadedCloneAudioSamples: [0.1, 0.2, 0.3],
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-relative-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"reference.wav","vibe":"masc","transcript":"Provided transcript","cwd":"\#(callerWorkingDirectory.path)"}"#
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-relative-clone"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "ghost-copy"
+        }
+    })
 }
 
 @Test func createCloneCanInferTranscriptFromReferenceAudio() async throws {

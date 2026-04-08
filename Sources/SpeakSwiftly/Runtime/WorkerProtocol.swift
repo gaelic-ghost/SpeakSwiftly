@@ -282,8 +282,23 @@ enum WorkerRequest: Sendable, Equatable {
     case expireGenerationJob(id: String, jobID: String)
     case generationJob(id: String, jobID: String)
     case generationJobs(id: String)
-    case createProfile(id: String, profileName: String, text: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)
-    case createClone(id: String, profileName: String, referenceAudioPath: String, vibe: SpeakSwiftly.Vibe, transcript: String?)
+    case createProfile(
+        id: String,
+        profileName: String,
+        text: String,
+        vibe: SpeakSwiftly.Vibe,
+        voiceDescription: String,
+        outputPath: String?,
+        cwd: String?
+    )
+    case createClone(
+        id: String,
+        profileName: String,
+        referenceAudioPath: String,
+        vibe: SpeakSwiftly.Vibe,
+        transcript: String?,
+        cwd: String?
+    )
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
     case textProfileActive(id: String)
@@ -318,8 +333,8 @@ enum WorkerRequest: Sendable, Equatable {
              .expireGenerationJob(let id, _),
              .generationJob(let id, _),
              .generationJobs(let id),
-             .createProfile(let id, _, _, _, _, _),
-             .createClone(let id, _, _, _, _),
+             .createProfile(let id, _, _, _, _, _, _),
+             .createClone(let id, _, _, _, _, _),
              .listProfiles(let id),
              .removeProfile(let id, _),
              .textProfileActive(let id),
@@ -501,8 +516,8 @@ enum WorkerRequest: Sendable, Equatable {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
              .queueBatch(id: _, profileName: let profileName, items: _),
-             .createProfile(_, let profileName, _, _, _, _),
-             .createClone(_, let profileName, _, _, _),
+             .createProfile(_, let profileName, _, _, _, _, _),
+             .createClone(_, let profileName, _, _, _, _),
              .removeProfile(_, let profileName):
             profileName
         case .generatedFile,
@@ -774,7 +789,8 @@ enum WorkerRequest: Sendable, Equatable {
                 text: text,
                 vibe: vibe,
                 voiceDescription: voiceDescription,
-                outputPath: outputPath
+                outputPath: outputPath,
+                cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
 
         case "create_clone":
@@ -787,7 +803,8 @@ enum WorkerRequest: Sendable, Equatable {
                 profileName: profileName,
                 referenceAudioPath: referenceAudioPath,
                 vibe: vibe,
-                transcript: transcript
+                transcript: transcript,
+                cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
 
         case "list_profiles":

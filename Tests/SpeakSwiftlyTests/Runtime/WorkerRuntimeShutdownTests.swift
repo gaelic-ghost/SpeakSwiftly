@@ -266,7 +266,8 @@ final class LockedFlag: @unchecked Sendable {
             text: "A queued request that should still be active when shutdown begins.",
             vibe: .femme,
             voiceDescription: "Warm and bright",
-            outputPath: nil
+            outputPath: nil,
+            cwd: nil
         )
     )
     var queuedIterator = queuedHandle.events.makeAsyncIterator()

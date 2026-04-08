@@ -92,12 +92,12 @@ import Testing
     )
 
     let exportURL = tempRoot.appendingPathComponent("exports/reference.wav")
-    try store.exportCanonicalAudio(for: stored, to: exportURL.path)
+    try store.exportCanonicalAudio(for: stored, to: exportURL)
     #expect(fileManager.fileExists(atPath: exportURL.path))
     #expect(try Data(contentsOf: exportURL) == audioData)
 
     #expect(throws: WorkerError.self) {
-        try store.exportCanonicalAudio(for: stored, to: exportURL.path)
+        try store.exportCanonicalAudio(for: stored, to: exportURL)
     }
 }
 

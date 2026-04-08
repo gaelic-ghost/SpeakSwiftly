@@ -18,7 +18,8 @@ public extension SpeakSwiftly.Runtime {
                 text: text,
                 vibe: vibe,
                 voiceDescription: voiceDescription,
-                outputPath: outputPath
+                outputPath: outputPath,
+                cwd: FileManager.default.currentDirectoryPath
             )
         )
     }
@@ -36,7 +37,8 @@ public extension SpeakSwiftly.Runtime {
                 profileName: profileName,
                 referenceAudioPath: referenceAudioURL.path,
                 vibe: vibe,
-                transcript: transcript
+                transcript: transcript,
+                cwd: FileManager.default.currentDirectoryPath
             )
         )
     }

@@ -207,6 +207,8 @@ Example request shapes:
 {"id":"req-9","op":"use_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
 ```
 
+For filesystem path fields such as `output_path` and `reference_audio_path`, raw JSONL callers should either send absolute paths or include `cwd` when using a relative path. SpeakSwiftly now resolves relative paths against the caller-provided `cwd`, not against the long-lived worker process launch directory. The typed Swift helpers populate `cwd` automatically from the caller process.
+
 Example response and event shapes:
 
 ```json
@@ -376,7 +378,7 @@ Current `stderr` observability is JSONL with fields such as:
 - `elapsed_ms`
 - `details`
 
-That log stream currently covers resident-model preload, request accept / queue / start / success / failure, playback milestones, queue-depth warnings, scheduling and chunk-gap warnings, rebuffer durations, starvation events, buffer-shape summaries, optional chunk-level playback tracing, profile-store operations, and process / MLX memory fields such as resident size, physical footprint, active MLX memory, cache memory, and peak MLX memory at key playback checkpoints.
+That log stream currently covers resident-model preload, request accept / queue / start / success / failure, playback milestones, queue-depth warnings, scheduling and chunk-gap warnings, rebuffer durations, starvation events, buffer-shape summaries, optional chunk-level playback tracing, profile-store operations, CLI stdin read failures, and process / MLX memory fields such as resident size, physical footprint, active MLX memory, cache memory, and peak MLX memory at key playback checkpoints.
 
 For text-shape forensics, the worker also logs narrow per-shape counts such as markdown headers, fenced code blocks, inline code spans, markdown links, URLs, file paths, identifier families, and repeated-letter runs. Playback threshold seeding itself remains length-based up front; those forensic counters are there to help explain difficult prompt shapes after the fact.
 

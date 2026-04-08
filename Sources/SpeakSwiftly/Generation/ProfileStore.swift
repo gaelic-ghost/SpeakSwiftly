@@ -355,8 +355,7 @@ struct ProfileStore: @unchecked Sendable {
         }
     }
 
-    func exportCanonicalAudio(for profile: StoredProfile, to outputPath: String) throws {
-        let outputURL = resolveOutputURL(outputPath)
+    func exportCanonicalAudio(for profile: StoredProfile, to outputURL: URL) throws {
         guard !fileManager.fileExists(atPath: outputURL.path) else {
             throw WorkerError(
                 code: .filesystemError,
@@ -373,16 +372,6 @@ struct ProfileStore: @unchecked Sendable {
                 message: "Profile '\(profile.manifest.profileName)' could not be exported to '\(outputURL.path)'. \(error.localizedDescription)"
             )
         }
-    }
-
-    func resolveOutputURL(_ outputPath: String) -> URL {
-        let url = URL(fileURLWithPath: outputPath)
-        if url.isFileURL, outputPath.hasPrefix("/") {
-            return url
-        }
-
-        return URL(fileURLWithPath: fileManager.currentDirectoryPath)
-            .appendingPathComponent(outputPath)
     }
 
     func profileDirectoryURL(for profileName: String) -> URL {

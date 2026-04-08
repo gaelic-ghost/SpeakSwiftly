@@ -9,7 +9,8 @@ extension SpeakSwiftly.Runtime {
         text: String,
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
-        outputPath: String?
+        outputPath: String?,
+        cwd: String?
     ) async throws -> StoredProfile {
         let op = WorkerRequest.createProfile(
             id: id,
@@ -17,7 +18,8 @@ extension SpeakSwiftly.Runtime {
             text: text,
             vibe: vibe,
             voiceDescription: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
+            cwd: cwd
         ).opName
         try profileStore.validateProfileName(profileName)
         await emitProgress(id: id, stage: .loadingProfileModel)
@@ -106,8 +108,15 @@ extension SpeakSwiftly.Runtime {
             try Task.checkCancellation()
             await emitProgress(id: id, stage: .exportingProfileAudio)
             let exportStartedAt = dependencies.now()
+            let resolvedOutputURL = try resolveFilesystemURL(
+                outputPath,
+                cwd: cwd,
+                requestID: id,
+                fieldName: "output_path",
+                purpose: "profile export audio"
+            )
             try await runBlockingFilesystemOperation {
-                try profileStore.exportCanonicalAudio(for: storedProfile, to: outputPath)
+                try profileStore.exportCanonicalAudio(for: storedProfile, to: resolvedOutputURL)
             }
             try Task.checkCancellation()
             await logRequestEvent(
@@ -116,7 +125,7 @@ extension SpeakSwiftly.Runtime {
                 op: op,
                 profileName: profileName,
                 details: [
-                    "path": .string(profileStore.resolveOutputURL(outputPath).path),
+                    "path": .string(resolvedOutputURL.path),
                     "duration_ms": .int(elapsedMS(since: exportStartedAt)),
                 ]
             )
@@ -130,17 +139,23 @@ extension SpeakSwiftly.Runtime {
         profileName: String,
         referenceAudioPath: String,
         vibe: SpeakSwiftly.Vibe,
-        transcript: String?
+        transcript: String?,
+        cwd: String?
     ) async throws -> StoredProfile {
         let op = WorkerRequest.createClone(
             id: id,
             profileName: profileName,
             referenceAudioPath: referenceAudioPath,
             vibe: vibe,
-            transcript: transcript
+            transcript: transcript,
+            cwd: cwd
         ).opName
         try profileStore.validateProfileName(profileName)
-        let referenceAudioURL = try resolveCloneReferenceAudioURL(referenceAudioPath, requestID: id)
+        let referenceAudioURL = try resolveCloneReferenceAudioURL(
+            referenceAudioPath,
+            cwd: cwd,
+            requestID: id
+        )
 
         let sourceAudioLoadStartedAt = dependencies.now()
         let canonicalAudio = try requireLoadedCloneAudio(
@@ -311,15 +326,18 @@ extension SpeakSwiftly.Runtime {
         return inferredTranscript
     }
 
-    func resolveCloneReferenceAudioURL(_ referenceAudioPath: String, requestID: String) throws -> URL {
-        let resolvedURL = profileStore.resolveOutputURL(referenceAudioPath)
-
-        guard resolvedURL.isFileURL else {
-            throw WorkerError(
-                code: .invalidRequest,
-                message: "Clone request '\(requestID)' must reference local audio via a file URL or filesystem path. Received '\(referenceAudioPath)'."
-            )
-        }
+    func resolveCloneReferenceAudioURL(
+        _ referenceAudioPath: String,
+        cwd: String?,
+        requestID: String
+    ) throws -> URL {
+        let resolvedURL = try resolveFilesystemURL(
+            referenceAudioPath,
+            cwd: cwd,
+            requestID: requestID,
+            fieldName: "reference_audio_path",
+            purpose: "clone reference audio"
+        )
 
         guard dependencies.fileManager.fileExists(atPath: resolvedURL.path) else {
             throw WorkerError(
@@ -329,6 +347,43 @@ extension SpeakSwiftly.Runtime {
         }
 
         return resolvedURL
+    }
+
+    func resolveFilesystemURL(
+        _ path: String,
+        cwd: String?,
+        requestID: String,
+        fieldName: String,
+        purpose: String
+    ) throws -> URL {
+        if let explicitURL = URL(string: path), explicitURL.isFileURL {
+            return explicitURL.standardizedFileURL
+        }
+
+        if path.hasPrefix("/") {
+            return URL(fileURLWithPath: path).standardizedFileURL
+        }
+
+        guard let cwd, !cwd.isEmpty else {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Request '\(requestID)' used relative '\(fieldName)' path '\(path)' for \(purpose), but did not provide 'cwd'. Send an absolute path or include the caller working directory so SpeakSwiftly can resolve the relative path explicitly."
+            )
+        }
+
+        let baseURL: URL
+        if let explicitBaseURL = URL(string: cwd), explicitBaseURL.isFileURL {
+            baseURL = explicitBaseURL.standardizedFileURL
+        } else if cwd.hasPrefix("/") {
+            baseURL = URL(fileURLWithPath: cwd, isDirectory: true).standardizedFileURL
+        } else {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Request '\(requestID)' provided non-absolute 'cwd' value '\(cwd)' while resolving '\(fieldName)'. SpeakSwiftly requires 'cwd' to be an absolute filesystem path or file URL."
+            )
+        }
+
+        return baseURL.appendingPathComponent(path).standardizedFileURL
     }
 
     func requireLoadedCloneAudio(

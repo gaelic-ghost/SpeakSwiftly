@@ -534,10 +534,10 @@ These findings came out of the latest live-service review pass and are duplicate
 - [x] Add or document stronger cancellation checkpoints around temp WAV writing, profile persistence, and export so shutdown behavior is not only bounded but also truly quiescent.
 - [x] Make `list_profiles` resilient to stray files, partial directories, and one-off corrupt entries instead of poisoning the full operation on the first bad manifest.
 - [x] Add a strict multi-request audible live-playback e2e lane that pre-queues several jobs on one worker and validates queued drain behavior directly.
-- [ ] Revisit relative `output_path` resolution so exports do not silently depend on the worker process launch directory.
+- [x] Revisit relative `output_path` resolution so exports do not silently depend on the worker process launch directory.
 - [x] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
-- [ ] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
-- [ ] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.
+- [x] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
+- [x] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.
 
 ## Pre-v1 Release Hardening
 

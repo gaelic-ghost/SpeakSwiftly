@@ -124,9 +124,9 @@ actor GenerationController {
 
     private func activeRequestCreatesProfileNamed(_ request: WorkerRequest, profileName: String) -> Bool {
         switch request {
-        case .createProfile(_, let activeProfileName, _, _, _, _):
+        case .createProfile(_, let activeProfileName, _, _, _, _, _):
             return activeProfileName == profileName
-        case .createClone(_, let activeProfileName, _, _, _):
+        case .createClone(_, let activeProfileName, _, _, _, _):
             return activeProfileName == profileName
         default:
             return false

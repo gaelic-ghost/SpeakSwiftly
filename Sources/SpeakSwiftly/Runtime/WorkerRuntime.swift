@@ -151,60 +151,13 @@ public extension SpeakSwiftly {
         }
     }
 
-    enum LogLevel: String, Encodable {
-        case info
-        case error
-    }
-
-    enum LogValue: Encodable, Sendable {
-        case string(String)
-        case int(Int)
-        case double(Double)
-        case bool(Bool)
-
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            switch self {
-            case .string(let value):
-                try container.encode(value)
-            case .int(let value):
-                try container.encode(value)
-            case .double(let value):
-                try container.encode(value)
-            case .bool(let value):
-                try container.encode(value)
-            }
-        }
-    }
-
-    struct LogEvent: Encodable {
-        let event: String
-        let level: LogLevel
-        let ts: String
-        let requestID: String?
-        let op: String?
-        let profileName: String?
-        let queueDepth: Int?
-        let elapsedMS: Int?
-        let details: [String: LogValue]?
-
-        enum CodingKeys: String, CodingKey {
-            case event
-            case level
-            case ts
-            case requestID = "request_id"
-            case op
-            case profileName = "profile_name"
-            case queueDepth = "queue_depth"
-            case elapsedMS = "elapsed_ms"
-            case details
-        }
-    }
+    typealias LogLevel = WorkerLogLevel
+    typealias LogValue = WorkerLogValue
+    typealias LogEvent = WorkerLogEvent
 
     let dependencies: WorkerDependencies
     let speechBackend: SpeakSwiftly.SpeechBackend
     let encoder = JSONEncoder()
-    let logEncoder = JSONEncoder()
     let profileStore: ProfileStore
     let generatedFileStore: GeneratedFileStore
     let generationJobStore: GenerationJobStore
@@ -240,7 +193,6 @@ public extension SpeakSwiftly {
         normalizerRef = normalizer
         self.playbackController = playbackController
         encoder.outputFormatting = [.sortedKeys]
-        logEncoder.outputFormatting = [.sortedKeys]
     }
 
     public static func live(
@@ -738,14 +690,15 @@ public extension SpeakSwiftly {
                     )
                 ))
 
-            case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath):
+            case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath, let cwd):
                 let storedProfile = try await handleCreateProfile(
                     id: id,
                     profileName: profileName,
                     text: text,
                     vibe: vibe,
                     voiceDescription: voiceDescription,
-                    outputPath: outputPath
+                    outputPath: outputPath,
+                    cwd: cwd
                 )
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
@@ -755,13 +708,14 @@ public extension SpeakSwiftly {
                     )
                 ))
 
-            case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript):
+            case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript, let cwd):
                 let storedProfile = try await handleCreateClone(
                     id: id,
                     profileName: profileName,
                     referenceAudioPath: referenceAudioPath,
                     vibe: vibe,
-                    transcript: transcript
+                    transcript: transcript,
+                    cwd: cwd
                 )
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
