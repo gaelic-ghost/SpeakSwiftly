@@ -29,13 +29,13 @@ Today we already have:
 - a local release flow that publishes both Debug and Release runtimes through `scripts/repo-maintenance/release.sh`
 - a stable published runtime directory layout under `.local/xcode/<Configuration>` with a metadata manifest and the copied `mlx-swift_Cmlx.bundle/.../default.metallib`
 
-The remaining gaps are mostly around retention, enforcement, and developer ergonomics.
+This release-hardening pass is complete inside this repository. The only explicitly deferred item from this note is the separate queued-playback audible e2e lane listed at the end.
 
 ## Required Before Full v1.0.0
 
 ### 1. Persist real e2e worker artifacts for later inspection
 
-Status: done on 2026-04-07 for retained stdout or stderr JSONL and compact summary artifacts; CPU accounting is still pending.
+Status: done on 2026-04-07 for retained stdout or stderr JSONL, compact summary artifacts, and CPU accounting through the same unprivileged process snapshot path already used for runtime memory metrics.
 
 We should retain per-run artifacts for real-model e2e runs instead of keeping stdout and stderr only in memory.
 
@@ -53,7 +53,7 @@ Target behavior:
 
 CPU and GPU expectations:
 
-- CPU summary should be added if we can do it through the same unprivileged process-accounting path we already use for memory snapshots.
+- CPU summary is now retained through the same unprivileged process-accounting path we already use for runtime memory snapshots.
 - GPU memory is already partially represented through MLX memory fields.
 - GPU utilization should not become a default release gate unless we have a stable, permissionless, Apple-supported way to gather it. We should avoid adding a privileged or flaky metrics dependency to routine local and CI test runs.
 
@@ -98,7 +98,7 @@ This is a durable building-block cleanup because it removes current launch frict
 
 ### 4. Tighten runtime resource lookup around bundle reality, not cwd guesses
 
-Status: still pending.
+Status: done on 2026-04-07 for published-runtime consumers in this repository.
 
 The worker and its consumers should continue moving away from any behavior that silently depends on the process launch directory.
 

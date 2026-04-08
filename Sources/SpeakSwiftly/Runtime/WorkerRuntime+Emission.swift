@@ -573,6 +573,12 @@ extension SpeakSwiftly.Runtime {
         if let processPhysFootprintBytes = snapshot.processPhysFootprintBytes {
             details["process_phys_footprint_bytes"] = .int(processPhysFootprintBytes)
         }
+        if let processUserCPUTimeNS = snapshot.processUserCPUTimeNS {
+            details["process_user_cpu_time_ns"] = .int(processUserCPUTimeNS)
+        }
+        if let processSystemCPUTimeNS = snapshot.processSystemCPUTimeNS {
+            details["process_system_cpu_time_ns"] = .int(processSystemCPUTimeNS)
+        }
         if let mlxActiveMemoryBytes = snapshot.mlxActiveMemoryBytes {
             details["mlx_active_memory_bytes"] = .int(mlxActiveMemoryBytes)
         }

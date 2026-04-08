@@ -560,6 +560,8 @@ struct PlaybackSummary: Sendable {
 struct RuntimeMemorySnapshot: Sendable {
     let processResidentBytes: Int?
     let processPhysFootprintBytes: Int?
+    let processUserCPUTimeNS: Int?
+    let processSystemCPUTimeNS: Int?
     let mlxActiveMemoryBytes: Int?
     let mlxCacheMemoryBytes: Int?
     let mlxPeakMemoryBytes: Int?
@@ -2212,6 +2214,8 @@ private func currentRuntimeMemorySnapshot() -> RuntimeMemorySnapshot? {
     return RuntimeMemorySnapshot(
         processResidentBytes: usageResult == 0 ? Int(usage.ri_resident_size) : nil,
         processPhysFootprintBytes: usageResult == 0 ? Int(usage.ri_phys_footprint) : nil,
+        processUserCPUTimeNS: usageResult == 0 ? Int(usage.ri_user_time) : nil,
+        processSystemCPUTimeNS: usageResult == 0 ? Int(usage.ri_system_time) : nil,
         mlxActiveMemoryBytes: snapshot.activeMemory,
         mlxCacheMemoryBytes: snapshot.cacheMemory,
         mlxPeakMemoryBytes: snapshot.peakMemory,

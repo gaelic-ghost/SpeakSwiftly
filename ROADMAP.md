@@ -544,7 +544,7 @@ These findings came out of the latest live-service review pass and are duplicate
 Before the first full `v1.0.0` release, finish the release-hardening pass in [pre-v1-release-hardening-2026-04-07.md](/Users/galew/Workspace/SpeakSwiftly/docs/maintainers/pre-v1-release-hardening-2026-04-07.md).
 
 - [x] Persist real e2e worker stdout and stderr artifacts plus compact per-run summaries so memory and later CPU telemetry can be inspected after a run finishes.
-- [ ] Add CPU accounting to the retained real e2e run summaries when we can do so through the same unprivileged process-accounting path used for current memory snapshots.
+- [x] Add CPU accounting to the retained real e2e run summaries through the same unprivileged process-accounting path used for current memory snapshots.
 - [x] Enforce Debug and Release runtime publication and verification on tagged prereleases and final releases, not only through the local repo-maintenance release script.
 - [x] Publish launcher scripts, stable runtime aliases, and manifest-first consumption helpers so local consumers stop reconstructing executable and `default.metallib` paths by hand.
-- [ ] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.
+- [x] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.

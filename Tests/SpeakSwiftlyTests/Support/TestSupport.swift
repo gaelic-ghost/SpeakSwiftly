@@ -498,7 +498,8 @@ func makeRuntime<ResidentModelResult>(
     },
     cloneTranscriptionModelLoader: @escaping @Sendable () async throws -> AnyCloneTranscriptionModel = {
         makeCloneTranscriptionModel()
-    }
+    },
+    readRuntimeMemory: @escaping @Sendable () -> RuntimeMemorySnapshot? = { nil }
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
@@ -549,7 +550,7 @@ func makeRuntime<ResidentModelResult>(
         writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,
         now: Date.init,
-        readRuntimeMemory: { nil }
+        readRuntimeMemory: readRuntimeMemory
     )
 
     let runtime = WorkerRuntime(

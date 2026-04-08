@@ -138,6 +138,8 @@ extension SpeakSwiftlyE2ETests {
 
             return details["process_phys_footprint_bytes"] as? Int != nil
                 && details["process_resident_bytes"] as? Int != nil
+                && details["process_user_cpu_time_ns"] as? Int != nil
+                && details["process_system_cpu_time_ns"] as? Int != nil
                 && details["mlx_active_memory_bytes"] as? Int != nil
                 && details["mlx_cache_memory_bytes"] as? Int != nil
                 && details["mlx_peak_memory_bytes"] as? Int != nil
@@ -301,6 +303,8 @@ extension SpeakSwiftlyE2ETests {
                 && details["startup_buffered_audio_ms"] as? Int != nil
                 && details["process_phys_footprint_bytes"] as? Int != nil
                 && details["process_resident_bytes"] as? Int != nil
+                && details["process_user_cpu_time_ns"] as? Int != nil
+                && details["process_system_cpu_time_ns"] as? Int != nil
                 && details["mlx_active_memory_bytes"] as? Int != nil
                 && details["mlx_cache_memory_bytes"] as? Int != nil
                 && details["mlx_peak_memory_bytes"] as? Int != nil
@@ -335,6 +339,8 @@ extension SpeakSwiftlyE2ETests {
                     && details["starvation_event_count"] as? Int != nil
                     && details["process_phys_footprint_bytes"] as? Int != nil
                     && details["process_resident_bytes"] as? Int != nil
+                    && details["process_user_cpu_time_ns"] as? Int != nil
+                    && details["process_system_cpu_time_ns"] as? Int != nil
                     && details["mlx_active_memory_bytes"] as? Int != nil
                     && details["mlx_cache_memory_bytes"] as? Int != nil
                     && details["mlx_peak_memory_bytes"] as? Int != nil
@@ -1180,6 +1186,8 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
             let hasMetrics =
                 details["process_resident_bytes"] != nil
                 || details["process_phys_footprint_bytes"] != nil
+                || details["process_user_cpu_time_ns"] != nil
+                || details["process_system_cpu_time_ns"] != nil
                 || details["mlx_active_memory_bytes"] != nil
                 || details["mlx_cache_memory_bytes"] != nil
                 || details["mlx_peak_memory_bytes"] != nil
@@ -1193,6 +1201,8 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
                 requestID: object["request_id"] as? String,
                 processResidentBytes: details["process_resident_bytes"] as? Int,
                 processPhysFootprintBytes: details["process_phys_footprint_bytes"] as? Int,
+                processUserCPUTimeNS: details["process_user_cpu_time_ns"] as? Int,
+                processSystemCPUTimeNS: details["process_system_cpu_time_ns"] as? Int,
                 mlxActiveMemoryBytes: details["mlx_active_memory_bytes"] as? Int,
                 mlxCacheMemoryBytes: details["mlx_cache_memory_bytes"] as? Int,
                 mlxPeakMemoryBytes: details["mlx_peak_memory_bytes"] as? Int,
@@ -1237,6 +1247,8 @@ private struct E2ERuntimeMetrics: Codable {
     let requestID: String?
     let processResidentBytes: Int?
     let processPhysFootprintBytes: Int?
+    let processUserCPUTimeNS: Int?
+    let processSystemCPUTimeNS: Int?
     let mlxActiveMemoryBytes: Int?
     let mlxCacheMemoryBytes: Int?
     let mlxPeakMemoryBytes: Int?

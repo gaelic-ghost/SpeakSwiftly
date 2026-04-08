@@ -208,9 +208,9 @@ Operational notes:
 - For local forensic runs, stop the live `speak-to-user-mcp` service first so the worker has more unified memory available.
 - A separate queue-ordering bug allowed `speak_live` to outrun an earlier `create_profile` for the same profile name; that was fixed in commit `a4f62eb`.
 - The direct-command forensic capture path that worked reliably was:
-  - reuse the Xcode-built worker product under `/var/folders/.../SpeakSwiftly-xcodebuild-e2e-dd/Build/Products/Debug/SpeakSwiftly`
-  - point `DYLD_FRAMEWORK_PATH` at the matching `Build/Products/Debug` directory
-  - hold stdin open with a pattern like `(cat input.jsonl; sleep 180) | ... SpeakSwiftly ...`
+  - publish the Debug runtime with `sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug`
+  - launch through `.local/xcode/current-debug/run-speakswiftly` or the published runtime manifest instead of a raw DerivedData binary path
+  - hold stdin open with a pattern like `(cat input.jsonl; sleep 180) | ... run-speakswiftly ...`
   - capture `stdout` and `stderr` JSONL separately under `/tmp/...`
 - Closing stdin before queued work drains currently cancels queued requests, even if the worker is only waiting for resident-model warmup. This is a known behavior quirk that should be fixed soon.
 
