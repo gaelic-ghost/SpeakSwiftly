@@ -263,6 +263,26 @@ Current operation families are:
 - Structured terminal success and failure responses.
 - Structured JSONL `stderr` logs that explain the most likely cause when something breaks and include request timing context.
 
+### Resident Control Naming
+
+The resident runtime controls intentionally use Cocoa-style names in the typed Swift surface and snake_case names on the JSONL wire surface.
+
+| Typed Swift API | JSONL `op` | Notes |
+| --- | --- | --- |
+| `status(id:)` | `"status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
+| `switchSpeechBackend(to:id:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
+| `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
+| `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
+
+Example resident-control requests:
+
+```json
+{"id":"req-status","op":"status"}
+{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
+{"id":"req-reload","op":"reload_models"}
+{"id":"req-unload","op":"unload_models"}
+```
+
 The test suite is organized to mirror the source tree:
 
 - `Tests/SpeakSwiftlyTests/API/LibrarySurfaceTests.swift`
