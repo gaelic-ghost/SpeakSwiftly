@@ -230,6 +230,14 @@ import TextForSpeech
     let generationQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.generation)
     }
+    let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
+        await runtime.status()
+    }
+    let switchSpeechBackend: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        speechBackend in
+        await runtime.switchSpeechBackend(to: speechBackend)
+    }
     let playbackQueue: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.queue(.playback)
     }
@@ -284,6 +292,8 @@ import TextForSpeech
     _ = removeActiveReplacement
     _ = removeStoredReplacement
     _ = generationQueue
+    _ = status
+    _ = switchSpeechBackend
     _ = playbackQueue
     _ = playbackPause
     _ = clearQueue
@@ -317,4 +327,14 @@ import TextForSpeech
     _ = textProfileName
     _ = sampleRate
     _ = filePath
+}
+
+@Test func publicStatusSurfaceExposesStableMetadata() {
+    let speechBackend: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.SpeechBackend> = \.speechBackend
+    let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
+    let successSpeechBackend: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.SpeechBackend?> = \.speechBackend
+
+    _ = speechBackend
+    _ = successStatus
+    _ = successSpeechBackend
 }

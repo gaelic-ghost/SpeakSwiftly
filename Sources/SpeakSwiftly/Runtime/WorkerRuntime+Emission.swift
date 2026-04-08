@@ -30,6 +30,8 @@ extension SpeakSwiftly.Runtime {
                 activeRequest: payload.activeRequest,
                 queue: payload.queue,
                 playbackState: payload.playbackState,
+                status: payload.status,
+                speechBackend: payload.speechBackend,
                 clearedCount: payload.clearedCount,
                 cancelledRequestID: payload.cancelledRequestID
             )
@@ -140,7 +142,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func emitStatus(_ stage: WorkerStatusStage) async {
-        let status = WorkerStatusEvent(stage: stage)
+        let status = WorkerStatusEvent(stage: stage, speechBackend: speechBackend)
         await emit(status)
         broadcastStatus(status)
     }
@@ -177,6 +179,7 @@ extension SpeakSwiftly.Runtime {
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestID: String? = nil,
+        speechBackend: SpeakSwiftly.SpeechBackend? = nil,
         vibe: SpeakSwiftly.Vibe? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil,
@@ -206,6 +209,7 @@ extension SpeakSwiftly.Runtime {
             nestedSourceFormat: textContext?.nestedSourceFormat,
             sourceFormat: sourceFormat,
             requestID: requestID,
+            speechBackend: speechBackend,
             vibe: vibe,
             voiceDescription: voiceDescription,
             outputPath: outputPath,
@@ -356,6 +360,10 @@ extension SpeakSwiftly.Runtime {
             )
         case .listQueue(let id, _):
             await submitRequest(id: id, op: request.opName)
+        case .status(let id):
+            await submitRequest(id: id, op: request.opName)
+        case .switchSpeechBackend(let id, let speechBackend):
+            await submitRequest(id: id, op: request.opName, speechBackend: speechBackend)
         case .playback(let id, _):
             await submitRequest(id: id, op: request.opName)
         case .clearQueue(let id):
@@ -509,11 +517,11 @@ extension SpeakSwiftly.Runtime {
         switch residentState {
         case .warming:
             guard preloadTask != nil else { return nil }
-            return WorkerStatusEvent(stage: .warmingResidentModel)
+            return WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: speechBackend)
         case .ready:
-            return WorkerStatusEvent(stage: .residentModelReady)
+            return WorkerStatusEvent(stage: .residentModelReady, speechBackend: speechBackend)
         case .failed:
-            return WorkerStatusEvent(stage: .residentModelFailed)
+            return WorkerStatusEvent(stage: .residentModelFailed, speechBackend: speechBackend)
         }
     }
 

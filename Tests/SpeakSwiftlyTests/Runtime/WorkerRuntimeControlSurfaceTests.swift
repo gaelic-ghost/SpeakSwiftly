@@ -76,6 +76,142 @@ private final class WeakRuntimeBox: @unchecked Sendable {
     await playbackDrain.open()
 }
 
+@Test func statusReturnsCurrentResidentBackendAndStage() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        speechBackend: .qwen3,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "qwen3"
+        }
+    })
+
+    let statusID = await runtime.status(id: "req-status").id
+    #expect(statusID == "req-status")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-status",
+                $0["ok"] as? Bool == true,
+                $0["speech_backend"] as? String == "qwen3",
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "resident_model_ready"
+                && status["speech_backend"] as? String == "qwen3"
+        }
+    })
+}
+
+@Test func switchSpeechBackendReloadsResidentModelsWithoutRestartingRuntime() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        speechBackend: .qwen3,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "qwen3"
+        }
+    })
+
+    let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch").id
+    #expect(switchID == "req-switch")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == "req-switch",
+                $0["ok"] as? Bool == true,
+                $0["speech_backend"] as? String == "marvis",
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "warming_resident_model"
+                && status["speech_backend"] as? String == "marvis"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "marvis"
+        }
+    })
+}
+
+@Test func switchSpeechBackendRejectsWhilePlaybackWorkIsActive() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        speechBackend: .qwen3,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-active"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch-busy").id
+    #expect(switchID == "req-switch-busy")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-switch-busy"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "invalid_request"
+        }
+    })
+
+    await playbackDrain.open()
+}
+
 @Test func clearQueueFailsQueuedRequestsWhenGenerationQueueHasWaitingWork() async throws {
     let output = OutputRecorder()
     let profileGate = AsyncGate()
@@ -901,8 +1037,8 @@ private final class WeakRuntimeBox: @unchecked Sendable {
 
     let firstStatus = await statusIterator.next()
     let secondStatus = await statusIterator.next()
-    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel))
-    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady))
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: .qwen3))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
 
     let handle = await runtime.submit(
         .listProfiles(id: "req-stream")
@@ -1006,7 +1142,7 @@ private final class WeakRuntimeBox: @unchecked Sendable {
     let statuses = await runtime.statusEvents()
     var iterator = statuses.makeAsyncIterator()
 
-    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady))
+    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
 }
 
 @Test func droppingStatusSubscriptionDoesNotRetainRuntime() async throws {
@@ -1062,8 +1198,8 @@ private final class WeakRuntimeBox: @unchecked Sendable {
     let firstStatus = await iterator.next()
     let secondStatus = await iterator.next()
 
-    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel))
-    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady))
+    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, speechBackend: .qwen3))
+    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, speechBackend: .qwen3))
     #expect(await loadCounter.value() == 1)
     #expect(
         output.countJSONObjects {

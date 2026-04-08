@@ -75,3 +75,16 @@ public extension SpeakSwiftly {
         }
     }
 }
+
+public extension SpeakSwiftly.Runtime {
+    func status(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+        await submit(.status(id: requestID))
+    }
+
+    func switchSpeechBackend(
+        to speechBackend: SpeakSwiftly.SpeechBackend,
+        id requestID: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await submit(.switchSpeechBackend(id: requestID, speechBackend: speechBackend))
+    }
+}

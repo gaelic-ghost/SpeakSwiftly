@@ -52,6 +52,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let outputPath: String?
     let referenceAudioPath: String?
     let transcript: String?
+    let speechBackend: SpeakSwiftly.SpeechBackend?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -80,6 +81,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case outputPath = "output_path"
         case referenceAudioPath = "reference_audio_path"
         case transcript
+        case speechBackend = "speech_backend"
     }
 
     init(from decoder: any Decoder) throws {
@@ -108,6 +110,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         outputPath = try container.decodeIfPresent(String.self, forKey: .outputPath)
         referenceAudioPath = try container.decodeIfPresent(String.self, forKey: .referenceAudioPath)
         transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
+        speechBackend = try container.decodeIfPresent(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
 
         let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
         let explicitNestedSourceFormat = try Self.decodeSourceFormat(
@@ -318,6 +321,8 @@ enum WorkerRequest: Sendable, Equatable {
     case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
     case removeTextReplacement(id: String, replacementID: String, profileName: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
+    case status(id: String)
+    case switchSpeechBackend(id: String, speechBackend: SpeakSwiftly.SpeechBackend)
     case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String)
     case cancelRequest(id: String, requestID: String)
@@ -354,6 +359,8 @@ enum WorkerRequest: Sendable, Equatable {
              .replaceTextReplacement(let id, _, _),
              .removeTextReplacement(let id, _, _),
              .listQueue(let id, _),
+             .status(let id),
+             .switchSpeechBackend(let id, _),
              .playback(let id, _),
              .clearQueue(let id),
              .cancelRequest(let id, _):
@@ -427,6 +434,10 @@ enum WorkerRequest: Sendable, Equatable {
             "list_queue_generation"
         case .listQueue(_, .playback):
             "list_queue_playback"
+        case .status:
+            "status"
+        case .switchSpeechBackend:
+            "set_speech_backend"
         case .playback(_, .pause):
             "playback_pause"
         case .playback(_, .resume):
@@ -503,6 +514,8 @@ enum WorkerRequest: Sendable, Equatable {
              .replaceTextReplacement,
              .removeTextReplacement,
              .listQueue,
+             .status,
+             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -538,6 +551,8 @@ enum WorkerRequest: Sendable, Equatable {
              .resetTextProfile,
              .listProfiles,
              .listQueue,
+             .status,
+             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -590,6 +605,8 @@ enum WorkerRequest: Sendable, Equatable {
              .replaceTextReplacement,
              .removeTextReplacement,
              .listQueue,
+             .status,
+             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -631,6 +648,8 @@ enum WorkerRequest: Sendable, Equatable {
              .replaceTextReplacement,
              .removeTextReplacement,
              .listQueue,
+             .status,
+             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -672,6 +691,8 @@ enum WorkerRequest: Sendable, Equatable {
              .replaceTextReplacement,
              .removeTextReplacement,
              .listQueue,
+             .status,
+             .switchSpeechBackend,
              .playback,
              .clearQueue,
              .cancelRequest:
@@ -910,6 +931,13 @@ enum WorkerRequest: Sendable, Equatable {
         case "list_queue_playback":
             return .listQueue(id: id, queueType: .playback)
 
+        case "status":
+            return .status(id: id)
+
+        case "set_speech_backend":
+            let speechBackend = try require(raw.speechBackend, field: "speech_backend", id: id)
+            return .switchSpeechBackend(id: id, speechBackend: speechBackend)
+
         case "playback_pause":
             return .playback(id: id, action: .pause)
 
@@ -999,9 +1027,17 @@ public extension SpeakSwiftly {
     struct StatusEvent: Encodable, Sendable, Equatable {
         public let event = "worker_status"
         public let stage: StatusStage
+        public let speechBackend: SpeechBackend
 
-        public init(stage: StatusStage) {
+        enum CodingKeys: String, CodingKey {
+            case event
+            case stage
+            case speechBackend = "speech_backend"
+        }
+
+        public init(stage: StatusStage, speechBackend: SpeechBackend) {
             self.stage = stage
+            self.speechBackend = speechBackend
         }
     }
 
@@ -1065,6 +1101,8 @@ public extension SpeakSwiftly {
         public let activeRequest: ActiveRequest?
         public let queue: [QueuedRequest]?
         public let playbackState: PlaybackStateSnapshot?
+        public let status: StatusEvent?
+        public let speechBackend: SpeechBackend?
         public let clearedCount: Int?
         public let cancelledRequestID: String?
 
@@ -1086,6 +1124,8 @@ public extension SpeakSwiftly {
             case activeRequest = "active_request"
             case queue
             case playbackState = "playback_state"
+            case status
+            case speechBackend = "speech_backend"
             case clearedCount = "cleared_count"
             case cancelledRequestID = "cancelled_request_id"
         }
@@ -1107,6 +1147,8 @@ public extension SpeakSwiftly {
             activeRequest: ActiveRequest? = nil,
             queue: [QueuedRequest]? = nil,
             playbackState: PlaybackStateSnapshot? = nil,
+            status: StatusEvent? = nil,
+            speechBackend: SpeechBackend? = nil,
             clearedCount: Int? = nil,
             cancelledRequestID: String? = nil
         ) {
@@ -1126,6 +1168,8 @@ public extension SpeakSwiftly {
             self.activeRequest = activeRequest
             self.queue = queue
             self.playbackState = playbackState
+            self.status = status
+            self.speechBackend = speechBackend
             self.clearedCount = clearedCount
             self.cancelledRequestID = cancelledRequestID
         }

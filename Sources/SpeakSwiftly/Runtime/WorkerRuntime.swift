@@ -44,6 +44,8 @@ public extension SpeakSwiftly {
         let activeRequest: ActiveWorkerRequestSummary?
         let queue: [QueuedWorkerRequestSummary]?
         let playbackState: PlaybackStateSummary?
+        let status: WorkerStatusEvent?
+        let speechBackend: SpeakSwiftly.SpeechBackend?
         let clearedCount: Int?
         let cancelledRequestID: String?
 
@@ -64,6 +66,8 @@ public extension SpeakSwiftly {
             activeRequest: ActiveWorkerRequestSummary? = nil,
             queue: [QueuedWorkerRequestSummary]? = nil,
             playbackState: PlaybackStateSummary? = nil,
+            status: WorkerStatusEvent? = nil,
+            speechBackend: SpeakSwiftly.SpeechBackend? = nil,
             clearedCount: Int? = nil,
             cancelledRequestID: String? = nil
         ) {
@@ -83,6 +87,8 @@ public extension SpeakSwiftly {
             self.activeRequest = activeRequest
             self.queue = queue
             self.playbackState = playbackState
+            self.status = status
+            self.speechBackend = speechBackend
             self.clearedCount = clearedCount
             self.cancelledRequestID = cancelledRequestID
         }
@@ -115,6 +121,7 @@ public extension SpeakSwiftly {
         let nestedSourceFormat: TextForSpeech.SourceFormat?
         let sourceFormat: TextForSpeech.SourceFormat?
         let requestID: String?
+        let speechBackend: SpeakSwiftly.SpeechBackend?
         let vibe: SpeakSwiftly.Vibe?
         let voiceDescription: String?
         let outputPath: String?
@@ -143,6 +150,7 @@ public extension SpeakSwiftly {
             case nestedSourceFormat = "nested_source_format"
             case sourceFormat = "source_format"
             case requestID = "request_id"
+            case speechBackend = "speech_backend"
             case vibe
             case voiceDescription = "voice_description"
             case outputPath = "output_path"
@@ -156,7 +164,7 @@ public extension SpeakSwiftly {
     typealias LogEvent = WorkerLogEvent
 
     let dependencies: WorkerDependencies
-    let speechBackend: SpeakSwiftly.SpeechBackend
+    var speechBackend: SpeakSwiftly.SpeechBackend
     let encoder = JSONEncoder()
     let profileStore: ProfileStore
     let generatedFileStore: GeneratedFileStore
@@ -170,6 +178,7 @@ public extension SpeakSwiftly {
     var residentState: ResidentState = .warming
     var isShuttingDown = false
     var preloadTask: Task<Void, Never>?
+    var residentPreloadToken: UUID?
     var requestAcceptedAt = [String: Date]()
     var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
     var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
@@ -328,15 +337,22 @@ public extension SpeakSwiftly {
 
     public func start() {
         guard preloadTask == nil else { return }
+        startResidentPreload()
+    }
+
+    private func startResidentPreload() {
+        let preloadToken = UUID()
+        residentPreloadToken = preloadToken
+        let targetSpeechBackend = speechBackend
 
         preloadTask = Task {
             let preloadStartedAt = dependencies.now()
-            let preloadModelRepos = preloadModelRepos()
+            let preloadModelRepos = preloadModelRepos(for: targetSpeechBackend)
             await emitStatus(.warmingResidentModel)
             await logEvent(
                 "resident_model_preload_started",
                 details: [
-                    "speech_backend": .string(speechBackend.rawValue),
+                    "speech_backend": .string(targetSpeechBackend.rawValue),
                     "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                     "profile_root": .string(profileStore.rootURL.path),
                 ]
@@ -344,16 +360,17 @@ public extension SpeakSwiftly {
 
             do {
                 try profileStore.ensureRootExists()
-                let residentModels = try await dependencies.loadResidentModels(speechBackend)
+                let residentModels = try await dependencies.loadResidentModels(targetSpeechBackend)
                 let playbackEngineWasPrepared = try await playbackController.prepare(
                     sampleRate: Double(primaryResidentSampleRate(for: residentModels))
                 )
+                guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
                 residentState = .ready(residentModels)
                 await emitStatus(.residentModelReady)
                 await logEvent(
                     "resident_model_preload_ready",
                     details: [
-                        "speech_backend": .string(speechBackend.rawValue),
+                        "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                     ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
@@ -370,17 +387,18 @@ public extension SpeakSwiftly {
                 try await startNextGenerationIfPossible()
                 await playbackController.startNextIfPossible()
             } catch is CancellationError {
+                guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
                 guard !isShuttingDown else { return }
 
                 let workerError = WorkerError(
                     code: .modelGenerationFailed,
-                    message: "Resident model preload was cancelled before \(preloadModelRepos.joined(separator: ", ")) finished loading for the '\(speechBackend.rawValue)' backend."
+                    message: "Resident model preload was cancelled before \(preloadModelRepos.joined(separator: ", ")) finished loading for the '\(targetSpeechBackend.rawValue)' backend."
                 )
                 residentState = .failed(workerError)
                 await logError(
                     workerError.message,
                     details: [
-                        "speech_backend": .string(speechBackend.rawValue),
+                        "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                     ]
@@ -388,11 +406,12 @@ public extension SpeakSwiftly {
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch let workerError as WorkerError {
+                guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
                 residentState = .failed(workerError)
                 await logError(
-                    "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(speechBackend.rawValue)' backend. \(workerError.message)",
+                    "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(targetSpeechBackend.rawValue)' backend. \(workerError.message)",
                     details: [
-                        "speech_backend": .string(speechBackend.rawValue),
+                        "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                         "failure_code": .string(workerError.code.rawValue),
@@ -401,15 +420,16 @@ public extension SpeakSwiftly {
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch {
+                guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
                 let workerError = WorkerError(
                     code: .modelGenerationFailed,
-                    message: "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(speechBackend.rawValue)' backend. \(error.localizedDescription)"
+                    message: "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(targetSpeechBackend.rawValue)' backend. \(error.localizedDescription)"
                 )
                 residentState = .failed(workerError)
                 await logError(
                     workerError.message,
                     details: [
-                        "speech_backend": .string(speechBackend.rawValue),
+                        "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                     ]
@@ -781,6 +801,8 @@ public extension SpeakSwiftly {
                  .replaceTextReplacement,
                  .removeTextReplacement,
                  .listQueue,
+                 .status,
+                 .switchSpeechBackend,
                  .playback,
                  .clearQueue,
                  .cancelRequest:
@@ -1053,6 +1075,24 @@ public extension SpeakSwiftly {
                     )
                 )
 
+            case .status(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        status: currentStatusSnapshot(),
+                        speechBackend: speechBackend
+                    )
+                )
+
+            case .switchSpeechBackend(let id, let requestedSpeechBackend):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        status: try await switchSpeechBackendNow(to: requestedSpeechBackend),
+                        speechBackend: speechBackend
+                    )
+                )
+
             case .playback(let id, let action):
                 _ = await playbackController.handle(action)
                 result = .success(
@@ -1296,13 +1336,39 @@ public extension SpeakSwiftly {
         )
     }
 
-    func preloadModelRepos() -> [String] {
+    func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
         switch speechBackend {
         case .qwen3:
             [ModelFactory.qwenResidentModelRepo]
         case .marvis:
             [ModelFactory.marvisResidentModelRepo, ModelFactory.marvisResidentModelRepo]
         }
+    }
+
+    func shouldApplyResidentPreloadResult(
+        token: UUID,
+        backend: SpeakSwiftly.SpeechBackend
+    ) -> Bool {
+        residentPreloadToken == token && speechBackend == backend
+    }
+
+    func switchSpeechBackendNow(
+        to requestedSpeechBackend: SpeakSwiftly.SpeechBackend
+    ) async throws -> WorkerStatusEvent? {
+        let hasQueuedGenerationWork = !((await generationController.queuedJobsOrdered()).isEmpty)
+        let playbackJobCount = await playbackController.jobCount()
+        if activeGeneration != nil || hasQueuedGenerationWork || playbackJobCount > 0 {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "SpeakSwiftly cannot switch the resident speech backend to '\(requestedSpeechBackend.rawValue)' while generation or playback work is still active or queued. Let the worker go idle, or clear or cancel the pending work first."
+            )
+        }
+
+        preloadTask?.cancel()
+        speechBackend = requestedSpeechBackend
+        residentState = .warming
+        startResidentPreload()
+        return currentStatusSnapshot()
     }
 
     func primaryResidentSampleRate(for models: ResidentSpeechModels) -> Int {
@@ -1331,7 +1397,7 @@ public extension SpeakSwiftly {
                 message: "SpeakSwiftly attempted to use the resident Qwen model while the runtime is configured for the 'marvis' backend. This indicates a backend-routing bug."
             )
         case .warming:
-            throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos().joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
+            throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
         case .failed(let error):
             throw error
         }
@@ -1356,7 +1422,7 @@ public extension SpeakSwiftly {
                 message: "SpeakSwiftly attempted to use the resident Marvis model bundle while the runtime is configured for the 'qwen3' backend. This indicates a backend-routing bug."
             )
         case .warming:
-            throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos().joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
+            throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")
         case .failed(let error):
             throw error
         }
