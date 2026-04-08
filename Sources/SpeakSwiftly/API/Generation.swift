@@ -4,18 +4,24 @@ import TextForSpeech
 // MARK: - Generation API
 
 public extension SpeakSwiftly {
+    // MARK: Generate Handle
+
     struct Generate: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Accessors
+
     nonisolated var generate: SpeakSwiftly.Generate {
         SpeakSwiftly.Generate(runtime: self)
     }
 }
 
 public extension SpeakSwiftly.Generate {
+    // MARK: Operations
+
     func speech(
         text: String,
         with profileName: SpeakSwiftly.Name,

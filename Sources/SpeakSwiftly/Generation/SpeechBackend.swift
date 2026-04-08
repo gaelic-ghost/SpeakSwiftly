@@ -3,6 +3,8 @@ import Foundation
 // MARK: - Speech Backend
 
 public extension SpeakSwiftly {
+    // MARK: Backend Enumeration
+
     enum SpeechBackend: String, Codable, Sendable, Equatable, CaseIterable {
         case qwen3
         case marvis
@@ -10,6 +12,8 @@ public extension SpeakSwiftly {
 }
 
 extension SpeakSwiftly.SpeechBackend {
+    // MARK: Environment
+
     public static let environmentVariable = "SPEAKSWIFTLY_SPEECH_BACKEND"
 
     public static func configured(in environment: [String: String]) -> Self? {

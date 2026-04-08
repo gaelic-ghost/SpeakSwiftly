@@ -4,6 +4,8 @@ import TextForSpeech
 // MARK: - Generation Job API
 
 public extension SpeakSwiftly {
+    // MARK: Job Models
+
     struct GenerationJobItem: Codable, Sendable, Equatable {
         public let artifactID: String
         public let text: String
@@ -184,18 +186,24 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly {
+    // MARK: Jobs Handle
+
     struct Jobs: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Accessors
+
     nonisolated var jobs: SpeakSwiftly.Jobs {
         SpeakSwiftly.Jobs(runtime: self)
     }
 }
 
 public extension SpeakSwiftly.Jobs {
+    // MARK: Operations
+
     func generationQueue() async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .generation))
     }

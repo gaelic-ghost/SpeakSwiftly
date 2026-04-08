@@ -4,6 +4,8 @@ import TextForSpeech
 // MARK: - Text Normalization Logic
 
 public extension SpeakSwiftly.Normalizer {
+    // MARK: Profile Inspection
+
     func activeProfile() -> TextForSpeech.Profile {
         textRuntime.customProfile
     }
@@ -28,6 +30,8 @@ public extension SpeakSwiftly.Normalizer {
         textRuntime.persistenceURL
     }
 
+    // MARK: Persistence
+
     func loadProfiles() throws {
         try textRuntime.load()
     }
@@ -35,6 +39,8 @@ public extension SpeakSwiftly.Normalizer {
     func saveProfiles() throws {
         try textRuntime.save()
     }
+
+    // MARK: Profile Mutation
 
     func createProfile(
         id: String,
@@ -69,6 +75,8 @@ public extension SpeakSwiftly.Normalizer {
         textRuntime.reset()
         try textRuntime.save()
     }
+
+    // MARK: Replacement Mutation
 
     func addReplacement(
         _ replacement: TextForSpeech.Replacement

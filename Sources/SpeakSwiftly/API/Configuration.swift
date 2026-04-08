@@ -3,7 +3,11 @@ import Foundation
 // MARK: - Runtime Configuration
 
 public extension SpeakSwiftly {
+    // MARK: Configuration
+
     struct Configuration: Codable, Sendable {
+        // MARK: Load Error
+
         public enum LoadError: Swift.Error, LocalizedError, Sendable, Equatable {
             case fileNotFound(path: String)
             case unreadableFile(path: String, message: String)
@@ -129,6 +133,8 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Control
+
     func status() async -> SpeakSwiftly.RequestHandle {
         await submit(.status(id: UUID().uuidString))
     }

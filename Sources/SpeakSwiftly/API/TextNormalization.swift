@@ -4,6 +4,8 @@ import TextForSpeech
 // MARK: - Text Normalization API
 
 public extension SpeakSwiftly {
+    // MARK: Normalizer Handle
+
     actor Normalizer {
         let textRuntime: TextForSpeechRuntime
 
@@ -24,6 +26,8 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Accessors
+
     nonisolated var normalizer: SpeakSwiftly.Normalizer {
         normalizerRef
     }

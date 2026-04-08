@@ -3,18 +3,24 @@ import Foundation
 // MARK: - Playback API
 
 public extension SpeakSwiftly {
+    // MARK: Player Handle
+
     struct Player: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Accessors
+
     nonisolated var player: SpeakSwiftly.Player {
         SpeakSwiftly.Player(runtime: self)
     }
 }
 
 public extension SpeakSwiftly.Player {
+    // MARK: Operations
+
     func list() async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .playback))
     }
@@ -41,6 +47,8 @@ public extension SpeakSwiftly.Player {
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Lifecycle
+
     func shutdown() async {
         guard !isShuttingDown else { return }
 

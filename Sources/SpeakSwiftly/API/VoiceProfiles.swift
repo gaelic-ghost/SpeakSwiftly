@@ -3,18 +3,24 @@ import Foundation
 // MARK: - Voice Profile API
 
 public extension SpeakSwiftly {
+    // MARK: Voices Handle
+
     struct Voices: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Runtime Accessors
+
     nonisolated var voices: SpeakSwiftly.Voices {
         SpeakSwiftly.Voices(runtime: self)
     }
 }
 
 public extension SpeakSwiftly.Voices {
+    // MARK: Operations
+
     func create(
         design named: SpeakSwiftly.Name,
         from text: String,

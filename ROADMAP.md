@@ -35,6 +35,7 @@
 - [ ] Milestone 17: Notification-linked priority playback
 - [ ] Milestone 18: Package docs and distribution polish
 - [x] Milestone 19: Persisted async generation jobs and batch artifacts
+- [ ] Milestone 20: Per-request event stream observability
 
 ## Milestone 0: Bootstrap
 
@@ -257,6 +258,29 @@ Tickets:
 - [ ] Decide whether SwiftLint belongs in the same pass or should remain a separate follow-up once SwiftFormat is in place.
 - [ ] Add a minimal `.spi.yml` that reflects the package's DocC and Swift Package Index needs once the docs surface exists.
 - [ ] Document when `.spi.yml` needs changes and keep it intentionally small.
+
+## Milestone 20: Per-request event stream observability
+
+Scope:
+
+- [ ] Make per-request event streaming a first-class documented part of the Swift package surface instead of an incidental detail of `RequestHandle`.
+- [ ] Keep request correlation and event observation readable without forcing callers down into JSONL worker internals.
+- [ ] Clarify the relationship between request IDs, streamed request events, cancellation, queue snapshots, and any future polling surface.
+
+Tickets:
+
+- [ ] Audit the current `RequestHandle` and `RequestEvent` surface for any missing event types, missing lifecycle guarantees, or mismatches between docs and implementation.
+- [ ] Decide whether event streaming alone is the intended per-request observation API or whether the package also needs an explicit request-status lookup surface.
+- [ ] Document the exact lifecycle guarantees for streamed request events, including queued, started, progress, acknowledgement, completion, and cancellation behavior.
+- [ ] Ensure request IDs returned by the Swift API are clearly described as stable correlation IDs for event observation and cancellation.
+- [ ] Add or tighten fast tests around request-handle event ordering, terminal completion semantics, cancellation semantics, and stream teardown.
+- [ ] Update package docs so Swift consumers can discover and use per-request event streams without reading runtime internals.
+
+Exit criteria:
+
+- [ ] The package documents one clear per-request observation story for Swift callers.
+- [ ] Streamed request events have explicit lifecycle guarantees backed by tests.
+- [ ] Request IDs, streamed events, and cancellation semantics are easy to understand from the public docs alone.
 
 Exit criteria:
 

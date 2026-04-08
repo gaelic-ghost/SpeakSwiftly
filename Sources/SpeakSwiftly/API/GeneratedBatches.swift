@@ -4,6 +4,8 @@ import TextForSpeech
 // MARK: - Generated Batch API
 
 public extension SpeakSwiftly {
+    // MARK: Batch Input
+
     struct BatchItem: Codable, Sendable, Equatable {
         public let artifactID: String?
         public let text: String
@@ -33,6 +35,8 @@ public extension SpeakSwiftly {
             self.sourceFormat = sourceFormat
         }
     }
+
+    // MARK: Batch Output
 
     struct GeneratedBatch: Codable, Sendable, Equatable {
         public let batchID: String
@@ -106,6 +110,8 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Artifacts {
+    // MARK: Batch Queries
+
     func batch(id batchID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.generatedBatch(id: UUID().uuidString, batchID: batchID))
     }
@@ -116,6 +122,8 @@ public extension SpeakSwiftly.Artifacts {
 }
 
 public extension SpeakSwiftly.Runtime {
+    // MARK: Batch Helpers
+
     static func resolveBatchItems(
         _ items: [SpeakSwiftly.BatchItem],
         batchID: String
