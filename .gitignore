@@ -1,4 +1,6 @@
 .DS_Store
+
+# SwiftPM and Xcode
 /.build
 /Packages
 xcuserdata/
@@ -7,6 +9,23 @@ DerivedData/
 /.local/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
 *.profraw
+
+# Python and uv
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local machine auth
+.netrc
+
+# Local plugin cache noise
+/.codex/plugins/**/assets/repo-maintenance/release/
+
 !scripts/repo-maintenance/release/*.sh
