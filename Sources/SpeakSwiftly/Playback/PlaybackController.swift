@@ -883,6 +883,7 @@ struct PlaybackHooks: Sendable {
     let handleEvent: @Sendable (PlaybackEvent, PlaybackJob) async -> Void
     let logFinished: @Sendable (PlaybackJob, PlaybackSummary, Double) async -> Void
     let completeJob: @Sendable (PlaybackJob, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
+    let resumeQueue: @Sendable () async -> Void
 }
 
 actor PlaybackController {
@@ -946,6 +947,10 @@ actor PlaybackController {
     func activeRequestSummary() -> ActiveWorkerRequestSummary? {
         guard let requestID = activePlayback?.requestID, let job = jobs[requestID] else { return nil }
         return ActiveWorkerRequestSummary(id: requestID, op: job.op, profileName: job.profileName)
+    }
+
+    func hasActivePlayback() -> Bool {
+        activePlayback != nil
     }
 
     func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
@@ -1087,7 +1092,7 @@ actor PlaybackController {
         job.generationTask = nil
         job.playbackTask = nil
         await hooks.completeJob(job, result)
-        await startNextIfPossible()
+        await hooks.resumeQueue()
     }
 }
 

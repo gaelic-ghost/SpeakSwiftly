@@ -497,4 +497,3 @@ import TextForSpeech
 
     await profileGate.open()
 }
-

@@ -343,6 +343,10 @@ public extension SpeakSwiftly {
                 },
                 completeJob: { job, result in
                     await self.completePlaybackJob(job, result: result)
+                },
+                resumeQueue: {
+                    try? await self.startNextGenerationIfPossible()
+                    await self.playbackController.startNextIfPossible()
                 }
             )
         )
@@ -619,6 +623,11 @@ public extension SpeakSwiftly {
             return
         case .ready:
             break
+        }
+
+        guard let nextJob = await generationController.nextQueuedJob(residentReady: true) else { return }
+        if nextJob.request.requiresPlayback, await playbackController.hasActivePlayback() {
+            return
         }
 
         guard let job = await generationController.beginNextIfPossible(residentReady: true) else { return }

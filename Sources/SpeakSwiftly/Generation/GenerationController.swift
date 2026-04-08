@@ -36,6 +36,13 @@ actor GenerationController {
         return job
     }
 
+    func nextQueuedJob(residentReady: Bool) -> Job? {
+        guard residentReady else { return nil }
+        guard active == nil else { return nil }
+        guard let index = nextQueueIndex() else { return nil }
+        return queue[index]
+    }
+
     func finishActive(token: UUID) {
         guard active?.token == token else { return }
         active = nil

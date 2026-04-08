@@ -114,6 +114,6 @@ This should stay a concrete cleanup of the existing published-runtime model, not
 
 This note does not replace the existing queued-playback test gap:
 
-- we still need a strict multi-request audible live-playback e2e lane that pre-queues several jobs on one worker and validates queued drain behavior directly
+- the strict multi-request audible live-playback e2e lane is now in place and validates queued drain behavior directly on one worker
 
 That remains separate from the release-hardening items above.

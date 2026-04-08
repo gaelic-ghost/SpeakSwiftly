@@ -271,12 +271,41 @@ extension SpeakSwiftlyE2ETests {
         text: String,
         profileName: String
     ) async throws {
+        try await queueAudibleSpeech(
+            on: worker,
+            id: id,
+            text: text,
+            profileName: profileName
+        )
+        _ = try await awaitAudibleSpeechCompletion(
+            on: worker,
+            id: id
+        )
+    }
+
+    static func queueAudibleSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String
+    ) async throws {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"queue_speech_live","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
             """
         )
 
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+        } != nil)
+    }
+
+    @discardableResult
+    static func awaitAudibleSpeechCompletion(
+        on worker: WorkerProcess,
+        id: String
+    ) async throws -> [String: Any] {
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "progress"
@@ -352,6 +381,8 @@ extension SpeakSwiftlyE2ETests {
             $0["id"] as? String == id
                 && $0["ok"] as? Bool == true
         } != nil)
+
+        return playbackFinished
     }
 
     static func runGeneratedFileSpeech(
@@ -844,6 +875,10 @@ final class WorkerProcess: @unchecked Sendable {
         throw WorkerProcessError(
             "Timed out waiting for a matching worker stderr JSON event. Current stderr:\n\(stderr)"
         )
+    }
+
+    func stdoutObjects() -> [[String: Any]] {
+        recorder.allStdoutObjects()
     }
 
     private static func captureLines(
