@@ -34,6 +34,13 @@ enum PlaybackEvent: Sendable {
     case starved
 }
 
+enum PlaybackEnvironmentEvent: Sendable {
+    case outputDeviceObserved(currentDevice: String?)
+    case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
+    case engineConfigurationChanged(engineIsRunning: Bool)
+    case interJobBoopPlayed(durationMS: Int, frequencyHz: Double, sampleRate: Double)
+}
+
 struct PlaybackTraceEvent: Sendable {
     let name: String
     let chunkIndex: Int?
@@ -583,6 +590,9 @@ final class AnyPlaybackController: @unchecked Sendable {
     private let pauseImpl: @Sendable () async -> PlaybackState
     private let resumeImpl: @Sendable () async -> PlaybackState
     private let stateImpl: @Sendable () async -> PlaybackState
+    private let bindEnvironmentEventsImpl: @Sendable (
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+    ) async -> Void
 
     init(
         prepare: @escaping @Sendable (_ sampleRate: Double) async throws -> Bool,
@@ -595,7 +605,10 @@ final class AnyPlaybackController: @unchecked Sendable {
         stop: @escaping @Sendable () async -> Void,
         pause: @escaping @Sendable () async -> PlaybackState,
         resume: @escaping @Sendable () async -> PlaybackState,
-        state: @escaping @Sendable () async -> PlaybackState
+        state: @escaping @Sendable () async -> PlaybackState,
+        bindEnvironmentEvents: @escaping @Sendable (
+            _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+        ) async -> Void = { _ in }
     ) {
         prepareImpl = prepare
         playImpl = play
@@ -603,6 +616,7 @@ final class AnyPlaybackController: @unchecked Sendable {
         pauseImpl = pause
         resumeImpl = resume
         stateImpl = state
+        bindEnvironmentEventsImpl = bindEnvironmentEvents
     }
 
     convenience init(_ controller: AudioPlaybackDriver) {
@@ -629,8 +643,17 @@ final class AnyPlaybackController: @unchecked Sendable {
             },
             state: {
                 await controller.state()
+            },
+            bindEnvironmentEvents: { sink in
+                await controller.setEnvironmentEventSink(sink)
             }
         )
+    }
+
+    func bindEnvironmentEvents(
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+    ) async {
+        await bindEnvironmentEventsImpl(sink)
     }
 
     static func silent(traceEnabled: Bool = false) -> AnyPlaybackController {
@@ -881,6 +904,7 @@ final class PlaybackJob: @unchecked Sendable {
 
 struct PlaybackHooks: Sendable {
     let handleEvent: @Sendable (PlaybackEvent, PlaybackJob) async -> Void
+    let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
     let logFinished: @Sendable (PlaybackJob, PlaybackSummary, Double) async -> Void
     let completeJob: @Sendable (PlaybackJob, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
     let resumeQueue: @Sendable () async -> Void
@@ -906,6 +930,13 @@ actor PlaybackController {
 
     func bind(_ hooks: PlaybackHooks) {
         self.hooks = hooks
+        Task {
+            await driver.bindEnvironmentEvents { [weak self] (event: PlaybackEnvironmentEvent) in
+                guard let self else { return }
+                let activeRequest = await self.activeRequestSummary()
+                await hooks.handleEnvironmentEvent(event, activeRequest)
+            }
+        }
     }
 
     // MARK: - Driver Control
@@ -1150,13 +1181,18 @@ final class AudioPlaybackDriver {
         }
     }
 
-    private enum PlaybackConfiguration {
+    fileprivate enum PlaybackConfiguration {
         static let minimumDrainTimeout: Duration = .seconds(5)
         static let drainTimeoutPaddingMS = 3_000
         static let drainProgressCheckIntervalMS = 500
         static let drainProgressStallTimeoutMS = 8_000
         static let lowQueueThresholdMS = 100
         static let channels: AVAudioChannelCount = 1
+        static let interJobBoopDurationMS = 90
+        static let interJobBoopFrequencyHz = 1_176.0
+        static let interJobBoopAmplitude: Float = 0.14
+        static let interJobBoopFadeMS = 10
+        static let interJobBoopTimeout: Duration = .seconds(2)
 
         static func drainTimeout(forQueuedAudioMS queuedAudioMS: Int) -> Duration {
             let paddedQueuedAudioMS = queuedAudioMS + drainTimeoutPaddingMS
@@ -1183,6 +1219,8 @@ final class AudioPlaybackDriver {
     private var lastObservedOutputDeviceDescription: String?
     private var playbackState: PlaybackState = .idle
     private var isPlaybackPausedManually = false
+    private var environmentEventSink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+    private var shouldPlayInterJobBoop = false
 
     // MARK: - Lifecycle
 
@@ -1191,6 +1229,16 @@ final class AudioPlaybackDriver {
         lastObservedOutputDeviceDescription = currentDefaultOutputDeviceDescription()
         installEngineConfigurationObserver()
         installDefaultOutputDeviceObserver()
+    }
+
+    func setEnvironmentEventSink(
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+    ) {
+        environmentEventSink = sink
+        guard let sink else { return }
+        Task {
+            await sink(PlaybackEnvironmentEvent.outputDeviceObserved(currentDevice: lastObservedOutputDeviceDescription))
+        }
     }
 
     func prepare(sampleRate: Double) throws -> Bool {
@@ -1215,6 +1263,7 @@ final class AudioPlaybackDriver {
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
     ) async throws -> PlaybackSummary {
         _ = try prepare(sampleRate: sampleRate)
+        try await playInterJobBoopIfNeeded(sampleRate: sampleRate)
 
         let startedAt = Date()
         let requestID = nextRequestID
@@ -1635,6 +1684,7 @@ final class AudioPlaybackDriver {
             }
 
             resetPlayerNodeForNextRequest()
+            shouldPlayInterJobBoop = true
 
             return PlaybackSummary(
                 thresholds: state.thresholdsController.thresholds,
@@ -1665,9 +1715,11 @@ final class AudioPlaybackDriver {
             )
         } catch is CancellationError {
             resetPlayerNodeForNextRequest()
+            shouldPlayInterJobBoop = false
             throw CancellationError()
         } catch {
             resetPlayerNodeForNextRequest()
+            shouldPlayInterJobBoop = false
             if let workerError = error as? WorkerError {
                 throw workerError
             }
@@ -1688,6 +1740,7 @@ final class AudioPlaybackDriver {
         engineSampleRate = nil
         playbackState = .idle
         isPlaybackPausedManually = false
+        shouldPlayInterJobBoop = false
     }
 
     func pause() -> PlaybackState {
@@ -1833,7 +1886,6 @@ final class AudioPlaybackDriver {
     private func resetPlayerNodeForNextRequest() {
         playerNode?.stop()
         playerNode?.reset()
-        playerNode?.play()
     }
 
     // MARK: - System Observers
@@ -1849,6 +1901,9 @@ final class AudioPlaybackDriver {
                 guard let engine = self.audioEngine else { return }
 
                 let engineIsRunning = engine.isRunning
+                if let environmentEventSink {
+                    await environmentEventSink(.engineConfigurationChanged(engineIsRunning: engineIsRunning))
+                }
                 if let activeEventSink {
                     await activeEventSink(.engineConfigurationChanged(engineIsRunning: engineIsRunning))
                 }
@@ -1884,6 +1939,14 @@ final class AudioPlaybackDriver {
         guard previousDevice != currentDevice else { return }
         lastObservedOutputDeviceDescription = currentDevice
 
+        if let environmentEventSink {
+            Task {
+                await environmentEventSink(
+                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice)
+                )
+            }
+        }
+
         if let activeEventSink {
             Task {
                 await activeEventSink(
@@ -1907,6 +1970,7 @@ final class AudioPlaybackDriver {
         guard activeRuntimeFailure == nil else { return }
 
         activeRuntimeFailure = error
+        shouldPlayInterJobBoop = false
         stop()
         activeRequestState?.drainContinuation?.resume(throwing: error)
         activeRequestState?.drainContinuation = nil
@@ -2026,9 +2090,98 @@ final class AudioPlaybackDriver {
             completionHandler: completion
         )
     }
+
+    // MARK: - Inter-Job Boop
+
+    private func playInterJobBoopIfNeeded(sampleRate: Double) async throws {
+        guard shouldPlayInterJobBoop else { return }
+        shouldPlayInterJobBoop = false
+
+        guard
+            let buffer = makePCMBuffer(
+                from: makeInterJobBoopSamples(sampleRate: sampleRate),
+                sampleRate: sampleRate,
+                previousTrailingSample: nil,
+                applyFadeIn: false
+            )?.buffer
+        else {
+            throw WorkerError(
+                code: .audioPlaybackFailed,
+                message: "SpeakSwiftly could not synthesize the short inter-job playback boop buffer for sample rate \(sampleRate)."
+            )
+        }
+
+        if playerNode?.isPlaying == false {
+            playerNode?.play()
+        }
+
+        let playbackTask = Task {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                scheduleBuffer(buffer, callbackType: .dataPlayedBack) { callbackType in
+                    guard callbackType == .dataPlayedBack else { return }
+                    continuation.resume()
+                }
+            }
+        }
+        defer { playbackTask.cancel() }
+
+        let timeoutTask = Task {
+            try await Task.sleep(for: PlaybackConfiguration.interJobBoopTimeout)
+            throw WorkerError(
+                code: .audioPlaybackTimeout,
+                message: "SpeakSwiftly timed out while trying to play the short inter-job playback boop before the next live request could begin."
+            )
+        }
+        defer { timeoutTask.cancel() }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await playbackTask.value }
+            group.addTask { try await timeoutTask.value }
+
+            _ = try await group.next()
+            group.cancelAll()
+        }
+
+        if let environmentEventSink {
+            await environmentEventSink(
+                .interJobBoopPlayed(
+                    durationMS: PlaybackConfiguration.interJobBoopDurationMS,
+                    frequencyHz: PlaybackConfiguration.interJobBoopFrequencyHz,
+                    sampleRate: sampleRate
+                )
+            )
+        }
+    }
 }
 
 // MARK: - Sample Shaping
+
+func makeInterJobBoopSamples(sampleRate: Double) -> [Float] {
+    let sampleCount = max(
+        1,
+        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopDurationMS)) / 1_000.0)
+    )
+    let fadeSampleCount = max(
+        1,
+        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFadeMS)) / 1_000.0)
+    )
+
+    return (0..<sampleCount).map { index in
+        let time = Double(index) / sampleRate
+        let phase = 2.0 * Double.pi * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFrequencyHz * time
+        let fadeEnvelope: Double
+
+        if index < fadeSampleCount {
+            fadeEnvelope = Double(index) / Double(fadeSampleCount)
+        } else if index >= sampleCount - fadeSampleCount {
+            fadeEnvelope = Double(sampleCount - index) / Double(fadeSampleCount)
+        } else {
+            fadeEnvelope = 1
+        }
+
+        return Float(sin(phase) * fadeEnvelope) * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopAmplitude
+    }
+}
 
 func shapePlaybackSamples(
     _ samples: [Float],

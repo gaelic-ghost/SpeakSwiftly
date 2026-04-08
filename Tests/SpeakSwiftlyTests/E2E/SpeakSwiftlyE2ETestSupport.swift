@@ -681,6 +681,8 @@ final class WorkerProcess: @unchecked Sendable {
     private let artifacts: E2EWorkerArtifacts
     private let process: Process
     private let stdinPipe: Pipe
+    private let stdoutHandle: FileHandle
+    private let stderrHandle: FileHandle
     private let recorder: JSONLineRecorder
     private let stdoutTask: Task<Void, Never>
     private let stderrTask: Task<Void, Never>
@@ -704,6 +706,8 @@ final class WorkerProcess: @unchecked Sendable {
         self.recorder = recorder
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        stdoutHandle = stdoutPipe.fileHandleForReading
+        stderrHandle = stderrPipe.fileHandleForReading
 
         let executableURL = try Self.workerExecutableURL(
             packageRootURL: packageRootURL,
@@ -737,7 +741,7 @@ final class WorkerProcess: @unchecked Sendable {
         process.environment = environment
 
         stdoutTask = Self.captureLines(
-            from: stdoutPipe.fileHandleForReading,
+            from: stdoutHandle,
             append: { [artifacts, recorder] line in
                 artifacts.appendStdout(line)
                 recorder.appendStdout(line)
@@ -745,7 +749,7 @@ final class WorkerProcess: @unchecked Sendable {
         )
 
         stderrTask = Self.captureLines(
-            from: stderrPipe.fileHandleForReading,
+            from: stderrHandle,
             append: { [artifacts, recorder] line in
                 artifacts.appendStderr(line)
                 recorder.appendStderr(line)
@@ -757,6 +761,7 @@ final class WorkerProcess: @unchecked Sendable {
     }
 
     deinit {
+        closeCapturedOutputs()
         stdoutTask.cancel()
         stderrTask.cancel()
     }
@@ -780,6 +785,7 @@ final class WorkerProcess: @unchecked Sendable {
             try? await waitForExit(timeout: .seconds(5))
         }
 
+        closeCapturedOutputs()
         stdoutTask.cancel()
         stderrTask.cancel()
         finalizeArtifactsIfNeeded()
@@ -836,6 +842,10 @@ final class WorkerProcess: @unchecked Sendable {
                 "The SpeakSwiftly worker did not exit before the timeout expired. Current stderr:\n\(stderr)"
             )
         }
+
+        closeCapturedOutputs()
+        stdoutTask.cancel()
+        stderrTask.cancel()
 
         guard process.terminationStatus == 0 else {
             let stderr = recorder.stderrText()
@@ -906,6 +916,11 @@ final class WorkerProcess: @unchecked Sendable {
                 append(line)
             }
         }
+    }
+
+    private func closeCapturedOutputs() {
+        try? stdoutHandle.close()
+        try? stderrHandle.close()
     }
 
     private func finalizeArtifactsIfNeeded() {

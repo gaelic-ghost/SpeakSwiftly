@@ -296,4 +296,63 @@ extension SpeakSwiftly.Runtime {
             await logRequestEvent("playback_starved", requestID: id, op: op, profileName: profileName)
         }
     }
+
+    func handlePlaybackEnvironmentEvent(
+        _ event: PlaybackEnvironmentEvent,
+        activeRequest: ActiveWorkerRequestSummary?
+    ) async {
+        let requestID = activeRequest?.id
+        let op = activeRequest?.op
+        let profileName = activeRequest?.profileName
+
+        switch event {
+        case .outputDeviceObserved(let currentDevice):
+            await logEvent(
+                "playback_output_device_observed",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "current_device": .string(currentDevice ?? "unknown"),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .outputDeviceChanged(let previousDevice, let currentDevice):
+            await logEvent(
+                "playback_output_device_changed",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "previous_device": .string(previousDevice ?? "unknown"),
+                    "current_device": .string(currentDevice ?? "unknown"),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .engineConfigurationChanged(let engineIsRunning):
+            await logEvent(
+                "playback_engine_configuration_changed",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "engine_is_running": .bool(engineIsRunning),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .interJobBoopPlayed(let durationMS, let frequencyHz, let sampleRate):
+            await logEvent(
+                "playback_inter_job_boop_played",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "duration_ms": .int(durationMS),
+                    "frequency_hz": .double(frequencyHz),
+                    "sample_rate": .double(sampleRate),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        }
+    }
 }

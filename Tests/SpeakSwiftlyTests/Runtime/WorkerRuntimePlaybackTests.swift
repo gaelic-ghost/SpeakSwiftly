@@ -3,6 +3,20 @@ import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeech
 
+// MARK: - Playback Utilities
+
+@Test func interJobBoopSamplesAreShortFadedAndAudible() {
+    let sampleRate = 24_000.0
+    let samples = makeInterJobBoopSamples(sampleRate: sampleRate)
+
+    #expect(!samples.isEmpty)
+    #expect(samples.count == Int((sampleRate * 90.0) / 1_000.0))
+    #expect(abs(samples.first ?? 1) < 0.01)
+    #expect(abs(samples.last ?? 1) < 0.02)
+    #expect(samples.contains { abs($0) > 0.05 })
+    #expect(samples.allSatisfy { $0.isFinite && abs($0) <= 0.14 })
+}
+
 // MARK: - Live Playback Queueing
 
 @Test func speakLiveBackgroundAcknowledgesQueueBeforePlaybackStartsAndOnlySucceedsOnce() async throws {

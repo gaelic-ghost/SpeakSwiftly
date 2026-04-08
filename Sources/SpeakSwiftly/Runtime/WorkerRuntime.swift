@@ -291,6 +291,9 @@ public extension SpeakSwiftly {
                 handleEvent: { [weak self] event, job in
                     await self?.handlePlaybackEvent(event, for: job)
                 },
+                handleEnvironmentEvent: { [weak self] event, activeRequest in
+                    await self?.handlePlaybackEnvironmentEvent(event, activeRequest: activeRequest)
+                },
                 logFinished: { [weak self] job, playbackSummary, sampleRate in
                     await self?.emitProgress(id: job.requestID, stage: .playbackFinished)
                     await self?.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
@@ -1511,9 +1514,20 @@ public extension SpeakSwiftly {
 
         activeGeneration = nil
         await generationController.finishActive(token: token)
-        recordGenerationDispositionIfNeeded(for: request, disposition: disposition)
+        let finalDisposition = if isShuttingDown {
+            switch disposition {
+            case .requestCompleted(.success):
+                GenerationCompletionDisposition.requestCompleted(.failure(cancellationError(for: request.id)))
+            default:
+                disposition
+            }
+        } else {
+            disposition
+        }
+
+        recordGenerationDispositionIfNeeded(for: request, disposition: finalDisposition)
         defer { requestAcceptedAt.removeValue(forKey: request.id) }
-        switch disposition {
+        switch finalDisposition {
         case .requestCompleted(let result):
             await completeRequest(request: request, result: result)
         case .requestStillPendingPlayback:
