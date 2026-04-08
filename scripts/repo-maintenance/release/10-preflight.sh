@@ -25,8 +25,8 @@ esac
 branch_name="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD || true)"
 [ -n "$branch_name" ] || die "Release workflow requires a named branch instead of detached HEAD."
 
-status_output="$(git -C "$REPO_ROOT" status --porcelain)"
-[ -z "$status_output" ] || die "Release workflow requires a clean worktree before tagging."
+status_output="$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)"
+[ -z "$status_output" ] || die "Release workflow requires a clean tracked worktree before tagging."
 
 if [ "${REPO_MAINTENANCE_RELEASE_MODE:-}" = "submodule" ]; then
   superproject_root="$(git -C "$REPO_ROOT" rev-parse --show-superproject-working-tree || true)"
