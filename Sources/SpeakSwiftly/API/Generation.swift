@@ -16,10 +16,9 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Generate {
-    func speak(
+    func speech(
         text: String,
         with profileName: SpeakSwiftly.Name,
-        as job: SpeakSwiftly.Job,
         textProfileName: String? = nil,
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
@@ -31,7 +30,28 @@ public extension SpeakSwiftly.Generate {
                 text: text,
                 profileName: profileName,
                 textProfileName: textProfileName,
-                jobType: job,
+                jobType: .live,
+                textContext: textContext,
+                sourceFormat: sourceFormat
+            )
+        )
+    }
+
+    func audio(
+        text: String,
+        with profileName: SpeakSwiftly.Name,
+        textProfileName: String? = nil,
+        textContext: TextForSpeech.Context? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
+        id: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .queueSpeech(
+                id: id,
+                text: text,
+                profileName: profileName,
+                textProfileName: textProfileName,
+                jobType: .file,
                 textContext: textContext,
                 sourceFormat: sourceFormat
             )

@@ -69,7 +69,7 @@ public extension SpeakSwiftly {
             case retentionPolicy = "retention_policy"
         }
 
-        public init(
+        init(
             batchID: String,
             profileName: String,
             textProfileName: String?,

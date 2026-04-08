@@ -69,13 +69,12 @@ That produces stable local runtime launchers under `.local/xcode/current-debug` 
 import SpeakSwiftlyCore
 import TextForSpeech
 
-let runtime = await SpeakSwiftly.live()
+let runtime = await SpeakSwiftly.liftoff()
 await runtime.start()
 
-let handle = await runtime.generate.speak(
+let handle = await runtime.generate.speech(
     text: "Hello there.",
-    with: "default-femme",
-    as: .live
+    with: "default-femme"
 )
 
 for try await event in handle.events {
@@ -86,10 +85,9 @@ for try await event in handle.events {
 When the whole input is source code rather than prose with embedded code, use `sourceFormat`:
 
 ```swift
-let sourceHandle = await runtime.generate.speak(
+let sourceHandle = await runtime.generate.speech(
     text: "struct WorkerRuntime { let sampleRate: Int }",
     with: "default-femme",
-    as: .live,
     sourceFormat: .swift
 )
 ```
@@ -109,9 +107,9 @@ Runtime preferences have a matching typed surface:
 import SpeakSwiftlyCore
 
 let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
-try configuration.saveDefault()
+try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration.json"))
 
-let runtime = await SpeakSwiftly.live(configuration: configuration)
+let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
 ### Worker Executable
@@ -134,20 +132,21 @@ The package currently publishes:
 
 Key typed runtime entry points include:
 
-- `runtime.generate.speak(text:with:as:textProfileName:textContext:sourceFormat:id:)`
+- `runtime.generate.speech(text:with:textProfileName:textContext:sourceFormat:id:)`
+- `runtime.generate.audio(text:with:textProfileName:textContext:sourceFormat:id:)`
 - `runtime.generate.batch(_:with:id:)`
 - `runtime.voices.create(design named:from:vibe:voice:outputPath:id:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:id:)`
 - `runtime.voices.list(id:)`
 - `runtime.voices.delete(named:id:)`
-- `runtime.player.generationQueue(id:)`
-- `runtime.player.playbackQueue(id:)`
+- `runtime.player.list(id:)`
 - `runtime.player.pause(id:)`
 - `runtime.player.resume(id:)`
 - `runtime.player.state(id:)`
 - `runtime.player.clearQueue(id:)`
 - `runtime.player.cancelRequest(_:requestID:)`
 - `runtime.jobs.expire(id:requestID:)`
+- `runtime.jobs.generationQueue(id:)`
 - `runtime.jobs.job(id:requestID:)`
 - `runtime.jobs.list(id:)`
 - `runtime.artifacts.file(id:requestID:)`

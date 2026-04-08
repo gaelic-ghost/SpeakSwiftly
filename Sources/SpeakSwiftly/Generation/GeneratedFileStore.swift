@@ -30,7 +30,7 @@ public extension SpeakSwiftly {
             case filePath = "file_path"
         }
 
-        public init(
+        init(
             artifactID: String,
             createdAt: Date,
             profileName: String,

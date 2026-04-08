@@ -454,6 +454,33 @@ Exit criteria:
 
 Scope:
 
+- [x] Finish the typed Swift API breakout from a kitchen-sink `Runtime` method surface into stable concern handles.
+- [x] Make the public startup story and generation surface read like a deliberate library instead of a thin transport wrapper.
+- [x] Trim public transport-shaped model construction points that do not need to be caller-authored.
+
+Tickets:
+
+- [x] Replace `SpeakSwiftly.live(...)` with `SpeakSwiftly.liftoff(configuration:)`, keeping `configuration` optional.
+- [x] Reshape `SpeakSwiftly.Configuration` so startup options include the selected `speechBackend` plus an optional `textNormalizer`.
+- [x] Keep explicit path-based configuration persistence public, and move default persistence helpers out of the primary public API story.
+- [x] Rename `Generate.speak(...)` to `Generate.speech(...)`.
+- [x] Add `Generate.audio(...)` for file-oriented audio generation.
+- [x] Remove the public `SpeakSwiftly.Job` multiplexing surface once `Generate.speech(...)` and `Generate.audio(...)` exist.
+- [x] Move generation-queue inspection from `Player` to `Jobs`.
+- [x] Collapse playback-queue inspection into a player-owned query such as `Player.list(...)`.
+- [x] Keep `Voices.create(design named: ...)` and `Voices.create(clone named: ...)` as the overloaded voice-profile creation surface.
+- [x] Review all public output model memberwise initializers and make transport/result-model construction internal unless a real caller-authored use case exists.
+- [ ] Revisit whether `BatchItem` remains a public caller-authored batch input type or should be narrowed once `Generate` owns more shaping work.
+
+Exit criteria:
+
+- [x] The typed Swift startup path is one obvious `liftoff(...)` entry point with clean defaults.
+- [x] Live playback and file generation are separate public generation calls instead of a shared job-type switch.
+- [x] Queue inspection methods live on the concern handle that matches the data being inspected.
+- [ ] Public model construction points are limited to the inputs and outputs callers truly need to author or inspect.
+
+Scope:
+
 - [ ] Decide the intended final folder and file structure for the package as the future scope solidifies.
 - [ ] Chart likely future breakouts without prematurely forcing them into extra targets, wrappers, or coordinators.
 - [ ] Keep the structure plan grounded in the real package surface instead of speculative framework architecture.

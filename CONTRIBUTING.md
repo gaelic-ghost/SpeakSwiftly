@@ -73,9 +73,9 @@ The intent behind this shape is:
 - explicit enough to read well at the call site
 - aligned with the runtime concept being controlled, not the JSON transport name
 
-The broader typed runtime surface is now moving toward one root startup result plus stored concern handles:
+The broader typed runtime surface now uses one root startup result plus stored concern handles:
 
-- `SpeakSwiftly.live(...)` returns `SpeakSwiftly.Runtime`
+- `SpeakSwiftly.liftoff(...)` returns `SpeakSwiftly.Runtime`
 - `runtime.generate`
 - `runtime.player`
 - `runtime.voices`
@@ -84,6 +84,18 @@ The broader typed runtime surface is now moving toward one root startup result p
 - `runtime.artifacts`
 
 Those concern handles should stay lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
+
+The current typed Swift startup and generation conventions are:
+
+- `SpeakSwiftly.liftoff(configuration:)` is the single startup entry point, with `configuration` optional so `liftoff()` remains the one obvious default path
+- `SpeakSwiftly.Configuration` carries startup inputs such as `speechBackend` and an optional `textNormalizer`
+- live playback and file rendering are separate generation calls, with `Generate.speech(...)` and `Generate.audio(...)`
+- generation-queue inspection lives under `Jobs`
+- playback-queue inspection lives under `Player.list(...)`
+- decode/result model memberwise initializers should stay internal unless callers have a concrete need to construct those values themselves
+- `BatchItem` remains public only because batch submission is still intentionally caller-authored at that layer
+
+Treat this as a durable building-block cleanup, not as a compatibility layer. Do not preserve legacy public shims for the old `live(...)`, job-multiplexed generation, or mismatched queue-query placement unless Gale explicitly asks for that compromise.
 
 `SpeakSwiftly.Name` is the intended semantic name type for stable operator-facing resource names in the library surface.
 
@@ -127,7 +139,7 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 ## Runtime Configuration
 
-`SpeakSwiftly.Configuration` is the typed runtime-preference surface. Right now it stores the preferred resident `speechBackend`.
+`SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend` plus an optional startup `textNormalizer`.
 
 Default persisted configuration path:
 
@@ -136,11 +148,10 @@ Default persisted configuration path:
 
 Backend resolution precedence is:
 
-1. explicit `speechBackend:` passed to `SpeakSwiftly.live(...)`
-2. explicit `configuration:` passed to `SpeakSwiftly.live(...)`
-3. `SPEAKSWIFTLY_SPEECH_BACKEND`
-4. persisted `configuration.json`
-5. fallback `.qwen3`
+1. explicit `configuration.speechBackend` passed to `SpeakSwiftly.liftoff(...)`
+2. `SPEAKSWIFTLY_SPEECH_BACKEND`
+3. persisted `configuration.json`
+4. fallback `.qwen3`
 
 ## Queueing and Resident Controls
 
@@ -189,12 +200,15 @@ The intended concern split is:
 
 The intended library-caller shape is:
 
-- `runtime.generate.speak(...)`
+- `runtime.generate.speech(...)`
+- `runtime.generate.audio(...)`
 - `runtime.generate.batch(...)`
+- `runtime.player.list(...)`
 - `runtime.voices.create(design named: ...)`
 - `runtime.voices.create(clone named: ...)`
 - `runtime.voices.list(...)`
 - `runtime.voices.delete(named: ...)`
+- `runtime.jobs.generationQueue(...)`
 - `runtime.jobs.expire(...)`
 - `runtime.jobs.job(...)`
 - `runtime.jobs.list(...)`

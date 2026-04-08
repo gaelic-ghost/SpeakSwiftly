@@ -111,8 +111,7 @@ import TextForSpeech
     let resolved = WorkerRuntime.resolvedSpeechBackend(
         dependencies: dependencies,
         environment: [ "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path ],
-        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis),
-        explicitSpeechBackend: nil
+        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis)
     )
 
     #expect(resolved == .marvis)
@@ -134,8 +133,7 @@ import TextForSpeech
             "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path,
             SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.marvis.rawValue,
         ],
-        configuration: nil,
-        explicitSpeechBackend: nil
+        configuration: nil
     )
 
     #expect(resolved == .marvis)

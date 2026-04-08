@@ -6,17 +6,17 @@ import TextForSpeech
 public enum SpeakSwiftly {
     public typealias Name = String
 
-    public enum Job: Sendable, Equatable {
+    enum SpeechJobType: Sendable, Equatable {
         case live
         case file
     }
 
-    public enum Queue: Sendable, Equatable {
+    enum WorkerQueueType: Sendable, Equatable {
         case generation
         case playback
     }
 
-    public enum PlaybackAction: Sendable, Equatable {
+    enum PlaybackAction: Sendable, Equatable {
         case pause
         case resume
         case state
@@ -55,23 +55,17 @@ public enum SpeakSwiftly {
         }
     }
 
-    public static func live(
-        normalizer: SpeakSwiftly.Normalizer? = nil,
-        configuration: SpeakSwiftly.Configuration? = nil,
-        speechBackend: SpeakSwiftly.SpeechBackend? = nil
+    public static func liftoff(
+        configuration: SpeakSwiftly.Configuration? = nil
     ) async -> Runtime {
-        await Runtime.live(
-            normalizer: normalizer,
-            configuration: configuration,
-            speechBackend: speechBackend
-        )
+        await Runtime.liftoff(configuration: configuration)
     }
 }
 
 // MARK: - Internal Compatibility
 
-typealias SpeechJobType = SpeakSwiftly.Job
-typealias WorkerQueueType = SpeakSwiftly.Queue
+typealias SpeechJobType = SpeakSwiftly.SpeechJobType
+typealias WorkerQueueType = SpeakSwiftly.WorkerQueueType
 typealias PlaybackAction = SpeakSwiftly.PlaybackAction
 typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent

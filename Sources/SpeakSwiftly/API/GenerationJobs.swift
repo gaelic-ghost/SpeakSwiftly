@@ -19,7 +19,7 @@ public extension SpeakSwiftly {
             case sourceFormat = "source_format"
         }
 
-        public init(
+        init(
             artifactID: String,
             text: String,
             textProfileName: String?,
@@ -64,7 +64,7 @@ public extension SpeakSwiftly {
             case message
         }
 
-        public init(code: String, message: String) {
+        init(code: String, message: String) {
             self.code = code
             self.message = message
         }
@@ -89,7 +89,7 @@ public extension SpeakSwiftly {
             case textProfileName = "text_profile_name"
         }
 
-        public init(
+        init(
             artifactID: String,
             kind: GenerationArtifactKind,
             createdAt: Date,
@@ -145,7 +145,7 @@ public extension SpeakSwiftly {
             case retentionPolicy = "retention_policy"
         }
 
-        public init(
+        init(
             jobID: String,
             jobKind: GenerationJobKind,
             createdAt: Date,
@@ -196,6 +196,12 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Jobs {
+    func generationQueue(
+        id requestID: String = UUID().uuidString
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: requestID, queueType: .generation))
+    }
+
     func expire(
         id jobID: String,
         requestID: String = UUID().uuidString

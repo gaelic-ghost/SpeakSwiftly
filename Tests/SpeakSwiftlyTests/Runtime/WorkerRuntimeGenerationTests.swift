@@ -36,10 +36,9 @@ import TextForSpeech
         }
     })
 
-    let requestID = await runtime.generate.speak(
+    let requestID = await runtime.generate.audio(
         text: "Hello from the generated file path.",
         with: "default-femme",
-        as: .file,
         id: "req-file-1"
     ).id
     #expect(requestID == "req-file-1")
@@ -444,4 +443,3 @@ import TextForSpeech
 
     await preloadGate.open()
 }
-

@@ -44,6 +44,10 @@
 - When adding or renaming a JSONL operation, update both `README.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented.
 - For the typed Swift library surface, prefer one startup entry point that returns `SpeakSwiftly.Runtime`, then expose stored concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts` from that root object instead of growing one monolithic `Runtime` method namespace.
 - Keep those concern handles lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
+- For the typed Swift library surface, prefer `SpeakSwiftly.liftoff(configuration:)` as the single startup entry point, with `configuration` optional and responsible for carrying startup-time choices such as `speechBackend` and an optional `textNormalizer`.
+- Prefer separate public generation verbs for live playback and file output, such as `Generate.speech(...)` and `Generate.audio(...)`, instead of exposing a public job-type switch.
+- Keep generation-queue inspection on `Jobs` and playback-queue inspection on `Player`; do not mirror internal queue routing details in the public typed surface when the domain handle already makes the ownership clearer.
+- Public transport/result model types may stay public for inspection, but make their memberwise construction internal unless callers have a concrete need to author those values directly.
 - Use `SpeakSwiftly.Name` as the operator-facing semantic name type for stored voice-profile names and similar stable user-named resources when the public API benefits from carrying that meaning explicitly.
 - For the voice-profile library surface, prefer one `Voices.create(...)` verb with overloaded first labels that keep the call site explicit, such as `create(design named: Name, ...)` and `create(clone named: Name, ...)`, instead of multiplying unrelated creation verbs.
 

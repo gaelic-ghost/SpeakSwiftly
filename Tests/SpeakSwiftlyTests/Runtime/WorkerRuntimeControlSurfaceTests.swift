@@ -53,7 +53,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -62,9 +62,9 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speak(text: "Hi there", with: "default-femme", as: .live, id: "req-queued-1")
+    _ = await runtime.generate.speech(text: "Hi there", with: "default-femme", id: "req-queued-1")
 
-    let listID = await runtime.player.playbackQueue(id: "req-list-queue").id
+    let listID = await runtime.player.list(id: "req-list-queue").id
     #expect(listID == "req-list-queue")
 
     #expect(await waitUntil {
@@ -232,10 +232,9 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let queuedFileID = await runtime.generate.speak(
+    let queuedFileID = await runtime.generate.audio(
         text: "Save this request once the resident models are back.",
         with: "default-femme",
-        as: .file,
         id: "req-after-unload"
     ).id
     #expect(queuedFileID == "req-after-unload")
@@ -323,7 +322,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"
@@ -334,10 +333,9 @@ private actor BackendLoadRecorder {
 
     let switchID = await runtime.switchSpeechBackend(to: .marvis, id: "req-switch-busy").id
     #expect(switchID == "req-switch-busy")
-    let queuedFileID = await runtime.generate.speak(
+    let queuedFileID = await runtime.generate.audio(
         text: "Save this request after the backend switch barrier.",
         with: "default-femme",
-        as: .file,
         id: "req-after-switch"
     ).id
     #expect(queuedFileID == "req-after-switch")
@@ -697,10 +695,9 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let speakFileID = await runtime.generate.speak(
+    let speakFileID = await runtime.generate.audio(
         text: "Save this request as an artifact.",
         with: "bright-guide",
-        as: .file,
         id: "req-file-helper"
     ).id
     let fileArtifactID = "req-file-helper-artifact-1"
@@ -1294,10 +1291,9 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speak(
+    _ = await runtime.generate.speech(
         text: "Hello there, galew.",
         with: "default-femme",
-        as: .live,
         id: "req-generation-params"
     )
 
@@ -1440,7 +1436,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    _ = await runtime.generate.speak(text: "Hello there", with: "default-femme", as: .live, id: "req-active")
+    _ = await runtime.generate.speech(text: "Hello there", with: "default-femme", id: "req-active")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-active"

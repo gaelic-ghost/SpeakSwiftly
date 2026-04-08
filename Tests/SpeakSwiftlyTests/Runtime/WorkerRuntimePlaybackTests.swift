@@ -37,10 +37,9 @@ import TextForSpeech
         }
     })
 
-    let activeID = await runtime.generate.speak(
+    let activeID = await runtime.generate.speech(
         text: "Hello there",
         with: "default-femme",
-        as: .live,
         id: "req-1"
     ).id
     #expect(activeID == "req-1")
@@ -52,10 +51,9 @@ import TextForSpeech
         }
     })
 
-    let backgroundID = await runtime.generate.speak(
+    let backgroundID = await runtime.generate.speech(
         text: "Hi there",
         with: "default-femme",
-        as: .live,
         id: "req-2"
     ).id
     #expect(backgroundID == "req-2")
@@ -124,10 +122,9 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.generate.speak(
+    _ = await runtime.generate.speech(
         text: "Hello there",
         with: "default-femme",
-        as: .live,
         id: "req-fail"
     )
 
@@ -207,10 +204,9 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.generate.speak(
+    _ = await runtime.generate.speech(
         text: "Hello there",
         with: "default-femme",
-        as: .live,
         id: "req-metrics"
     )
 

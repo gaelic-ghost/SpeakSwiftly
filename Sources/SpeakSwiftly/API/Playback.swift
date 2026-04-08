@@ -15,11 +15,7 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Player {
-    func generationQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.listQueue(id: requestID, queueType: .generation))
-    }
-
-    func playbackQueue(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
+    func list(id requestID: String = UUID().uuidString) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.listQueue(id: requestID, queueType: .playback))
     }
 

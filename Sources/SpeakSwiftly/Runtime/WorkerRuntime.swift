@@ -205,18 +205,15 @@ public extension SpeakSwiftly {
         encoder.outputFormatting = [.sortedKeys]
     }
 
-    public static func live(
-        normalizer: SpeakSwiftly.Normalizer? = nil,
-        configuration: SpeakSwiftly.Configuration? = nil,
-        speechBackend: SpeakSwiftly.SpeechBackend? = nil
+    static func liftoff(
+        configuration: SpeakSwiftly.Configuration? = nil
     ) async -> Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
         let configuredSpeechBackend = resolvedSpeechBackend(
             dependencies: dependencies,
             environment: environment,
-            configuration: configuration,
-            explicitSpeechBackend: speechBackend
+            configuration: configuration
         )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
@@ -225,7 +222,7 @@ public extension SpeakSwiftly {
             ),
             fileManager: dependencies.fileManager
         )
-        let normalizer = normalizer ?? SpeakSwiftly.Normalizer(
+        let normalizer = configuration?.textNormalizer ?? SpeakSwiftly.Normalizer(
             persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
         )
         let generatedFileStore = GeneratedFileStore(
@@ -259,13 +256,8 @@ public extension SpeakSwiftly {
     static func resolvedSpeechBackend(
         dependencies: WorkerDependencies,
         environment: [String: String],
-        configuration: SpeakSwiftly.Configuration?,
-        explicitSpeechBackend: SpeakSwiftly.SpeechBackend?
+        configuration: SpeakSwiftly.Configuration?
     ) -> SpeakSwiftly.SpeechBackend {
-        if let explicitSpeechBackend {
-            return explicitSpeechBackend
-        }
-
         if let configuration {
             return configuration.speechBackend
         }

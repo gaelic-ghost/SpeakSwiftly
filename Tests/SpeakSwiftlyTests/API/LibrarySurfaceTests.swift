@@ -5,8 +5,8 @@ import TextForSpeech
 
 // MARK: - Runtime Construction
 
-@Test func publicLibrarySurfaceConstructsLiveRuntime() async {
-    _ = await SpeakSwiftly.live()
+@Test func publicLibrarySurfaceConstructsRuntimeFromLiftoff() async {
+    _ = await SpeakSwiftly.liftoff()
 }
 
 @Test func publicLibrarySurfaceConstructsTopLevelNormalizer() {
@@ -18,6 +18,7 @@ import TextForSpeech
 @Test func publicLibrarySurfaceConstructsConfiguration() {
     let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
     #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.textNormalizer == nil)
 }
 
 @Test func publicConfigurationRoundTripsToDisk() throws {
@@ -31,7 +32,19 @@ import TextForSpeech
     try configuration.save(to: persistenceURL)
     let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
 
-    #expect(loaded == configuration)
+    #expect(loaded.speechBackend == configuration.speechBackend)
+    #expect(loaded.textNormalizer == nil)
+}
+
+@Test func publicConfigurationCanCarryATextNormalizer() {
+    let normalizer = SpeakSwiftly.Normalizer()
+    let configuration = SpeakSwiftly.Configuration(
+        speechBackend: .marvis,
+        textNormalizer: normalizer
+    )
+
+    #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.textNormalizer != nil)
 }
 
 // MARK: - Runtime Helpers
@@ -45,17 +58,16 @@ import TextForSpeech
         textContext,
         sourceFormat,
         id in
-        await generate.speak(
+        await generate.speech(
             text: text,
             with: profileName,
-            as: .live,
             textProfileName: textProfileName,
             textContext: textContext,
             sourceFormat: sourceFormat,
             id: id
         )
     }
-    let speakFile: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
+    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?, String) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
@@ -63,10 +75,9 @@ import TextForSpeech
         textContext,
         sourceFormat,
         id in
-        await generate.speak(
+        await generate.audio(
             text: text,
             with: profileName,
-            as: .file,
             textProfileName: textProfileName,
             textContext: textContext,
             sourceFormat: sourceFormat,
@@ -94,11 +105,11 @@ import TextForSpeech
     let makeNormalizer: @Sendable (URL?) -> SpeakSwiftly.Normalizer = { persistenceURL in
         SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
     }
-    let liveWithNormalizer: @Sendable (SpeakSwiftly.Normalizer) async -> SpeakSwiftly.Runtime = { normalizer in
-        await SpeakSwiftly.live(normalizer: normalizer)
+    let liftoffWithDefaults: @Sendable () async -> SpeakSwiftly.Runtime = {
+        await SpeakSwiftly.liftoff()
     }
-    let liveWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
-        await SpeakSwiftly.live(configuration: configuration)
+    let liftoffWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
+        await SpeakSwiftly.liftoff(configuration: configuration)
     }
     let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, name in
         await normalizer.profile(named: name)
@@ -242,8 +253,8 @@ import TextForSpeech
     let generationJobs: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, requestID in
         await jobs.list(id: requestID)
     }
-    let generationQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
-        await player.generationQueue()
+    let generationQueue: @Sendable (SpeakSwiftly.Jobs) async -> SpeakSwiftly.RequestHandle = { jobs in
+        await jobs.generationQueue()
     }
     let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.status()
@@ -260,7 +271,7 @@ import TextForSpeech
         await runtime.unloadModels()
     }
     let playbackQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
-        await player.playbackQueue()
+        await player.list()
     }
     let playbackPause: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
         await player.pause()
@@ -276,7 +287,7 @@ import TextForSpeech
     }
 
     _ = speak
-    _ = speakFile
+    _ = generateAudio
     _ = generateHandle
     _ = playerHandle
     _ = voicesHandle
@@ -284,8 +295,8 @@ import TextForSpeech
     _ = artifactsHandle
     _ = normalizer
     _ = makeNormalizer
-    _ = liveWithNormalizer
-    _ = liveWithConfiguration
+    _ = liftoffWithDefaults
+    _ = liftoffWithConfiguration
     _ = createProfile
     _ = createClone
     _ = profiles
