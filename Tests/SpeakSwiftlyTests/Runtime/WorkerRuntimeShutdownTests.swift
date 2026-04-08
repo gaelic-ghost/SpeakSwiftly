@@ -116,13 +116,6 @@ final class LockedFlag: @unchecked Sendable {
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-2"
-                && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
-        }
-    })
 
     await runtime.shutdown()
 

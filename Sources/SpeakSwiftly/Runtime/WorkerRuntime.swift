@@ -286,17 +286,18 @@ public extension SpeakSwiftly {
     func installPlaybackHooks() async {
         await playbackController.bind(
             PlaybackHooks(
-                handleEvent: { event, job in
-                    await self.handlePlaybackEvent(event, for: job)
+                handleEvent: { [weak self] event, job in
+                    await self?.handlePlaybackEvent(event, for: job)
                 },
-                logFinished: { job, playbackSummary, sampleRate in
-                    await self.emitProgress(id: job.requestID, stage: .playbackFinished)
-                    await self.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
+                logFinished: { [weak self] job, playbackSummary, sampleRate in
+                    await self?.emitProgress(id: job.requestID, stage: .playbackFinished)
+                    await self?.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
                 },
-                completeJob: { job, result in
-                    await self.completePlaybackJob(job, result: result)
+                completeJob: { [weak self] job, result in
+                    await self?.completePlaybackJob(job, result: result)
                 },
-                resumeQueue: {
+                resumeQueue: { [weak self] in
+                    guard let self else { return }
                     try? await self.startNextGenerationIfPossible()
                     await self.playbackController.startNextIfPossible()
                 }
@@ -311,9 +312,9 @@ public extension SpeakSwiftly {
             if let status = currentStatusSnapshot() {
                 continuation.yield(status)
             }
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 Task {
-                    await self.removeStatusContinuation(subscriptionID)
+                    await self?.removeStatusContinuation(subscriptionID)
                 }
             }
         }

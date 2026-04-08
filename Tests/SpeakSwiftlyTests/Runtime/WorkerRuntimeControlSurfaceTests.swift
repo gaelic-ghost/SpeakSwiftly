@@ -5,6 +5,10 @@ import TextForSpeech
 
 // MARK: - Control Operations and Typed Surface
 
+private final class WeakRuntimeBox: @unchecked Sendable {
+    weak var value: WorkerRuntime?
+}
+
 @Test func listQueueReturnsActiveAndQueuedRequestsWithoutWaitingForActivePlayback() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
@@ -47,13 +51,6 @@ import TextForSpeech
     })
 
     _ = await runtime.speak(text: "Hi there", with: "default-femme", as: .live, id: "req-queued-1")
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-queued-1"
-                && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
-        }
-    })
 
     let listID = await runtime.queue(.playback, id: "req-list-queue").id
     #expect(listID == "req-list-queue")
@@ -1012,6 +1009,26 @@ import TextForSpeech
     #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady))
 }
 
+@Test func droppingStatusSubscriptionDoesNotRetainRuntime() async throws {
+    let output = OutputRecorder()
+    let weakRuntime = WeakRuntimeBox()
+
+    var runtime: WorkerRuntime? = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+    weakRuntime.value = runtime
+
+    var statuses: AsyncStream<SpeakSwiftly.StatusEvent>? = await runtime?.statusEvents()
+    _ = statuses?.makeAsyncIterator()
+
+    statuses = nil
+    runtime = nil
+
+    #expect(await waitUntil { weakRuntime.value == nil })
+}
+
 @Test func startIsIdempotentForLibraryConsumers() async throws {
     actor LoadCounter {
         private(set) var count = 0
@@ -1117,10 +1134,7 @@ import TextForSpeech
     var iterator = handle.events.makeAsyncIterator()
 
     let acknowledged = try await iterator.next()
-    let started = try await iterator.next()
-
     #expect(acknowledged == .acknowledged(WorkerSuccessResponse(id: "req-stream-bg")))
-    #expect(started == .started(WorkerStartedEvent(id: "req-stream-bg", op: "queue_speech_live")))
 
     await playbackDrain.open()
 

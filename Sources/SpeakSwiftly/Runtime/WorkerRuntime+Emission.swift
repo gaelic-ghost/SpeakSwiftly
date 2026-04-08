@@ -468,9 +468,9 @@ extension SpeakSwiftly.Runtime {
         let requestID = request.id
         let events = AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> { continuation in
             requestContinuations[requestID] = continuation
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 Task {
-                    await self.removeRequestContinuation(for: requestID)
+                    await self?.removeRequestContinuation(for: requestID)
                 }
             }
         }
