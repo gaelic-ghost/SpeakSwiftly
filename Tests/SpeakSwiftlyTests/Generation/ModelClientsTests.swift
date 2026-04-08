@@ -426,7 +426,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"list_voice_profiles"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"

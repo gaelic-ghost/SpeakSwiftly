@@ -165,7 +165,7 @@ extension SpeakSwiftlyE2ETests {
         let outputPathFragment = outputURL.map { #","output_path":"\#($0.path)""# } ?? ""
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"create_profile","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","vibe":"\(vibe.rawValue)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
+            {"id":"\(id)","op":"create_voice_profile_from_description","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","vibe":"\(vibe.rawValue)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
             """
         )
 
@@ -205,7 +205,7 @@ extension SpeakSwiftlyE2ETests {
         let transcriptFragment = transcript.map { #","transcript":"\#($0.jsonEscaped)""# } ?? ""
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"create_clone","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)","vibe":"\(vibe.rawValue)"\(transcriptFragment)}
+            {"id":"\(id)","op":"create_voice_profile_from_audio","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)","vibe":"\(vibe.rawValue)"\(transcriptFragment)}
             """
         )
 

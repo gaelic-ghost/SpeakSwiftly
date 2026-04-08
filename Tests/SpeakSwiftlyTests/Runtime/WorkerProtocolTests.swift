@@ -149,7 +149,7 @@ import TextForSpeech
 
 @Test func decodesCreateProfileRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav"}"#
+        from: #"{"id":"req-2","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav"}"#
     )
 
     #expect(
@@ -167,7 +167,7 @@ import TextForSpeech
 
 @Test func decodesCreateProfileRequestWithCallerWorkingDirectory() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-2b","op":"create_profile","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav","cwd":"/tmp/export-base"}"#
+        from: #"{"id":"req-2b","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav","cwd":"/tmp/export-base"}"#
     )
 
     #expect(
@@ -185,7 +185,7 @@ import TextForSpeech
 
 @Test func decodesCreateCloneRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio"}"#
+        from: #"{"id":"req-clone","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio"}"#
     )
 
     #expect(
@@ -202,7 +202,7 @@ import TextForSpeech
 
 @Test func decodesCreateCloneRequestWithCallerWorkingDirectory() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-clone-cwd","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio","cwd":"file:///tmp/clone-base"}"#
+        from: #"{"id":"req-clone-cwd","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio","cwd":"file:///tmp/clone-base"}"#
     )
 
     #expect(
@@ -218,7 +218,7 @@ import TextForSpeech
 }
 
 @Test func decodesListProfilesRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-3","op":"list_profiles"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-3","op":"list_voice_profiles"}"#)
     #expect(request == .listProfiles(id: "req-3"))
 }
 
@@ -256,7 +256,7 @@ import TextForSpeech
 }
 
 @Test func decodesRemoveProfileRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"delete_profile","profile_name":"bright-guide"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}"#)
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))
 }
 
@@ -451,7 +451,7 @@ import TextForSpeech
             profilePath: "/tmp/default-femme",
             profiles: nil,
             activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
-            queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_profiles", profileName: nil, queuePosition: 1)],
+            queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_voice_profiles", profileName: nil, queuePosition: 1)],
             status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,
             clearedCount: 2,

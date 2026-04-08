@@ -395,13 +395,13 @@ enum WorkerRequest: Sendable, Equatable {
         case .generationJobs:
             "list_generation_jobs"
         case .createProfile:
-            "create_profile"
+            "create_voice_profile_from_description"
         case .createClone:
-            "create_clone"
+            "create_voice_profile_from_audio"
         case .listProfiles:
-            "list_profiles"
+            "list_voice_profiles"
         case .removeProfile:
-            "delete_profile"
+            "delete_voice_profile"
         case .textProfileActive:
             "get_active_text_profile"
         case .textProfileBase:
@@ -851,7 +851,7 @@ enum WorkerRequest: Sendable, Equatable {
         case "list_generation_jobs":
             return .generationJobs(id: id)
 
-        case "create_profile":
+        case "create_voice_profile_from_description":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let text = try requireNonEmpty(raw.text, field: "text", id: id)
             let vibe = try require(raw.vibe, field: "vibe", id: id)
@@ -867,7 +867,7 @@ enum WorkerRequest: Sendable, Equatable {
                 cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
 
-        case "create_clone":
+        case "create_voice_profile_from_audio":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
             let vibe = try require(raw.vibe, field: "vibe", id: id)
@@ -881,10 +881,10 @@ enum WorkerRequest: Sendable, Equatable {
                 cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
 
-        case "list_profiles":
+        case "list_voice_profiles":
             return .listProfiles(id: id)
 
-        case "delete_profile":
+        case "delete_voice_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
 

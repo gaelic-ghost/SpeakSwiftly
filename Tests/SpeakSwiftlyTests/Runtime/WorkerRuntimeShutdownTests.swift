@@ -268,7 +268,7 @@ final class LockedFlag: @unchecked Sendable {
         output.containsJSONObject {
             $0["id"] as? String == "req-queued-shutdown-stream"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "create_profile"
+                && $0["op"] as? String == "create_voice_profile_from_description"
         }
     })
 
@@ -299,7 +299,7 @@ final class LockedFlag: @unchecked Sendable {
 
     await runtime.start()
     await runtime.shutdown()
-    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"list_voice_profiles"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -345,7 +345,7 @@ final class LockedFlag: @unchecked Sendable {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -414,13 +414,13 @@ final class LockedFlag: @unchecked Sendable {
     })
 
     await blockedRuntime.accept(
-        line: #"{"id":"req-write-gate","op":"create_profile","profile_name":"bright-gate","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-write-gate","op":"create_voice_profile_from_description","profile_name":"bright-gate","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-write-gate"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "create_profile"
+                && $0["op"] as? String == "create_voice_profile_from_description"
         }
     })
     writeCoordinator.waitUntilEntered()
@@ -523,7 +523,7 @@ final class LockedFlag: @unchecked Sendable {
 
     await runtime.accept(
         line: """
-        {"id":"req-export-gate","op":"create_profile","profile_name":"bright-export","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"\(exportURL.path)"}
+        {"id":"req-export-gate","op":"create_voice_profile_from_description","profile_name":"bright-export","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"\(exportURL.path)"}
         """
     )
     #expect(await waitUntil {

@@ -102,7 +102,7 @@ Current examples of the broader convention are:
 - `list_text_profiles`
 - `create_text_replacement`
 - `replace_text_profile`
-- `delete_profile`
+- `delete_voice_profile`
 
 The wire shape is intentionally more literal and transport-oriented than the Swift surface, and it should stay mechanically consistent enough that a caller can often guess an operation name correctly before looking it up.
 
@@ -212,9 +212,9 @@ Representative request shapes:
 {"id":"req-1l","op":"get_generation_job","job_id":"req-1f"}
 {"id":"req-1m","op":"list_generation_jobs"}
 {"id":"req-1n","op":"expire_generation_job","job_id":"req-1g"}
-{"id":"req-2","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
-{"id":"req-3","op":"list_profiles"}
-{"id":"req-4","op":"delete_profile","profile_name":"bright-guide"}
+{"id":"req-2","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"A warm, bright, feminine narrator voice.","output_path":"/tmp/bright-guide.wav"}
+{"id":"req-3","op":"list_voice_profiles"}
+{"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}
 {"id":"req-5","op":"get_active_text_profile"}
 {"id":"req-6","op":"list_text_profiles"}
 {"id":"req-7","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}

@@ -833,7 +833,7 @@ private actor BackendLoadRecorder {
 
     let exportURL = callerWorkingDirectory.appendingPathComponent("exports/voice.wav")
     await runtime.accept(
-        line: #"{"id":"req-relative-export","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav","cwd":"\#(callerWorkingDirectory.path)"}"#
+        line: #"{"id":"req-relative-export","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav","cwd":"\#(callerWorkingDirectory.path)"}"#
     )
 
     #expect(await waitUntil {
@@ -867,7 +867,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-relative-export-missing-cwd","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav"}"#
+        line: #"{"id":"req-relative-export-missing-cwd","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav"}"#
     )
 
     #expect(await waitUntil {
@@ -1094,7 +1094,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-relative-clone","op":"create_clone","profile_name":"ghost-copy","reference_audio_path":"reference.wav","vibe":"masc","transcript":"Provided transcript","cwd":"\#(callerWorkingDirectory.path)"}"#
+        line: #"{"id":"req-relative-clone","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"reference.wav","vibe":"masc","transcript":"Provided transcript","cwd":"\#(callerWorkingDirectory.path)"}"#
     )
 
     #expect(await waitUntil {
@@ -1249,7 +1249,7 @@ private actor BackendLoadRecorder {
     let completed = try await iterator.next()
     let terminal = try await iterator.next()
 
-    #expect(started == .started(WorkerStartedEvent(id: "req-stream", op: "list_profiles")))
+    #expect(started == .started(WorkerStartedEvent(id: "req-stream", op: "list_voice_profiles")))
     #expect(
         completed == .completed(
             WorkerSuccessResponse(
@@ -1518,7 +1518,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"list_voice_profiles"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1580,17 +1580,17 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "create_profile"
+                && $0["op"] as? String == "create_voice_profile_from_description"
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"delete_profile","profile_name":"remove-me"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"delete_voice_profile","profile_name":"remove-me"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
 
     await profileGate.open()
@@ -1606,12 +1606,12 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "delete_profile"
+                && $0["op"] as? String == "delete_voice_profile"
         }
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_profile", "req-3:queue_speech_live", "req-2:delete_profile"])
+    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-3:queue_speech_live", "req-2:delete_voice_profile"])
 }
 
 @Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {
@@ -1638,18 +1638,18 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"brand-new","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"brand-new","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "create_profile"
+                && $0["op"] as? String == "create_voice_profile_from_description"
         }
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hi there","profile_name":"brand-new"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"list_voice_profiles"}"#)
 
     await profileGate.open()
 
@@ -1670,10 +1670,10 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == "req-3"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "list_profiles"
+                && $0["op"] as? String == "list_voice_profiles"
         }
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_profile", "req-2:queue_speech_live", "req-3:list_profiles"])
+    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:queue_speech_live", "req-3:list_voice_profiles"])
 }

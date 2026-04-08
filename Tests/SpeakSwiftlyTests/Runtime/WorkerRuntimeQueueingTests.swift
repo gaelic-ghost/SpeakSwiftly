@@ -19,7 +19,7 @@ import TextForSpeech
     )
 
     await runtime.start()
-    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"list_voice_profiles"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -60,7 +60,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"list_voice_profiles"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -157,7 +157,7 @@ import TextForSpeech
     )
 
     await runtime.start()
-    await runtime.accept(line: #"{"id":"req-1","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"list_voice_profiles"}"#)
     await preloadGate.open()
 
     #expect(await waitUntil {
@@ -466,7 +466,7 @@ import TextForSpeech
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_profile","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -475,7 +475,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"list_profiles"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"list_voice_profiles"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
