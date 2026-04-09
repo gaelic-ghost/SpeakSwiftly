@@ -37,7 +37,10 @@ let package = Package(
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift")
             ],
-            path: "Sources/SpeakSwiftly"
+            path: "Sources/SpeakSwiftly",
+            resources: [
+                .copy("Resources/mlx-swift_Cmlx.bundle"),
+            ]
         ),
         .executableTarget(
             name: "SpeakSwiftlyCLI",

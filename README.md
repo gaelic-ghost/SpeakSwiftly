@@ -47,6 +47,8 @@ Library consumers can add the package directly from GitHub:
 
 Then add `SpeakSwiftlyCore` to the target that will own the runtime.
 
+`SpeakSwiftlyCore` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without spelunking through DerivedData.
+
 For package-local validation:
 
 ```bash
@@ -112,6 +114,13 @@ try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
+If a host needs the packaged MLX bundle or the exact metallib path, use the support-resource surface:
+
+```swift
+let mlxBundleURL = try SpeakSwiftly.SupportResources.mlxBundleURL()
+let defaultMetallibURL = try SpeakSwiftly.SupportResources.defaultMetallibURL()
+```
+
 ### Worker Executable
 
 Launch the published runtime through the stable launcher:
@@ -153,6 +162,9 @@ Key typed runtime entry points include:
 - `runtime.artifacts.files()`
 - `runtime.artifacts.batch(id:)`
 - `runtime.artifacts.batches()`
+- `SpeakSwiftly.SupportResources.bundle`
+- `SpeakSwiftly.SupportResources.mlxBundleURL()`
+- `SpeakSwiftly.SupportResources.defaultMetallibURL()`
 - `runtime.status()`
 - `runtime.switchSpeechBackend(to:)`
 - `runtime.reloadModels()`

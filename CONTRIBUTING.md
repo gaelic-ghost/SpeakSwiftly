@@ -380,6 +380,13 @@ sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Release
 ```
 
+Refresh the vendored MLX shader bundle after an `mlx-audio-swift` or `mlx-swift` upgrade:
+
+```bash
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Release
+sh scripts/repo-maintenance/update-vendored-mlx-bundle.sh
+```
+
 Opt-in real-model e2e coverage:
 
 ```bash
@@ -421,3 +428,5 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swi
 ```
 
 If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, the runtime was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime and launch through the published `run-speakswiftly` script or stable alias.
+
+The library target also vendors one copy of `mlx-swift_Cmlx.bundle` under `Sources/SpeakSwiftly/Resources` so linked consumers can resolve the packaged MLX bundle and metallib through `SpeakSwiftly.SupportResources`. Keep that vendored bundle in sync with the pinned MLX dependency by refreshing it from the published Release runtime whenever the MLX stack changes.
