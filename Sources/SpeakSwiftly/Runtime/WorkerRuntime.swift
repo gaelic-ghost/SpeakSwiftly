@@ -5,15 +5,21 @@ import TextForSpeech
 
 public extension SpeakSwiftly {
     actor Runtime {
+    // MARK: Environment
+
     private enum Environment {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
+
+    // MARK: Configuration
 
     enum PlaybackConfiguration {
         // Shorter chunk cadence gives playback a second chunk in reserve before
         // the first one drains, which reduces audible shudder from one-chunk starts.
         static let residentStreamingInterval = 0.18
     }
+
+    // MARK: Runtime State
 
     enum ResidentState: Sendable {
         case warming
@@ -183,6 +189,8 @@ public extension SpeakSwiftly {
     typealias LogValue = WorkerLogValue
     typealias LogEvent = WorkerLogEvent
 
+    // MARK: Stored Properties
+
     let dependencies: WorkerDependencies
     var speechBackend: SpeakSwiftly.SpeechBackend
     let encoder = JSONEncoder()
@@ -205,6 +213,7 @@ public extension SpeakSwiftly {
     var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
     var activeGenerations = [UUID: ActiveRequest]()
     var lastLoggedMarvisSchedulerState: String?
+
     // MARK: - Lifecycle
 
     init(

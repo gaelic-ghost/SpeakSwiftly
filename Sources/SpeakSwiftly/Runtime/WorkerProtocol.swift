@@ -263,6 +263,8 @@ struct RawWorkerRequest: Decodable, Sendable {
     }
 }
 
+// MARK: - Worker Request
+
 enum WorkerRequest: Sendable, Equatable {
     case queueSpeech(
         id: String,
@@ -1061,6 +1063,8 @@ enum WorkerRequest: Sendable, Equatable {
 // MARK: - Response Envelope
 
 public extension SpeakSwiftly {
+    // MARK: Status
+
     enum StatusStage: String, Codable, Sendable {
         case warmingResidentModel = "warming_resident_model"
         case residentModelReady = "resident_model_ready"
@@ -1125,6 +1129,8 @@ public extension SpeakSwiftly {
             self.speechBackend = speechBackend
         }
     }
+
+    // MARK: Request Events
 
     struct QueueSnapshot: Codable, Sendable, Equatable {
         public let queueType: String
@@ -1294,6 +1300,8 @@ public extension SpeakSwiftly {
         }
     }
 
+    // MARK: Runtime Overview
+
     struct PlaybackStateSnapshot: Codable, Sendable, Equatable {
         public let state: PlaybackState
         public let activeRequest: ActiveRequest?
@@ -1358,6 +1366,8 @@ public extension SpeakSwiftly {
         }
     }
 
+    // MARK: Queue Models
+
     struct ActiveRequest: Codable, Sendable, Equatable {
         public let id: String
         public let op: String
@@ -1396,6 +1406,8 @@ public extension SpeakSwiftly {
             self.queuePosition = queuePosition
         }
     }
+
+    // MARK: Failures
 
     struct Failure: Encodable, Sendable, Equatable {
         public let id: String
