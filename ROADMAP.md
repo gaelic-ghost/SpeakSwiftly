@@ -591,6 +591,33 @@ These findings came out of the latest live-service review pass and are duplicate
 - [x] Keep the README and roadmap aligned with the real implementation whenever playback semantics, shutdown behavior, or stderr instrumentation changes.
 - [x] Fix the current log structure drift, or adopt a real logging framework boundary, so operator output stays structured and readable end to end.
 - [x] Use the new playback metrics to decide whether the remaining wobble and pops are primarily starvation, schedule jitter, or chunk-boundary shaping problems before changing cadence again.
+- [ ] Tune the first drained-queue Marvis playback so it reaches a steadier audible startup without sacrificing the restored dual-lane generation model.
+- [ ] Use the new scheduler and playback observability to compare first-request startup reserve, rebuffer count, and schedule-gap behavior before and after each tuning pass.
+- [ ] Keep the restored dual-lane queued-live Marvis overlap semantics intact while adjusting only playback-buffer and cadence behavior.
+
+## Milestone 20: First-request Marvis playback tuning
+
+Scope:
+
+- [ ] Improve the first live Marvis playback in a drained queue without collapsing the restored dual-lane generation scheduler back into blanket serialization.
+- [ ] Keep playback tuning and scheduler correctness clearly separated so later regressions are easier to diagnose.
+- [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning pass.
+
+Tickets:
+
+- [ ] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
+- [ ] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before and after capture for each tuning change.
+- [ ] Revisit warmup startup, low-water, and resume thresholds specifically for the first active Marvis playback request.
+- [ ] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
+- [ ] Keep the `marvis_generation_scheduler_snapshot` and lane-reservation logs aligned with any playback-tuning changes so queue truth stays obvious.
+- [ ] Add or update regression coverage when a tuning change intentionally shifts logged threshold values or expected playback metrics.
+- [ ] Record subjective audible outcomes and objective stderr metrics together in the maintainer note after each meaningful tuning pass.
+
+Exit criteria:
+
+- [ ] The first drained-queue Marvis playback is measurably steadier than the current baseline.
+- [ ] The restored dual-lane queued-live Marvis overlap model remains intact and verified.
+- [ ] The repository has a documented before and after record for the tuning work that makes later regressions obvious.
 
 ## Pre-v1 Release Hardening
 

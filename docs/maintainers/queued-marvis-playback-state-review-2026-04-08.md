@@ -298,3 +298,35 @@ What still remains true:
 - the first live Marvis playback in a drained queue is still the most fragile audible path
 - playback-quality tuning and scheduler correctness are now separated much more cleanly
 - any remaining first-request roughness should now be treated as a playback-buffer and cadence-tuning problem, not as a reason to collapse the scheduler back into blanket serialization
+
+## 2026-04-09 Tuning Follow-up Scope
+
+The next pass should stay intentionally narrow:
+
+- preserve the restored dual-lane queued-live Marvis scheduler exactly as implemented
+- tune only first-request playback startup reserve, low-water behavior, resume behavior, and Marvis chunk cadence if needed
+- use the current playback and scheduler stderr metrics as the before and after record for each change
+
+The primary tuning questions are:
+
+- is the first-request roughness mostly startup-buffer sizing
+- is it mostly early low-water and resume behavior after playback begins
+- or is Marvis chunk cadence still too sparse during the first drained-queue request even with corrected warmup thresholds
+
+The preferred validation loop for each tuning pass is:
+
+1. rerun the queued-live Marvis E2E lane with the current scheduler
+2. capture subjective audible quality for the first, second, and third queued playback requests
+3. compare stderr metrics for:
+   - `startup_buffer_target_ms`
+   - `startup_buffered_audio_ms`
+   - `low_water_target_ms`
+   - `resume_buffer_target_ms`
+   - `rebuffer_event_count`
+   - `starvation_event_count`
+   - `min_queued_audio_ms`
+   - `max_queued_audio_ms`
+   - `avg_queued_audio_ms`
+4. confirm the scheduler still reports the same dual-lane overlap truth while tuning is in progress
+
+The tuning work should be considered successful only if the first drained-queue Marvis playback becomes measurably steadier without reverting to the old blanket serialization stopgap.
