@@ -22,7 +22,6 @@ extension SpeakSwiftly.Runtime {
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
             failRequestStream(for: job.request.id, error: cancellation)
-            requestAcceptedAt.removeValue(forKey: job.request.id)
             await logError(
                 cancellation.message,
                 requestID: job.request.id,
@@ -79,7 +78,6 @@ extension SpeakSwiftly.Runtime {
         case .active(let job):
             activeGenerations.removeValue(forKey: job.token)?.task.cancel()
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
-            requestAcceptedAt.removeValue(forKey: targetRequestID)
             failRequestStream(for: targetRequestID, error: cancellation)
             await logError(
                 cancellation.message,
@@ -91,7 +89,6 @@ extension SpeakSwiftly.Runtime {
             return targetRequestID
         case .queued(let job):
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
-            requestAcceptedAt.removeValue(forKey: targetRequestID)
             failRequestStream(for: targetRequestID, error: cancellation)
             await logError(
                 cancellation.message,
@@ -118,7 +115,6 @@ extension SpeakSwiftly.Runtime {
     ) async {
         job.generationTask = nil
         job.playbackTask = nil
-        requestAcceptedAt.removeValue(forKey: job.requestID)
         let request = WorkerRequest.queueSpeech(
             id: job.requestID,
             text: job.text,

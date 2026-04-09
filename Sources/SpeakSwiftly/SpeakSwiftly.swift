@@ -4,7 +4,11 @@ import TextForSpeech
 // MARK: - Public Library Streams
 
 public enum SpeakSwiftly {
+    // MARK: Names
+
     public typealias Name = String
+
+    // MARK: Internal Request Helpers
 
     enum SpeechJobType: Sendable, Equatable {
         case live
@@ -35,6 +39,35 @@ public enum SpeakSwiftly {
         case progress(ProgressEvent)
         case completed(Success)
     }
+
+    public enum RequestState: Sendable, Equatable {
+        case queued(QueuedEvent)
+        case acknowledged(Success)
+        case started(StartedEvent)
+        case progress(ProgressEvent)
+        case completed(Success)
+        case failed(Failure)
+        case cancelled(Failure)
+    }
+
+    public struct RequestUpdate: Sendable, Equatable {
+        public let id: String
+        public let sequence: Int
+        public let date: Date
+        public let state: RequestState
+    }
+
+    public struct RequestSnapshot: Sendable, Equatable {
+        public let id: String
+        public let operation: String
+        public let profileName: String?
+        public let acceptedAt: Date
+        public let lastUpdatedAt: Date
+        public let sequence: Int
+        public let state: RequestState
+    }
+
+    // MARK: Handles
 
     public struct RequestHandle: Sendable {
         public let id: String

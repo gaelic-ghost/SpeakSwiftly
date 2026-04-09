@@ -11,6 +11,11 @@ public extension SpeakSwiftly {
         static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
     }
 
+    enum RequestObservationConfiguration {
+        static let maxReplayUpdates = 16
+        static let maxRetainedTerminalRequests = 128
+    }
+
     // MARK: Configuration
 
     enum PlaybackConfiguration {
@@ -32,6 +37,54 @@ public extension SpeakSwiftly {
         let token: UUID
         let request: WorkerRequest
         let task: Task<Void, Never>
+    }
+
+    struct RequestBroker {
+        let id: String
+        let operation: String
+        let profileName: String?
+        let acceptedAt: Date
+        var lastUpdatedAt: Date
+        var sequence = 0
+        var latestState: SpeakSwiftly.RequestState?
+        var replayUpdates = [SpeakSwiftly.RequestUpdate]()
+        var subscriberContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error>.Continuation]()
+        var isTerminal = false
+
+        mutating func record(
+            state: SpeakSwiftly.RequestState,
+            date: Date,
+            maxReplayUpdates: Int
+        ) -> SpeakSwiftly.RequestUpdate {
+            sequence += 1
+            lastUpdatedAt = date
+            latestState = state
+
+            let update = SpeakSwiftly.RequestUpdate(
+                id: id,
+                sequence: sequence,
+                date: date,
+                state: state
+            )
+            replayUpdates.append(update)
+            if replayUpdates.count > maxReplayUpdates {
+                replayUpdates.removeFirst(replayUpdates.count - maxReplayUpdates)
+            }
+            return update
+        }
+
+        func snapshot() -> SpeakSwiftly.RequestSnapshot? {
+            guard let latestState else { return nil }
+            return SpeakSwiftly.RequestSnapshot(
+                id: id,
+                operation: operation,
+                profileName: profileName,
+                acceptedAt: acceptedAt,
+                lastUpdatedAt: lastUpdatedAt,
+                sequence: sequence,
+                state: latestState
+            )
+        }
     }
 
     enum GenerationParkReason: String, Sendable {
@@ -207,10 +260,10 @@ public extension SpeakSwiftly {
     var isShuttingDown = false
     var preloadTask: Task<Void, Never>?
     var residentPreloadToken: UUID?
-    var requestAcceptedAt = [String: Date]()
     var lastQueuedGenerationParkReason = [String: GenerationParkReason]()
     var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
-    var requestContinuations = [String: AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error>.Continuation]()
+    var requestBrokers = [String: RequestBroker]()
+    var terminalRequestBrokerOrder = [String]()
     var activeGenerations = [UUID: ActiveRequest]()
     var lastLoggedMarvisSchedulerState: String?
 
@@ -356,6 +409,7 @@ public extension SpeakSwiftly {
     }
 
     func submit(_ request: WorkerRequest) async -> WorkerRequestHandle {
+        ensureRequestBroker(for: request)
         let handle = makeRequestHandle(for: request)
         await submitRequest(request)
         return handle
@@ -474,7 +528,6 @@ public extension SpeakSwiftly {
         } catch let workerError as WorkerError {
             let id = bestEffortID(from: line)
             failRequestStream(for: id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: id)
             await emitFailure(id: id, error: workerError)
             return
         } catch {
@@ -484,7 +537,6 @@ public extension SpeakSwiftly {
                 message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)"
             )
             failRequestStream(for: id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: id)
             await emitFailure(
                 id: id,
                 error: workerError
@@ -492,13 +544,14 @@ public extension SpeakSwiftly {
             return
         }
 
+        ensureRequestBroker(for: request)
+
         if isShuttingDown {
             let workerError = WorkerError(
                 code: .workerShuttingDown,
                 message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down."
             )
             failRequestStream(for: request.id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(
                 id: request.id,
                 error: workerError
@@ -507,7 +560,6 @@ public extension SpeakSwiftly {
         }
 
         if request.isImmediateControlOperation {
-            requestAcceptedAt[request.id] = dependencies.now()
             await logRequestEvent(
                 "request_accepted",
                 requestID: request.id,
@@ -536,7 +588,6 @@ public extension SpeakSwiftly {
                 message: "Request '\(request.id)' cannot start because the resident model state is failed. Queue `reload_models` or `set_speech_backend` first, then retry the generation request."
             )
             failRequestStream(for: request.id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(id: request.id, error: workerError)
             return
         }
@@ -547,7 +598,6 @@ public extension SpeakSwiftly {
                 message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more."
             )
             failRequestStream(for: request.id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(id: request.id, error: workerError)
             return
         }
@@ -557,7 +607,6 @@ public extension SpeakSwiftly {
             queuedGenerationJob = try createQueuedGenerationJobIfNeeded(for: request)
         } catch let workerError as WorkerError {
             failRequestStream(for: request.id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(id: request.id, error: workerError)
             return
         } catch {
@@ -566,12 +615,10 @@ public extension SpeakSwiftly {
                 message: "Request '\(request.id)' could not create a persisted generation job record before queueing generation work. \(error.localizedDescription)"
             )
             failRequestStream(for: request.id, error: workerError)
-            requestAcceptedAt.removeValue(forKey: request.id)
             await emitFailure(id: request.id, error: workerError)
             return
         }
         let job = await generationController.enqueue(request)
-        requestAcceptedAt[request.id] = dependencies.now()
         await logRequestEvent(
             "request_accepted",
             requestID: request.id,
@@ -1870,7 +1917,6 @@ public extension SpeakSwiftly {
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: error)
             failRequestStream(for: job.request.id, error: error)
-            requestAcceptedAt.removeValue(forKey: job.request.id)
             await emitFailure(id: job.request.id, error: error)
         }
     }
@@ -1897,7 +1943,6 @@ public extension SpeakSwiftly {
         }
 
         recordGenerationDispositionIfNeeded(for: request, disposition: finalDisposition)
-        defer { requestAcceptedAt.removeValue(forKey: request.id) }
         switch finalDisposition {
         case .requestCompleted(let result):
             await completeRequest(request: request, result: result)
@@ -1911,7 +1956,6 @@ public extension SpeakSwiftly {
     }
 
     private func finishImmediateRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
-        defer { requestAcceptedAt.removeValue(forKey: request.id) }
         await completeRequest(request: request, result: result)
     }
 

@@ -260,6 +260,14 @@ import TextForSpeech
     let overview: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.overview()
     }
+    let requestSnapshot: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestSnapshot? = { runtime, requestID in
+        await runtime.request(id: requestID)
+    }
+    let updates: @Sendable (SpeakSwiftly.Runtime, String) async -> AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error> = {
+        runtime,
+        requestID in
+        await runtime.updates(for: requestID)
+    }
     let switchSpeechBackend: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         speechBackend in
@@ -331,6 +339,8 @@ import TextForSpeech
     _ = generationQueue
     _ = status
     _ = overview
+    _ = requestSnapshot
+    _ = updates
     _ = switchSpeechBackend
     _ = reloadModels
     _ = unloadModels
@@ -351,6 +361,32 @@ import TextForSpeech
     _ = operation
     _ = profileName
     _ = events
+}
+
+@Test func publicRequestObservationSurfaceExposesStableMetadata() {
+    let updateID: KeyPath<SpeakSwiftly.RequestUpdate, String> = \.id
+    let updateSequence: KeyPath<SpeakSwiftly.RequestUpdate, Int> = \.sequence
+    let updateDate: KeyPath<SpeakSwiftly.RequestUpdate, Date> = \.date
+    let updateState: KeyPath<SpeakSwiftly.RequestUpdate, SpeakSwiftly.RequestState> = \.state
+    let snapshotID: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.id
+    let snapshotOperation: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.operation
+    let snapshotProfileName: KeyPath<SpeakSwiftly.RequestSnapshot, String?> = \.profileName
+    let snapshotAcceptedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.acceptedAt
+    let snapshotLastUpdatedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.lastUpdatedAt
+    let snapshotSequence: KeyPath<SpeakSwiftly.RequestSnapshot, Int> = \.sequence
+    let snapshotState: KeyPath<SpeakSwiftly.RequestSnapshot, SpeakSwiftly.RequestState> = \.state
+
+    _ = updateID
+    _ = updateSequence
+    _ = updateDate
+    _ = updateState
+    _ = snapshotID
+    _ = snapshotOperation
+    _ = snapshotProfileName
+    _ = snapshotAcceptedAt
+    _ = snapshotLastUpdatedAt
+    _ = snapshotSequence
+    _ = snapshotState
 }
 
 @Test func publicGeneratedFileSurfaceExposesStableMetadata() {

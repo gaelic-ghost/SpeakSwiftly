@@ -1441,6 +1441,232 @@ private actor BackendLoadRecorder {
     #expect(sawCompleted)
 }
 
+@Test func requestObservationReturnsNilAndFinishedStreamForUnknownRequestID() async throws {
+    let runtime = try await makeRuntime(
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+
+    #expect(await runtime.request(id: "missing-request") == nil)
+
+    let updates = await runtime.updates(for: "missing-request")
+    var iterator = updates.makeAsyncIterator()
+    let first = try await iterator.next()
+    #expect(first == nil)
+}
+
+@Test func requestObservationReplaysQueuedStateAndFansOutToMultipleSubscribers() async throws {
+    let output = OutputRecorder()
+    let preloadGate = AsyncGate()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in
+            await preloadGate.wait()
+            return makeResidentModel()
+        }
+    )
+
+    await runtime.start()
+
+    let handle = await runtime.submit(.listProfiles(id: "req-late"))
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-late"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_resident_model"
+        }
+    })
+
+    let snapshot = await runtime.request(id: "req-late")
+    #expect(snapshot?.id == "req-late")
+    #expect(snapshot?.operation == "list_voice_profiles")
+    #expect(snapshot?.sequence == 1)
+    if let snapshot {
+        switch snapshot.state {
+        case .queued(let queued):
+            #expect(queued == WorkerQueuedEvent(id: "req-late", reason: .waitingForResidentModel, queuePosition: 1))
+        default:
+            Issue.record("Expected queued state in the late-attach snapshot, got \(snapshot.state)")
+        }
+        #expect(snapshot.acceptedAt <= snapshot.lastUpdatedAt)
+    }
+
+    let updatesA = await runtime.updates(for: "req-late")
+    let updatesB = await runtime.updates(for: "req-late")
+    var iteratorA = updatesA.makeAsyncIterator()
+    var iteratorB = updatesB.makeAsyncIterator()
+
+    let replayA = try await iteratorA.next()
+    let replayB = try await iteratorB.next()
+    #expect(replayA?.sequence == 1)
+    #expect(replayB?.sequence == 1)
+    if case .queued(let queuedA)? = replayA?.state {
+        #expect(queuedA.reason == .waitingForResidentModel)
+    } else {
+        Issue.record("Expected subscriber A to replay a queued update first.")
+    }
+    if case .queued(let queuedB)? = replayB?.state {
+        #expect(queuedB.reason == .waitingForResidentModel)
+    } else {
+        Issue.record("Expected subscriber B to replay a queued update first.")
+    }
+
+    await preloadGate.open()
+
+    let startedA = try await iteratorA.next()
+    let startedB = try await iteratorB.next()
+    #expect(startedA?.sequence == 2)
+    #expect(startedB?.sequence == 2)
+    if case .started(let eventA)? = startedA?.state {
+        #expect(eventA == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+    } else {
+        Issue.record("Expected subscriber A to receive a started update second.")
+    }
+    if case .started(let eventB)? = startedB?.state {
+        #expect(eventB == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+    } else {
+        Issue.record("Expected subscriber B to receive a started update second.")
+    }
+
+    let completedA = try await iteratorA.next()
+    let completedB = try await iteratorB.next()
+    #expect(completedA?.sequence == 3)
+    #expect(completedB?.sequence == 3)
+    if case .completed(let successA)? = completedA?.state {
+        #expect(successA.id == "req-late")
+    } else {
+        Issue.record("Expected subscriber A to receive a completed update third.")
+    }
+    if case .completed(let successB)? = completedB?.state {
+        #expect(successB.id == "req-late")
+    } else {
+        Issue.record("Expected subscriber B to receive a completed update third.")
+    }
+
+    #expect(try await iteratorA.next() == nil)
+    #expect(try await iteratorB.next() == nil)
+
+    var handleIterator = handle.events.makeAsyncIterator()
+    let handleQueued = try await handleIterator.next()
+    let handleStarted = try await handleIterator.next()
+    let handleCompleted = try await handleIterator.next()
+    if case .queued(let queued)? = handleQueued {
+        #expect(queued == WorkerQueuedEvent(id: "req-late", reason: .waitingForResidentModel, queuePosition: 1))
+    } else {
+        Issue.record("Expected the original handle stream to retain the queued event history.")
+    }
+    if case .started(let started)? = handleStarted {
+        #expect(started == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+    } else {
+        Issue.record("Expected the original handle stream to retain the started event history.")
+    }
+    if case .completed(let success)? = handleCompleted {
+        #expect(success.id == "req-late")
+    } else {
+        Issue.record("Expected the original handle stream to retain the completed event history.")
+    }
+    #expect(try await handleIterator.next() == nil)
+
+    let completedSnapshot = await runtime.request(id: "req-late")
+    #expect(completedSnapshot?.sequence == 3)
+    if case .completed(let success)? = completedSnapshot?.state {
+        #expect(success.id == "req-late")
+    } else {
+        Issue.record("Expected the retained request snapshot to stay completed after terminal success.")
+    }
+}
+
+@Test func requestObservationReportsCancellationAsDataWhileHandleStreamStillThrows() async throws {
+    let output = OutputRecorder()
+    let profileGate = AsyncGate()
+
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.voices.create(design: "bright-guide",
+        from: "Hello there",
+        voice: "Warm and bright"
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "started"
+                && $0["op"] as? String == "create_voice_profile_from_description"
+        }
+    })
+
+    let queuedHandle = await runtime.submit(.listProfiles(id: "req-cancelled"))
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-cancelled"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+        }
+    })
+
+    let updates = await runtime.updates(for: "req-cancelled")
+    var updatesIterator = updates.makeAsyncIterator()
+    if case .queued(let queued)? = try await updatesIterator.next()?.state {
+        #expect(queued == WorkerQueuedEvent(id: "req-cancelled", reason: .waitingForActiveRequest, queuePosition: 1))
+    } else {
+        Issue.record("Expected the reconnecting observer to replay the queued state first.")
+    }
+
+    let cancelID = await runtime.player.cancelRequest("req-cancelled").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == cancelID
+                && $0["ok"] as? Bool == true
+                && $0["cancelled_request_id"] as? String == "req-cancelled"
+        }
+    })
+
+    let cancelledUpdate = try await updatesIterator.next()
+    if case .cancelled(let failure)? = cancelledUpdate?.state {
+        #expect(failure.id == "req-cancelled")
+        #expect(failure.code == .requestCancelled)
+    } else {
+        Issue.record("Expected the reconnecting observer to receive cancellation as data.")
+    }
+    #expect(try await updatesIterator.next() == nil)
+
+    let cancelledSnapshot = await runtime.request(id: "req-cancelled")
+    if case .cancelled(let failure)? = cancelledSnapshot?.state {
+        #expect(failure.code == .requestCancelled)
+    } else {
+        Issue.record("Expected the retained request snapshot to stay cancelled after terminal failure.")
+    }
+
+    var handleIterator = queuedHandle.events.makeAsyncIterator()
+    do {
+        while let _ = try await handleIterator.next() {}
+        Issue.record("The original RequestHandle stream should still throw on cancellation for compatibility.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
+    await profileGate.open()
+}
+
 @Test func speakLiveUsesStableResidentGenerationParameters() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

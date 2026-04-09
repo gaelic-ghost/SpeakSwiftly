@@ -39,7 +39,6 @@ extension SpeakSwiftly.Runtime {
                 cancelledRequestID: payload.cancelledRequestID
             )
             yieldRequestEvent(.completed(success), for: request.id)
-            finishRequestStream(for: request.id)
             if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
                 await emit(success)
             }
@@ -578,38 +577,186 @@ extension SpeakSwiftly.Runtime {
     }
 
     func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
-        let requestID = request.id
-        let events = AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> { continuation in
-            requestContinuations[requestID] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task {
-                    await self?.removeRequestContinuation(for: requestID)
-                }
+        return WorkerRequestHandle(
+            id: request.id,
+            operation: request.opName,
+            profileName: request.profileName,
+            events: makeLegacyRequestEventStream(for: request.id)
+        )
+    }
+
+    func ensureRequestBroker(for request: WorkerRequest) {
+        if requestBrokers[request.id]?.isTerminal == true {
+            terminalRequestBrokerOrder.removeAll { $0 == request.id }
+            requestBrokers.removeValue(forKey: request.id)
+        }
+        guard requestBrokers[request.id] == nil else { return }
+
+        let acceptedAt = dependencies.now()
+        requestBrokers[request.id] = RequestBroker(
+            id: request.id,
+            operation: request.opName,
+            profileName: request.profileName,
+            acceptedAt: acceptedAt,
+            lastUpdatedAt: acceptedAt
+        )
+    }
+
+    func requestSnapshot(for requestID: String) -> SpeakSwiftly.RequestSnapshot? {
+        requestBrokers[requestID]?.snapshot()
+    }
+
+    func makeRequestUpdateStream(
+        for requestID: String,
+        replayBuffered: Bool = true
+    ) -> AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error> {
+        guard let broker = requestBrokers[requestID] else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish()
             }
         }
 
-        return WorkerRequestHandle(
-            id: requestID,
-            operation: request.opName,
-            profileName: request.profileName,
-            events: events
-        )
+        let subscriberID = UUID()
+        let replayUpdates = replayBuffered ? broker.replayUpdates : []
+        let isTerminal = broker.isTerminal
+
+        return AsyncThrowingStream { continuation in
+            replayUpdates.forEach { continuation.yield($0) }
+
+            guard !isTerminal, requestBrokers[requestID] != nil else {
+                continuation.finish()
+                return
+            }
+
+            requestBrokers[requestID]?.subscriberContinuations[subscriberID] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeRequestUpdateSubscriber(subscriberID, for: requestID)
+                }
+            }
+        }
+    }
+
+    func makeLegacyRequestEventStream(
+        for requestID: String
+    ) -> AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> {
+        let updates = makeRequestUpdateStream(for: requestID, replayBuffered: false)
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await update in updates {
+                        switch update.state {
+                        case .queued(let event):
+                            continuation.yield(.queued(event))
+                        case .acknowledged(let success):
+                            continuation.yield(.acknowledged(success))
+                        case .started(let event):
+                            continuation.yield(.started(event))
+                        case .progress(let event):
+                            continuation.yield(.progress(event))
+                        case .completed(let success):
+                            continuation.yield(.completed(success))
+                        case .failed(let failure), .cancelled(let failure):
+                            continuation.finish(
+                                throwing: WorkerError(code: failure.code, message: failure.message)
+                            )
+                            return
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
     }
 
     func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {
-        requestContinuations[requestID]?.yield(event)
-    }
+        let state: SpeakSwiftly.RequestState
+        switch event {
+        case .queued(let queuedEvent):
+            state = .queued(queuedEvent)
+        case .acknowledged(let success):
+            state = .acknowledged(success)
+        case .started(let startedEvent):
+            state = .started(startedEvent)
+        case .progress(let progressEvent):
+            state = .progress(progressEvent)
+        case .completed(let success):
+            state = .completed(success)
+        }
 
-    func finishRequestStream(for requestID: String) {
-        requestContinuations[requestID]?.finish()
-        requestContinuations.removeValue(forKey: requestID)
+        recordRequestState(
+            state,
+            for: requestID,
+            terminal: {
+                if case .completed = state { return true }
+                return false
+            }()
+        )
     }
 
     func failRequestStream(for requestID: String, error: WorkerError) {
-        requestContinuations[requestID]?.finish(
-            throwing: WorkerError(code: error.code, message: error.message)
+        let failure = WorkerFailureResponse(
+            id: requestID,
+            code: error.code,
+            message: error.message
         )
-        requestContinuations.removeValue(forKey: requestID)
+        let state: SpeakSwiftly.RequestState =
+            error.code == .requestCancelled ? .cancelled(failure) : .failed(failure)
+        recordRequestState(state, for: requestID, terminal: true)
+    }
+
+    func recordRequestState(
+        _ state: SpeakSwiftly.RequestState,
+        for requestID: String,
+        terminal: Bool
+    ) {
+        guard var broker = requestBrokers[requestID] else { return }
+
+        let update = broker.record(
+            state: state,
+            date: dependencies.now(),
+            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates
+        )
+        let continuations = Array(broker.subscriberContinuations.values)
+
+        if terminal {
+            broker.isTerminal = true
+            broker.subscriberContinuations.removeAll()
+        }
+
+        requestBrokers[requestID] = broker
+
+        continuations.forEach { continuation in
+            continuation.yield(update)
+            if terminal {
+                continuation.finish()
+            }
+        }
+
+        if terminal {
+            retainTerminalRequestBrokerIfNeeded(for: requestID)
+        }
+    }
+
+    func retainTerminalRequestBrokerIfNeeded(for requestID: String) {
+        guard requestBrokers[requestID]?.isTerminal == true else { return }
+        terminalRequestBrokerOrder.removeAll { $0 == requestID }
+        terminalRequestBrokerOrder.append(requestID)
+
+        while terminalRequestBrokerOrder.count > RequestObservationConfiguration.maxRetainedTerminalRequests {
+            let evictedRequestID = terminalRequestBrokerOrder.removeFirst()
+            requestBrokers.removeValue(forKey: evictedRequestID)
+        }
+    }
+
+    func removeRequestUpdateSubscriber(_ subscriberID: UUID, for requestID: String) {
+        requestBrokers[requestID]?.subscriberContinuations.removeValue(forKey: subscriberID)
     }
 
     func broadcastStatus(_ status: WorkerStatusEvent) {
@@ -663,10 +810,6 @@ extension SpeakSwiftly.Runtime {
 
     func removeStatusContinuation(_ id: UUID) {
         statusContinuations.removeValue(forKey: id)
-    }
-
-    func removeRequestContinuation(for requestID: String) {
-        requestContinuations.removeValue(forKey: requestID)
     }
 
     func logError(
@@ -777,7 +920,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func elapsedMS(for requestID: String) -> Int? {
-        guard let startedAt = requestAcceptedAt[requestID] else { return nil }
+        guard let startedAt = requestBrokers[requestID]?.acceptedAt else { return nil }
         return elapsedMS(since: startedAt)
     }
 
