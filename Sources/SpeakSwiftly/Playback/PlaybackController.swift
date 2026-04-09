@@ -919,9 +919,21 @@ actor PlaybackController {
         let task: Task<Void, Never>
     }
 
+    struct ConcurrencySnapshot: Sendable, Equatable {
+        let activeRequestID: String?
+        let isStableForConcurrentGeneration: Bool
+        let stableBufferedAudioMS: Int?
+        let stableBufferTargetMS: Int?
+        let isRebuffering: Bool
+    }
+
     private let driver: AnyPlaybackController
     private var hooks: PlaybackHooks?
     private var activePlayback: ActivePlayback?
+    private var activePlaybackIsStableForConcurrentGeneration = false
+    private var activePlaybackStableBufferedAudioMS: Int?
+    private var activePlaybackStableBufferTargetMS: Int?
+    private var activePlaybackIsRebuffering = false
     private var jobs = [String: PlaybackJob]()
     private var queue = [String]()
 
@@ -984,6 +996,16 @@ actor PlaybackController {
     func activeRequestSummary() -> ActiveWorkerRequestSummary? {
         guard let requestID = activePlayback?.requestID, let job = jobs[requestID] else { return nil }
         return ActiveWorkerRequestSummary(id: requestID, op: job.op, profileName: job.profileName)
+    }
+
+    func concurrencySnapshot() -> ConcurrencySnapshot {
+        ConcurrencySnapshot(
+            activeRequestID: activePlayback?.requestID,
+            isStableForConcurrentGeneration: activePlaybackIsStableForConcurrentGeneration,
+            stableBufferedAudioMS: activePlaybackStableBufferedAudioMS,
+            stableBufferTargetMS: activePlaybackStableBufferTargetMS,
+            isRebuffering: activePlaybackIsRebuffering
+        )
     }
 
     func hasActivePlayback() -> Bool {
@@ -1088,6 +1110,10 @@ actor PlaybackController {
             await self.runPlayback(for: job, sampleRate: sampleRate, hooks: hooks)
         }
         activePlayback = ActivePlayback(requestID: requestID, task: task)
+        activePlaybackIsStableForConcurrentGeneration = false
+        activePlaybackStableBufferedAudioMS = nil
+        activePlaybackStableBufferTargetMS = nil
+        activePlaybackIsRebuffering = false
         job.playbackTask = task
     }
 
@@ -1104,6 +1130,7 @@ actor PlaybackController {
                 text: job.normalizedText,
                 stream: job.stream
             ) { event in
+                await self.recordConcurrencyEvent(event, for: job.requestID)
                 await hooks.handleEvent(event, job)
             }
             await hooks.logFinished(job, playbackSummary, sampleRate)
@@ -1137,6 +1164,10 @@ actor PlaybackController {
         guard activePlayback?.requestID == requestID else { return }
 
         activePlayback = nil
+        activePlaybackIsStableForConcurrentGeneration = false
+        activePlaybackStableBufferedAudioMS = nil
+        activePlaybackStableBufferTargetMS = nil
+        activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
         guard let job = jobs.removeValue(forKey: requestID) else {
@@ -1148,6 +1179,39 @@ actor PlaybackController {
         job.playbackTask = nil
         await hooks.completeJob(job, result)
         await hooks.resumeQueue()
+    }
+
+    private func recordConcurrencyEvent(_ event: PlaybackEvent, for requestID: String) {
+        guard activePlayback?.requestID == requestID else { return }
+
+        switch event {
+        case .prerollReady(let startupBufferedAudioMS, let thresholds):
+            activePlaybackIsStableForConcurrentGeneration = true
+            activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
+            activePlaybackStableBufferTargetMS = thresholds.startupBufferTargetMS
+            activePlaybackIsRebuffering = false
+        case .rebufferStarted:
+            activePlaybackIsStableForConcurrentGeneration = false
+            activePlaybackIsRebuffering = true
+        case .rebufferResumed(let bufferedAudioMS, let thresholds):
+            activePlaybackIsStableForConcurrentGeneration = true
+            activePlaybackStableBufferedAudioMS = bufferedAudioMS
+            activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
+            activePlaybackIsRebuffering = false
+        case .starved:
+            activePlaybackIsStableForConcurrentGeneration = false
+            activePlaybackIsRebuffering = true
+        case .firstChunk,
+             .queueDepthLow,
+             .chunkGapWarning,
+             .scheduleGapWarning,
+             .rebufferThrashWarning,
+             .outputDeviceChanged,
+             .engineConfigurationChanged,
+             .bufferShapeSummary,
+             .trace:
+            break
+        }
     }
 }
 

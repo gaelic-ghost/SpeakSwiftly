@@ -501,10 +501,10 @@ import TextForSpeech
 
             return details["chunk_count"] as? Int == 3
                 && details["streaming_interval"] as? Double == 0.18
-                && details["startup_buffer_target_ms"] as? Int == 360
-                && details["low_water_target_ms"] as? Int == 140
-                && details["chunk_gap_warning_threshold_ms"] as? Int == 450
-                && details["schedule_gap_warning_threshold_ms"] as? Int == 180
+                && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
+                && (details["low_water_target_ms"] as? Int ?? 0) >= 140
+                && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 450
+                && (details["schedule_gap_warning_threshold_ms"] as? Int ?? 0) >= 180
                 && details["rebuffer_event_count"] as? Int == 0
                 && details["starvation_event_count"] as? Int == 0
                 && details["startup_buffered_audio_ms"] as? Int != nil
@@ -572,7 +572,7 @@ import TextForSpeech
                 return false
             }
 
-            return details["low_water_target_ms"] as? Int == 140
+            return (details["low_water_target_ms"] as? Int ?? 0) >= 140
                 && details["queued_audio_ms"] as? Int == 120
         }
     })

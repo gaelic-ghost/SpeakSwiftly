@@ -319,22 +319,49 @@ extension SpeakSwiftlyE2ETests {
                 )
             }
 
-            let queuedLiveIDs = Set<String>(
-                worker.stdoutObjects().compactMap { object in
-                    guard
-                        object["event"] as? String == "queued",
-                        object["reason"] as? String == "waiting_for_active_request",
-                        let id = object["id"] as? String
-                    else {
-                        return nil
-                    }
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == lanes[0].liveID
+                    && $0["event"] as? String == "progress"
+                    && $0["stage"] as? String == "preroll_ready"
+            } != nil)
+            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                $0["id"] as? String == lanes[1].liveID
+                    && $0["event"] as? String == "started"
+            } != nil)
 
-                    return id
+            let req1PrerollReadyIndex = worker.stdoutObjects().firstIndex { object in
+                object["id"] as? String == lanes[0].liveID
+                    && object["event"] as? String == "progress"
+                    && object["stage"] as? String == "preroll_ready"
+            }
+            let req2StartedIndex = worker.stdoutObjects().firstIndex { object in
+                object["id"] as? String == lanes[1].liveID
+                    && object["event"] as? String == "started"
+            }
+
+            #expect(req1PrerollReadyIndex != nil)
+            #expect(req2StartedIndex != nil)
+            if let req1PrerollReadyIndex, let req2StartedIndex {
+                #expect(req1PrerollReadyIndex < req2StartedIndex)
+            }
+
+            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "marvis_generation_scheduler_snapshot",
+                    let details = $0["details"] as? [String: Any],
+                    let activeGenerationRequestIDs = details["active_generation_request_ids"] as? String,
+                    let activeMarvisGenerationLanes = details["active_marvis_generation_lanes"] as? String,
+                    let parkedGenerationReasons = details["parked_generation_reasons"] as? String
+                else {
+                    return false
                 }
-            )
 
-            #expect(queuedLiveIDs.contains(lanes[1].liveID) || queuedLiveIDs.contains(lanes[2].liveID))
-            #expect(!queuedLiveIDs.isEmpty)
+                return activeGenerationRequestIDs.contains(lanes[0].liveID)
+                    && activeGenerationRequestIDs.contains(lanes[1].liveID)
+                    && activeMarvisGenerationLanes.contains("\(lanes[0].liveID):\(lanes[0].expectedVoice)")
+                    && activeMarvisGenerationLanes.contains("\(lanes[1].liveID):\(lanes[1].expectedVoice)")
+                    && parkedGenerationReasons.contains("\(lanes[2].liveID):waiting_for_marvis_generation_lane")
+            } != nil)
 
             for lane in lanes {
                 _ = try await SpeakSwiftlyE2ETests.awaitAudibleSpeechCompletion(

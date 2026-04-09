@@ -8,7 +8,7 @@ extension SpeakSwiftly.Runtime {
     func clearQueuedRequests(cancelledByRequestID: String, reason: String) async -> Int {
         let queuedJobs = await generationController.clearQueued()
         let activePlaybackRequestID = await playbackController.activeRequestSummary()?.id
-        let protectedRequestIDs = Set([activeGeneration?.request.id, activePlaybackRequestID].compactMap { $0 })
+        let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
         let waitingPlaybackJobs = await playbackController.clearQueued(excluding: protectedRequestIDs)
 
         let cancellation = WorkerError(
@@ -48,7 +48,7 @@ extension SpeakSwiftly.Runtime {
 
     func failWaitingPlaybackRequests(with error: WorkerError) async {
         let activePlaybackRequestID = await playbackController.activeRequestSummary()?.id
-        let protectedRequestIDs = Set([activeGeneration?.request.id, activePlaybackRequestID].compactMap { $0 })
+        let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
         let waitingPlaybackJobs = await playbackController.clearQueued(excluding: protectedRequestIDs)
 
         for job in waitingPlaybackJobs {
@@ -77,8 +77,7 @@ extension SpeakSwiftly.Runtime {
 
         switch cancelledGenerationTarget {
         case .active(let job):
-            activeGeneration?.task.cancel()
-            activeGeneration = nil
+            activeGenerations.removeValue(forKey: job.token)?.task.cancel()
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
             requestAcceptedAt.removeValue(forKey: targetRequestID)
             failRequestStream(for: targetRequestID, error: cancellation)
@@ -171,6 +170,7 @@ extension SpeakSwiftly.Runtime {
                 .merging(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
                 .merging(memoryDetails(), uniquingKeysWith: { _, new in new })
             )
+            try? await startNextGenerationIfPossible()
         case .queueDepthLow(let queuedAudioMS):
             await logRequestEvent(
                 "playback_queue_depth_low",
@@ -202,6 +202,7 @@ extension SpeakSwiftly.Runtime {
                     "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
                 ]
             )
+            try? await startNextGenerationIfPossible()
         case .chunkGapWarning(let gapMS, let chunkIndex):
             await logRequestEvent(
                 "playback_chunk_gap_warning",

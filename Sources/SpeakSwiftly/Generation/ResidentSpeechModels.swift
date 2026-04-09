@@ -5,6 +5,15 @@ import Foundation
 enum MarvisResidentVoice: String, Sendable, Equatable {
     case conversationalA = "conversational_a"
     case conversationalB = "conversational_b"
+
+    static func forVibe(_ vibe: SpeakSwiftly.Vibe) -> MarvisResidentVoice {
+        switch vibe {
+        case .femme, .androgenous:
+            .conversationalA
+        case .masc:
+            .conversationalB
+        }
+    }
 }
 
 struct MarvisResidentModels: Sendable {
@@ -12,10 +21,10 @@ struct MarvisResidentModels: Sendable {
     let conversationalB: AnySpeechModel
 
     func model(for vibe: SpeakSwiftly.Vibe) -> (model: AnySpeechModel, voice: MarvisResidentVoice) {
-        switch vibe {
-        case .femme, .androgenous:
+        switch MarvisResidentVoice.forVibe(vibe) {
+        case .conversationalA:
             (conversationalA, .conversationalA)
-        case .masc:
+        case .conversationalB:
             (conversationalB, .conversationalB)
         }
     }

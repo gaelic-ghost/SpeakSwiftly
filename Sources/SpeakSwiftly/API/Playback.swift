@@ -60,8 +60,10 @@ public extension SpeakSwiftly.Runtime {
             message: "The request was cancelled because the SpeakSwiftly worker is shutting down."
         )
 
-        if let activeGeneration {
+        for activeGeneration in activeGenerations.values {
             activeGeneration.task.cancel()
+        }
+        for activeGeneration in activeGenerations.values {
             await activeGeneration.task.value
         }
 

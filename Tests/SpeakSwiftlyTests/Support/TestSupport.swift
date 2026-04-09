@@ -82,6 +82,36 @@ final class OutputRecorder: @unchecked Sendable {
         }
     }
 
+    func stdoutJSONObjects() -> [[String: Any]] {
+        lock.withLock {
+            stdoutLines.compactMap { line in
+                try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+            }
+        }
+    }
+
+    func stderrJSONObjects() -> [[String: Any]] {
+        lock.withLock {
+            stderrLines.compactMap { line in
+                try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+            }
+        }
+    }
+
+    func firstStdoutJSONObjectIndex(_ predicate: ([String: Any]) -> Bool) -> Int? {
+        lock.withLock {
+            stdoutLines.firstIndex { line in
+                guard
+                    let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+                else {
+                    return false
+                }
+
+                return predicate(object)
+            }
+        }
+    }
+
     func startedEvents() -> [String] {
         lock.withLock {
             stdoutLines.compactMap { line in

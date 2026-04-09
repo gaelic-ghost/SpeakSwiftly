@@ -370,9 +370,11 @@ import TextForSpeech
     let residentState: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.ResidentModelState> = \.residentState
     let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
     let successSpeechBackend: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.SpeechBackend?> = \.speechBackend
+    let successActiveRequests: KeyPath<SpeakSwiftly.Success, [SpeakSwiftly.ActiveRequest]?> = \.activeRequests
 
     _ = speechBackend
     _ = residentState
     _ = successStatus
     _ = successSpeechBackend
+    _ = successActiveRequests
 }

@@ -1090,6 +1090,8 @@ public extension SpeakSwiftly {
         case waitingForResidentModel = "waiting_for_resident_model"
         case waitingForResidentModels = "waiting_for_resident_models"
         case waitingForActiveRequest = "waiting_for_active_request"
+        case waitingForPlaybackStability = "waiting_for_playback_stability"
+        case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
     }
 
     struct StatusEvent: Encodable, Sendable, Equatable {
@@ -1170,6 +1172,7 @@ public extension SpeakSwiftly {
         public let textProfiles: [TextForSpeech.Profile]?
         public let textProfilePath: String?
         public let activeRequest: ActiveRequest?
+        public let activeRequests: [ActiveRequest]?
         public let queue: [QueuedRequest]?
         public let playbackState: PlaybackStateSnapshot?
         public let status: StatusEvent?
@@ -1193,6 +1196,7 @@ public extension SpeakSwiftly {
             case textProfiles = "text_profiles"
             case textProfilePath = "text_profile_path"
             case activeRequest = "active_request"
+            case activeRequests = "active_requests"
             case queue
             case playbackState = "playback_state"
             case status
@@ -1216,6 +1220,7 @@ public extension SpeakSwiftly {
             textProfiles: [TextForSpeech.Profile]? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveRequest? = nil,
+            activeRequests: [ActiveRequest]? = nil,
             queue: [QueuedRequest]? = nil,
             playbackState: PlaybackStateSnapshot? = nil,
             status: StatusEvent? = nil,
@@ -1237,6 +1242,7 @@ public extension SpeakSwiftly {
             self.textProfiles = textProfiles
             self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
+            self.activeRequests = activeRequests
             self.queue = queue
             self.playbackState = playbackState
             self.status = status

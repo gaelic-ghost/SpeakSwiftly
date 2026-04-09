@@ -451,6 +451,10 @@ import TextForSpeech
             profilePath: "/tmp/default-femme",
             profiles: nil,
             activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+            activeRequests: [
+                SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "queue_speech_live", profileName: "default-masc"),
+            ],
             queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_voice_profiles", profileName: nil, queuePosition: 1)],
             status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,
@@ -462,6 +466,7 @@ import TextForSpeech
     #expect(success["profile_name"] as? String == "default-femme")
     #expect(success["profile_path"] as? String == "/tmp/default-femme")
     #expect((success["active_request"] as? [String: Any])?["id"] as? String == "req-active")
+    #expect((success["active_requests"] as? [[String: Any]])?.count == 2)
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
     #expect((success["status"] as? [String: Any])?["resident_state"] as? String == "ready")
     #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3")

@@ -5,6 +5,7 @@ import TextForSpeech
 
 extension SpeakSwiftly.Runtime {
     func completeRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
+        lastQueuedGenerationParkReason.removeValue(forKey: request.id)
         switch result {
         case .success(let payload):
             await logRequestEvent(
@@ -28,6 +29,7 @@ extension SpeakSwiftly.Runtime {
                 textProfiles: payload.textProfiles,
                 textProfilePath: payload.textProfilePath,
                 activeRequest: payload.activeRequest,
+                activeRequests: payload.activeRequests,
                 queue: payload.queue,
                 playbackState: payload.playbackState,
                 status: payload.status,
@@ -67,54 +69,63 @@ extension SpeakSwiftly.Runtime {
     }
 
     func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
-        let reason: WorkerQueuedReason
-        let hasActiveGeneration = await generationController.activeJob() != nil
-        let waitsForActivePlayback = await queuedRequestWaitsForActivePlayback(job.request)
-        switch residentState {
-        case .warming:
-            reason = .waitingForResidentModel
-        case .unloaded:
-            if job.request.requiresResidentModels {
-                reason = .waitingForResidentModels
-            } else {
-                guard hasActiveGeneration || waitsForActivePlayback else { return nil }
-                reason = .waitingForActiveRequest
-            }
-        case .failed:
+        let activeJobs = await generationController.activeJobsOrdered()
+        let queuedJobs = await generationController.queuedJobsOrdered()
+        let playbackSnapshot = await playbackController.concurrencySnapshot()
+        let decision = try? evaluateGenerationSchedule(
+            activeJobs: activeJobs,
+            queuedJobs: queuedJobs,
+            playbackSnapshot: playbackSnapshot
+        )
+        guard let reason = decision?.parkReasons[job.token] else {
             return nil
-        case .ready:
-            guard hasActiveGeneration || waitsForActivePlayback else { return nil }
-            reason = .waitingForActiveRequest
         }
 
         let queuePosition = await generationController.waitingPosition(
             for: job.token,
             residentReady: isResidentReady
         ) ?? 1
-        return WorkerQueuedEvent(id: job.request.id, reason: reason, queuePosition: queuePosition)
+        return WorkerQueuedEvent(
+            id: job.request.id,
+            reason: queuedReason(for: reason),
+            queuePosition: queuePosition
+        )
     }
 
-    private func queuedRequestWaitsForActivePlayback(_ request: WorkerRequest) async -> Bool {
-        let hasActivePlayback = await playbackController.hasActivePlayback()
-        guard hasActivePlayback else { return false }
-        if request.requiresPlaybackDrainBeforeStart {
-            return true
+    func syncQueuedGenerationParkReasons(
+        queuedJobs: [GenerationController.Job],
+        parkReasons: [UUID: GenerationParkReason]
+    ) async {
+        var queuedRequestIDs = Set<String>()
+
+        for job in queuedJobs {
+            queuedRequestIDs.insert(job.request.id)
+            guard let reason = parkReasons[job.token] else {
+                lastQueuedGenerationParkReason.removeValue(forKey: job.request.id)
+                continue
+            }
+            guard lastQueuedGenerationParkReason[job.request.id] != reason else {
+                continue
+            }
+
+            let queuePosition = await generationController.waitingPosition(
+                for: job.token,
+                residentReady: isResidentReady
+            ) ?? 1
+            let queuedEvent = WorkerQueuedEvent(
+                id: job.request.id,
+                reason: queuedReason(for: reason),
+                queuePosition: queuePosition
+            )
+            await emit(queuedEvent)
+            yieldRequestEvent(.queued(queuedEvent), for: job.request.id)
+            lastQueuedGenerationParkReason[job.request.id] = reason
         }
 
-        if speechBackend == .marvis,
-           case .queueSpeech(
-               id: _,
-               text: _,
-               profileName: _,
-               textProfileName: _,
-               jobType: .live,
-               textContext: _,
-               sourceFormat: _
-           ) = request {
-            return true
+        let staleRequestIDs = Set(lastQueuedGenerationParkReason.keys).subtracting(queuedRequestIDs)
+        for requestID in staleRequestIDs {
+            lastQueuedGenerationParkReason.removeValue(forKey: requestID)
         }
-
-        return false
     }
 
     var isResidentReady: Bool {
@@ -124,13 +135,17 @@ extension SpeakSwiftly.Runtime {
         return false
     }
 
-    func generationActiveRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let activeGeneration else { return nil }
-        return ActiveWorkerRequestSummary(
-            id: activeGeneration.request.id,
-            op: activeGeneration.request.opName,
-            profileName: activeGeneration.request.profileName
-        )
+    func generationActiveRequestSummaries() -> [ActiveWorkerRequestSummary] {
+        activeGenerations.values
+            .map(\.request)
+            .sorted { $0.id < $1.id }
+            .map {
+                ActiveWorkerRequestSummary(
+                    id: $0.id,
+                    op: $0.opName,
+                    profileName: $0.profileName
+                )
+            }
     }
 
     func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
@@ -153,14 +168,39 @@ extension SpeakSwiftly.Runtime {
     func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
         switch queueType {
         case .generation:
-            return generationActiveRequestSummary()
+            return generationActiveRequestSummaries().first
         case .playback:
             return await playbackController.activeRequestSummary()
         }
     }
 
+    func queueSummaryActiveRequests(for queueType: WorkerQueueType) async -> [ActiveWorkerRequestSummary]? {
+        switch queueType {
+        case .generation:
+            let activeRequests = generationActiveRequestSummaries()
+            return activeRequests.isEmpty ? nil : activeRequests
+        case .playback:
+            return nil
+        }
+    }
+
     func generationQueueDepth() async -> Int {
         (await generationController.queuedJobsOrdered()).count
+    }
+
+    private func queuedReason(for parkReason: SpeakSwiftly.Runtime.GenerationParkReason) -> WorkerQueuedReason {
+        switch parkReason {
+        case .waitingForResidentModel:
+            .waitingForResidentModel
+        case .waitingForResidentModels:
+            .waitingForResidentModels
+        case .waitingForActiveRequest:
+            .waitingForActiveRequest
+        case .waitingForPlaybackStability:
+            .waitingForPlaybackStability
+        case .waitingForMarvisGenerationLane:
+            .waitingForMarvisGenerationLane
+        }
     }
 
     func emitStarted(for request: WorkerRequest) async {
