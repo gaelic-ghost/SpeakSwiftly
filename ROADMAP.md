@@ -264,23 +264,37 @@ Tickets:
 Scope:
 
 - [ ] Make per-request event streaming a first-class documented part of the Swift package surface instead of an incidental detail of `RequestHandle`.
+- [ ] Add an explicit in-process per-request observation surface for callers that only have a request ID and need to reconnect later.
 - [ ] Keep request correlation and event observation readable without forcing callers down into JSONL worker internals.
-- [ ] Clarify the relationship between request IDs, streamed request events, cancellation, queue snapshots, and any future polling surface.
+- [ ] Clarify the relationship between request IDs, streamed request events, cancellation, queue snapshots, request snapshots, and any later cross-process subscription story.
 
 Tickets:
 
+- [ ] Replace the current single-continuation request-stream bookkeeping with a runtime-owned per-request event broker that supports multiple in-process subscribers.
+- [ ] Add a public `runtime.request(id:)` snapshot API for callers that need current per-request state before attaching to live updates.
+- [ ] Add a public `runtime.updates(for:)` API for callers that only know a request ID and need on-demand in-process observation.
+- [ ] Decide whether the new on-demand stream should replay a bounded recent window on attach or start at the live tail only, and make that behavior explicit in the API contract.
+- [ ] Introduce a data-first per-request update payload that can represent terminal failure as data for late subscribers, while keeping `RequestHandle.events` source-compatible for existing callers.
 - [ ] Audit the current `RequestHandle` and `RequestEvent` surface for any missing event types, missing lifecycle guarantees, or mismatches between docs and implementation.
-- [ ] Decide whether event streaming alone is the intended per-request observation API or whether the package also needs an explicit request-status lookup surface.
-- [ ] Document the exact lifecycle guarantees for streamed request events, including queued, started, progress, acknowledgement, completion, and cancellation behavior.
+- [ ] Document the exact lifecycle guarantees for request snapshots and streamed updates, including queued, acknowledgement, started, progress, completed, failed, cancelled, and stream teardown behavior.
 - [ ] Ensure request IDs returned by the Swift API are clearly described as stable correlation IDs for event observation and cancellation.
-- [ ] Add or tighten fast tests around request-handle event ordering, terminal completion semantics, cancellation semantics, and stream teardown.
-- [ ] Update package docs so Swift consumers can discover and use per-request event streams without reading runtime internals.
+- [ ] Add or tighten fast tests around request-handle event ordering, terminal completion semantics, cancellation semantics, multiple subscribers, late subscribers, replay behavior, and stream teardown.
+- [ ] Update package docs so Swift consumers can discover and use per-request snapshots and update streams without reading runtime internals.
+- [ ] Record the intentional boundary that this milestone is in-process only and does not yet promise durable cross-process subscriptions or persisted request-event history.
+
+Implementation notes:
+
+- Detailed design and sequencing live in `docs/maintainers/per-request-update-stream-plan-2026-04-09.md`.
+- The preferred implementation shape is a runtime-owned request-event broker plus additive `request(id:)` and `updates(for:)` APIs, not a second ad-hoc observer map.
+- If bounded replay needs a queue structure richer than `Array`, prefer a first-party or top-tier Swift package such as `swift-collections` on purpose rather than bespoke ring-buffer code.
 
 Exit criteria:
 
 - [ ] The package documents one clear per-request observation story for Swift callers.
-- [ ] Streamed request events have explicit lifecycle guarantees backed by tests.
-- [ ] Request IDs, streamed events, and cancellation semantics are easy to understand from the public docs alone.
+- [ ] In-process callers can reconnect to per-request state and live updates using only a request ID.
+- [ ] Streamed request events and request snapshots have explicit lifecycle guarantees backed by tests.
+- [ ] Request IDs, streamed updates, snapshots, and cancellation semantics are easy to understand from the public docs alone.
+- [ ] The in-process scope boundary is explicit, so callers do not mistake this milestone for a durable cross-process subscription guarantee.
 
 Exit criteria:
 
