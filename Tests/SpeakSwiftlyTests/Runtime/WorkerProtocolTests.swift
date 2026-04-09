@@ -340,6 +340,11 @@ import TextForSpeech
     #expect(request == .status(id: "req-status"))
 }
 
+@Test func decodesRuntimeOverviewRequest() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-overview","op":"get_runtime_overview"}"#)
+    #expect(request == .overview(id: "req-overview"))
+}
+
 @Test func decodesSwitchSpeechBackendRequest() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}"#
@@ -456,6 +461,40 @@ import TextForSpeech
                 SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "queue_speech_live", profileName: "default-masc"),
             ],
             queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_voice_profiles", profileName: nil, queuePosition: 1)],
+            playbackState: SpeakSwiftly.PlaybackStateSnapshot(
+                state: .playing,
+                activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                isStableForConcurrentGeneration: true,
+                isRebuffering: false,
+                stableBufferedAudioMS: 840,
+                stableBufferTargetMS: 600
+            ),
+            runtimeOverview: SpeakSwiftly.RuntimeOverview(
+                status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
+                speechBackend: .qwen3,
+                generationQueue: SpeakSwiftly.QueueSnapshot(
+                    queueType: "generation",
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                    activeRequests: [
+                        SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                        SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "queue_speech_live", profileName: "default-masc"),
+                    ],
+                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "queue_speech_live", profileName: "default-femme", queuePosition: 1)]
+                ),
+                playbackQueue: SpeakSwiftly.QueueSnapshot(
+                    queueType: "playback",
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "queue_speech_live", profileName: "default-femme", queuePosition: 1)]
+                ),
+                playbackState: SpeakSwiftly.PlaybackStateSnapshot(
+                    state: .playing,
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                    isStableForConcurrentGeneration: true,
+                    isRebuffering: false,
+                    stableBufferedAudioMS: 840,
+                    stableBufferTargetMS: 600
+                )
+            ),
             status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,
             clearedCount: 2,
@@ -468,6 +507,10 @@ import TextForSpeech
     #expect((success["active_request"] as? [String: Any])?["id"] as? String == "req-active")
     #expect((success["active_requests"] as? [[String: Any]])?.count == 2)
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
+    #expect((success["playback_state"] as? [String: Any])?["is_stable_for_concurrent_generation"] as? Bool == true)
+    #expect((success["playback_state"] as? [String: Any])?["stable_buffered_audio_ms"] as? Int == 840)
+    #expect((success["runtime_overview"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
+    #expect((((success["runtime_overview"] as? [String: Any])?["generation_queue"] as? [String: Any])?["active_requests"] as? [[String: Any]])?.count == 2)
     #expect((success["status"] as? [String: Any])?["resident_state"] as? String == "ready")
     #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
     #expect(success["speech_backend"] as? String == "qwen3")

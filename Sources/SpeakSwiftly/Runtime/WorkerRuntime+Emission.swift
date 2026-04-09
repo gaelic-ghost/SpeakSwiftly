@@ -32,6 +32,7 @@ extension SpeakSwiftly.Runtime {
                 activeRequests: payload.activeRequests,
                 queue: payload.queue,
                 playbackState: payload.playbackState,
+                runtimeOverview: payload.runtimeOverview,
                 status: payload.status,
                 speechBackend: payload.speechBackend,
                 clearedCount: payload.clearedCount,
@@ -165,6 +166,15 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
+    func queueSnapshot(for queueType: WorkerQueueType) async -> SpeakSwiftly.QueueSnapshot {
+        SpeakSwiftly.QueueSnapshot(
+            queueType: queueType.rawValue,
+            activeRequest: await queueSummaryActiveRequest(for: queueType),
+            activeRequests: await queueSummaryActiveRequests(for: queueType),
+            queue: await queuedRequestSummaries(for: queueType)
+        )
+    }
+
     func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
         switch queueType {
         case .generation:
@@ -182,6 +192,16 @@ extension SpeakSwiftly.Runtime {
         case .playback:
             return nil
         }
+    }
+
+    func runtimeOverviewSnapshot() async -> SpeakSwiftly.RuntimeOverview {
+        SpeakSwiftly.RuntimeOverview(
+            status: currentStatusSnapshot(),
+            speechBackend: speechBackend,
+            generationQueue: await queueSnapshot(for: .generation),
+            playbackQueue: await queueSnapshot(for: .playback),
+            playbackState: await playbackController.stateSnapshot()
+        )
     }
 
     func generationQueueDepth() async -> Int {
@@ -334,6 +354,11 @@ extension SpeakSwiftly.Runtime {
                 artifactID: artifactID
             )
         case .generatedFiles(let id):
+            await submitRequest(
+                id: id,
+                op: request.opName
+            )
+        case .overview(let id):
             await submitRequest(
                 id: id,
                 op: request.opName

@@ -257,6 +257,9 @@ import TextForSpeech
     let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.status()
     }
+    let overview: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
+        await runtime.overview()
+    }
     let switchSpeechBackend: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         speechBackend in
@@ -327,6 +330,7 @@ import TextForSpeech
     _ = removeStoredReplacement
     _ = generationQueue
     _ = status
+    _ = overview
     _ = switchSpeechBackend
     _ = reloadModels
     _ = unloadModels

@@ -11,7 +11,7 @@ public enum SpeakSwiftly {
         case file
     }
 
-    enum WorkerQueueType: Sendable, Equatable {
+    enum WorkerQueueType: String, Sendable, Equatable {
         case generation
         case playback
     }

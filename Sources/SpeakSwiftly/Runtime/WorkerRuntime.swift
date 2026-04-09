@@ -59,6 +59,7 @@ public extension SpeakSwiftly {
         let activeRequests: [ActiveWorkerRequestSummary]?
         let queue: [QueuedWorkerRequestSummary]?
         let playbackState: PlaybackStateSummary?
+        let runtimeOverview: SpeakSwiftly.RuntimeOverview?
         let status: WorkerStatusEvent?
         let speechBackend: SpeakSwiftly.SpeechBackend?
         let clearedCount: Int?
@@ -82,6 +83,7 @@ public extension SpeakSwiftly {
             activeRequests: [ActiveWorkerRequestSummary]? = nil,
             queue: [QueuedWorkerRequestSummary]? = nil,
             playbackState: PlaybackStateSummary? = nil,
+            runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
             status: WorkerStatusEvent? = nil,
             speechBackend: SpeakSwiftly.SpeechBackend? = nil,
             clearedCount: Int? = nil,
@@ -104,6 +106,7 @@ public extension SpeakSwiftly {
             self.activeRequests = activeRequests
             self.queue = queue
             self.playbackState = playbackState
+            self.runtimeOverview = runtimeOverview
             self.status = status
             self.speechBackend = speechBackend
             self.clearedCount = clearedCount
@@ -1042,6 +1045,7 @@ public extension SpeakSwiftly {
                  .removeTextReplacement,
                  .listQueue,
                  .status,
+                 .overview,
                  .playback,
                  .clearQueue,
                  .cancelRequest:
@@ -1321,6 +1325,14 @@ public extension SpeakSwiftly {
                         id: id,
                         status: currentStatusSnapshot(),
                         speechBackend: speechBackend
+                    )
+                )
+
+            case .overview(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        runtimeOverview: await runtimeOverviewSnapshot()
                     )
                 )
 

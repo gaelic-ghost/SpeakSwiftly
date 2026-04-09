@@ -139,6 +139,10 @@ public extension SpeakSwiftly.Runtime {
         await submit(.status(id: UUID().uuidString))
     }
 
+    func overview() async -> SpeakSwiftly.RequestHandle {
+        await submit(.overview(id: UUID().uuidString))
+    }
+
     func switchSpeechBackend(
         to speechBackend: SpeakSwiftly.SpeechBackend
     ) async -> SpeakSwiftly.RequestHandle {

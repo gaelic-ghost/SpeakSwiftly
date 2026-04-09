@@ -150,6 +150,145 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
+@Test func runtimeOverviewCapturesDualLaneMarvisGenerationAndPlaybackStability() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let laneAGenerationDrain = AsyncGate()
+    let laneBGenerationDrain = AsyncGate()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    @Sendable func makeLaneModel(_ gate: AsyncGate) -> AnySpeechModel {
+        AnySpeechModel(
+            sampleRate: 24_000,
+            generate: { _, _, _, _, _, _ in
+                [0.1, 0.2]
+            },
+            generateSamplesStream: { _, _, _, _, _, _, _ in
+                AsyncThrowingStream { continuation in
+                    continuation.yield(Array(repeating: 0.1, count: 24_000))
+                    Task {
+                        await gate.wait()
+                        continuation.finish()
+                    }
+                }
+            }
+        )
+    }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "lane-a-primary",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+    _ = try store.createProfile(
+        profileName: "lane-b-secondary",
+        vibe: .masc,
+        modelRepo: "test-model",
+        voiceDescription: "Grounded and rich.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x03, 0x04])
+    )
+    _ = try store.createProfile(
+        profileName: "lane-a-tertiary",
+        vibe: .androgenous,
+        modelRepo: "test-model",
+        voiceDescription: "Balanced and clear.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x05, 0x06])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        speechBackend: .marvis,
+        residentModelLoader: { _ in
+            ResidentSpeechModels.marvis(
+                MarvisResidentModels(
+                    conversationalA: makeLaneModel(laneAGenerationDrain),
+                    conversationalB: makeLaneModel(laneBGenerationDrain)
+                )
+            )
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "marvis"
+        }
+    })
+
+    let firstHandle = await runtime.generate.speech(text: "First request", with: "lane-a-primary")
+    let secondHandle = await runtime.generate.speech(text: "Second request", with: "lane-b-secondary")
+    let thirdHandle = await runtime.generate.speech(text: "Third request", with: "lane-a-tertiary")
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == firstHandle.id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == secondHandle.id
+                && $0["event"] as? String == "started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == thirdHandle.id
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_marvis_generation_lane"
+        }
+    })
+
+    let overviewID = await runtime.overview().id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == overviewID,
+                $0["ok"] as? Bool == true,
+                let overview = $0["runtime_overview"] as? [String: Any],
+                let generationQueue = overview["generation_queue"] as? [String: Any],
+                let activeRequests = generationQueue["active_requests"] as? [[String: Any]],
+                let queuedRequests = generationQueue["queue"] as? [[String: Any]],
+                let playbackState = overview["playback_state"] as? [String: Any],
+                let playbackActiveRequest = playbackState["active_request"] as? [String: Any]
+            else {
+                return false
+            }
+
+            let activeIDs = Set(activeRequests.compactMap { $0["id"] as? String })
+            let queuedIDs = Set(queuedRequests.compactMap { $0["id"] as? String })
+            return overview["speech_backend"] as? String == "marvis"
+                && activeIDs == Set([firstHandle.id, secondHandle.id])
+                && queuedIDs == Set([thirdHandle.id])
+                && playbackState["state"] as? String == "playing"
+                && playbackState["is_stable_for_concurrent_generation"] as? Bool == true
+                && playbackState["is_rebuffering"] as? Bool == false
+                && (playbackState["stable_buffered_audio_ms"] as? Int ?? 0) >= 0
+                && (playbackState["stable_buffer_target_ms"] as? Int ?? 0) > 0
+                && playbackActiveRequest["id"] as? String == firstHandle.id
+        }
+    })
+
+    await laneAGenerationDrain.open()
+    await laneBGenerationDrain.open()
+    await playbackDrain.open()
+}
+
 @Test func statusReturnsCurrentResidentBackendAndStage() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(

@@ -249,6 +249,20 @@ The scheduler snapshot now captures:
 - stable buffered-audio and target-buffer values
 - parked generation reasons for waiting queued requests
 
+### New server-facing runtime truth surfaces
+
+To reduce MCP and HTTP host-side guesswork, the package now exposes stronger direct runtime truth in the worker protocol and Swift surface:
+
+- `runtime.overview()` now returns one atomic `runtime_overview` payload instead of forcing consumers to stitch together separate generation-queue, playback-queue, and playback-state reads.
+- `runtime_overview.generation_queue.active_requests` now reports all concurrently active generation jobs, not only one legacy `active_request`.
+- `runtime_overview.playback_state` now includes:
+  - `is_stable_for_concurrent_generation`
+  - `is_rebuffering`
+  - `stable_buffered_audio_ms`
+  - `stable_buffer_target_ms`
+
+That means downstream consumers like `SpeakSwiftlyServer` no longer need to infer Marvis overlap readiness indirectly from progress events such as `preroll_ready` or `starting_playback`, and they no longer need to flatten dual-lane generation back into a fake single-active model.
+
 ### What the corrected queued-live Marvis behavior means
 
 The intended queued-live Marvis path is now:

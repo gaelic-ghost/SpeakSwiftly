@@ -1027,10 +1027,15 @@ actor PlaybackController {
 
     func stateSnapshot() async -> SpeakSwiftly.PlaybackStateSnapshot {
         let activeRequest = activeRequestSummary()
+        let concurrency = concurrencySnapshot()
         let driverState = await driver.state()
         return SpeakSwiftly.PlaybackStateSnapshot(
             state: resolvedPlaybackState(driverState: driverState, activeRequest: activeRequest),
-            activeRequest: activeRequest
+            activeRequest: activeRequest,
+            isStableForConcurrentGeneration: concurrency.isStableForConcurrentGeneration,
+            isRebuffering: concurrency.isRebuffering,
+            stableBufferedAudioMS: concurrency.stableBufferedAudioMS,
+            stableBufferTargetMS: concurrency.stableBufferTargetMS
         )
     }
 
