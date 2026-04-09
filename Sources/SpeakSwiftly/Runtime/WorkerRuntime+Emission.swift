@@ -68,6 +68,8 @@ extension SpeakSwiftly.Runtime {
 
     func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
         let reason: WorkerQueuedReason
+        let hasActiveGeneration = await generationController.activeJob() != nil
+        let waitsForActivePlayback = await queuedRequestWaitsForActivePlayback(job.request)
         switch residentState {
         case .warming:
             reason = .waitingForResidentModel
@@ -75,13 +77,13 @@ extension SpeakSwiftly.Runtime {
             if job.request.requiresResidentModels {
                 reason = .waitingForResidentModels
             } else {
-                guard await generationController.activeJob() != nil else { return nil }
+                guard hasActiveGeneration || waitsForActivePlayback else { return nil }
                 reason = .waitingForActiveRequest
             }
         case .failed:
             return nil
         case .ready:
-            guard await generationController.activeJob() != nil else { return nil }
+            guard hasActiveGeneration || waitsForActivePlayback else { return nil }
             reason = .waitingForActiveRequest
         }
 
@@ -90,6 +92,29 @@ extension SpeakSwiftly.Runtime {
             residentReady: isResidentReady
         ) ?? 1
         return WorkerQueuedEvent(id: job.request.id, reason: reason, queuePosition: queuePosition)
+    }
+
+    private func queuedRequestWaitsForActivePlayback(_ request: WorkerRequest) async -> Bool {
+        let hasActivePlayback = await playbackController.hasActivePlayback()
+        guard hasActivePlayback else { return false }
+        if request.requiresPlaybackDrainBeforeStart {
+            return true
+        }
+
+        if speechBackend == .marvis,
+           case .queueSpeech(
+               id: _,
+               text: _,
+               profileName: _,
+               textProfileName: _,
+               jobType: .live,
+               textContext: _,
+               sourceFormat: _
+           ) = request {
+            return true
+        }
+
+        return false
     }
 
     var isResidentReady: Bool {

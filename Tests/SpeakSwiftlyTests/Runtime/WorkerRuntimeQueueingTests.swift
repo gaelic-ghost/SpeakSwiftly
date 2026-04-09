@@ -74,6 +74,70 @@ import TextForSpeech
     })
 }
 
+@Test func marvisLiveGenerationWaitsForActivePlaybackToDrainBeforeStartingLaterLiveRequests() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        speechBackend: .marvis,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "marvis"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-live-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-live-2","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-2"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-live-2"
+            && $0["event"] as? String == "started"
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-live-2"
+            && $0["event"] as? String == "progress"
+            && $0["stage"] as? String == "starting_playback"
+    })
+
+    await playbackDrain.open()
+}
+
 @Test func runtimeUsesConfiguredSpeechBackendForResidentModelPreload() async throws {
     let output = OutputRecorder()
     let recorder = LoadedBackendRecorder()

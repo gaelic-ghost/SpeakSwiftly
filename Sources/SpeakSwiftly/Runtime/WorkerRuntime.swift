@@ -589,9 +589,29 @@ public extension SpeakSwiftly {
         guard !isShuttingDown else { return }
         let hasActivePlayback = await playbackController.hasActivePlayback()
         let residentState = self.residentState
+        let activeSpeechBackend = speechBackend
         let queueDisposition: @Sendable (GenerationController.Job) -> GenerationController.RunDisposition = { job in
             let request = job.request
-            if request.requiresPlaybackDrainBeforeStart && hasActivePlayback {
+            let shouldParkBehindActivePlayback = if !hasActivePlayback {
+                false
+            } else if request.requiresPlaybackDrainBeforeStart {
+                true
+            } else if activeSpeechBackend == .marvis,
+                      case .queueSpeech(
+                          id: _,
+                          text: _,
+                          profileName: _,
+                          textProfileName: _,
+                          jobType: .live,
+                          textContext: _,
+                          sourceFormat: _
+                      ) = request {
+                true
+            } else {
+                false
+            }
+
+            if shouldParkBehindActivePlayback {
                 return .park
             }
 

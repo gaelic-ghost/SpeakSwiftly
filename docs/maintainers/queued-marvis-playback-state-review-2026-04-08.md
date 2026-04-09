@@ -117,3 +117,29 @@ Recommended order:
 - Or should the public playback state eventually grow explicit buffering/draining states?
 - Once playback state is trustworthy, does queued live Marvis still need the freedom to generate behind active playback?
 - If so, do we need a backend-sensitive concurrency rule for heavier resident backends like Marvis?
+
+## 2026-04-08 Follow-up Fixes and Verification
+
+Two runtime-side fixes landed after the initial review:
+
+1. `PlaybackController` now reports playback state from controller-owned active playback truth instead of exposing a raw `driver.state()` plus `active_request` pair that can disagree during preroll, interruption, or drain.
+2. Live Marvis generation now parks later live requests behind active playback, and queued-event reporting now treats that parked state as a real `waiting_for_active_request` condition instead of silently accepting and parking the work.
+
+Verification after those fixes:
+
+- `swift test --filter 'WorkerRuntimeQueueingTests|WorkerRuntimeControlSurfaceTests'`
+- `SPEAKSWIFTLY_E2E=1 swift test --filter marvisAudibleLivePlaybackPrequeuesThreeJobsAndDrainsInOrder`
+
+The targeted queued-live Marvis E2E lane now passes instead of stalling.
+
+Subjective audible result from the latest run:
+
+- the first queued playback was still somewhat janky and hit noticeable rebuffering
+- the second queued playback sounded good
+- the third queued playback also sounded good
+
+That suggests the deadlock/overlap problem improved meaningfully, but the first live Marvis request is still carrying most of the startup-buffer pressure and likely needs separate tuning around:
+
+- initial startup buffer thresholds
+- Marvis-specific chunk cadence or scheduling
+- rebuffer recovery targets during the first live request in a drained queue
