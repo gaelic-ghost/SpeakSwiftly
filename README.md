@@ -132,6 +132,18 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 
 At startup the worker begins preloading the resident model and emits JSONL status events on `stdout`.
 
+### Consumer Test Harness
+
+The package also ships a small executable consumer harness, `SpeakSwiftlyTesting`, for package-level smoke tests:
+
+```bash
+swift run SpeakSwiftlyTesting resources
+swift run SpeakSwiftlyTesting status
+swift run SpeakSwiftlyTesting smoke
+```
+
+`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, and `smoke` runs both checks in sequence.
+
 ## API Notes
 
 The package currently publishes:

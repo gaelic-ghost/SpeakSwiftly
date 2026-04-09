@@ -17,6 +17,10 @@ let package = Package(
             name: "SpeakSwiftly",
             targets: ["SpeakSwiftlyCLI"]
         ),
+        .executable(
+            name: "SpeakSwiftlyTesting",
+            targets: ["SpeakSwiftlyTesting"]
+        ),
     ],
     dependencies: [
         .package(
@@ -52,6 +56,10 @@ let package = Package(
                 "SpeakSwiftlyCore",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ]
+        ),
+        .executableTarget(
+            name: "SpeakSwiftlyTesting",
+            dependencies: ["SpeakSwiftlyCore"]
         ),
     ]
 )
