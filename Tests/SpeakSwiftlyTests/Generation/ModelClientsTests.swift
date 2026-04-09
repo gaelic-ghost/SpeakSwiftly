@@ -27,6 +27,29 @@ import TextForSpeech
     #expect(balanced.resumeBufferTargetMS < extended.resumeBufferTargetMS)
 }
 
+@Test func adaptivePlaybackThresholdsStartFromWarmupBiasedTargets() {
+    let compact = PlaybackThresholdController(text: "Hello there.").thresholds
+    let balanced = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7)
+    ).thresholds
+    let extended = PlaybackThresholdController(
+        text: String(
+            repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
+            count: 9
+        )
+    ).thresholds
+
+    #expect(compact.startupBufferTargetMS == 480)
+    #expect(compact.lowWaterTargetMS == 220)
+    #expect(compact.resumeBufferTargetMS == 540)
+    #expect(balanced.startupBufferTargetMS == 720)
+    #expect(balanced.lowWaterTargetMS == 340)
+    #expect(balanced.resumeBufferTargetMS == 800)
+    #expect(extended.startupBufferTargetMS == 13_120)
+    #expect(extended.lowWaterTargetMS == 5_000)
+    #expect(extended.resumeBufferTargetMS == 16_480)
+}
+
 @Test func adaptivePlaybackThresholdsIgnoreContentShapeWhenLengthsMatch() {
     let plainText = String(repeating: "Please explain this clearly. ", count: 8)
     let codeishSeed = """

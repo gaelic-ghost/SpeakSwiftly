@@ -100,7 +100,7 @@ struct PlaybackThresholdController: Sendable {
     private var scheduleGapWarningFloorMS: Int
 
     init(text: String) {
-        thresholds = Self.seedThresholds(for: text)
+        thresholds = Self.seedThresholds(for: text, phase: .warmup)
         startupBufferFloorMS = thresholds.startupBufferTargetMS
         lowWaterFloorMS = thresholds.lowWaterTargetMS
         resumeBufferFloorMS = thresholds.resumeBufferTargetMS
@@ -353,8 +353,11 @@ struct PlaybackThresholdController: Sendable {
         Int((2.0 / codecTokenRateHz * 1_000).rounded())
     }
 
-    private static func seedThresholds(for text: String) -> PlaybackAdaptiveThresholds {
-        seededThresholds(for: classify(text: text), phase: .steady)
+    private static func seedThresholds(
+        for text: String,
+        phase: PlaybackPhase
+    ) -> PlaybackAdaptiveThresholds {
+        seededThresholds(for: classify(text: text), phase: phase)
     }
 
     private static func seededThresholds(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> PlaybackAdaptiveThresholds {

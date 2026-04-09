@@ -143,3 +143,21 @@ That suggests the deadlock/overlap problem improved meaningfully, but the first 
 - initial startup buffer thresholds
 - Marvis-specific chunk cadence or scheduling
 - rebuffer recovery targets during the first live request in a drained queue
+
+## 2026-04-08 Warmup Threshold Seeding Follow-up
+
+The next playback-quality pass found a concrete startup-threshold bug:
+
+- `PlaybackThresholdController` started in `.warmup`
+- but its initial thresholds were seeded from the `.steady` profile instead of the `.warmup` profile
+
+That meant the first live request in a drained queue could start with startup-buffer targets that were too optimistic until enough chunks arrived for adaptive tuning to catch up.
+
+That bug is now fixed so the first request starts from warmup-biased thresholds immediately.
+
+Verification after that tuning pass:
+
+- `swift test --filter 'adaptivePlaybackThresholdsSeedFromTextComplexityClasses|adaptivePlaybackThresholdsStartFromWarmupBiasedTargets|adaptivePlaybackThresholdsRaiseTargetsForSlowCadenceAndStarvation|adaptivePlaybackThresholdsRaiseTargetsForRepeatedRebuffers|adaptivePlaybackThresholdsLeaveWarmupAfterStableChunkCadence|adaptivePlaybackThresholdsStayInWarmupWhileEarlyCadenceTrailsRealtimePlayback|adaptivePlaybackThresholdsEnterRecoveryAfterRebufferAndReturnToSteadyAfterStableChunks'`
+- `SPEAKSWIFTLY_E2E=1 swift test --filter marvisAudibleLivePlaybackPrequeuesThreeJobsAndDrainsInOrder`
+
+The queued-live Marvis lane still passes end to end after the warmup-threshold change.
