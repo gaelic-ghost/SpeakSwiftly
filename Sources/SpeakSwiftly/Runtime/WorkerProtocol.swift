@@ -126,8 +126,7 @@ struct RawWorkerRequest: Decodable, Sendable {
             if let parsedTextFormat = TextForSpeech.TextFormat(rawValue: rawTextFormat) {
                 textFormat = parsedTextFormat
                 sourceFormat = explicitSourceFormat
-            } else if let legacyFormat = TextForSpeech.Format(rawValue: rawTextFormat) {
-                let compatibility = Self.legacyCompatibility(for: legacyFormat)
+            } else if let compatibility = Self.legacyCompatibility(forRawValue: rawTextFormat) {
                 textFormat = compatibility.textFormat
                 sourceFormat = explicitSourceFormat ?? compatibility.sourceFormat
             } else {
@@ -165,19 +164,20 @@ struct RawWorkerRequest: Decodable, Sendable {
     }
 
     private static func legacyCompatibility(
-        for format: TextForSpeech.Format
-    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?) {
-        switch format {
-        case .plain: (.plain, nil)
-        case .markdown: (.markdown, nil)
-        case .html: (.html, nil)
-        case .log: (.log, nil)
-        case .cli: (.cli, nil)
-        case .list: (.list, nil)
-        case .source: (nil, .generic)
-        case .swift: (nil, .swift)
-        case .python: (nil, .python)
-        case .rust: (nil, .rust)
+        forRawValue rawValue: String
+    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?)? {
+        switch rawValue {
+        case TextForSpeech.TextFormat.plain.rawValue: (.plain, nil)
+        case TextForSpeech.TextFormat.markdown.rawValue: (.markdown, nil)
+        case TextForSpeech.TextFormat.html.rawValue: (.html, nil)
+        case TextForSpeech.TextFormat.log.rawValue: (.log, nil)
+        case TextForSpeech.TextFormat.cli.rawValue: (.cli, nil)
+        case TextForSpeech.TextFormat.list.rawValue: (.list, nil)
+        case TextForSpeech.SourceFormat.generic.rawValue: (nil, .generic)
+        case TextForSpeech.SourceFormat.swift.rawValue: (nil, .swift)
+        case TextForSpeech.SourceFormat.python.rawValue: (nil, .python)
+        case TextForSpeech.SourceFormat.rust.rawValue: (nil, .rust)
+        default: nil
         }
     }
 
@@ -307,7 +307,6 @@ enum WorkerRequest: Sendable, Equatable {
     case listProfiles(id: String)
     case removeProfile(id: String, profileName: String)
     case textProfileActive(id: String)
-    case textProfileBase(id: String)
     case textProfile(id: String, name: String)
     case textProfiles(id: String)
     case textProfileEffective(id: String, name: String?)
@@ -348,7 +347,6 @@ enum WorkerRequest: Sendable, Equatable {
              .listProfiles(let id),
              .removeProfile(let id, _),
              .textProfileActive(let id),
-             .textProfileBase(let id),
              .textProfile(let id, _),
              .textProfiles(let id),
              .textProfileEffective(let id, _),
@@ -408,8 +406,6 @@ enum WorkerRequest: Sendable, Equatable {
             "delete_voice_profile"
         case .textProfileActive:
             "get_active_text_profile"
-        case .textProfileBase:
-            "get_base_text_profile"
         case .textProfile:
             "get_text_profile"
         case .textProfiles:
@@ -533,7 +529,6 @@ enum WorkerRequest: Sendable, Equatable {
              .generationJob,
              .generationJobs,
              .textProfileActive,
-             .textProfileBase,
              .textProfile,
              .textProfiles,
              .textProfileEffective,
@@ -593,7 +588,6 @@ enum WorkerRequest: Sendable, Equatable {
              .generationJob,
              .generationJobs,
              .textProfileActive,
-             .textProfileBase,
              .textProfiles,
              .textProfilePersistence,
              .loadTextProfiles,
@@ -644,7 +638,6 @@ enum WorkerRequest: Sendable, Equatable {
              .listProfiles,
              .removeProfile,
              .textProfileActive,
-             .textProfileBase,
              .textProfile,
              .textProfiles,
              .textProfileEffective,
@@ -690,7 +683,6 @@ enum WorkerRequest: Sendable, Equatable {
              .listProfiles,
              .removeProfile,
              .textProfileActive,
-             .textProfileBase,
              .textProfile,
              .textProfiles,
              .textProfileEffective,
@@ -736,7 +728,6 @@ enum WorkerRequest: Sendable, Equatable {
              .listProfiles,
              .removeProfile,
              .textProfileActive,
-             .textProfileBase,
              .textProfile,
              .textProfiles,
              .textProfileEffective,
@@ -901,9 +892,6 @@ enum WorkerRequest: Sendable, Equatable {
 
         case "get_active_text_profile":
             return .textProfileActive(id: id)
-
-        case "get_base_text_profile":
-            return .textProfileBase(id: id)
 
         case "get_text_profile":
             let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)

@@ -537,7 +537,7 @@ func makeRuntime<ResidentModelResult>(
     let normalizer = SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
     )
-    try await normalizer.loadProfiles()
+    try await normalizer.persistence.load()
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
         fileManager: .default,

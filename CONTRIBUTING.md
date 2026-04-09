@@ -217,26 +217,30 @@ The intended library-caller shape is:
 - `runtime.artifacts.batch(...)`
 - `runtime.artifacts.batches(...)`
 
-The typed text-normalization helpers live on `SpeakSwiftly.Normalizer`:
+The typed text-normalization helpers live on grouped handles under `SpeakSwiftly.Normalizer`:
 
-- `activeProfile()`
-- `baseProfile()`
-- `profile(id:)`
-- `profiles()`
-- `effectiveProfile(id:)`
-- `loadProfiles()`
-- `saveProfiles()`
-- `createProfile(id:named:replacements:)`
-- `storeProfile(_:)`
-- `useProfile(_:)`
-- `removeProfile(id:)`
-- `reset()`
-- `addReplacement(_:)`
-- `addReplacement(_:toStoredProfileID:)`
-- `replaceReplacement(_:)`
-- `replaceReplacement(_:inStoredProfileID:)`
-- `removeReplacement(id:)`
-- `removeReplacement(id:fromStoredProfileID:)`
+- `normalizer.profiles.active(id:)`
+- `normalizer.profiles.stored(id:)`
+- `normalizer.profiles.list()`
+- `normalizer.profiles.effective(id:)`
+- `normalizer.profiles.create(id:name:replacements:)`
+- `normalizer.profiles.store(_:)`
+- `normalizer.profiles.use(_:)`
+- `normalizer.profiles.delete(id:)`
+- `normalizer.profiles.reset()`
+- `normalizer.profiles.add(_:)`
+- `normalizer.profiles.add(_:toStoredProfileID:)`
+- `normalizer.profiles.replace(_:)`
+- `normalizer.profiles.replace(_:inStoredProfileID:)`
+- `normalizer.profiles.removeReplacement(id:)`
+- `normalizer.profiles.removeReplacement(id:fromStoredProfileID:)`
+- `normalizer.persistence.url()`
+- `normalizer.persistence.state()`
+- `normalizer.persistence.restore(_:)`
+- `normalizer.persistence.load()`
+- `normalizer.persistence.load(from:)`
+- `normalizer.persistence.save()`
+- `normalizer.persistence.save(to:)`
 
 `runtime.normalizer` remains the intended way to reach the injected normalizer object when callers already have a runtime in hand.
 

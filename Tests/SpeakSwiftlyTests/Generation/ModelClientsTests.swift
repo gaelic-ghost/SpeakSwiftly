@@ -316,8 +316,11 @@ import TextForSpeech
     Also say chrommmaticallly and qqqwweerrtyy once.
     """
 
-    let normalized = TextForSpeech.normalize(original)
-    let features = TextForSpeech.forensicFeatures(originalText: original, normalizedText: normalized)
+    let normalized = TextForSpeech.Normalize.text(original)
+    let features = TextForSpeech.Forensics.features(
+        originalText: original,
+        normalizedText: normalized
+    )
 
     #expect(features.originalCharacterCount > 0)
     #expect(features.normalizedCharacterCount > 0)
@@ -356,13 +359,13 @@ import TextForSpeech
     End this probe clearly and without looping.
     """
 
-    let sections = TextForSpeech.sections(originalText: original)
+    let sections = TextForSpeech.Forensics.sections(originalText: original)
     #expect(sections.map(\.title) == ["Section One", "Section Two", "Section Three", "Footer"])
     #expect(sections.allSatisfy { $0.kind == .markdownHeader })
     #expect(sections.allSatisfy { $0.normalizedCharacterCount > 0 })
     #expect(abs(sections.map(\.normalizedCharacterShare).reduce(0, +) - 1.0) < 0.0001)
 
-    let windows = TextForSpeech.sectionWindows(
+    let windows = TextForSpeech.Forensics.sectionWindows(
         originalText: original,
         totalDurationMS: 12_000,
         totalChunkCount: 75
@@ -372,12 +375,11 @@ import TextForSpeech
     #expect(windows.first?.estimatedStartChunk == 0)
     #expect(windows.last?.estimatedEndMS == 12_000)
     #expect(windows.last?.estimatedEndChunk == 75)
-    #expect(
-        zip(windows, windows.dropFirst()).allSatisfy { lhs, rhs in
-            lhs.estimatedEndMS == rhs.estimatedStartMS
-                && lhs.estimatedEndChunk == rhs.estimatedStartChunk
-        }
-    )
+    let windowsAreContiguous = zip(windows, windows.dropFirst()).allSatisfy { lhs, rhs in
+        lhs.estimatedEndMS == rhs.estimatedStartMS
+            && lhs.estimatedEndChunk == rhs.estimatedStartChunk
+    }
+    #expect(windowsAreContiguous)
 }
 
 @Test func speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable() {
@@ -385,7 +387,7 @@ import TextForSpeech
     Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
     """
 
-    let normalized = TextForSpeech.normalize(original)
+    let normalized = TextForSpeech.Normalize.text(original)
 
     #expect(normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
@@ -803,13 +805,17 @@ import TextForSpeech
         canonicalAudioData: Data([0x01, 0x02])
     )
 
-    try await runtime.normalizer.storeProfile(
+    try await runtime.normalizer.profiles.store(
         TextForSpeech.Profile(
             id: "logs",
             name: "Logs",
             replacements: [
                 TextForSpeech.Replacement("stderr", with: "standard error"),
-                TextForSpeech.Replacement("snake case stuff", with: "settings token", in: .afterNormalization)
+                TextForSpeech.Replacement(
+                    "snake case stuff",
+                    with: "settings token",
+                    during: .afterBuiltIns
+                )
             ]
         )
     )

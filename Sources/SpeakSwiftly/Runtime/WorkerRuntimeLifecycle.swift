@@ -33,9 +33,9 @@ extension SpeakSwiftly.Runtime {
             rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true)
         )
         do {
-            try await normalizer.loadProfiles()
+            try await normalizer.persistence.load()
         } catch {
-            let path = await normalizer.persistenceURL()?.path ?? "unknown path"
+            let path = await normalizer.persistence.url()?.path ?? "unknown path"
             let message = "SpeakSwiftly could not load persisted text profiles from '\(path)'. \(error.localizedDescription)\n"
             FileHandle.standardError.write(Data(message.utf8))
         }

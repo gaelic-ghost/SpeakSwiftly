@@ -264,9 +264,6 @@ import TextForSpeech
     let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(active == .textProfileActive(id: "req-text-active"))
 
-    let base = try WorkerRequest.decode(from: #"{"id":"req-text-base","op":"get_base_text_profile"}"#)
-    #expect(base == .textProfileBase(id: "req-text-base"))
-
     let named = try WorkerRequest.decode(
         from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_name":"logs"}"#
     )
@@ -283,7 +280,7 @@ import TextForSpeech
 
 @Test func decodesTextProfileMutationRequests() throws {
     let create = try WorkerRequest.decode(
-        from: #"{"id":"req-text-create","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}"#
+        from: #"{"id":"req-text-create","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}]}"#
     )
     #expect(
         create == .createTextProfile(
@@ -308,7 +305,7 @@ import TextForSpeech
     #expect(store == .storeTextProfile(id: "req-text-store", profile: profile))
 
     let add = try WorkerRequest.decode(
-        from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}"#
+        from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#
     )
     #expect(
         add == .addTextReplacement(

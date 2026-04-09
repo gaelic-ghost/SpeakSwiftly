@@ -193,7 +193,6 @@ extension SpeakSwiftly.Runtime {
                  .generationJob,
                  .generationJobs,
                  .textProfileActive,
-                 .textProfileBase,
                  .textProfile,
                  .textProfiles,
                  .textProfileEffective,
@@ -237,7 +236,7 @@ extension SpeakSwiftly.Runtime {
 
     func processImmediateControlRequest(_ request: WorkerRequest) async {
         let result: Result<WorkerSuccessPayload, WorkerError>
-        let textProfilePath = await normalizerRef.persistenceURL()?.path
+        let textProfilePath = await normalizerRef.persistence.url()?.path
 
         do {
             switch request {
@@ -301,16 +300,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.activeProfile(),
-                        textProfilePath: textProfilePath
-                    )
-                )
-
-            case .textProfileBase(let id):
-                result = .success(
-                    WorkerSuccessPayload(
-                        id: id,
-                        textProfile: await normalizerRef.baseProfile(),
+                        textProfile: await normalizerRef.profiles.active(),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -319,7 +309,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.profile(id: name),
+                        textProfile: await normalizerRef.profiles.stored(id: name),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -328,7 +318,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfiles: await normalizerRef.profiles(),
+                        textProfiles: await normalizerRef.profiles.list(),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -337,7 +327,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.effectiveProfile(id: name),
+                        textProfile: await normalizerRef.profiles.effective(id: name),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -351,18 +341,18 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .loadTextProfiles(let id):
-                try await normalizerRef.loadProfiles()
+                try await normalizerRef.persistence.load()
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.activeProfile(),
-                        textProfiles: await normalizerRef.profiles(),
+                        textProfile: await normalizerRef.profiles.active(),
+                        textProfiles: await normalizerRef.profiles.list(),
                         textProfilePath: textProfilePath
                     )
                 )
 
             case .saveTextProfiles(let id):
-                try await normalizerRef.saveProfiles()
+                try await normalizerRef.persistence.save()
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
@@ -371,9 +361,9 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .createTextProfile(let id, let profileID, let profileName, let replacements):
-                let profile = try await normalizerRef.createProfile(
+                let profile = try await normalizerRef.profiles.create(
                     id: profileID,
-                    named: profileName,
+                    name: profileName,
                     replacements: replacements
                 )
                 result = .success(
@@ -385,7 +375,7 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .storeTextProfile(let id, let profile):
-                try await normalizerRef.storeProfile(profile)
+                try await normalizerRef.profiles.store(profile)
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
@@ -395,7 +385,7 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .useTextProfile(let id, let profile):
-                try await normalizerRef.useProfile(profile)
+                try await normalizerRef.profiles.use(profile)
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
@@ -405,7 +395,7 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .removeTextProfile(let id, let profileName):
-                try await normalizerRef.removeProfile(id: profileName)
+                try await normalizerRef.profiles.delete(id: profileName)
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
@@ -414,23 +404,23 @@ extension SpeakSwiftly.Runtime {
                 )
 
             case .resetTextProfile(let id):
-                try await normalizerRef.reset()
+                try await normalizerRef.profiles.reset()
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
-                        textProfile: await normalizerRef.activeProfile(),
+                        textProfile: await normalizerRef.profiles.active(),
                         textProfilePath: textProfilePath
                     )
                 )
 
             case .addTextReplacement(let id, let replacement, let profileName):
                 let profile = if let profileName {
-                    try await normalizerRef.addReplacement(
+                    try await normalizerRef.profiles.add(
                         replacement,
                         toStoredProfileID: profileName
                     )
                 } else {
-                    try await normalizerRef.addReplacement(replacement)
+                    try await normalizerRef.profiles.add(replacement)
                 }
                 result = .success(
                     WorkerSuccessPayload(
@@ -442,12 +432,12 @@ extension SpeakSwiftly.Runtime {
 
             case .replaceTextReplacement(let id, let replacement, let profileName):
                 let profile = if let profileName {
-                    try await normalizerRef.replaceReplacement(
+                    try await normalizerRef.profiles.replace(
                         replacement,
                         inStoredProfileID: profileName
                     )
                 } else {
-                    try await normalizerRef.replaceReplacement(replacement)
+                    try await normalizerRef.profiles.replace(replacement)
                 }
                 result = .success(
                     WorkerSuccessPayload(
@@ -459,12 +449,12 @@ extension SpeakSwiftly.Runtime {
 
             case .removeTextReplacement(let id, let replacementID, let profileName):
                 let profile = if let profileName {
-                    try await normalizerRef.removeReplacement(
+                    try await normalizerRef.profiles.removeReplacement(
                         id: replacementID,
                         fromStoredProfileID: profileName
                     )
                 } else {
-                    try await normalizerRef.removeReplacement(id: replacementID)
+                    try await normalizerRef.profiles.removeReplacement(id: replacementID)
                 }
                 result = .success(
                     WorkerSuccessPayload(
@@ -1111,23 +1101,26 @@ extension SpeakSwiftly.Runtime {
         let textProfileName = request.textProfileName
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
-        let textProfile = await normalizerRef.effectiveProfile(id: textProfileName)
+        let textProfile = await normalizerRef.profiles.effective(id: textProfileName) ?? .default
         let normalizedText = if let sourceFormat {
-            TextForSpeech.normalizeSource(
+            TextForSpeech.Normalize.source(
                 text,
                 as: sourceFormat,
                 context: textContext,
                 profile: textProfile
             )
         } else {
-            TextForSpeech.normalizeText(
+            TextForSpeech.Normalize.text(
                 text,
                 context: textContext,
                 profile: textProfile
             )
         }
-        let textFeatures = TextForSpeech.forensicFeatures(originalText: text, normalizedText: normalizedText)
-        let textSections = TextForSpeech.sections(originalText: text)
+        let textFeatures = TextForSpeech.Forensics.features(
+            originalText: text,
+            normalizedText: normalizedText
+        )
+        let textSections = TextForSpeech.Forensics.sections(originalText: text)
         var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
         let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
 

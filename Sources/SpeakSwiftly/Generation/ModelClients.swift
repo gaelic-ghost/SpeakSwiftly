@@ -212,12 +212,12 @@ enum GenerationPolicy {
     }
 
     private static func residentMaxTokens(for text: String) -> Int {
-        let wordCount = max(TextForSpeech.words(in: text).count, 1)
+        let wordCount = max(TextForSpeech.Forensics.words(in: text).count, 1)
         return min(2_048, max(56, wordCount * 8))
     }
 
     private static func profileMaxTokens(for text: String) -> Int {
-        let wordCount = max(TextForSpeech.words(in: text).count, 1)
+        let wordCount = max(TextForSpeech.Forensics.words(in: text).count, 1)
         return min(3_072, max(96, wordCount * 10))
     }
 }

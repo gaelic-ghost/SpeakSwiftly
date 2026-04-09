@@ -108,6 +108,12 @@ import TextForSpeech
     let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
         runtime.normalizer
     }
+    let profilesHandle: @Sendable (SpeakSwiftly.Normalizer) -> SpeakSwiftly.Normalizer.Profiles = { normalizer in
+        normalizer.profiles
+    }
+    let persistenceHandle: @Sendable (SpeakSwiftly.Normalizer) -> SpeakSwiftly.Normalizer.Persistence = { normalizer in
+        normalizer.persistence
+    }
     let makeNormalizer: @Sendable (URL?) -> SpeakSwiftly.Normalizer = { persistenceURL in
         SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
     }
@@ -117,78 +123,75 @@ import TextForSpeech
     let liftoffWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
         await SpeakSwiftly.liftoff(configuration: configuration)
     }
-    let profile: @Sendable (SpeakSwiftly.Normalizer, String) async -> TextForSpeech.Profile? = { normalizer, id in
-        await normalizer.profile(id: id)
+    let profile: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async -> TextForSpeech.Profile? = { profiles, id in
+        await profiles.stored(id: id)
     }
-    let profilesList: @Sendable (SpeakSwiftly.Normalizer) async -> [TextForSpeech.Profile] = { normalizer in
-        await normalizer.profiles()
+    let profilesList: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> [TextForSpeech.Profile] = { profiles in
+        await profiles.list()
     }
-    let activeProfile: @Sendable (SpeakSwiftly.Normalizer) async -> TextForSpeech.Profile = { normalizer in
-        await normalizer.activeProfile()
+    let activeProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> TextForSpeech.Profile? = { profiles in
+        await profiles.active()
     }
-    let baseProfile: @Sendable (SpeakSwiftly.Normalizer) async -> TextForSpeech.Profile = { normalizer in
-        await normalizer.baseProfile()
+    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles, String?) async -> TextForSpeech.Profile? = { profiles, id in
+        await profiles.effective(id: id)
     }
-    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer, String?) async -> TextForSpeech.Profile = { normalizer, id in
-        await normalizer.effectiveProfile(id: id)
+    let loadProfiles: @Sendable (SpeakSwiftly.Normalizer.Persistence) async throws -> Void = { persistence in
+        try await persistence.load()
     }
-    let loadProfiles: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
-        try await normalizer.loadProfiles()
+    let saveProfiles: @Sendable (SpeakSwiftly.Normalizer.Persistence) async throws -> Void = { persistence in
+        try await persistence.save()
     }
-    let saveProfiles: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
-        try await normalizer.saveProfiles()
-    }
-    let createProfileObject: @Sendable (SpeakSwiftly.Normalizer, String, String, [TextForSpeech.Replacement]) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let createProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String, [TextForSpeech.Replacement]) async throws -> TextForSpeech.Profile = {
+        profiles,
         id,
         name,
         replacements in
-        try await normalizer.createProfile(id: id, named: name, replacements: replacements)
+        try await profiles.create(id: id, name: name, replacements: replacements)
     }
-    let storeProfile: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Profile) async throws -> Void = { normalizer, profile in
-        try await normalizer.storeProfile(profile)
+    let storeProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Profile) async throws -> Void = { profiles, profile in
+        try await profiles.store(profile)
     }
-    let useProfile: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Profile) async throws -> Void = { normalizer, profile in
-        try await normalizer.useProfile(profile)
+    let useProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Profile) async throws -> Void = { profiles, profile in
+        try await profiles.use(profile)
     }
-    let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> Void = { normalizer, id in
-        try await normalizer.removeProfile(id: id)
+    let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> Void = { profiles, id in
+        try await profiles.delete(id: id)
     }
-    let reset: @Sendable (SpeakSwiftly.Normalizer) async throws -> Void = { normalizer in
-        try await normalizer.reset()
+    let reset: @Sendable (SpeakSwiftly.Normalizer.Profiles) async throws -> Void = { profiles in
+        try await profiles.reset()
     }
-    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacement in
-        try await normalizer.addReplacement(replacement)
+        try await profiles.add(replacement)
     }
-    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacement,
         profileID in
-        try await normalizer.addReplacement(replacement, toStoredProfileID: profileID)
+        try await profiles.add(replacement, toStoredProfileID: profileID)
     }
-    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacement in
-        try await normalizer.replaceReplacement(replacement)
+        try await profiles.replace(replacement)
     }
-    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacement,
         profileID in
-        try await normalizer.replaceReplacement(replacement, inStoredProfileID: profileID)
+        try await profiles.replace(replacement, inStoredProfileID: profileID)
     }
-    let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer, String) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacementID in
-        try await normalizer.removeReplacement(id: replacementID)
+        try await profiles.removeReplacement(id: replacementID)
     }
-    let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer, String, String) async throws -> TextForSpeech.Profile = {
-        normalizer,
+    let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String) async throws -> TextForSpeech.Profile = {
+        profiles,
         replacementID,
         profileID in
-        try await normalizer.removeReplacement(id: replacementID, fromStoredProfileID: profileID)
+        try await profiles.removeReplacement(id: replacementID, fromStoredProfileID: profileID)
     }
     let createProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, String?) async -> SpeakSwiftly.RequestHandle = {
         voices,
@@ -303,6 +306,8 @@ import TextForSpeech
     _ = jobsHandle
     _ = artifactsHandle
     _ = normalizer
+    _ = profilesHandle
+    _ = persistenceHandle
     _ = makeNormalizer
     _ = liftoffWithDefaults
     _ = liftoffWithConfiguration
@@ -321,7 +326,6 @@ import TextForSpeech
     _ = profile
     _ = profilesList
     _ = activeProfile
-    _ = baseProfile
     _ = effectiveProfile
     _ = loadProfiles
     _ = saveProfiles

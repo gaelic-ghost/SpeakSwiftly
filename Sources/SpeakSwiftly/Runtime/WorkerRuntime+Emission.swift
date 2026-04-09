@@ -416,7 +416,6 @@ extension SpeakSwiftly.Runtime {
         case .removeProfile(let id, let profileName):
             await submitRequest(id: id, op: request.opName, profileName: profileName)
         case .textProfileActive(let id),
-             .textProfileBase(let id),
              .textProfiles(let id),
              .textProfilePersistence(let id),
              .loadTextProfiles(let id),
@@ -560,7 +559,7 @@ extension SpeakSwiftly.Runtime {
         )
 
         let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
-        let sectionWindows = TextForSpeech.sectionWindows(
+        let sectionWindows = TextForSpeech.Forensics.sectionWindows(
             originalText: speechJob.text,
             totalDurationMS: totalDurationMS,
             totalChunkCount: playbackSummary.chunkCount

@@ -7,21 +7,37 @@ public extension SpeakSwiftly {
     // MARK: Normalizer Handle
 
     actor Normalizer {
-        let textRuntime: TextForSpeechRuntime
+        let textRuntime: TextForSpeech.Runtime
 
         public init(
-            baseProfile: TextForSpeech.Profile = .base,
             activeProfile: TextForSpeech.Profile = .default,
             profiles: [String: TextForSpeech.Profile] = [:],
             persistenceURL: URL? = nil
         ) {
-            textRuntime = TextForSpeechRuntime(
-                baseProfile: baseProfile,
+            textRuntime = TextForSpeech.Runtime(
                 customProfile: activeProfile,
                 profiles: profiles,
                 persistenceURL: persistenceURL
             )
         }
+
+        public nonisolated var profiles: Profiles {
+            Profiles(normalizer: self)
+        }
+
+        public nonisolated var persistence: Persistence {
+            Persistence(normalizer: self)
+        }
+    }
+}
+
+public extension SpeakSwiftly.Normalizer {
+    struct Profiles: Sendable {
+        let normalizer: SpeakSwiftly.Normalizer
+    }
+
+    struct Persistence: Sendable {
+        let normalizer: SpeakSwiftly.Normalizer
     }
 }
 

@@ -3,132 +3,269 @@ import TextForSpeech
 
 // MARK: - Text Normalization Logic
 
-public extension SpeakSwiftly.Normalizer {
-    // MARK: Profile Inspection
-
-    func activeProfile() -> TextForSpeech.Profile {
-        textRuntime.customProfile
+extension SpeakSwiftly.Normalizer {
+    fileprivate func activeProfile(id: String? = nil) -> TextForSpeech.Profile? {
+        textRuntime.profiles.active(id: id)
     }
 
-    func baseProfile() -> TextForSpeech.Profile {
-        textRuntime.baseProfile
+    fileprivate func storedProfile(id: String) -> TextForSpeech.Profile? {
+        textRuntime.profiles.stored(id: id)
     }
 
-    func profile(id: String) -> TextForSpeech.Profile? {
-        textRuntime.profile(named: id)
+    fileprivate func storedProfiles() -> [TextForSpeech.Profile] {
+        textRuntime.profiles.list()
     }
 
-    func profiles() -> [TextForSpeech.Profile] {
-        textRuntime.storedProfiles()
+    fileprivate func effectiveProfile(id: String? = nil) -> TextForSpeech.Profile? {
+        textRuntime.profiles.effective(id: id)
     }
 
-    func effectiveProfile(id: String? = nil) -> TextForSpeech.Profile {
-        textRuntime.snapshot(named: id)
+    fileprivate func storeProfile(_ profile: TextForSpeech.Profile) {
+        textRuntime.profiles.store(profile)
     }
 
-    package func persistenceURL() -> URL? {
-        textRuntime.persistenceURL
+    fileprivate func useProfile(_ profile: TextForSpeech.Profile) {
+        textRuntime.profiles.use(profile)
     }
 
-    // MARK: Persistence
-
-    func loadProfiles() throws {
-        try textRuntime.load()
-    }
-
-    func saveProfiles() throws {
-        try textRuntime.save()
-    }
-
-    // MARK: Profile Mutation
-
-    func createProfile(
+    fileprivate func createProfile(
         id: String,
-        named name: String,
+        name: String,
         replacements: [TextForSpeech.Replacement] = []
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.createProfile(
+        try textRuntime.profiles.create(
             id: id,
-            named: name,
+            name: name,
             replacements: replacements
         )
-        try textRuntime.save()
-        return profile
     }
 
-    func storeProfile(_ profile: TextForSpeech.Profile) throws {
-        textRuntime.store(profile)
-        try textRuntime.save()
+    fileprivate func deleteProfile(id: String) {
+        textRuntime.profiles.delete(id: id)
     }
 
-    func useProfile(_ profile: TextForSpeech.Profile) throws {
-        textRuntime.use(profile)
-        try textRuntime.save()
+    fileprivate func resetProfiles() {
+        textRuntime.profiles.reset()
     }
 
-    func removeProfile(id: String) throws {
-        textRuntime.removeProfile(named: id)
-        try textRuntime.save()
+    fileprivate func addReplacement(
+        _ replacement: TextForSpeech.Replacement
+    ) -> TextForSpeech.Profile {
+        textRuntime.profiles.add(replacement)
     }
 
-    func reset() throws {
-        textRuntime.reset()
-        try textRuntime.save()
+    fileprivate func addReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        toStoredProfileID id: String
+    ) throws -> TextForSpeech.Profile {
+        try textRuntime.profiles.add(replacement, toStoredProfileID: id)
     }
 
-    // MARK: Replacement Mutation
-
-    func addReplacement(
+    fileprivate func replaceReplacement(
         _ replacement: TextForSpeech.Replacement
     ) throws -> TextForSpeech.Profile {
-        let profile = textRuntime.addReplacement(replacement)
-        try textRuntime.save()
-        return profile
+        try textRuntime.profiles.replace(replacement)
     }
 
-    func addReplacement(
+    fileprivate func replaceReplacement(
         _ replacement: TextForSpeech.Replacement,
-        toStoredProfileID profileID: String
+        inStoredProfileID id: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.addReplacement(replacement, toStoredProfileNamed: profileID)
-        try textRuntime.save()
-        return profile
+        try textRuntime.profiles.replace(replacement, inStoredProfileID: id)
     }
 
-    func replaceReplacement(
-        _ replacement: TextForSpeech.Replacement
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement)
-        try textRuntime.save()
-        return profile
-    }
-
-    func replaceReplacement(
-        _ replacement: TextForSpeech.Replacement,
-        inStoredProfileID profileID: String
-    ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.replaceReplacement(replacement, inStoredProfileNamed: profileID)
-        try textRuntime.save()
-        return profile
-    }
-
-    func removeReplacement(
+    fileprivate func removeReplacement(
         id replacementID: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.removeReplacement(id: replacementID)
-        try textRuntime.save()
-        return profile
+        try textRuntime.profiles.removeReplacement(id: replacementID)
     }
 
-    func removeReplacement(
+    fileprivate func removeReplacement(
         id replacementID: String,
         fromStoredProfileID profileID: String
     ) throws -> TextForSpeech.Profile {
-        let profile = try textRuntime.removeReplacement(
+        try textRuntime.profiles.removeReplacement(
             id: replacementID,
-            fromStoredProfileNamed: profileID
+            fromStoredProfileID: profileID
         )
-        try textRuntime.save()
+    }
+
+    fileprivate func persistenceURL() -> URL? {
+        textRuntime.persistenceURL
+    }
+
+    fileprivate func persistenceState() -> TextForSpeech.PersistedState {
+        textRuntime.persistence.state
+    }
+
+    fileprivate func restorePersistence(
+        _ state: TextForSpeech.PersistedState
+    ) throws {
+        try textRuntime.persistence.restore(state)
+    }
+
+    fileprivate func loadPersistence() throws {
+        try textRuntime.persistence.load()
+    }
+
+    fileprivate func loadPersistence(from url: URL) throws {
+        try textRuntime.persistence.load(from: url)
+    }
+
+    fileprivate func savePersistence() throws {
+        try textRuntime.persistence.save()
+    }
+
+    fileprivate func savePersistence(to url: URL) throws {
+        try textRuntime.persistence.save(to: url)
+    }
+}
+
+public extension SpeakSwiftly.Normalizer.Profiles {
+    func active(id: String? = nil) async -> TextForSpeech.Profile? {
+        await normalizer.activeProfile(id: id)
+    }
+
+    func stored(id: String) async -> TextForSpeech.Profile? {
+        await normalizer.storedProfile(id: id)
+    }
+
+    func list() async -> [TextForSpeech.Profile] {
+        await normalizer.storedProfiles()
+    }
+
+    func effective(id: String? = nil) async -> TextForSpeech.Profile? {
+        await normalizer.effectiveProfile(id: id)
+    }
+
+    @discardableResult
+    func create(
+        id: String,
+        name: String,
+        replacements: [TextForSpeech.Replacement] = []
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.createProfile(
+            id: id,
+            name: name,
+            replacements: replacements
+        )
+        try await normalizer.savePersistence()
         return profile
+    }
+
+    func store(_ profile: TextForSpeech.Profile) async throws {
+        await normalizer.storeProfile(profile)
+        try await normalizer.savePersistence()
+    }
+
+    func use(_ profile: TextForSpeech.Profile) async throws {
+        await normalizer.useProfile(profile)
+        try await normalizer.savePersistence()
+    }
+
+    func delete(id: String) async throws {
+        await normalizer.deleteProfile(id: id)
+        try await normalizer.savePersistence()
+    }
+
+    func reset() async throws {
+        await normalizer.resetProfiles()
+        try await normalizer.savePersistence()
+    }
+
+    @discardableResult
+    func add(
+        _ replacement: TextForSpeech.Replacement
+    ) async throws -> TextForSpeech.Profile {
+        let profile = await normalizer.addReplacement(replacement)
+        try await normalizer.savePersistence()
+        return profile
+    }
+
+    @discardableResult
+    func add(
+        _ replacement: TextForSpeech.Replacement,
+        toStoredProfileID id: String
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.addReplacement(
+            replacement,
+            toStoredProfileID: id
+        )
+        try await normalizer.savePersistence()
+        return profile
+    }
+
+    @discardableResult
+    func replace(
+        _ replacement: TextForSpeech.Replacement
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.replaceReplacement(replacement)
+        try await normalizer.savePersistence()
+        return profile
+    }
+
+    @discardableResult
+    func replace(
+        _ replacement: TextForSpeech.Replacement,
+        inStoredProfileID id: String
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.replaceReplacement(
+            replacement,
+            inStoredProfileID: id
+        )
+        try await normalizer.savePersistence()
+        return profile
+    }
+
+    @discardableResult
+    func removeReplacement(
+        id replacementID: String
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.removeReplacement(id: replacementID)
+        try await normalizer.savePersistence()
+        return profile
+    }
+
+    @discardableResult
+    func removeReplacement(
+        id replacementID: String,
+        fromStoredProfileID profileID: String
+    ) async throws -> TextForSpeech.Profile {
+        let profile = try await normalizer.removeReplacement(
+            id: replacementID,
+            fromStoredProfileID: profileID
+        )
+        try await normalizer.savePersistence()
+        return profile
+    }
+}
+
+public extension SpeakSwiftly.Normalizer.Persistence {
+    func url() async -> URL? {
+        await normalizer.persistenceURL()
+    }
+
+    func state() async -> TextForSpeech.PersistedState {
+        await normalizer.persistenceState()
+    }
+
+    func restore(_ state: TextForSpeech.PersistedState) async throws {
+        try await normalizer.restorePersistence(state)
+    }
+
+    func load() async throws {
+        try await normalizer.loadPersistence()
+    }
+
+    func load(from url: URL) async throws {
+        try await normalizer.loadPersistence(from: url)
+    }
+
+    func save() async throws {
+        try await normalizer.savePersistence()
+    }
+
+    func save(to url: URL) async throws {
+        try await normalizer.savePersistence(to: url)
     }
 }

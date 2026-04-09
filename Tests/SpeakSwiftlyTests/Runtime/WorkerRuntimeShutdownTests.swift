@@ -480,7 +480,7 @@ final class LockedFlag: @unchecked Sendable {
     let normalizer = SpeakSwiftly.Normalizer(
         persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
     )
-    try await normalizer.loadProfiles()
+    try await normalizer.persistence.load()
 
     let dependencies = WorkerDependencies(
         fileManager: fileManager,
