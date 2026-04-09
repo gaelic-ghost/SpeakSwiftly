@@ -1059,6 +1059,20 @@ final class AudioPlaybackDriver {
             }
 
             state.generationFinished = true
+            if startedPlayback, state.isRebuffering {
+                let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+                if !isPlaybackPausedManually {
+                    playerNode?.play()
+                }
+                state.isRebuffering = false
+                if let rebufferStartedAt = state.rebufferStartedAt {
+                    let durationMS = milliseconds(since: rebufferStartedAt)
+                    state.rebufferTotalDurationMS += durationMS
+                    state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
+                    state.rebufferStartedAt = nil
+                }
+                await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
+            }
             if !startedPlayback, !pendingBuffers.isEmpty {
                 startupBufferedAudioMS = bufferedAudioMS()
 
