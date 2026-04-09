@@ -361,10 +361,12 @@ Tickets:
 
 - [x] Define the minimum playback control operations that are actually worth owning around `playback_pause`, `playback_resume`, and `playback_state`, and keep the contract narrow instead of growing a generic command surface.
 - [ ] Define typed `SpeakSwiftlyCore` API parity for playback control requests and events instead of forcing library callers back through ad-hoc JSONL handling.
+- [ ] Unify playback-state reporting under one controller-owned source of truth so `playback_state.state` and `playback_state.active_request` cannot diverge during preroll, rebuffer, interruption, or drain.
 - [ ] Decide and document whether a stop request only interrupts the active request or can also affect queued playback requests.
 - [ ] Emit structured lifecycle output for control acceptance, playback interruption, and terminal request state so parent processes can reason about what happened without guessing.
 - [ ] Add runtime coverage for `playback_pause`, `playback_resume`, and `playback_state`, including no-op state transitions when nothing is currently playing and explicit state payload assertions for idle, paused, and resumed playback.
 - [ ] Add automated coverage for active `speak_live` interruption, background-playback interruption, and control requests that must not disturb queued playback ownership when they only target the active request.
+- [ ] Add targeted queued-live coverage that exercises preroll, rebuffer, and drain while asserting that playback-state snapshots stay internally consistent.
 - [ ] Document the control semantics clearly in the README once the contract is real.
 
 Exit criteria:

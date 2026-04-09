@@ -948,11 +948,14 @@ actor PlaybackController {
     func handle(_ action: PlaybackAction) async -> PlaybackState {
         switch action {
         case .pause:
-            return await driver.pause()
+            let driverState = await driver.pause()
+            return resolvedPlaybackState(driverState: driverState)
         case .resume:
-            return await driver.resume()
+            let driverState = await driver.resume()
+            return resolvedPlaybackState(driverState: driverState)
         case .state:
-            return await driver.state()
+            let driverState = await driver.state()
+            return resolvedPlaybackState(driverState: driverState)
         }
     }
 
@@ -998,10 +1001,28 @@ actor PlaybackController {
     }
 
     func stateSnapshot() async -> SpeakSwiftly.PlaybackStateSnapshot {
-        SpeakSwiftly.PlaybackStateSnapshot(
-            state: await driver.state(),
-            activeRequest: activeRequestSummary()
+        let activeRequest = activeRequestSummary()
+        let driverState = await driver.state()
+        return SpeakSwiftly.PlaybackStateSnapshot(
+            state: resolvedPlaybackState(driverState: driverState, activeRequest: activeRequest),
+            activeRequest: activeRequest
         )
+    }
+
+    private func resolvedPlaybackState(
+        driverState: PlaybackState,
+        activeRequest: ActiveWorkerRequestSummary? = nil
+    ) -> PlaybackState {
+        let resolvedActiveRequest = activeRequest ?? activeRequestSummary()
+        guard resolvedActiveRequest != nil else {
+            return .idle
+        }
+
+        if driverState == .paused {
+            return .paused
+        }
+
+        return .playing
     }
 
     func clearQueued(excluding protectedRequestIDs: Set<String>) -> [PlaybackJob] {

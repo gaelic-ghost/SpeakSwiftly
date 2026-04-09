@@ -87,6 +87,69 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
+@Test func playbackStateStaysConsistentWhileLivePlaybackOwnsTheActiveRequest() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == activeHandle.id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    _ = await runtime.generate.speech(text: "Hi there", with: "default-femme")
+    let stateID = await runtime.player.state().id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == stateID,
+                $0["ok"] as? Bool == true,
+                let playbackState = $0["playback_state"] as? [String: Any],
+                let activeRequest = playbackState["active_request"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return playbackState["state"] as? String == "playing"
+                && activeRequest["id"] as? String == activeHandle.id
+        }
+    })
+
+    await playbackDrain.open()
+}
+
 @Test func statusReturnsCurrentResidentBackendAndStage() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
@@ -1200,28 +1263,43 @@ private actor BackendLoadRecorder {
     var iterator = handle.events.makeAsyncIterator()
     let createdAt = try store.loadProfile(named: "default-femme").manifest.createdAt
 
-    let started = try await iterator.next()
-    let completed = try await iterator.next()
-    let terminal = try await iterator.next()
+    var sawStarted = false
+    var sawCompleted = false
 
-    #expect(started == .started(WorkerStartedEvent(id: "req-stream", op: "list_voice_profiles")))
-    #expect(
-        completed == .completed(
-            WorkerSuccessResponse(
-                id: "req-stream",
-                profiles: [
-                    ProfileSummary(
-                        profileName: "default-femme",
-                        vibe: .femme,
-                        createdAt: createdAt,
-                        voiceDescription: "Warm and bright.",
-                        sourceText: "Reference transcript"
-                    )
-                ]
+    while let event = try await iterator.next() {
+        switch event {
+        case .queued:
+            continue
+
+        case .started(let started):
+            #expect(started == WorkerStartedEvent(id: "req-stream", op: "list_voice_profiles"))
+            sawStarted = true
+
+        case .completed(let response):
+            #expect(
+                response == WorkerSuccessResponse(
+                    id: "req-stream",
+                    profiles: [
+                        ProfileSummary(
+                            profileName: "default-femme",
+                            vibe: .femme,
+                            createdAt: createdAt,
+                            voiceDescription: "Warm and bright.",
+                            sourceText: "Reference transcript"
+                        )
+                    ]
+                )
             )
-        )
-    )
-    #expect(terminal == nil)
+            sawCompleted = true
+            break
+
+        case .progress, .acknowledged:
+            Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
+        }
+    }
+
+    #expect(sawStarted)
+    #expect(sawCompleted)
 }
 
 @Test func speakLiveUsesStableResidentGenerationParameters() async throws {
