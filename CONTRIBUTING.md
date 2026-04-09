@@ -219,6 +219,9 @@ The intended library-caller shape is:
 
 The typed text-normalization helpers live on grouped handles under `SpeakSwiftly.Normalizer`:
 
+- `try SpeakSwiftly.Normalizer(...)` now follows `TextForSpeech.Runtime` construction semantics and can throw immediately if persisted text profiles are unreadable or undecodable.
+- `SpeakSwiftly.liftoff()` keeps a best-effort recovery path for unreadable text-profile archives so the worker can continue starting after quarantining a bad archive.
+
 - `normalizer.profiles.active(id:)`
 - `normalizer.profiles.stored(id:)`
 - `normalizer.profiles.list()`

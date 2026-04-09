@@ -534,10 +534,9 @@ func makeRuntime<ResidentModelResult>(
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
-    let normalizer = SpeakSwiftly.Normalizer(
+    let normalizer = try SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
     )
-    try await normalizer.persistence.load()
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
         fileManager: .default,

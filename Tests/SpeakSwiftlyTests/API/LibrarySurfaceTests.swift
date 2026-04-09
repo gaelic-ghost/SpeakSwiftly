@@ -9,9 +9,9 @@ import TextForSpeech
     _ = await SpeakSwiftly.liftoff()
 }
 
-@Test func publicLibrarySurfaceConstructsTopLevelNormalizer() {
+@Test func publicLibrarySurfaceConstructsTopLevelNormalizer() throws {
     let persistenceURL = URL(fileURLWithPath: "/tmp/speakswiftly-test-profiles.json")
-    let normalizer = SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+    let normalizer = try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
     _ = normalizer
 }
 
@@ -46,8 +46,8 @@ import TextForSpeech
     }
 }
 
-@Test func publicConfigurationCanCarryATextNormalizer() {
-    let normalizer = SpeakSwiftly.Normalizer()
+@Test func publicConfigurationCanCarryATextNormalizer() throws {
+    let normalizer = try SpeakSwiftly.Normalizer()
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         textNormalizer: normalizer
@@ -59,7 +59,7 @@ import TextForSpeech
 
 // MARK: - Runtime Helpers
 
-@Test func publicLibrarySurfaceExposesQueueingHelpers() {
+@Test func publicLibrarySurfaceExposesQueueingHelpers() throws {
     let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
@@ -114,8 +114,8 @@ import TextForSpeech
     let persistenceHandle: @Sendable (SpeakSwiftly.Normalizer) -> SpeakSwiftly.Normalizer.Persistence = { normalizer in
         normalizer.persistence
     }
-    let makeNormalizer: @Sendable (URL?) -> SpeakSwiftly.Normalizer = { persistenceURL in
-        SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+    let makeNormalizer: @Sendable (URL?) throws -> SpeakSwiftly.Normalizer = { persistenceURL in
+        try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
     }
     let liftoffWithDefaults: @Sendable () async -> SpeakSwiftly.Runtime = {
         await SpeakSwiftly.liftoff()

@@ -4,6 +4,48 @@ import TextForSpeech
 // MARK: - Worker Runtime Lifecycle
 
 extension SpeakSwiftly.Runtime {
+    private static func makeDefaultNormalizer(
+        persistenceURL: URL,
+        dependencies: WorkerDependencies
+    ) -> SpeakSwiftly.Normalizer {
+        do {
+            return try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+        } catch {
+            let archiveURL = quarantinedTextProfileArchiveURL(for: persistenceURL)
+
+            if dependencies.fileManager.fileExists(atPath: persistenceURL.path) {
+                do {
+                    try dependencies.fileManager.moveItem(at: persistenceURL, to: archiveURL)
+                    dependencies.writeStderr(
+                        "SpeakSwiftly could not load persisted text profiles from '\(persistenceURL.path)'. The unreadable archive was moved to '\(archiveURL.path)', and SpeakSwiftly will continue with a fresh text-profile state. \(error.localizedDescription)\n"
+                    )
+
+                    return try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
+                } catch {
+                    dependencies.writeStderr(
+                        "SpeakSwiftly could not recover the unreadable text-profile archive at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n"
+                    )
+                }
+            } else {
+                dependencies.writeStderr(
+                    "SpeakSwiftly could not initialize text-profile persistence at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n"
+                )
+            }
+
+            let recoveryURL = persistenceURL
+                .deletingLastPathComponent()
+                .appending(path: "text-profiles.recovery.\(UUID().uuidString).json")
+
+            return try! SpeakSwiftly.Normalizer(persistenceURL: recoveryURL)
+        }
+    }
+
+    private static func quarantinedTextProfileArchiveURL(for persistenceURL: URL) -> URL {
+        persistenceURL
+            .deletingPathExtension()
+            .appendingPathExtension("invalid-\(Int(Date().timeIntervalSince1970)).json")
+    }
+
     // MARK: - Lifecycle
 
     static func liftoff(
@@ -23,22 +65,18 @@ extension SpeakSwiftly.Runtime {
             ),
             fileManager: dependencies.fileManager
         )
-        let normalizer = configuration?.textNormalizer ?? SpeakSwiftly.Normalizer(
-            persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
-        )
         let generatedFileStore = GeneratedFileStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true)
         )
         let generationJobStore = GenerationJobStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true)
         )
-        do {
-            try await normalizer.persistence.load()
-        } catch {
-            let path = await normalizer.persistence.url()?.path ?? "unknown path"
-            let message = "SpeakSwiftly could not load persisted text profiles from '\(path)'. \(error.localizedDescription)\n"
-            FileHandle.standardError.write(Data(message.utf8))
-        }
+        let textProfilesURL = profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
+        let normalizer = configuration?.textNormalizer
+            ?? makeDefaultNormalizer(
+                persistenceURL: textProfilesURL,
+                dependencies: dependencies
+            )
         let playbackController = PlaybackController(driver: await dependencies.makePlaybackController())
 
         let runtime = SpeakSwiftly.Runtime(

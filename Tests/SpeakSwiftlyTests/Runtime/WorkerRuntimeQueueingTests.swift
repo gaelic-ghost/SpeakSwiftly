@@ -413,7 +413,9 @@ import TextForSpeech
     #expect(await secondRuntime.normalizer.profiles.stored(id: "logs")?.replacements.map(\.id) == ["logs-rule"])
     #expect(await secondRuntime.normalizer.profiles.active()?.id == "ops")
     #expect(await secondRuntime.normalizer.profiles.active()?.replacements.map(\.id) == ["ops-rule"])
-    #expect(await secondRuntime.normalizer.profiles.effective(id: "logs")?.replacements.map(\.id) == ["logs-rule"])
+    let effectiveLogsReplacementIDs = await secondRuntime.normalizer.profiles.effective(id: "logs")?.replacements.map(\.id) ?? []
+    #expect(effectiveLogsReplacementIDs.contains("logs-rule"))
+    #expect(effectiveLogsReplacementIDs.contains("base-url"))
 }
 
 @Test func textProfileEditingHelpersMutateAndPersistStoredProfiles() async throws {

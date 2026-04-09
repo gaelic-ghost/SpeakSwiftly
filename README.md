@@ -103,6 +103,8 @@ The typed runtime is organized around stored concern handles that callers can ke
 - `runtime.jobs`
 - `runtime.artifacts`
 
+When callers need to construct a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` now throws if the persisted text-profile archive cannot be loaded or decoded. The worker runtime still uses a best-effort recovery path for unreadable archives so `SpeakSwiftly.liftoff()` can continue starting in operator-facing environments.
+
 Runtime preferences have a matching typed surface:
 
 ```swift

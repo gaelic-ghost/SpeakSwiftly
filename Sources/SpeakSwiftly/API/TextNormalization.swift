@@ -13,12 +13,16 @@ public extension SpeakSwiftly {
             activeProfile: TextForSpeech.Profile = .default,
             profiles: [String: TextForSpeech.Profile] = [:],
             persistenceURL: URL? = nil
-        ) {
-            textRuntime = TextForSpeech.Runtime(
-                customProfile: activeProfile,
-                profiles: profiles,
-                persistenceURL: persistenceURL
-            )
+        ) throws {
+            let runtime = try TextForSpeech.Runtime(persistenceURL: persistenceURL)
+            if !profiles.isEmpty || activeProfile != .default {
+                try Self.seed(
+                    runtime: runtime,
+                    activeProfile: activeProfile,
+                    profiles: profiles
+                )
+            }
+            textRuntime = runtime
         }
 
         public nonisolated var profiles: Profiles {
@@ -38,6 +42,25 @@ public extension SpeakSwiftly.Normalizer {
 
     struct Persistence: Sendable {
         let normalizer: SpeakSwiftly.Normalizer
+    }
+}
+
+private extension SpeakSwiftly.Normalizer {
+    static func seed(
+        runtime: TextForSpeech.Runtime,
+        activeProfile: TextForSpeech.Profile,
+        profiles: [String: TextForSpeech.Profile]
+    ) throws {
+        var storedProfiles = profiles
+        storedProfiles[activeProfile.id] = activeProfile
+
+        try runtime.persistence.restore(
+            TextForSpeech.PersistedState(
+                version: runtime.persistence.state.version,
+                activeCustomProfileID: activeProfile.id,
+                profiles: storedProfiles
+            )
+        )
     }
 }
 

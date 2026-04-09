@@ -4,8 +4,8 @@ import TextForSpeech
 // MARK: - Text Normalization Logic
 
 extension SpeakSwiftly.Normalizer {
-    fileprivate func activeProfile(id: String? = nil) -> TextForSpeech.Profile? {
-        textRuntime.profiles.active(id: id)
+    fileprivate func activeProfile() -> TextForSpeech.Profile {
+        textRuntime.profiles.active()
     }
 
     fileprivate func storedProfile(id: String) -> TextForSpeech.Profile? {
@@ -17,15 +17,20 @@ extension SpeakSwiftly.Normalizer {
     }
 
     fileprivate func effectiveProfile(id: String? = nil) -> TextForSpeech.Profile? {
-        textRuntime.profiles.effective(id: id)
+        if let id {
+            return textRuntime.profiles.effective(id: id)
+        }
+
+        return textRuntime.profiles.effective()
     }
 
-    fileprivate func storeProfile(_ profile: TextForSpeech.Profile) {
-        textRuntime.profiles.store(profile)
+    fileprivate func storeProfile(_ profile: TextForSpeech.Profile) throws {
+        try textRuntime.profiles.store(profile)
     }
 
-    fileprivate func useProfile(_ profile: TextForSpeech.Profile) {
-        textRuntime.profiles.use(profile)
+    fileprivate func useProfile(_ profile: TextForSpeech.Profile) throws {
+        try textRuntime.profiles.store(profile)
+        try textRuntime.profiles.activate(id: profile.id)
     }
 
     fileprivate func createProfile(
@@ -40,25 +45,25 @@ extension SpeakSwiftly.Normalizer {
         )
     }
 
-    fileprivate func deleteProfile(id: String) {
-        textRuntime.profiles.delete(id: id)
+    fileprivate func deleteProfile(id: String) throws {
+        try textRuntime.profiles.delete(id: id)
     }
 
-    fileprivate func resetProfiles() {
-        textRuntime.profiles.reset()
+    fileprivate func resetProfiles() throws {
+        try textRuntime.profiles.reset()
     }
 
     fileprivate func addReplacement(
         _ replacement: TextForSpeech.Replacement
-    ) -> TextForSpeech.Profile {
-        textRuntime.profiles.add(replacement)
+    ) throws -> TextForSpeech.Profile {
+        try textRuntime.profiles.add(replacement)
     }
 
     fileprivate func addReplacement(
         _ replacement: TextForSpeech.Replacement,
         toStoredProfileID id: String
     ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.add(replacement, toStoredProfileID: id)
+        try textRuntime.profiles.add(replacement, toProfileID: id)
     }
 
     fileprivate func replaceReplacement(
@@ -71,7 +76,7 @@ extension SpeakSwiftly.Normalizer {
         _ replacement: TextForSpeech.Replacement,
         inStoredProfileID id: String
     ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.replace(replacement, inStoredProfileID: id)
+        try textRuntime.profiles.replace(replacement, inProfileID: id)
     }
 
     fileprivate func removeReplacement(
@@ -86,7 +91,7 @@ extension SpeakSwiftly.Normalizer {
     ) throws -> TextForSpeech.Profile {
         try textRuntime.profiles.removeReplacement(
             id: replacementID,
-            fromStoredProfileID: profileID
+            fromProfileID: profileID
         )
     }
 
@@ -123,7 +128,11 @@ extension SpeakSwiftly.Normalizer {
 
 public extension SpeakSwiftly.Normalizer.Profiles {
     func active(id: String? = nil) async -> TextForSpeech.Profile? {
-        await normalizer.activeProfile(id: id)
+        if let id {
+            return await normalizer.storedProfile(id: id)
+        }
+
+        return await normalizer.activeProfile()
     }
 
     func stored(id: String) async -> TextForSpeech.Profile? {
@@ -144,42 +153,34 @@ public extension SpeakSwiftly.Normalizer.Profiles {
         name: String,
         replacements: [TextForSpeech.Replacement] = []
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.createProfile(
+        try await normalizer.createProfile(
             id: id,
             name: name,
             replacements: replacements
         )
-        try await normalizer.savePersistence()
-        return profile
     }
 
     func store(_ profile: TextForSpeech.Profile) async throws {
-        await normalizer.storeProfile(profile)
-        try await normalizer.savePersistence()
+        try await normalizer.storeProfile(profile)
     }
 
     func use(_ profile: TextForSpeech.Profile) async throws {
-        await normalizer.useProfile(profile)
-        try await normalizer.savePersistence()
+        try await normalizer.useProfile(profile)
     }
 
     func delete(id: String) async throws {
-        await normalizer.deleteProfile(id: id)
-        try await normalizer.savePersistence()
+        try await normalizer.deleteProfile(id: id)
     }
 
     func reset() async throws {
-        await normalizer.resetProfiles()
-        try await normalizer.savePersistence()
+        try await normalizer.resetProfiles()
     }
 
     @discardableResult
     func add(
         _ replacement: TextForSpeech.Replacement
     ) async throws -> TextForSpeech.Profile {
-        let profile = await normalizer.addReplacement(replacement)
-        try await normalizer.savePersistence()
-        return profile
+        try await normalizer.addReplacement(replacement)
     }
 
     @discardableResult
@@ -187,21 +188,17 @@ public extension SpeakSwiftly.Normalizer.Profiles {
         _ replacement: TextForSpeech.Replacement,
         toStoredProfileID id: String
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.addReplacement(
+        try await normalizer.addReplacement(
             replacement,
             toStoredProfileID: id
         )
-        try await normalizer.savePersistence()
-        return profile
     }
 
     @discardableResult
     func replace(
         _ replacement: TextForSpeech.Replacement
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.replaceReplacement(replacement)
-        try await normalizer.savePersistence()
-        return profile
+        try await normalizer.replaceReplacement(replacement)
     }
 
     @discardableResult
@@ -209,21 +206,17 @@ public extension SpeakSwiftly.Normalizer.Profiles {
         _ replacement: TextForSpeech.Replacement,
         inStoredProfileID id: String
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.replaceReplacement(
+        try await normalizer.replaceReplacement(
             replacement,
             inStoredProfileID: id
         )
-        try await normalizer.savePersistence()
-        return profile
     }
 
     @discardableResult
     func removeReplacement(
         id replacementID: String
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.removeReplacement(id: replacementID)
-        try await normalizer.savePersistence()
-        return profile
+        try await normalizer.removeReplacement(id: replacementID)
     }
 
     @discardableResult
@@ -231,12 +224,10 @@ public extension SpeakSwiftly.Normalizer.Profiles {
         id replacementID: String,
         fromStoredProfileID profileID: String
     ) async throws -> TextForSpeech.Profile {
-        let profile = try await normalizer.removeReplacement(
+        try await normalizer.removeReplacement(
             id: replacementID,
             fromStoredProfileID: profileID
         )
-        try await normalizer.savePersistence()
-        return profile
     }
 }
 

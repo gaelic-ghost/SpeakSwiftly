@@ -399,7 +399,7 @@ final class LockedFlag: @unchecked Sendable {
         profileStore: try makeProfileStore(rootURL: storeRoot),
         generatedFileStore: try makeGeneratedFileStore(rootURL: storeRoot),
         generationJobStore: try makeGenerationJobStore(rootURL: storeRoot),
-        normalizer: SpeakSwiftly.Normalizer(
+        normalizer: try SpeakSwiftly.Normalizer(
             persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
         ),
         playbackController: PlaybackController(driver: AnyPlaybackController.silent())
@@ -477,10 +477,9 @@ final class LockedFlag: @unchecked Sendable {
     try generatedFileStore.ensureRootExists()
     try generationJobStore.ensureRootExists()
 
-    let normalizer = SpeakSwiftly.Normalizer(
+    let normalizer = try SpeakSwiftly.Normalizer(
         persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
     )
-    try await normalizer.persistence.load()
 
     let dependencies = WorkerDependencies(
         fileManager: fileManager,

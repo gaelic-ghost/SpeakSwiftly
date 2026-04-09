@@ -54,6 +54,141 @@ struct RawWorkerRequest: Decodable, Sendable {
     let transcript: String?
     let speechBackend: SpeakSwiftly.SpeechBackend?
 
+    private struct LegacyReplacementPayload: Decodable, Sendable {
+        private enum LegacyMatchPayload: Decodable, Sendable {
+            case match(TextForSpeech.Replacement.Match)
+
+            init(from decoder: any Decoder) throws {
+                if let match = try? TextForSpeech.Replacement.Match(from: decoder) {
+                    self = .match(match)
+                    return
+                }
+
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self)
+
+                switch rawValue {
+                case "exact_phrase":
+                    self = .match(.exactPhrase)
+                case "whole_token":
+                    self = .match(.wholeToken)
+                default:
+                    throw DecodingError.dataCorruptedError(
+                        in: container,
+                        debugDescription: "Unsupported legacy replacement match '\(rawValue)'."
+                    )
+                }
+            }
+
+            var resolved: TextForSpeech.Replacement.Match {
+                switch self {
+                case .match(let match):
+                    match
+                }
+            }
+        }
+
+        private enum LegacyTransformPayload: Decodable, Sendable {
+            case transform(TextForSpeech.Replacement.Transform)
+
+            init(from decoder: any Decoder) throws {
+                if let transform = try? TextForSpeech.Replacement.Transform(from: decoder) {
+                    self = .transform(transform)
+                    return
+                }
+
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self)
+
+                switch rawValue {
+                case "spoken_path":
+                    self = .transform(.spokenPath)
+                case "spoken_url":
+                    self = .transform(.spokenURL)
+                case "spoken_identifier":
+                    self = .transform(.spokenIdentifier)
+                case "spoken_code":
+                    self = .transform(.spokenCode)
+                case "spell_out":
+                    self = .transform(.spellOut)
+                default:
+                    throw DecodingError.dataCorruptedError(
+                        in: container,
+                        debugDescription: "Unsupported legacy replacement transform '\(rawValue)'."
+                    )
+                }
+            }
+
+            var resolved: TextForSpeech.Replacement.Transform {
+                switch self {
+                case .transform(let transform):
+                    transform
+                }
+            }
+        }
+
+        let id: String
+        let text: String
+        private let transform: LegacyTransformPayload?
+        let replacement: String?
+        private let match: LegacyMatchPayload
+        let phase: TextForSpeech.Replacement.Phase
+        let isCaseSensitive: Bool
+        let textFormats: Set<TextForSpeech.TextFormat>
+        let sourceFormats: Set<TextForSpeech.SourceFormat>
+        let priority: Int
+
+        func resolved() throws -> TextForSpeech.Replacement {
+            if let replacement {
+                return TextForSpeech.Replacement(
+                    text,
+                    with: replacement,
+                    id: id,
+                    matching: match.resolved,
+                    during: phase,
+                    caseSensitive: isCaseSensitive,
+                    forTextFormats: textFormats,
+                    forSourceFormats: sourceFormats,
+                    priority: priority
+                )
+            }
+
+            guard let transform else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Replacement payload must provide either a literal 'replacement' or a 'transform'."
+                    )
+                )
+            }
+
+            if case .literal(let literal) = transform.resolved {
+                return TextForSpeech.Replacement(
+                    text,
+                    with: literal,
+                    id: id,
+                    matching: match.resolved,
+                    during: phase,
+                    caseSensitive: isCaseSensitive,
+                    forTextFormats: textFormats,
+                    forSourceFormats: sourceFormats,
+                    priority: priority
+                )
+            }
+
+            return TextForSpeech.Replacement(
+                id: id,
+                matching: match.resolved,
+                using: transform.resolved,
+                during: phase,
+                caseSensitive: isCaseSensitive,
+                forTextFormats: textFormats,
+                forSourceFormats: sourceFormats,
+                priority: priority
+            )
+        }
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case op
@@ -99,8 +234,8 @@ struct RawWorkerRequest: Decodable, Sendable {
         textProfileID = try container.decodeIfPresent(String.self, forKey: .textProfileID)
         textProfileDisplayName = try container.decodeIfPresent(String.self, forKey: .textProfileDisplayName)
         textProfile = try container.decodeIfPresent(TextForSpeech.Profile.self, forKey: .textProfile)
-        replacements = try container.decodeIfPresent([TextForSpeech.Replacement].self, forKey: .replacements)
-        replacement = try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: .replacement)
+        replacements = try Self.decodeReplacementsIfPresent(in: container, forKey: .replacements)
+        replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
         replacementID = try container.decodeIfPresent(String.self, forKey: .replacementID)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
@@ -161,6 +296,36 @@ struct RawWorkerRequest: Decodable, Sendable {
         }
 
         return format
+    }
+
+    private static func decodeReplacementIfPresent(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) throws -> TextForSpeech.Replacement? {
+        guard container.contains(key) else { return nil }
+
+        do {
+            return try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: key)
+        } catch {
+            return try container
+                .decodeIfPresent(LegacyReplacementPayload.self, forKey: key)?
+                .resolved()
+        }
+    }
+
+    private static func decodeReplacementsIfPresent(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) throws -> [TextForSpeech.Replacement]? {
+        guard container.contains(key) else { return nil }
+
+        do {
+            return try container.decodeIfPresent([TextForSpeech.Replacement].self, forKey: key)
+        } catch {
+            return try container
+                .decodeIfPresent([LegacyReplacementPayload].self, forKey: key)?
+                .map { try $0.resolved() }
+        }
     }
 
     private static func legacyCompatibility(
