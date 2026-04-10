@@ -1463,24 +1463,26 @@ final class AudioPlaybackDriver {
             return nil
         }
 
-        var deviceName: Unmanaged<CFString>?
-        var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        var deviceName: CFString = "" as CFString
+        var nameSize = UInt32(MemoryLayout<CFString>.stride)
         var nameAddress = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        let nameStatus = AudioObjectGetPropertyData(
-            deviceID,
-            &nameAddress,
-            0,
-            nil,
-            &nameSize,
-            &deviceName
-        )
+        let nameStatus = withUnsafeMutablePointer(to: &deviceName) { pointer in
+            AudioObjectGetPropertyData(
+                deviceID,
+                &nameAddress,
+                0,
+                nil,
+                &nameSize,
+                UnsafeMutableRawPointer(pointer)
+            )
+        }
 
-        if nameStatus == noErr, let deviceName {
-            let name = deviceName.takeRetainedValue() as String
+        if nameStatus == noErr {
+            let name = deviceName as String
             if !name.isEmpty {
                 return "\(name) [\(deviceID)]"
             }
