@@ -379,6 +379,7 @@ Tickets:
 - [ ] Add an explicit playback-route policy surface so worker owners can choose whether live playback follows the current system output immediately, waits for the original device class to return, or fails over only for specific route categories.
 - [ ] Keep the current default route policy as “follow the active system output device” until a narrower policy surface is implemented and documented.
 - [ ] Add targeted coverage for Bluetooth and default-output-device churn, including a simulated “AirPods leave for another device, then return” path that proves active requests recover without dying.
+- [ ] Add an out-of-band playback hardware harness that can trigger sleep, wake, and route-change scenarios from a second machine so host power-state validation does not depend only on manual local testing.
 - [ ] Once an iPhone companion app exists, revisit route policy with a smarter multi-device model that can see both endpoints at once and make better choices than blind speaker fallback.
 - [ ] Decide and document whether a stop request only interrupts the active request or can also affect queued playback requests.
 - [ ] Emit structured lifecycle output for control acceptance, playback interruption, and terminal request state so parent processes can reason about what happened without guessing.
