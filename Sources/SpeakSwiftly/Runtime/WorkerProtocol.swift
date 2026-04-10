@@ -38,6 +38,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let textProfileID: String?
     let textProfileDisplayName: String?
     let textProfile: TextForSpeech.Profile?
+    let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
     let replacements: [TextForSpeech.Replacement]?
     let replacement: TextForSpeech.Replacement?
     let replacementID: String?
@@ -202,6 +203,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case textProfileID = "text_profile_id"
         case textProfileDisplayName = "text_profile_display_name"
         case textProfile = "text_profile"
+        case textProfileStyle = "text_profile_style"
         case replacements
         case replacement
         case replacementID = "replacement_id"
@@ -234,6 +236,10 @@ struct RawWorkerRequest: Decodable, Sendable {
         textProfileID = try container.decodeIfPresent(String.self, forKey: .textProfileID)
         textProfileDisplayName = try container.decodeIfPresent(String.self, forKey: .textProfileDisplayName)
         textProfile = try container.decodeIfPresent(TextForSpeech.Profile.self, forKey: .textProfile)
+        textProfileStyle = try container.decodeIfPresent(
+            TextForSpeech.BuiltInProfileStyle.self,
+            forKey: .textProfileStyle
+        )
         replacements = try Self.decodeReplacementsIfPresent(in: container, forKey: .replacements)
         replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
         replacementID = try container.decodeIfPresent(String.self, forKey: .replacementID)
@@ -474,10 +480,12 @@ enum WorkerRequest: Sendable, Equatable {
     case textProfileActive(id: String)
     case textProfile(id: String, name: String)
     case textProfiles(id: String)
+    case textProfileStyle(id: String)
     case textProfileEffective(id: String, name: String?)
     case textProfilePersistence(id: String)
     case loadTextProfiles(id: String)
     case saveTextProfiles(id: String)
+    case setTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
     case createTextProfile(id: String, profileID: String, profileName: String, replacements: [TextForSpeech.Replacement])
     case storeTextProfile(id: String, profile: TextForSpeech.Profile)
     case useTextProfile(id: String, profile: TextForSpeech.Profile)
@@ -514,10 +522,12 @@ enum WorkerRequest: Sendable, Equatable {
              .textProfileActive(let id),
              .textProfile(let id, _),
              .textProfiles(let id),
+             .textProfileStyle(let id),
              .textProfileEffective(let id, _),
              .textProfilePersistence(let id),
              .loadTextProfiles(let id),
              .saveTextProfiles(let id),
+             .setTextProfileStyle(let id, _),
              .createTextProfile(let id, _, _, _),
              .storeTextProfile(let id, _),
              .useTextProfile(let id, _),
@@ -542,11 +552,11 @@ enum WorkerRequest: Sendable, Equatable {
     var opName: String {
         switch self {
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
-            "queue_speech_live"
+            "generate_speech"
         case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
-            "queue_speech_file"
+            "generate_audio_file"
         case .queueBatch:
-            "queue_speech_batch"
+            "generate_batch"
         case .generatedFile:
             "get_generated_file"
         case .generatedFiles:
@@ -575,6 +585,8 @@ enum WorkerRequest: Sendable, Equatable {
             "get_text_profile"
         case .textProfiles:
             "list_text_profiles"
+        case .textProfileStyle:
+            "get_text_profile_style"
         case .textProfileEffective:
             "get_effective_text_profile"
         case .textProfilePersistence:
@@ -583,6 +595,8 @@ enum WorkerRequest: Sendable, Equatable {
             "load_text_profiles"
         case .saveTextProfiles:
             "save_text_profiles"
+        case .setTextProfileStyle:
+            "set_text_profile_style"
         case .createTextProfile:
             "create_text_profile"
         case .storeTextProfile:
@@ -696,10 +710,12 @@ enum WorkerRequest: Sendable, Equatable {
              .textProfileActive,
              .textProfile,
              .textProfiles,
+             .textProfileStyle,
              .textProfileEffective,
              .textProfilePersistence,
              .loadTextProfiles,
              .saveTextProfiles,
+             .setTextProfileStyle,
              .createTextProfile,
              .storeTextProfile,
              .useTextProfile,
@@ -754,9 +770,11 @@ enum WorkerRequest: Sendable, Equatable {
              .generationJobs,
              .textProfileActive,
              .textProfiles,
+             .textProfileStyle,
              .textProfilePersistence,
              .loadTextProfiles,
              .saveTextProfiles,
+             .setTextProfileStyle,
              .storeTextProfile,
              .useTextProfile,
              .resetTextProfile,
@@ -805,10 +823,12 @@ enum WorkerRequest: Sendable, Equatable {
              .textProfileActive,
              .textProfile,
              .textProfiles,
+             .textProfileStyle,
              .textProfileEffective,
              .textProfilePersistence,
              .loadTextProfiles,
              .saveTextProfiles,
+             .setTextProfileStyle,
              .createTextProfile,
              .storeTextProfile,
              .useTextProfile,
@@ -850,10 +870,12 @@ enum WorkerRequest: Sendable, Equatable {
              .textProfileActive,
              .textProfile,
              .textProfiles,
+             .textProfileStyle,
              .textProfileEffective,
              .textProfilePersistence,
              .loadTextProfiles,
              .saveTextProfiles,
+             .setTextProfileStyle,
              .createTextProfile,
              .storeTextProfile,
              .useTextProfile,
@@ -895,10 +917,12 @@ enum WorkerRequest: Sendable, Equatable {
              .textProfileActive,
              .textProfile,
              .textProfiles,
+             .textProfileStyle,
              .textProfileEffective,
              .textProfilePersistence,
              .loadTextProfiles,
              .saveTextProfiles,
+             .setTextProfileStyle,
              .createTextProfile,
              .storeTextProfile,
              .useTextProfile,
@@ -944,7 +968,7 @@ enum WorkerRequest: Sendable, Equatable {
         }
 
         switch op {
-        case "queue_speech_live":
+        case "generate_speech":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                 id: id,
@@ -966,7 +990,7 @@ enum WorkerRequest: Sendable, Equatable {
                 sourceFormat: resolved.sourceFormat
             )
 
-        case "queue_speech_file":
+        case "generate_audio_file":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                 id: id,
@@ -988,7 +1012,7 @@ enum WorkerRequest: Sendable, Equatable {
                 sourceFormat: resolved.sourceFormat
             )
 
-        case "queue_speech_batch":
+        case "generate_batch":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
             return .queueBatch(id: id, profileName: profileName, items: items)
@@ -1065,6 +1089,9 @@ enum WorkerRequest: Sendable, Equatable {
         case "list_text_profiles":
             return .textProfiles(id: id)
 
+        case "get_text_profile_style":
+            return .textProfileStyle(id: id)
+
         case "get_effective_text_profile":
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .textProfileEffective(id: id, name: textProfileName)
@@ -1077,6 +1104,10 @@ enum WorkerRequest: Sendable, Equatable {
 
         case "save_text_profiles":
             return .saveTextProfiles(id: id)
+
+        case "set_text_profile_style":
+            let style = try require(raw.textProfileStyle, field: "text_profile_style", id: id)
+            return .setTextProfileStyle(id: id, style: style)
 
         case "create_text_profile":
             let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)

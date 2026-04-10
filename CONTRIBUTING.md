@@ -116,7 +116,7 @@ Use these naming rules for new wire operations:
 - partially mutate a resource: `update_*`
 - replace a whole resource payload: `replace_*`
 - delete a resource: `delete_*`
-- keep literal lifecycle or control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best described as CRUD
+- keep literal lifecycle or control verbs like `generate_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best described as CRUD
 
 Current resident runtime controls on the wire are:
 
@@ -130,7 +130,9 @@ Current examples of the broader convention are:
 - `get_generated_file`
 - `list_generated_files`
 - `get_active_text_profile`
+- `get_text_profile_style`
 - `list_text_profiles`
+- `set_text_profile_style`
 - `create_text_replacement`
 - `replace_text_profile`
 - `delete_voice_profile`
@@ -219,13 +221,15 @@ The intended library-caller shape is:
 
 The typed text-normalization helpers live on grouped handles under `SpeakSwiftly.Normalizer`:
 
-- `try SpeakSwiftly.Normalizer(...)` now follows `TextForSpeech.Runtime` construction semantics and can throw immediately if persisted text profiles are unreadable or undecodable.
+- `try SpeakSwiftly.Normalizer(...)` now follows `TextForSpeech.Runtime` construction semantics, accepts an explicit built-in style, and can throw immediately if persisted text profiles are unreadable or undecodable.
 - `SpeakSwiftly.liftoff()` keeps a best-effort recovery path for unreadable text-profile archives so the worker can continue starting after quarantining a bad archive.
 
+- `normalizer.profiles.builtInStyle()`
 - `normalizer.profiles.active(id:)`
 - `normalizer.profiles.stored(id:)`
 - `normalizer.profiles.list()`
 - `normalizer.profiles.effective(id:)`
+- `normalizer.profiles.setBuiltInStyle(_:)`
 - `normalizer.profiles.create(id:name:replacements:)`
 - `normalizer.profiles.store(_:)`
 - `normalizer.profiles.use(_:)`
@@ -252,12 +256,12 @@ The typed text-normalization helpers live on grouped handles under `SpeakSwiftly
 Representative request shapes:
 
 ```json
-{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1c","op":"queue_speech_live","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
-{"id":"req-1d","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
-{"id":"req-1e","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
-{"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
-{"id":"req-1g","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
+{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
+{"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
+{"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
+{"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
+{"id":"req-1g","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
 {"id":"req-1h","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
 {"id":"req-1i","op":"list_generated_files"}
 {"id":"req-1j","op":"get_generated_batch","batch_id":"req-1g"}
@@ -269,10 +273,12 @@ Representative request shapes:
 {"id":"req-3","op":"list_voice_profiles"}
 {"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}
 {"id":"req-5","op":"get_active_text_profile"}
-{"id":"req-6","op":"list_text_profiles"}
-{"id":"req-7","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
-{"id":"req-8","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
-{"id":"req-9","op":"replace_active_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
+{"id":"req-6","op":"get_text_profile_style"}
+{"id":"req-7","op":"set_text_profile_style","text_profile_style":"compact"}
+{"id":"req-8","op":"list_text_profiles"}
+{"id":"req-9","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
+{"id":"req-10","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-11","op":"replace_active_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
 {"id":"req-status","op":"get_status"}
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
 {"id":"req-reload","op":"reload_models"}
@@ -289,7 +295,7 @@ Representative response and event shapes:
 {"id":"req-unload","ok":true,"status":{"event":"worker_status","stage":"resident_models_unloaded","resident_state":"unloaded","speech_backend":"qwen3"},"speech_backend":"qwen3"}
 {"id":"req-after-unload","event":"queued","reason":"waiting_for_resident_models","queue_position":1}
 {"id":"req-reload","ok":true,"status":{"event":"worker_status","stage":"resident_model_ready","resident_state":"ready","speech_backend":"qwen3"},"speech_backend":"qwen3"}
-{"id":"req-1","event":"started","op":"queue_speech_live"}
+{"id":"req-1","event":"started","op":"generate_speech"}
 {"id":"req-1","event":"progress","stage":"buffering_audio"}
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
@@ -303,9 +309,10 @@ Raw JSONL callers should send absolute filesystem paths for path fields, or incl
 
 Current live-playback behavior:
 
-- `queue_speech_live` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, while `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
+- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, while `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
+- The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_text_profile_style` and update it with `set_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
-- `queue_speech_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
+- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
 - Marvis resident warmup keeps both `conversational_a` and `conversational_b` loaded at once because the model is small enough that preset switching does not need another preload cycle.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.androgenous` -> `conversational_a`, `.masc` -> `conversational_b`.
 - Resident generation currently streams chunks at the `0.18` cadence.

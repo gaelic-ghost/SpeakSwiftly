@@ -27,6 +27,7 @@ extension SpeakSwiftly.Runtime {
                 profiles: payload.profiles,
                 textProfile: payload.textProfile,
                 textProfiles: payload.textProfiles,
+                textProfileStyle: payload.textProfileStyle,
                 textProfilePath: payload.textProfilePath,
                 activeRequest: payload.activeRequest,
                 activeRequests: payload.activeRequests,
@@ -268,6 +269,7 @@ extension SpeakSwiftly.Runtime {
         textProfileID: String? = nil,
         textProfileDisplayName: String? = nil,
         textProfile: TextForSpeech.Profile? = nil,
+        textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
         replacements: [TextForSpeech.Replacement]? = nil,
         replacement: TextForSpeech.Replacement? = nil,
         replacementID: String? = nil,
@@ -295,6 +297,7 @@ extension SpeakSwiftly.Runtime {
             textProfileID: textProfileID,
             textProfileDisplayName: textProfileDisplayName,
             textProfile: textProfile,
+            textProfileStyle: textProfileStyle,
             replacements: replacements,
             replacement: replacement,
             replacementID: replacementID,
@@ -417,6 +420,7 @@ extension SpeakSwiftly.Runtime {
             await submitRequest(id: id, op: request.opName, profileName: profileName)
         case .textProfileActive(let id),
              .textProfiles(let id),
+             .textProfileStyle(let id),
              .textProfilePersistence(let id),
              .loadTextProfiles(let id),
              .saveTextProfiles(let id),
@@ -427,6 +431,12 @@ extension SpeakSwiftly.Runtime {
             await submitRequest(id: id, op: request.opName, textProfileName: name)
         case .textProfileEffective(let id, let name):
             await submitRequest(id: id, op: request.opName, textProfileName: name)
+        case .setTextProfileStyle(let id, let style):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                textProfileStyle: style
+            )
         case .createTextProfile(let id, let profileID, let profileName, let replacements):
             await submitRequest(
                 id: id,

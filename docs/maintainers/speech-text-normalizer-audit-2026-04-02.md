@@ -205,13 +205,9 @@ The important boundary now is simple:
 
 ## Forensics
 
-The forensic APIs were preserved:
+The broad playback-analysis surface described here no longer lives in `TextForSpeech`. SpeakSwiftly now owns that request-level tracing and section-window analysis directly through `DeepTrace`, while `TextForSpeech` keeps only lightweight lexical helpers such as word tokenization.
 
-- `forensicFeatures(originalText:normalizedText:)`
-- `forensicSections(originalText:)`
-- `forensicSectionWindows(originalText:totalDurationMS:totalChunkCount:)`
-
-The current counters now derive from the same parsing helpers that the normalizer uses, instead of separate regex-only counting paths. That keeps the feature report more aligned with the real transformations.
+The counters and section windows described below still reflect the same parsing concepts, but their public ownership moved back into SpeakSwiftly so the normalization package no longer advertises a playback-analysis API it does not really need to own.
 
 Current counters include:
 

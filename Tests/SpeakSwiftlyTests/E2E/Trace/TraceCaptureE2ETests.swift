@@ -30,7 +30,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-trace","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.testingPlaybackText)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-trace","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.testingPlaybackText)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 

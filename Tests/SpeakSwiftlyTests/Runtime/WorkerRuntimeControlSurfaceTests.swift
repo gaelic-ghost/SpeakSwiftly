@@ -1121,7 +1121,7 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == batchID
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_batch"
+                && $0["op"] as? String == "generate_batch"
         }
     })
     #expect(await waitUntil {
@@ -1987,7 +1987,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"delete_voice_profile","profile_name":"remove-me"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","profile_name":"default-femme"}"#)
 
     await profileGate.open()
 
@@ -1995,7 +1995,7 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == "req-3"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
+                && $0["op"] as? String == "generate_speech"
         }
     })
     #expect(await waitUntil {
@@ -2007,7 +2007,7 @@ private actor BackendLoadRecorder {
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-3:queue_speech_live", "req-2:delete_voice_profile"])
+    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-3:generate_speech", "req-2:delete_voice_profile"])
 }
 
 @Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {
@@ -2044,7 +2044,7 @@ private actor BackendLoadRecorder {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hi there","profile_name":"brand-new"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hi there","profile_name":"brand-new"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"list_voice_profiles"}"#)
 
     await profileGate.open()
@@ -2053,7 +2053,7 @@ private actor BackendLoadRecorder {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
+                && $0["op"] as? String == "generate_speech"
         }
     })
     #expect(await waitUntil {
@@ -2071,5 +2071,5 @@ private actor BackendLoadRecorder {
     })
 
     let startedOps = output.startedEvents()
-    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:queue_speech_live", "req-3:list_voice_profiles"])
+    #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:generate_speech", "req-3:list_voice_profiles"])
 }

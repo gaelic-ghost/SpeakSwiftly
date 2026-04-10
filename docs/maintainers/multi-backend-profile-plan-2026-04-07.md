@@ -15,7 +15,7 @@ That model was sufficient while the package only targeted the current Qwen3-base
 
 - keep one stable public `profileName`
 - let callers switch the active speech backend
-- keep the same `createProfile`, `createClone`, `speak`, `queue_speech_file`, and profile-listing APIs
+- keep the same `createProfile`, `createClone`, `speak`, `generate_audio_file`, and profile-listing APIs
 - have the selected backend use a backend-appropriate materialization of that logical profile without making callers rebuild profiles manually per model
 
 The simpler extension path considered first was:
@@ -125,7 +125,7 @@ The public API should remain conceptually stable:
 - `profiles()`
 - `removeProfile(named:...)`
 - `speak(..., using: profileName, ...)`
-- `queue_speech_file(..., using: profileName, ...)`
+- `generate_audio_file(..., using: profileName, ...)`
 
 Callers should not need to know:
 

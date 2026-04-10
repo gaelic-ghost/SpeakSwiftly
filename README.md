@@ -191,7 +191,7 @@ The typed Swift library and the JSONL worker surface intentionally use different
 - JSONL read-one operations use `get_*`.
 - JSONL collection and queue reads use `list_*`.
 - JSONL CRUD-style writes use `create_*`, `replace_*`, and `delete_*`.
-- JSONL lifecycle and control operations keep literal verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
+- JSONL lifecycle and control operations keep literal verbs like `generate_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
 
 Resident runtime controls currently map like this:
 
@@ -209,9 +209,11 @@ The worker protocol is newline-delimited JSON over standard input and output.
 Representative request shapes:
 
 ```json
-{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1f","op":"queue_speech_file","text":"Save this one for later playback.","profile_name":"default-femme"}
-{"id":"req-batch","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
+{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
+{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
+{"id":"req-text-style","op":"get_text_profile_style"}
+{"id":"req-set-text-style","op":"set_text_profile_style","text_profile_style":"compact"}
 {"id":"req-status","op":"get_status"}
 {"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
 {"id":"req-generated-files","op":"list_generated_files"}

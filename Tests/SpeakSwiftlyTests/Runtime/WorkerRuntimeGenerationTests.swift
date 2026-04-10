@@ -66,7 +66,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["id"] as? String == requestID
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_file"
+                && $0["op"] as? String == "generate_audio_file"
         }
     })
     #expect(await waitUntil {

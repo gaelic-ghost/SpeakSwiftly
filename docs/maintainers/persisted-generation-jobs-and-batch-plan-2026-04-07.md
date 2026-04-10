@@ -14,7 +14,7 @@ The near-term use cases it unlocks are already visible:
 
 The simpler extension path considered first was:
 
-- keep `queue_speech_file` as an immediate request/response operation
+- keep `generate_audio_file` as an immediate request/response operation
 - keep using the request id as the one durable identifier
 - keep the current generated-file store as the only persisted state
 
@@ -32,7 +32,7 @@ So the right next step is not a whole new service. It is an explicit persisted j
 
 Today `SpeakSwiftly` has:
 
-- a worker request surface for `queue_speech_file`
+- a worker request surface for `generate_audio_file`
 - a generated-file store with persisted artifact metadata and WAV output
 - read operations for `generated_file` and `generated_files`
 
@@ -179,7 +179,7 @@ The worker contract should widen intentionally, but only enough to make persiste
 
 The next worker operations should be:
 
-- `queue_speech_file`
+- `generate_audio_file`
   submit a file job and return a durable `jobID`
 - `generation_job`
   fetch one persisted job by `jobID`
@@ -198,7 +198,7 @@ That gives a clean split:
 
 ### Response Shape Direction
 
-`queue_speech_file` should stop implying that completion is tied to one still-open stream.
+`generate_audio_file` should stop implying that completion is tied to one still-open stream.
 
 The submission response should be shaped around the job:
 
@@ -206,7 +206,7 @@ The submission response should be shaped around the job:
 - `job`
 - optionally `generated_file` only when the file is already completed before the response is emitted
 
-The simpler alternative considered first was keeping `queue_speech_file` as a fully immediate completed response and layering reconnect semantics somewhere else later. That path should be rejected because it would preserve two mental models for the same operation.
+The simpler alternative considered first was keeping `generate_audio_file` as a fully immediate completed response and layering reconnect semantics somewhere else later. That path should be rejected because it would preserve two mental models for the same operation.
 
 ## Retention And Expiry
 
@@ -286,7 +286,7 @@ Important cleanup rule:
 The first implementation pass should be:
 
 1. Add persisted generation-job models and store types with explicit `jobKind`.
-2. Make `queue_speech_file` create a durable file-job record before generation starts.
+2. Make `generate_audio_file` create a durable file-job record before generation starts.
 3. Update generation operations to transition the file job through `queued` -> `running` -> `completed` or `failed`.
 4. Store artifact references on the completed file job record.
 5. Add worker read operations for one job and many jobs.

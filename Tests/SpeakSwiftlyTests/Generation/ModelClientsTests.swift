@@ -249,7 +249,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -273,7 +273,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"queue_speech_live","text":"Hello again","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -436,7 +436,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -489,7 +489,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -562,7 +562,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -634,7 +634,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Longer playback diagnostics check","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Longer playback diagnostics check","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -717,7 +717,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"queue_speech_live","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -767,7 +767,7 @@ import TextForSpeech
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"queue_speech_live","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
+        {"id":"req-1","op":"generate_speech","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
         """#
     )
 
@@ -823,7 +823,7 @@ import TextForSpeech
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"queue_speech_live","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_name":"logs","text_format":"plain_text"}
+        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_name":"logs","text_format":"plain_text"}
         """#
     )
 
@@ -861,7 +861,7 @@ import TextForSpeech
 
     await runtime.accept(
         line: #"""
-        {"id":"req-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
+        {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
         """#
     )
 

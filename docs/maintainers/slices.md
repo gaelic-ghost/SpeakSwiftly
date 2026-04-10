@@ -8,7 +8,7 @@ This note explains the current `TextForSpeech` model in maintainer terms, with s
 - text replacements
 - slices
 
-The first two are now first-class public API in the extracted `TextForSpeech` package and are wired through `SpeakSwiftly.Runtime`. The third is still only partially formalized, but it is no longer hidden entirely inside `SpeakSwiftly`; the public `TextForSpeech` surface now exposes section and section-window forensic data.
+The first two are now first-class public API in the extracted `TextForSpeech` package and are wired through `SpeakSwiftly.Runtime`. The third is still only partially formalized, but it now lives squarely in SpeakSwiftly's own `DeepTrace` surface instead of pretending to be a public `TextForSpeech` responsibility.
 
 ## Normalization profile
 

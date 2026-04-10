@@ -240,14 +240,14 @@ extension SpeakSwiftlyE2ETests {
     ) async throws {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"queue_speech_live","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
             """
         )
 
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_live"
+                && $0["op"] as? String == "generate_speech"
         } != nil)
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
@@ -291,7 +291,7 @@ extension SpeakSwiftlyE2ETests {
     ) async throws {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"queue_speech_live","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
             """
         )
 
@@ -393,7 +393,7 @@ extension SpeakSwiftlyE2ETests {
     ) async throws -> [String: Any] {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"queue_speech_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_audio_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
             """
         )
 
@@ -405,7 +405,7 @@ extension SpeakSwiftlyE2ETests {
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_file"
+                && $0["op"] as? String == "generate_audio_file"
         } != nil)
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
@@ -446,7 +446,7 @@ extension SpeakSwiftlyE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"queue_speech_batch","profile_name":"\(profileName)","items":\(compactItemsJSON)}
+            {"id":"\(id)","op":"generate_batch","profile_name":"\(profileName)","items":\(compactItemsJSON)}
             """
         )
 
@@ -458,7 +458,7 @@ extension SpeakSwiftlyE2ETests {
         #expect(try await worker.waitForJSONObject(timeout: batchTimeout) {
             $0["id"] as? String == id
                 && $0["event"] as? String == "started"
-                && $0["op"] as? String == "queue_speech_batch"
+                && $0["op"] as? String == "generate_batch"
         } != nil)
 
         let success = try #require(

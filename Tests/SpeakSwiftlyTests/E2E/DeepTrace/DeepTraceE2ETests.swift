@@ -30,7 +30,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-deep-trace","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.deepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-deep-trace","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.deepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -102,7 +102,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-segmented","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -184,7 +184,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-reversed-segmented","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -266,7 +266,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-conversational","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-conversational","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -347,7 +347,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-reversed-conversational","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-reversed-conversational","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 

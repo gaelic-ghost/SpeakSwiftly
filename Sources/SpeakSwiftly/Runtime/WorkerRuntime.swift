@@ -113,6 +113,7 @@ public extension SpeakSwiftly {
         let profiles: [ProfileSummary]?
         let textProfile: TextForSpeech.Profile?
         let textProfiles: [TextForSpeech.Profile]?
+        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
         let textProfilePath: String?
         let activeRequest: ActiveWorkerRequestSummary?
         let activeRequests: [ActiveWorkerRequestSummary]?
@@ -137,6 +138,7 @@ public extension SpeakSwiftly {
             profiles: [ProfileSummary]? = nil,
             textProfile: TextForSpeech.Profile? = nil,
             textProfiles: [TextForSpeech.Profile]? = nil,
+            textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveWorkerRequestSummary? = nil,
             activeRequests: [ActiveWorkerRequestSummary]? = nil,
@@ -160,6 +162,7 @@ public extension SpeakSwiftly {
             self.profiles = profiles
             self.textProfile = textProfile
             self.textProfiles = textProfiles
+            self.textProfileStyle = textProfileStyle
             self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
             self.activeRequests = activeRequests
@@ -191,6 +194,7 @@ public extension SpeakSwiftly {
         let textProfileID: String?
         let textProfileDisplayName: String?
         let textProfile: TextForSpeech.Profile?
+        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
         let replacements: [TextForSpeech.Replacement]?
         let replacement: TextForSpeech.Replacement?
         let replacementID: String?
@@ -220,6 +224,7 @@ public extension SpeakSwiftly {
             case textProfileID = "text_profile_id"
             case textProfileDisplayName = "text_profile_display_name"
             case textProfile = "text_profile"
+            case textProfileStyle = "text_profile_style"
             case replacements
             case replacement
             case replacementID = "replacement_id"

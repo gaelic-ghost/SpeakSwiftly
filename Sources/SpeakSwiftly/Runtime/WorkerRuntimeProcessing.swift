@@ -195,10 +195,12 @@ extension SpeakSwiftly.Runtime {
                  .textProfileActive,
                  .textProfile,
                  .textProfiles,
+                 .textProfileStyle,
                  .textProfileEffective,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
+                 .setTextProfileStyle,
                  .createTextProfile,
                  .storeTextProfile,
                  .useTextProfile,
@@ -237,6 +239,7 @@ extension SpeakSwiftly.Runtime {
     func processImmediateControlRequest(_ request: WorkerRequest) async {
         let result: Result<WorkerSuccessPayload, WorkerError>
         let textProfilePath = await normalizerRef.persistence.url()?.path
+        let textProfileStyle = await normalizerRef.profiles.builtInStyle()
 
         do {
             switch request {
@@ -301,6 +304,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: await normalizerRef.profiles.active(),
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -310,6 +314,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: await normalizerRef.profiles.stored(id: name),
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -319,6 +324,16 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfiles: await normalizerRef.profiles.list(),
+                        textProfileStyle: textProfileStyle,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .textProfileStyle(let id):
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -328,6 +343,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: await normalizerRef.profiles.effective(id: name),
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -336,6 +352,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -347,6 +364,7 @@ extension SpeakSwiftly.Runtime {
                         id: id,
                         textProfile: await normalizerRef.profiles.active(),
                         textProfiles: await normalizerRef.profiles.list(),
+                        textProfileStyle: await normalizerRef.profiles.builtInStyle(),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -356,6 +374,17 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
+                        textProfileStyle: textProfileStyle,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .setTextProfileStyle(let id, let style):
+                try await normalizerRef.profiles.setBuiltInStyle(style)
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfileStyle: await normalizerRef.profiles.builtInStyle(),
                         textProfilePath: textProfilePath
                     )
                 )
@@ -370,6 +399,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -380,6 +410,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -390,6 +421,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -399,6 +431,7 @@ extension SpeakSwiftly.Runtime {
                 result = .success(
                     WorkerSuccessPayload(
                         id: id,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -409,6 +442,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: await normalizerRef.profiles.active(),
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -426,6 +460,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -443,6 +478,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -460,6 +496,7 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
                 )
@@ -1101,19 +1138,26 @@ extension SpeakSwiftly.Runtime {
         let textProfileName = request.textProfileName
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
-        let textProfile = await normalizerRef.profiles.effective(id: textProfileName) ?? .default
+        let textProfileStyle = await normalizerRef.profiles.builtInStyle()
+        let textProfile = if let textProfileName {
+            await normalizerRef.profiles.stored(id: textProfileName) ?? .default
+        } else {
+            await normalizerRef.profiles.active() ?? .default
+        }
         let normalizedText = if let sourceFormat {
             TextForSpeech.Normalize.source(
                 text,
                 as: sourceFormat,
                 context: textContext,
-                profile: textProfile
+                customProfile: textProfile,
+                style: textProfileStyle
             )
         } else {
             TextForSpeech.Normalize.text(
                 text,
                 context: textContext,
-                profile: textProfile
+                customProfile: textProfile,
+                style: textProfileStyle
             )
         }
         let textFeatures = SpeakSwiftly.DeepTrace.features(

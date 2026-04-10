@@ -155,6 +155,7 @@ public extension SpeakSwiftly {
         public let profiles: [ProfileSummary]?
         public let textProfile: TextForSpeech.Profile?
         public let textProfiles: [TextForSpeech.Profile]?
+        public let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
         public let textProfilePath: String?
         public let activeRequest: ActiveRequest?
         public let activeRequests: [ActiveRequest]?
@@ -180,6 +181,7 @@ public extension SpeakSwiftly {
             case profiles
             case textProfile = "text_profile"
             case textProfiles = "text_profiles"
+            case textProfileStyle = "text_profile_style"
             case textProfilePath = "text_profile_path"
             case activeRequest = "active_request"
             case activeRequests = "active_requests"
@@ -205,6 +207,7 @@ public extension SpeakSwiftly {
             profiles: [ProfileSummary]? = nil,
             textProfile: TextForSpeech.Profile? = nil,
             textProfiles: [TextForSpeech.Profile]? = nil,
+            textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveRequest? = nil,
             activeRequests: [ActiveRequest]? = nil,
@@ -228,6 +231,7 @@ public extension SpeakSwiftly {
             self.profiles = profiles
             self.textProfile = textProfile
             self.textProfiles = textProfiles
+            self.textProfileStyle = textProfileStyle
             self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
             self.activeRequests = activeRequests

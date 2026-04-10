@@ -153,9 +153,9 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-live-1","op":"queue_speech_live","text":"Hello there","profile_name":"lane-a-primary"}"#)
-    await runtime.accept(line: #"{"id":"req-live-2","op":"queue_speech_live","text":"Hi there","profile_name":"lane-b-secondary"}"#)
-    await runtime.accept(line: #"{"id":"req-live-3","op":"queue_speech_live","text":"Hey there","profile_name":"lane-a-tertiary"}"#)
+    await runtime.accept(line: #"{"id":"req-live-1","op":"generate_speech","text":"Hello there","profile_name":"lane-a-primary"}"#)
+    await runtime.accept(line: #"{"id":"req-live-2","op":"generate_speech","text":"Hi there","profile_name":"lane-b-secondary"}"#)
+    await runtime.accept(line: #"{"id":"req-live-3","op":"generate_speech","text":"Hey there","profile_name":"lane-a-tertiary"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -546,6 +546,17 @@ import TextForSpeech
         output.containsJSONObject {
             $0["id"] as? String == "req-text-active"
                 && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "ops"
+                && ($0["text_profile_style"] as? String) == "balanced"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-text-style","op":"set_text_profile_style","text_profile_style":"explicit"}"#
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-style"
+                && ($0["text_profile_style"] as? String) == "explicit"
         }
     })
 
@@ -554,6 +565,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["id"] as? String == "req-text-list"
                 && (($0["text_profiles"] as? [[String: Any]])?.count ?? 0) >= 1
+                && ($0["text_profile_style"] as? String) == "explicit"
                 && ($0["text_profile_path"] as? String)?.hasSuffix("text-profiles.json") == true
         }
     })
@@ -563,6 +575,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["id"] as? String == "req-reset-text"
                 && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "default"
+                && ($0["text_profile_style"] as? String) == "explicit"
         }
     })
 }
@@ -636,7 +649,7 @@ import TextForSpeech
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"list_voice_profiles"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"queue_speech_live","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","profile_name":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {

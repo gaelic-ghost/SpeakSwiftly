@@ -10,14 +10,19 @@ public extension SpeakSwiftly {
         let textRuntime: TextForSpeech.Runtime
 
         public init(
+            builtInStyle: TextForSpeech.BuiltInProfileStyle = .balanced,
             activeProfile: TextForSpeech.Profile = .default,
             profiles: [String: TextForSpeech.Profile] = [:],
             persistenceURL: URL? = nil
         ) throws {
-            let runtime = try TextForSpeech.Runtime(persistenceURL: persistenceURL)
-            if !profiles.isEmpty || activeProfile != .default {
+            let runtime = try TextForSpeech.Runtime(
+                builtInStyle: builtInStyle,
+                persistenceURL: persistenceURL
+            )
+            if builtInStyle != .balanced || !profiles.isEmpty || activeProfile != .default {
                 try Self.seed(
                     runtime: runtime,
+                    builtInStyle: builtInStyle,
                     activeProfile: activeProfile,
                     profiles: profiles
                 )
@@ -48,6 +53,7 @@ public extension SpeakSwiftly.Normalizer {
 private extension SpeakSwiftly.Normalizer {
     static func seed(
         runtime: TextForSpeech.Runtime,
+        builtInStyle: TextForSpeech.BuiltInProfileStyle,
         activeProfile: TextForSpeech.Profile,
         profiles: [String: TextForSpeech.Profile]
     ) throws {
@@ -57,6 +63,7 @@ private extension SpeakSwiftly.Normalizer {
         try runtime.persistence.restore(
             TextForSpeech.PersistedState(
                 version: runtime.persistence.state.version,
+                builtInStyle: builtInStyle,
                 activeCustomProfileID: activeProfile.id,
                 profiles: storedProfiles
             )

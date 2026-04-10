@@ -6,7 +6,7 @@ import TextForSpeech
 // MARK: - Request Decoding
 
 @Test func decodesSpeakLiveRequest() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme"}"#)
+    let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme"}"#)
 
     #expect(
         request == .queueSpeech(
@@ -23,7 +23,7 @@ import TextForSpeech
 
 @Test func decodesSpeakFileRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-file","op":"queue_speech_file","text":"Hello","profile_name":"default-femme"}"#
+        from: #"{"id":"req-file","op":"generate_audio_file","text":"Hello","profile_name":"default-femme"}"#
     )
 
     #expect(
@@ -41,7 +41,7 @@ import TextForSpeech
 
 @Test func decodesSpeakBatchRequest() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-batch","op":"queue_speech_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_name":"logs","source_format":"swift_source"}]}"#
+        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_name":"logs","source_format":"swift_source"}]}"#
     )
 
     #expect(
@@ -70,7 +70,7 @@ import TextForSpeech
 
 @Test func decodesSpeakLiveRequestWithTextContextAndProfile() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1","op":"queue_speech_live","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#
+        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#
     )
 
     #expect(
@@ -92,7 +92,7 @@ import TextForSpeech
 
 @Test func decodesSpeakLiveRequestWithNestedSourceFormat() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-embedded","op":"queue_speech_live","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}"#
+        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}"#
     )
 
     #expect(
@@ -113,7 +113,7 @@ import TextForSpeech
 
 @Test func decodesSpeakLiveRequestWithWholeSourceFormat() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#
+        from: #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#
     )
 
     #expect(
@@ -131,7 +131,7 @@ import TextForSpeech
 
 @Test func decodesLegacyWholeSourceTextFormatAsSourceLane() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-legacy-source","op":"queue_speech_live","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","text_format":"swift_source"}"#
+        from: #"{"id":"req-legacy-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","text_format":"swift_source"}"#
     )
 
     #expect(
@@ -264,6 +264,9 @@ import TextForSpeech
     let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(active == .textProfileActive(id: "req-text-active"))
 
+    let style = try WorkerRequest.decode(from: #"{"id":"req-text-style","op":"get_text_profile_style"}"#)
+    #expect(style == .textProfileStyle(id: "req-text-style"))
+
     let named = try WorkerRequest.decode(
         from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_name":"logs"}"#
     )
@@ -279,6 +282,16 @@ import TextForSpeech
 }
 
 @Test func decodesTextProfileMutationRequests() throws {
+    let setStyle = try WorkerRequest.decode(
+        from: #"{"id":"req-text-style-set","op":"set_text_profile_style","text_profile_style":"compact"}"#
+    )
+    #expect(
+        setStyle == .setTextProfileStyle(
+            id: "req-text-style-set",
+            style: .compact
+        )
+    )
+
     let create = try WorkerRequest.decode(
         from: #"{"id":"req-text-create","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}]}"#
     )
@@ -381,7 +394,7 @@ import TextForSpeech
 
 @Test func rejectsMalformedJSON() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live""#)
+        try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech""#)
     }
 }
 
@@ -393,7 +406,7 @@ import TextForSpeech
 
 @Test func rejectsMissingRequiredFields() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"queue_speech_live","text":"   ","profile_name":"default-femme"}"#)
+        try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","profile_name":"default-femme"}"#)
     }
 }
 
@@ -422,9 +435,9 @@ import TextForSpeech
     #expect(queued["reason"] as? String == "waiting_for_resident_model")
     #expect(queued["queue_position"] as? Int == 2)
 
-    let started = try jsonObject(SpeakSwiftly.StartedEvent(id: "req-1", op: "queue_speech_live"))
+    let started = try jsonObject(SpeakSwiftly.StartedEvent(id: "req-1", op: "generate_speech"))
     #expect(started["event"] as? String == "started")
-    #expect(started["op"] as? String == "queue_speech_live")
+    #expect(started["op"] as? String == "generate_speech")
 
     let progress = try jsonObject(SpeakSwiftly.ProgressEvent(id: "req-1", stage: .bufferingAudio))
     #expect(progress["event"] as? String == "progress")
@@ -452,15 +465,16 @@ import TextForSpeech
             profileName: "default-femme",
             profilePath: "/tmp/default-femme",
             profiles: nil,
-            activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+            textProfileStyle: .compact,
+            activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
             activeRequests: [
-                SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
-                SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "queue_speech_live", profileName: "default-masc"),
+                SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
+                SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "generate_speech", profileName: "default-masc"),
             ],
             queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "list_voice_profiles", profileName: nil, queuePosition: 1)],
             playbackState: SpeakSwiftly.PlaybackStateSnapshot(
                 state: .playing,
-                activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
                 isStableForConcurrentGeneration: true,
                 isRebuffering: false,
                 stableBufferedAudioMS: 840,
@@ -471,21 +485,21 @@ import TextForSpeech
                 speechBackend: .qwen3,
                 generationQueue: SpeakSwiftly.QueueSnapshot(
                     queueType: "generation",
-                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
                     activeRequests: [
-                        SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
-                        SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "queue_speech_live", profileName: "default-masc"),
+                        SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
+                        SpeakSwiftly.ActiveRequest(id: "req-active-2", op: "generate_speech", profileName: "default-masc"),
                     ],
-                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "queue_speech_live", profileName: "default-femme", queuePosition: 1)]
+                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "generate_speech", profileName: "default-femme", queuePosition: 1)]
                 ),
                 playbackQueue: SpeakSwiftly.QueueSnapshot(
                     queueType: "playback",
-                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
-                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "queue_speech_live", profileName: "default-femme", queuePosition: 1)]
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
+                    queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", op: "generate_speech", profileName: "default-femme", queuePosition: 1)]
                 ),
                 playbackState: SpeakSwiftly.PlaybackStateSnapshot(
                     state: .playing,
-                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "queue_speech_live", profileName: "default-femme"),
+                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", op: "generate_speech", profileName: "default-femme"),
                     isStableForConcurrentGeneration: true,
                     isRebuffering: false,
                     stableBufferedAudioMS: 840,
@@ -501,6 +515,7 @@ import TextForSpeech
     #expect(success["ok"] as? Bool == true)
     #expect(success["profile_name"] as? String == "default-femme")
     #expect(success["profile_path"] as? String == "/tmp/default-femme")
+    #expect(success["text_profile_style"] as? String == "compact")
     #expect((success["active_request"] as? [String: Any])?["id"] as? String == "req-active")
     #expect((success["active_requests"] as? [[String: Any]])?.count == 2)
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)

@@ -4,6 +4,10 @@ import TextForSpeech
 // MARK: - Text Normalization Logic
 
 extension SpeakSwiftly.Normalizer {
+    fileprivate func builtInStyle() -> TextForSpeech.BuiltInProfileStyle {
+        textRuntime.profiles.builtInStyle
+    }
+
     fileprivate func activeProfile() -> TextForSpeech.Profile {
         textRuntime.profiles.active()
     }
@@ -22,6 +26,12 @@ extension SpeakSwiftly.Normalizer {
         }
 
         return textRuntime.profiles.effective()
+    }
+
+    fileprivate func setBuiltInStyle(
+        _ style: TextForSpeech.BuiltInProfileStyle
+    ) throws {
+        try textRuntime.profiles.setBuiltInStyle(style)
     }
 
     fileprivate func storeProfile(_ profile: TextForSpeech.Profile) throws {
@@ -127,6 +137,10 @@ extension SpeakSwiftly.Normalizer {
 }
 
 public extension SpeakSwiftly.Normalizer.Profiles {
+    func builtInStyle() async -> TextForSpeech.BuiltInProfileStyle {
+        await normalizer.builtInStyle()
+    }
+
     func active(id: String? = nil) async -> TextForSpeech.Profile? {
         if let id {
             return await normalizer.storedProfile(id: id)
@@ -145,6 +159,12 @@ public extension SpeakSwiftly.Normalizer.Profiles {
 
     func effective(id: String? = nil) async -> TextForSpeech.Profile? {
         await normalizer.effectiveProfile(id: id)
+    }
+
+    func setBuiltInStyle(
+        _ style: TextForSpeech.BuiltInProfileStyle
+    ) async throws {
+        try await normalizer.setBuiltInStyle(style)
     }
 
     @discardableResult
