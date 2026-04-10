@@ -1466,7 +1466,7 @@ final class AudioPlaybackDriver {
         var deviceName: CFString = "" as CFString
         var nameSize = UInt32(MemoryLayout<CFString>.stride)
         var nameAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioObjectPropertyName,
+            mSelector: kAudioDevicePropertyDeviceNameCFString,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
@@ -1482,7 +1482,7 @@ final class AudioPlaybackDriver {
         }
 
         if nameStatus == noErr {
-            let name = deviceName as String
+            let name = "\(deviceName)"
             if !name.isEmpty {
                 return "\(name) [\(deviceID)]"
             }
