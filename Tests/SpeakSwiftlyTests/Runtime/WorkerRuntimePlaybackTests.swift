@@ -235,3 +235,84 @@ import TextForSpeech
         }
     })
 }
+
+@Test func playbackEnvironmentEventsAreLoggedForPowerSessionAndRecoveryChanges() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(
+            environmentEvents: [
+                .systemSleepStateChanged(isSleeping: true),
+                .systemSleepStateChanged(isSleeping: false),
+                .screenSleepStateChanged(isSleeping: true),
+                .screenSleepStateChanged(isSleeping: false),
+                .sessionActivityChanged(isActive: false),
+                .sessionActivityChanged(isActive: true),
+                .recoveryStateChanged(
+                    reason: "output_device_change",
+                    stage: "recovered",
+                    attempt: 2,
+                    currentDevice: "AirPods Pro [42]"
+                ),
+            ]
+        ),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_system_sleep_started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_system_woke"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_screen_sleep_started"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_screen_woke"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_session_resigned_active"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_recovery_state_changed",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["reason"] as? String == "output_device_change"
+                && details["stage"] as? String == "recovered"
+                && details["attempt"] as? Int == 2
+                && details["current_device"] as? String == "AirPods Pro [42]"
+        }
+    })
+}

@@ -165,12 +165,17 @@ final class PlaybackSpy: @unchecked Sendable {
 
     private let lock = NSLock()
     private let behavior: Behavior
+    private let environmentEvents: [PlaybackEnvironmentEvent]
     private(set) var playCount = 0
     private(set) var prepareCount = 0
     private(set) var stopCount = 0
 
-    init(behavior: Behavior = .immediate) {
+    init(
+        behavior: Behavior = .immediate,
+        environmentEvents: [PlaybackEnvironmentEvent] = []
+    ) {
         self.behavior = behavior
+        self.environmentEvents = environmentEvents
     }
 
     func controller() -> AnyPlaybackController {
@@ -379,7 +384,13 @@ final class PlaybackSpy: @unchecked Sendable {
             },
             pause: { .paused },
             resume: { .playing },
-            state: { .idle }
+            state: { .idle },
+            bindEnvironmentEvents: { [environmentEvents] sink in
+                guard let sink else { return }
+                for event in environmentEvents {
+                    await sink(event)
+                }
+            }
         )
     }
 }

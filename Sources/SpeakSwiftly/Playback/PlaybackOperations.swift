@@ -337,6 +337,56 @@ extension SpeakSwiftly.Runtime {
                     "had_active_request": .bool(activeRequest != nil),
                 ]
             )
+        case .systemSleepStateChanged(let isSleeping):
+            await logEvent(
+                isSleeping ? "playback_system_sleep_started" : "playback_system_woke",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "is_sleeping": .bool(isSleeping),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .screenSleepStateChanged(let isSleeping):
+            await logEvent(
+                isSleeping ? "playback_screen_sleep_started" : "playback_screen_woke",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "is_sleeping": .bool(isSleeping),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .sessionActivityChanged(let isActive):
+            await logEvent(
+                isActive ? "playback_session_became_active" : "playback_session_resigned_active",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "is_active": .bool(isActive),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+            )
+        case .recoveryStateChanged(let reason, let stage, let attempt, let currentDevice):
+            var details: [String: LogValue] = [
+                "reason": .string(reason),
+                "stage": .string(stage),
+                "current_device": .string(currentDevice ?? "unknown"),
+                "had_active_request": .bool(activeRequest != nil),
+            ]
+            if let attempt {
+                details["attempt"] = .int(attempt)
+            }
+            await logEvent(
+                "playback_recovery_state_changed",
+                requestID: requestID,
+                op: op,
+                profileName: profileName,
+                details: details
+            )
         case .interJobBoopPlayed(let durationMS, let frequencyHz, let sampleRate):
             await logEvent(
                 "playback_inter_job_boop_played",

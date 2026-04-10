@@ -1,3 +1,4 @@
+@preconcurrency import AppKit
 @preconcurrency import AVFoundation
 import CoreAudio
 import Foundation
@@ -30,6 +31,10 @@ enum PlaybackEnvironmentEvent: Sendable {
     case outputDeviceObserved(currentDevice: String?)
     case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
     case engineConfigurationChanged(engineIsRunning: Bool)
+    case systemSleepStateChanged(isSleeping: Bool)
+    case screenSleepStateChanged(isSleeping: Bool)
+    case sessionActivityChanged(isActive: Bool)
+    case recoveryStateChanged(reason: String, stage: String, attempt: Int?, currentDevice: String?)
     case interJobBoopPlayed(durationMS: Int, frequencyHz: Double, sampleRate: Double)
 }
 
@@ -579,12 +584,25 @@ final class AudioPlaybackDriver {
 
     @MainActor
     private final class RequestPlaybackState {
+        struct QueuedBuffer {
+            let pcmBuffer: AVAudioPCMBuffer
+            let frameCount: Int
+            let firstSample: Float
+            let lastSample: Float
+            let fadeInApplied: Bool
+            let chunkIndex: Int
+            var bufferIndex: Int?
+            var engineGeneration: Int?
+        }
+
         let requestID: UInt64
         var thresholdsController: PlaybackThresholdController
         var generationFinished = false
         var isRebuffering = false
-        var scheduledSampleCount = 0
-        var playedBackSampleCount = 0
+        var queuedBuffers = [QueuedBuffer]()
+        var queuedSampleCount = 0
+        var nextBufferIndex = 0
+        var engineGeneration = 0
         var minQueuedAudioMS: Int?
         var maxQueuedAudioMS: Int?
         var queueDepthTotalMS = 0
@@ -612,8 +630,7 @@ final class AudioPlaybackDriver {
         }
 
         func queuedAudioMS(sampleRate: Double) -> Int {
-            let queuedSamples = max(scheduledSampleCount - playedBackSampleCount, 0)
-            return Int((Double(queuedSamples) / sampleRate * 1_000).rounded())
+            Int((Double(max(queuedSampleCount, 0)) / sampleRate * 1_000).rounded())
         }
 
         func recordQueuedAudioDepth(sampleRate: Double) {
@@ -623,6 +640,65 @@ final class AudioPlaybackDriver {
             queueDepthTotalMS += currentQueuedAudioMS
             queueDepthSampleCount += 1
         }
+
+        func enqueueBuffer(
+            _ pcmBuffer: AVAudioPCMBuffer,
+            frameCount: Int,
+            firstSample: Float,
+            lastSample: Float,
+            fadeInApplied: Bool,
+            chunkIndex: Int
+        ) {
+            queuedBuffers.append(
+                QueuedBuffer(
+                    pcmBuffer: pcmBuffer,
+                    frameCount: frameCount,
+                    firstSample: firstSample,
+                    lastSample: lastSample,
+                    fadeInApplied: fadeInApplied,
+                    chunkIndex: chunkIndex,
+                    bufferIndex: nil,
+                    engineGeneration: nil
+                )
+            )
+            queuedSampleCount += frameCount
+        }
+
+        func reserveQueuedBufferIndicesForCurrentGeneration() -> [QueuedBuffer] {
+            guard !queuedBuffers.isEmpty else { return [] }
+            var reserved = [QueuedBuffer]()
+            for index in queuedBuffers.indices where queuedBuffers[index].bufferIndex == nil {
+                let bufferIndex = nextBufferIndex + 1
+                nextBufferIndex = bufferIndex
+                queuedBuffers[index].bufferIndex = bufferIndex
+                queuedBuffers[index].engineGeneration = engineGeneration
+                reserved.append(queuedBuffers[index])
+            }
+            return reserved
+        }
+
+        func markQueuedBuffersForReschedule() {
+            engineGeneration += 1
+            for index in queuedBuffers.indices {
+                queuedBuffers[index].bufferIndex = nil
+                queuedBuffers[index].engineGeneration = nil
+            }
+        }
+
+        func completeQueuedBuffer(
+            bufferIndex: Int,
+            engineGeneration: Int
+        ) -> QueuedBuffer? {
+            guard let queueIndex = queuedBuffers.firstIndex(where: {
+                $0.bufferIndex == bufferIndex && $0.engineGeneration == engineGeneration
+            }) else {
+                return nil
+            }
+
+            let completedBuffer = queuedBuffers.remove(at: queueIndex)
+            queuedSampleCount = max(0, queuedSampleCount - completedBuffer.frameCount)
+            return completedBuffer
+        }
     }
 
     fileprivate enum PlaybackConfiguration {
@@ -630,6 +706,9 @@ final class AudioPlaybackDriver {
         static let drainTimeoutPaddingMS = 3_000
         static let drainProgressCheckIntervalMS = 500
         static let drainProgressStallTimeoutMS = 8_000
+        static let environmentInstabilityWindowMS = 8_000
+        static let recoveryStabilizationDelayMS = 900
+        static let recoveryMaximumAttempts = 3
         static let lowQueueThresholdMS = 100
         static let channels: AVAudioChannelCount = 1
         static let interJobBoopDurationMS = 90
@@ -644,6 +723,12 @@ final class AudioPlaybackDriver {
         }
     }
 
+    private enum RecoveryReason: String {
+        case systemWake = "system_wake"
+        case outputDeviceChange = "output_device_change"
+        case engineConfigurationChange = "engine_configuration_change"
+    }
+
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var streamingFormat: AVAudioFormat?
@@ -651,12 +736,21 @@ final class AudioPlaybackDriver {
     private var nextRequestID: UInt64 = 0
     private let traceEnabled: Bool
     private var engineConfigurationObserver: NSObjectProtocol?
+    private var workspaceObservers = [NSObjectProtocol]()
     private var defaultOutputDeviceAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
         mScope: kAudioObjectPropertyScopeGlobal,
         mElement: kAudioObjectPropertyElementMain
     )
     private var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
+    private var lastEnvironmentInstabilityAt: Date?
+    private var recoveryTask: Task<Void, Never>?
+    private var isSystemSleeping = false
+    private var isScreenSleeping = false
+    private var isSessionActive = true
+    private var playbackRecoveryReason: RecoveryReason?
+    private var playbackRecoveryAttempt = 0
+    private var routingArbitration = AVAudioRoutingArbiter.shared
     private var activeRequestState: RequestPlaybackState?
     private var activeEventSink: (@Sendable (PlaybackEvent) async -> Void)?
     private var activeRuntimeFailure: WorkerError?
@@ -672,6 +766,7 @@ final class AudioPlaybackDriver {
         self.traceEnabled = traceEnabled
         lastObservedOutputDeviceDescription = currentDefaultOutputDeviceDescription()
         installEngineConfigurationObserver()
+        installWorkspaceObservers()
         installDefaultOutputDeviceObserver()
     }
 
@@ -685,10 +780,10 @@ final class AudioPlaybackDriver {
         }
     }
 
-    func prepare(sampleRate: Double) throws -> Bool {
+    func prepare(sampleRate: Double) async throws -> Bool {
         let needsSetup = audioEngine == nil || playerNode == nil || engineSampleRate != sampleRate
         if needsSetup {
-            try rebuildEngine(sampleRate: sampleRate)
+            try await rebuildEngine(sampleRate: sampleRate)
         } else if audioEngine?.isRunning == false {
             try audioEngine?.start()
         }
@@ -706,7 +801,7 @@ final class AudioPlaybackDriver {
         stream: AsyncThrowingStream<[Float], Error>,
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
     ) async throws -> PlaybackSummary {
-        _ = try prepare(sampleRate: sampleRate)
+        _ = try await prepare(sampleRate: sampleRate)
         try await playInterJobBoopIfNeeded(sampleRate: sampleRate)
 
         let startedAt = Date()
@@ -732,17 +827,6 @@ final class AudioPlaybackDriver {
         var startupBufferedAudioMS: Int?
         var timeToFirstChunkMS: Int?
         var timeToPrerollReadyMS: Int?
-        var pendingBuffers = [
-            (
-                buffer: AVAudioPCMBuffer,
-                frameCount: Int,
-                firstSample: Float,
-                lastSample: Float,
-                fadeInApplied: Bool,
-                chunkIndex: Int
-            )
-        ]()
-        var pendingSampleCount = 0
         var lastChunkReceivedAt: Date?
         var interChunkGapTotalMS = 0
         var interChunkGapCount = 0
@@ -751,20 +835,14 @@ final class AudioPlaybackDriver {
         var scheduleGapTotalMS = 0
         var scheduleGapCount = 0
         var maxScheduleGapMS: Int?
-        var bufferIndex = 0
         var lastPreparedTrailingSample: Float?
 
         func bufferedAudioMS() -> Int {
-            Int((Double(pendingSampleCount) / sampleRate * 1_000).rounded())
+            state.queuedAudioMS(sampleRate: sampleRate)
         }
 
-        func scheduleForPlayback(
-            _ buffer: AVAudioPCMBuffer,
-            frameCount: Int,
-            firstSample: Float,
-            lastSample: Float,
-            fadeInApplied: Bool,
-            chunkIndex: Int
+        func scheduleQueuedBuffer(
+            _ queuedBuffer: RequestPlaybackState.QueuedBuffer
         ) async throws {
             try throwIfActivePlaybackInterrupted()
             let queuedAudioBeforeMS = state.queuedAudioMS(sampleRate: sampleRate)
@@ -776,11 +854,14 @@ final class AudioPlaybackDriver {
                 maxScheduleGapMS = max(maxScheduleGapMS ?? gapMS, gapMS)
                 scheduleGapTotalMS += gapMS
                 scheduleGapCount += 1
-                if startedPlayback, gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS {
+                if startedPlayback,
+                   let bufferIndex = queuedBuffer.bufferIndex,
+                   gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS
+                {
                     await onEvent(
                         .scheduleGapWarning(
                             gapMS: gapMS,
-                            bufferIndex: bufferIndex + 1,
+                            bufferIndex: bufferIndex,
                             queuedAudioMS: queuedAudioBeforeMS
                         )
                     )
@@ -789,23 +870,22 @@ final class AudioPlaybackDriver {
                 scheduleGapMS = nil
             }
             lastScheduleAt = scheduledAt
-            bufferIndex += 1
-            let currentBufferIndex = bufferIndex
+            let currentBufferIndex = queuedBuffer.bufferIndex ?? 0
+            let currentEngineGeneration = queuedBuffer.engineGeneration ?? state.engineGeneration
 
-            let leadingAbs = Double(abs(firstSample))
-            let trailingAbs = Double(abs(lastSample))
+            let leadingAbs = Double(abs(queuedBuffer.firstSample))
+            let trailingAbs = Double(abs(queuedBuffer.lastSample))
             state.maxLeadingAbsAmplitude = max(state.maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
             state.maxTrailingAbsAmplitude = max(state.maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
-            if fadeInApplied {
+            if queuedBuffer.fadeInApplied {
                 state.fadeInChunkCount += 1
             }
             if let lastTrailingSample = state.lastTrailingSample {
-                let jump = Double(abs(firstSample - lastTrailingSample))
+                let jump = Double(abs(queuedBuffer.firstSample - lastTrailingSample))
                 state.maxBoundaryDiscontinuity = max(state.maxBoundaryDiscontinuity ?? jump, jump)
             }
-            state.lastTrailingSample = lastSample
+            state.lastTrailingSample = queuedBuffer.lastSample
 
-            state.scheduledSampleCount += frameCount
             state.scheduleCallbackCount += 1
             state.recordQueuedAudioDepth(sampleRate: sampleRate)
             let queuedAudioAfterMS = state.queuedAudioMS(sampleRate: sampleRate)
@@ -814,25 +894,32 @@ final class AudioPlaybackDriver {
                     .trace(
                         PlaybackTraceEvent(
                             name: "buffer_scheduled",
-                            chunkIndex: chunkIndex,
+                            chunkIndex: queuedBuffer.chunkIndex,
                             bufferIndex: currentBufferIndex,
-                            sampleCount: frameCount,
-                            durationMS: Int((Double(frameCount) / sampleRate * 1_000).rounded()),
+                            sampleCount: queuedBuffer.frameCount,
+                            durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1_000).rounded()),
                             queuedAudioBeforeMS: queuedAudioBeforeMS,
                             queuedAudioAfterMS: queuedAudioAfterMS,
                             gapMS: scheduleGapMS,
                             isRebuffering: state.isRebuffering,
-                            fadeInApplied: fadeInApplied
+                            fadeInApplied: queuedBuffer.fadeInApplied
                         )
                     )
                 )
             }
-            scheduleBuffer(buffer, callbackType: .dataPlayedBack) { callbackType in
+            scheduleBuffer(queuedBuffer.pcmBuffer, callbackType: .dataPlayedBack) { callbackType in
                 guard callbackType == .dataPlayedBack else { return }
                 Task { @MainActor in
                     guard requestID + 1 == self.nextRequestID else { return }
+                    guard
+                        state.completeQueuedBuffer(
+                            bufferIndex: currentBufferIndex,
+                            engineGeneration: currentEngineGeneration
+                        ) != nil
+                    else {
+                        return
+                    }
 
-                    state.playedBackSampleCount += frameCount
                     state.playedBackCallbackCount += 1
                     state.recordQueuedAudioDepth(sampleRate: sampleRate)
 
@@ -842,15 +929,15 @@ final class AudioPlaybackDriver {
                             .trace(
                                 PlaybackTraceEvent(
                                     name: "buffer_played_back",
-                                    chunkIndex: chunkIndex,
+                                    chunkIndex: queuedBuffer.chunkIndex,
                                     bufferIndex: currentBufferIndex,
-                                    sampleCount: frameCount,
-                                    durationMS: Int((Double(frameCount) / sampleRate * 1_000).rounded()),
+                                    sampleCount: queuedBuffer.frameCount,
+                                    durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1_000).rounded()),
                                     queuedAudioBeforeMS: nil,
                                     queuedAudioAfterMS: currentQueuedAudioMS,
                                     gapMS: nil,
                                     isRebuffering: state.isRebuffering,
-                                    fadeInApplied: fadeInApplied
+                                    fadeInApplied: queuedBuffer.fadeInApplied
                                 )
                             )
                         )
@@ -936,6 +1023,15 @@ final class AudioPlaybackDriver {
             }
         }
 
+        func scheduleQueuedBuffersIfPossible() async throws {
+            guard !isPlaybackRecoveryActive else { return }
+            let queuedBuffers = state.reserveQueuedBufferIndicesForCurrentGeneration()
+            for queuedBuffer in queuedBuffers {
+                try throwIfActivePlaybackInterrupted()
+                try await scheduleQueuedBuffer(queuedBuffer)
+            }
+        }
+
         do {
             for try await chunk in stream {
                 try throwIfActivePlaybackInterrupted()
@@ -969,7 +1065,7 @@ final class AudioPlaybackDriver {
                                 bufferIndex: nil,
                                 sampleCount: chunk.count,
                                 durationMS: chunkDurationMS,
-                                queuedAudioBeforeMS: startedPlayback ? state.queuedAudioMS(sampleRate: sampleRate) : bufferedAudioMS(),
+                                queuedAudioBeforeMS: bufferedAudioMS(),
                                 queuedAudioAfterMS: nil,
                                 gapMS: interChunkGapMS,
                                 isRebuffering: state.isRebuffering,
@@ -985,20 +1081,20 @@ final class AudioPlaybackDriver {
                     applyFadeIn: !emittedFirstChunk
                 ) {
                     lastPreparedTrailingSample = buffer.lastSample
-                    let frameCount = buffer.frameCount
+                    state.enqueueBuffer(
+                        buffer.buffer,
+                        frameCount: buffer.frameCount,
+                        firstSample: buffer.firstSample,
+                        lastSample: buffer.lastSample,
+                        fadeInApplied: buffer.fadeInApplied,
+                        chunkIndex: chunkCount
+                    )
                     if startedPlayback {
-                        try await scheduleForPlayback(
-                            buffer.buffer,
-                            frameCount: frameCount,
-                            firstSample: buffer.firstSample,
-                            lastSample: buffer.lastSample,
-                            fadeInApplied: buffer.fadeInApplied,
-                            chunkIndex: chunkCount
-                        )
+                        try await scheduleQueuedBuffersIfPossible()
                         if state.isRebuffering {
                             let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
                             if currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS {
-                                if !isPlaybackPausedManually {
+                                if !isPlaybackPausedManually && !isPlaybackRecoveryActive {
                                     playerNode?.play()
                                 }
                                 state.isRebuffering = false
@@ -1011,18 +1107,6 @@ final class AudioPlaybackDriver {
                                 await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                             }
                         }
-                    } else {
-                        pendingBuffers.append(
-                            (
-                                buffer: buffer.buffer,
-                                frameCount: frameCount,
-                                firstSample: buffer.firstSample,
-                                lastSample: buffer.lastSample,
-                                fadeInApplied: buffer.fadeInApplied,
-                                chunkIndex: chunkCount
-                            )
-                        )
-                        pendingSampleCount += frameCount
                     }
                 }
 
@@ -1034,26 +1118,13 @@ final class AudioPlaybackDriver {
 
                 if !startedPlayback, bufferedAudioMS() >= state.thresholdsController.thresholds.startupBufferTargetMS {
                     startupBufferedAudioMS = bufferedAudioMS()
-
-                    for pending in pendingBuffers {
-                        try await scheduleForPlayback(
-                            pending.buffer,
-                            frameCount: pending.frameCount,
-                            firstSample: pending.firstSample,
-                            lastSample: pending.lastSample,
-                            fadeInApplied: pending.fadeInApplied,
-                            chunkIndex: pending.chunkIndex
-                        )
-                    }
-
-                    pendingBuffers.removeAll(keepingCapacity: true)
-                    pendingSampleCount = 0
                     startedPlayback = true
                     emittedPrerollReady = true
                     timeToPrerollReadyMS = milliseconds(since: startedAt)
                     if !isPlaybackPausedManually {
                         playbackState = .playing
                     }
+                    try await scheduleQueuedBuffersIfPossible()
                     await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: state.thresholdsController.thresholds))
                 }
             }
@@ -1073,26 +1144,13 @@ final class AudioPlaybackDriver {
                 }
                 await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
             }
-            if !startedPlayback, !pendingBuffers.isEmpty {
+            if !startedPlayback, !state.queuedBuffers.isEmpty {
                 startupBufferedAudioMS = bufferedAudioMS()
-
-                for pending in pendingBuffers {
-                    try await scheduleForPlayback(
-                        pending.buffer,
-                        frameCount: pending.frameCount,
-                        firstSample: pending.firstSample,
-                        lastSample: pending.lastSample,
-                        fadeInApplied: pending.fadeInApplied,
-                        chunkIndex: pending.chunkIndex
-                    )
-                }
-
-                pendingBuffers.removeAll(keepingCapacity: true)
-                pendingSampleCount = 0
                 startedPlayback = true
+                try await scheduleQueuedBuffersIfPossible()
                 if state.isRebuffering {
                     let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
-                    if !isPlaybackPausedManually {
+                    if !isPlaybackPausedManually && !isPlaybackRecoveryActive {
                         playerNode?.play()
                     }
                     state.isRebuffering = false
@@ -1190,15 +1248,16 @@ final class AudioPlaybackDriver {
     }
 
     func stop() {
-        playerNode?.stop()
-        audioEngine?.stop()
-        playerNode = nil
-        audioEngine = nil
-        streamingFormat = nil
-        engineSampleRate = nil
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        tearDownPlaybackHardware(leavingArbitration: true)
+        playbackRecoveryReason = nil
+        playbackRecoveryAttempt = 0
+        lastEnvironmentInstabilityAt = nil
         playbackState = .idle
         isPlaybackPausedManually = false
         shouldPlayInterJobBoop = false
+        routingArbitration.leave()
     }
 
     func pause() -> PlaybackState {
@@ -1285,6 +1344,10 @@ final class AudioPlaybackDriver {
                     if snapshot.queuedAudioMS == 0 {
                         return
                     }
+                    if await MainActor.run(body: { self.shouldSuppressDrainProgressTimeout }) {
+                        lastProgressAt = Date()
+                        continue
+                    }
                     if snapshot.isPausedManually {
                         lastProgressAt = Date()
                         continue
@@ -1312,8 +1375,9 @@ final class AudioPlaybackDriver {
 
     // MARK: - Engine Management
 
-    private func rebuildEngine(sampleRate: Double) throws {
-        stop()
+    private func rebuildEngine(sampleRate: Double) async throws {
+        tearDownPlaybackHardware(leavingArbitration: true)
+        try await beginRoutingArbitration()
 
         let engine = AVAudioEngine()
         let node = AVAudioPlayerNode()
@@ -1346,6 +1410,35 @@ final class AudioPlaybackDriver {
         playerNode?.reset()
     }
 
+    private func tearDownPlaybackHardware(leavingArbitration: Bool) {
+        playerNode?.stop()
+        audioEngine?.stop()
+        playerNode = nil
+        audioEngine = nil
+        streamingFormat = nil
+        engineSampleRate = nil
+        if leavingArbitration {
+            routingArbitration.leave()
+        }
+    }
+
+    private func beginRoutingArbitration() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            routingArbitration.begin(category: .playback) { _, error in
+                if let error {
+                    continuation.resume(
+                        throwing: WorkerError(
+                            code: .audioPlaybackFailed,
+                            message: "SpeakSwiftly could not begin macOS audio routing arbitration before starting local playback. \(error.localizedDescription)"
+                        )
+                    )
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+    }
+
     // MARK: - System Observers
 
     private func installEngineConfigurationObserver() {
@@ -1359,21 +1452,87 @@ final class AudioPlaybackDriver {
                 guard let engine = self.audioEngine else { return }
 
                 let engineIsRunning = engine.isRunning
+                markEnvironmentInstability()
                 if let environmentEventSink {
                     await environmentEventSink(.engineConfigurationChanged(engineIsRunning: engineIsRunning))
                 }
                 if let activeEventSink {
                     await activeEventSink(.engineConfigurationChanged(engineIsRunning: engineIsRunning))
                 }
-
-                interruptActivePlayback(
-                    with: WorkerError(
-                        code: .audioPlaybackFailed,
-                        message: "Live playback stopped because macOS reported an AVAudioEngine configuration change during an active SpeakSwiftly request. The engine was running: \(engineIsRunning ? "yes" : "no"). The current request is being failed immediately so queued work can continue."
-                    )
-                )
+                beginPlaybackRecovery(reason: .engineConfigurationChange)
             }
         }
+    }
+
+    private func installWorkspaceObservers() {
+        let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
+
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.willSleepNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSystemSleepStateChange(isSleeping: true)
+                }
+            }
+        )
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSystemSleepStateChange(isSleeping: false)
+                }
+            }
+        )
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.screensDidSleepNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleScreenSleepStateChange(isSleeping: true)
+                }
+            }
+        )
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.screensDidWakeNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleScreenSleepStateChange(isSleeping: false)
+                }
+            }
+        )
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.sessionDidResignActiveNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSessionActivityChange(isActive: false)
+                }
+            }
+        )
+        workspaceObservers.append(
+            workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.sessionDidBecomeActiveNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.handleSessionActivityChange(isActive: true)
+                }
+            }
+        )
     }
 
     private func installDefaultOutputDeviceObserver() {
@@ -1396,6 +1555,7 @@ final class AudioPlaybackDriver {
         let currentDevice = currentDefaultOutputDeviceDescription()
         guard previousDevice != currentDevice else { return }
         lastObservedOutputDeviceDescription = currentDevice
+        markEnvironmentInstability()
 
         if let environmentEventSink {
             Task {
@@ -1413,12 +1573,182 @@ final class AudioPlaybackDriver {
             }
         }
 
+        beginPlaybackRecovery(reason: .outputDeviceChange)
+    }
+
+    private func handleSystemSleepStateChange(isSleeping: Bool) {
+        isSystemSleeping = isSleeping
+        markEnvironmentInstability()
+        emitEnvironmentEvent(.systemSleepStateChanged(isSleeping: isSleeping))
+
+        guard activeRequestState != nil else { return }
+        if isSleeping {
+            playerNode?.pause()
+            return
+        }
+
+        beginPlaybackRecovery(reason: .systemWake)
+    }
+
+    private func handleScreenSleepStateChange(isSleeping: Bool) {
+        isScreenSleeping = isSleeping
+        markEnvironmentInstability()
+        emitEnvironmentEvent(.screenSleepStateChanged(isSleeping: isSleeping))
+    }
+
+    private func handleSessionActivityChange(isActive: Bool) {
+        isSessionActive = isActive
+        markEnvironmentInstability()
+        emitEnvironmentEvent(.sessionActivityChanged(isActive: isActive))
+    }
+
+    private func emitEnvironmentEvent(_ event: PlaybackEnvironmentEvent) {
+        guard let environmentEventSink else { return }
+        Task {
+            await environmentEventSink(event)
+        }
+    }
+
+    private func markEnvironmentInstability() {
+        lastEnvironmentInstabilityAt = Date()
+    }
+
+    private var isPlaybackRecoveryActive: Bool {
+        playbackRecoveryReason != nil || isSystemSleeping
+    }
+
+    private var shouldSuppressDrainProgressTimeout: Bool {
+        if isPlaybackRecoveryActive || isScreenSleeping || !isSessionActive {
+            return true
+        }
+        guard let lastEnvironmentInstabilityAt else { return false }
+        return Date().timeIntervalSince(lastEnvironmentInstabilityAt) * 1_000
+            <= Double(PlaybackConfiguration.environmentInstabilityWindowMS)
+    }
+
+    private func beginPlaybackRecovery(reason: RecoveryReason) {
+        guard let activeRequestState else { return }
+        guard activeRuntimeFailure == nil else { return }
+        guard !isSystemSleeping || reason == .systemWake else { return }
+
+        recoveryTask?.cancel()
+        playbackRecoveryReason = reason
+        playbackRecoveryAttempt = 0
+        activeRequestState.markQueuedBuffersForReschedule()
+        playerNode?.pause()
+        emitEnvironmentEvent(
+            .recoveryStateChanged(
+                reason: reason.rawValue,
+                stage: "scheduled",
+                attempt: nil,
+                currentDevice: lastObservedOutputDeviceDescription
+            )
+        )
+
+        recoveryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performPlaybackRecovery(reason: reason)
+        }
+    }
+
+    private func performPlaybackRecovery(reason: RecoveryReason) async {
+        guard let activeRequestState else {
+            playbackRecoveryReason = nil
+            return
+        }
+        guard let sampleRate = engineSampleRate else {
+            interruptActivePlayback(
+                with: WorkerError(
+                    code: .audioPlaybackFailed,
+                    message: "SpeakSwiftly could not recover local playback after a \(reason.rawValue) event because the active playback sample rate was no longer available."
+                )
+            )
+            return
+        }
+
+        while playbackRecoveryAttempt < PlaybackConfiguration.recoveryMaximumAttempts {
+            playbackRecoveryAttempt += 1
+            let attempt = playbackRecoveryAttempt
+            emitEnvironmentEvent(
+                .recoveryStateChanged(
+                    reason: reason.rawValue,
+                    stage: "attempting",
+                    attempt: attempt,
+                    currentDevice: lastObservedOutputDeviceDescription
+                )
+            )
+
+            do {
+                try await Task.sleep(for: .milliseconds(PlaybackConfiguration.recoveryStabilizationDelayMS))
+                try Task.checkCancellation()
+                try await rebuildEngine(sampleRate: sampleRate)
+                activeRequestState.markQueuedBuffersForReschedule()
+                try await rescheduleActiveRequestBuffers(activeRequestState)
+                if !isPlaybackPausedManually,
+                   !activeRequestState.isRebuffering,
+                   !isSystemSleeping
+                {
+                    playerNode?.play()
+                }
+                playbackRecoveryReason = nil
+                playbackRecoveryAttempt = 0
+                emitEnvironmentEvent(
+                    .recoveryStateChanged(
+                        reason: reason.rawValue,
+                        stage: "recovered",
+                        attempt: attempt,
+                        currentDevice: lastObservedOutputDeviceDescription
+                    )
+                )
+                return
+            } catch is CancellationError {
+                return
+            } catch {
+                markEnvironmentInstability()
+                emitEnvironmentEvent(
+                    .recoveryStateChanged(
+                        reason: reason.rawValue,
+                        stage: "attempt_failed",
+                        attempt: attempt,
+                        currentDevice: lastObservedOutputDeviceDescription
+                    )
+                )
+            }
+        }
+
         interruptActivePlayback(
             with: WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback stopped because macOS switched the default output device from '\(previousDevice ?? "unknown output device")' to '\(currentDevice ?? "unknown output device")' during an active SpeakSwiftly request. The current request is being failed immediately so queued work can continue."
+                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(PlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request."
             )
         )
+    }
+
+    private func rescheduleActiveRequestBuffers(_ state: RequestPlaybackState) async throws {
+        let queuedBuffers = state.reserveQueuedBufferIndicesForCurrentGeneration()
+        for queuedBuffer in queuedBuffers {
+            try throwIfActivePlaybackInterrupted()
+            scheduleBuffer(queuedBuffer.pcmBuffer, callbackType: .dataPlayedBack) { [weak self] callbackType in
+                guard callbackType == .dataPlayedBack else { return }
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    guard state.completeQueuedBuffer(
+                        bufferIndex: queuedBuffer.bufferIndex ?? 0,
+                        engineGeneration: queuedBuffer.engineGeneration ?? state.engineGeneration
+                    ) != nil else {
+                        return
+                    }
+                    state.playedBackCallbackCount += 1
+                    state.recordQueuedAudioDepth(sampleRate: self.engineSampleRate ?? 24_000)
+                    if state.generationFinished, state.queuedSampleCount == 0 {
+                        state.drainContinuation?.resume()
+                        state.drainContinuation = nil
+                    }
+                }
+            }
+            state.scheduleCallbackCount += 1
+            state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24_000)
+        }
     }
 
     // MARK: - Interruption Handling
