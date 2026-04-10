@@ -1463,8 +1463,8 @@ final class AudioPlaybackDriver {
             return nil
         }
 
-        var deviceName = "" as CFString
-        var nameSize = UInt32(MemoryLayout<CFString>.size)
+        var deviceName: Unmanaged<CFString>?
+        var nameSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         var nameAddress = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -1479,8 +1479,8 @@ final class AudioPlaybackDriver {
             &deviceName
         )
 
-        if nameStatus == noErr {
-            let name = deviceName as String
+        if nameStatus == noErr, let deviceName {
+            let name = deviceName.takeRetainedValue() as String
             if !name.isEmpty {
                 return "\(name) [\(deviceID)]"
             }
