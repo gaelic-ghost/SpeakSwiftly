@@ -1,6 +1,6 @@
 # SpeakSwiftly
 
-A Swift speech runtime package for long-lived local text-to-speech with a typed Swift API, a JSONL worker surface, and resident-model control for local MLX-backed speech workflows.
+A Swift package providing local, multi-speaker text-to-speech via a typed Swift API and a JSONL worker surface. Includes voice creation by design or clone, as well as custom text normalization via [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech)
 
 ## Table of Contents
 
@@ -15,11 +15,11 @@ A Swift speech runtime package for long-lived local text-to-speech with a typed 
 
 ## Overview
 
-SpeakSwiftly is a Swift Package Manager repository that ships both an importable library product, `SpeakSwiftlyCore`, and a worker executable, `SpeakSwiftly`. The library gives Swift callers a typed runtime surface, while the executable gives non-Swift hosts a newline-delimited JSON protocol over `stdin` and `stdout`.
+SpeakSwiftly is a TTS-in-a-box solution for Swift app devs. It ships both an importable library product, and a worker executable, The library gives Swift callers a typed runtime surface, while the executable gives non-Swift hosts (Python, Rust, etc.) a newline-delimited JSON protocol over `stdio`.
 
 ### Motivation
 
-The project exists to keep MLX-backed speech generation, playback orchestration, and profile storage in one focused Swift runtime instead of forcing each host app or service to rebuild those behaviors itself. The public surface is meant to stay direct and predictable: typed Swift entry points for library consumers, stable JSONL operations for process-boundary callers, and clear runtime status for operators who need to understand what the resident speech backend is doing.
+This project was born from my desire for a simple, "plug-and-play" TTS option for other things I'm building. It's rapidly turned into something I think others will find useful as well.
 
 SpeakSwiftly currently supports:
 
