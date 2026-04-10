@@ -12,8 +12,8 @@ extension SpeakSwiftlyE2ETests {
     static let testingPlaybackText = """
     Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
     """
-    static let forensicPlaybackText = """
-    Forensic playback probe begins now. Please read this exactly once and do not repeat yourself.
+    static let deepTracePlaybackText = """
+    Deep trace playback probe begins now. Please read this exactly once and do not repeat yourself.
     The path `/Users/galew/Workspace/speak-to-user-mcp/src/speak_to_user_mcp/speakswiftly.py` contains a helper named `SpeakSwiftlyOwner.speak_live`.
     The config file `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should be spoken as plain speech rather than spiraling into code noise.
     Read this fenced code sample calmly.
@@ -24,9 +24,9 @@ extension SpeakSwiftlyE2ETests {
     print(sourcePath, fallback)
     ```
     Also read these oddly spelled words once each: quizzaciously, xylophonic, cwmfjord, lophophore, phthalo, zyzzyva.
-    Finish with this sentence exactly once. End of forensic playback probe.
+    Finish with this sentence exactly once. End of deep trace playback probe.
     """
-    static let segmentedForensicPlaybackText = """
+    static let segmentedDeepTracePlaybackText = """
     # Section One
 
     Please read this paragraph once and keep a natural tone. The path `/Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift` should sound like speech, not code noise.
@@ -48,12 +48,12 @@ extension SpeakSwiftlyE2ETests {
 
     ## Footer
 
-    End this segmented forensic playback probe once, clearly, and without looping.
+    End this segmented deep trace playback probe once, clearly, and without looping.
     """
-    static let reversedSegmentedForensicPlaybackText = """
+    static let reversedSegmentedDeepTracePlaybackText = """
     # Footer
 
-    End this segmented forensic playback probe once, clearly, and without looping.
+    End this segmented deep trace playback probe once, clearly, and without looping.
 
     ## Section Four
 
@@ -93,12 +93,12 @@ extension SpeakSwiftlyE2ETests {
 
     ## Footer
 
-    End this conversational forensic playback probe once, clearly, and without looping.
+    End this conversational deep trace playback probe once, clearly, and without looping.
     """
     static let reversedSegmentedConversationalPlaybackText = """
     # Footer
 
-    End this conversational forensic playback probe once, clearly, and without looping.
+    End this conversational deep trace playback probe once, clearly, and without looping.
 
     ## Section Four
 
@@ -565,8 +565,8 @@ extension SpeakSwiftlyE2ETests {
         ProcessInfo.processInfo.environment["SPEAKSWIFTLY_AUDIBLE_E2E"] == "1"
     }
 
-    static var isForensicE2EEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_FORENSIC_E2E"] == "1"
+    static var isDeepTraceE2EEnabled: Bool {
+        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_DEEP_TRACE_E2E"] == "1"
     }
 }
 

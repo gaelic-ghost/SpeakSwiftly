@@ -263,7 +263,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 ```
 
-Extended e2e and forensic workflows are documented in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+Extended e2e, trace-capture, and deep-trace workflows are documented in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
 
 ## License
 

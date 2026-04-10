@@ -694,7 +694,7 @@ extension SpeakSwiftly.Runtime {
         return try generationJobStore.markExpired(id: jobID, expiredAt: dependencies.now())
     }
 
-    func textFeatureDetails(_ features: SpeechTextForensicFeatures) -> [String: LogValue] {
+    func textFeatureDetails(_ features: SpeechTextDeepTraceFeatures) -> [String: LogValue] {
         [
             "original_character_count": .int(features.originalCharacterCount),
             "normalized_character_count": .int(features.normalizedCharacterCount),
@@ -715,7 +715,7 @@ extension SpeakSwiftly.Runtime {
         ]
     }
 
-    func textSectionDetails(_ section: SpeechTextForensicSection) -> [String: LogValue] {
+    func textSectionDetails(_ section: SpeechTextDeepTraceSection) -> [String: LogValue] {
         [
             "section_index": .int(section.index),
             "section_title": .string(section.title),
@@ -726,7 +726,7 @@ extension SpeakSwiftly.Runtime {
         ]
     }
 
-    func textSectionWindowDetails(_ window: SpeechTextForensicSectionWindow) -> [String: LogValue] {
+    func textSectionWindowDetails(_ window: SpeechTextDeepTraceSectionWindow) -> [String: LogValue] {
         textSectionDetails(window.section).merging(
             [
                 "estimated_start_ms": .int(window.estimatedStartMS),
@@ -1116,11 +1116,11 @@ extension SpeakSwiftly.Runtime {
                 profile: textProfile
             )
         }
-        let textFeatures = TextForSpeech.Forensics.features(
+        let textFeatures = SpeakSwiftly.DeepTrace.features(
             originalText: text,
             normalizedText: normalizedText
         )
-        let textSections = TextForSpeech.Forensics.sections(originalText: text)
+        let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
         var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
         let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
 

@@ -28,7 +28,7 @@ This document should hold:
 - repository layout and development expectations
 - contributor and integration guidance
 - full wire examples and operational behavior notes
-- extended verification and forensic workflows
+- extended verification and deep-trace workflows
 - rationale for public naming and runtime control design
 
 ## Runtime Shape
@@ -390,7 +390,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Release
 sh scripts/repo-maintenance/update-vendored-mlx-bundle.sh
 ```
 
-Opt-in real-model e2e coverage:
+Opt-in real-model e2e coverage. The root `SpeakSwiftlyE2ETests` suite is serialized on purpose, so the full e2e surface always runs one request flow at a time.
 
 ```bash
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
@@ -410,24 +410,24 @@ Chunk-level trace during e2e:
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
-Long forensic playback probe:
+Long deep-trace playback probe:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter SpeakSwiftlyE2ETests/longCodeHeavy
 ```
 
-Section-aware weird-text forensic probes:
+Section-aware weird-text deep-trace probes:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithReversedSegmentedWeirdTextRequest
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/segmentedWeirdText
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/reversedSegmentedWeirdText
 ```
 
-Section-aware conversational prose probes:
+Section-aware conversational prose deep-trace probes:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithSegmentedConversationalProseRequest
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_FORENSIC_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/segmentedConversationalProse
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/reversedSegmentedConversationalProse
 ```
 
 If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, the runtime was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime and launch through the published `run-speakswiftly` script or stable alias.

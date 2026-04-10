@@ -3,9 +3,9 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Playback Trace E2E")
-    struct PlaybackTraceSuite {
-        @Test func speakLivePlaybackTraceCanBeCapturedOnDemand() async throws {
+    @Suite("Trace Capture E2E")
+    struct TraceCaptureSuite {
+        @Test func captureOnDemand() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isPlaybackTraceEnabled else { return }
 
             let sandbox = try E2ESandbox()

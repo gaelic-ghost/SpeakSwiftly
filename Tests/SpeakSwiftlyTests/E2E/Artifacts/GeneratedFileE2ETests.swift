@@ -5,7 +5,7 @@ import Testing
 extension SpeakSwiftlyE2ETests {
     @Suite("Generated File E2E")
     struct GeneratedFileSuite {
-        @Test func generatedFileLaneRunsEndToEndAndSupportsManagedArtifactReads() async throws {
+        @Test func managedReads() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()

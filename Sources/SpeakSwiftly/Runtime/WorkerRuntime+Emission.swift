@@ -559,7 +559,7 @@ extension SpeakSwiftly.Runtime {
         )
 
         let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
-        let sectionWindows = TextForSpeech.Forensics.sectionWindows(
+        let sectionWindows = SpeakSwiftly.DeepTrace.sectionWindows(
             originalText: speechJob.text,
             totalDurationMS: totalDurationMS,
             totalChunkCount: playbackSummary.chunkCount

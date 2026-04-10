@@ -12,8 +12,8 @@ final class PlaybackJob: @unchecked Sendable {
     let textProfileName: String?
     let textContext: TextForSpeech.Context?
     let sourceFormat: TextForSpeech.SourceFormat?
-    let textFeatures: SpeechTextForensicFeatures
-    let textSections: [SpeechTextForensicSection]
+    let textFeatures: SpeechTextDeepTraceFeatures
+    let textSections: [SpeechTextDeepTraceSection]
     let stream: AsyncThrowingStream<[Float], any Swift.Error>
     let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
     var sampleRate: Double?
@@ -29,8 +29,8 @@ final class PlaybackJob: @unchecked Sendable {
         textProfileName: String?,
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?,
-        textFeatures: SpeechTextForensicFeatures,
-        textSections: [SpeechTextForensicSection],
+        textFeatures: SpeechTextDeepTraceFeatures,
+        textSections: [SpeechTextDeepTraceSection],
         stream: AsyncThrowingStream<[Float], any Swift.Error>,
         continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
     ) {

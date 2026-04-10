@@ -3,9 +3,9 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Qwen Workflow E2E")
+    @Suite("Qwen E2E")
     struct QwenWorkflowSuite {
-        @Test func voiceDesignLaneRunsSequentialSilentAndAudibleCoverage() async throws {
+        @Test func voiceDesignSilentThenAudible() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -58,7 +58,7 @@ extension SpeakSwiftlyE2ETests {
             }
         }
 
-        @Test func cloneLaneWithProvidedTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
+        @Test func cloneWithProvidedTranscript() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -131,7 +131,7 @@ extension SpeakSwiftlyE2ETests {
             }
         }
 
-        @Test func cloneLaneWithInferredTranscriptRunsSequentialSilentAndAudibleCoverage() async throws {
+        @Test func cloneWithInferredTranscript() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()

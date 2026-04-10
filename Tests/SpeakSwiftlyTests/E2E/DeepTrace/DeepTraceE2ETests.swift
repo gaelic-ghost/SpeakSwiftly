@@ -3,10 +3,10 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Forensic Playback E2E")
-    struct ForensicPlaybackSuite {
-        @Test func forensicSpeakLiveRunsEndToEndWithLongCodeHeavyRequest() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+    @Suite("Deep Trace E2E")
+    struct DeepTraceSuite {
+        @Test func longCodeHeavy() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -21,7 +21,7 @@ extension SpeakSwiftlyE2ETests {
             try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
-                id: "req-create-forensic",
+                id: "req-create-deep-trace",
                 profileName: SpeakSwiftlyE2ETests.testingProfileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .masc,
@@ -30,17 +30,17 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-forensic","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.forensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-deep-trace","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.deepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
             #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
-                $0["id"] as? String == "req-live-forensic"
+                $0["id"] as? String == "req-live-deep-trace"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "buffering_audio"
             } != nil)
             #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
-                $0["id"] as? String == "req-live-forensic"
+                $0["id"] as? String == "req-live-deep-trace"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
@@ -49,7 +49,7 @@ extension SpeakSwiftlyE2ETests {
                 try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
-                        $0["request_id"] as? String == "req-live-forensic",
+                        $0["request_id"] as? String == "req-live-deep-trace",
                         let details = $0["details"] as? [String: Any]
                     else {
                         return false
@@ -69,7 +69,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["sample_count"] as? Int ?? 0) > 0)
 
             #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
-                $0["id"] as? String == "req-live-forensic"
+                $0["id"] as? String == "req-live-deep-trace"
                     && $0["ok"] as? Bool == true
             } != nil)
 
@@ -77,8 +77,8 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func forensicSpeakLiveRunsEndToEndWithSegmentedWeirdTextRequest() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+        @Test func segmentedWeirdText() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -102,7 +102,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -159,8 +159,8 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedWeirdTextRequest() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+        @Test func reversedSegmentedWeirdText() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -184,7 +184,7 @@ extension SpeakSwiftlyE2ETests {
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedForensicPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-reversed-segmented","op":"queue_speech_live","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
                 """
             )
 
@@ -241,8 +241,8 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func forensicSpeakLiveRunsEndToEndWithSegmentedConversationalProseRequest() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+        @Test func segmentedConversationalProse() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -322,8 +322,8 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func forensicSpeakLiveRunsEndToEndWithReversedSegmentedConversationalProseRequest() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isForensicE2EEnabled else { return }
+        @Test func reversedSegmentedConversationalProse() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }

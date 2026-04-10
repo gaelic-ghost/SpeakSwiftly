@@ -298,9 +298,9 @@ import TextForSpeech
     #expect(playback.stopCount == 1)
 }
 
-// MARK: - Text Forensics and Normalization
+// MARK: - Deep Trace and Normalization
 
-@Test func speechTextForensicFeaturesCaptureCodeHeavyAndWeirdTextShapes() {
+@Test func speechTextDeepTraceFeaturesCaptureCodeHeavyAndWeirdTextShapes() {
     let original = """
     # Header
 
@@ -317,7 +317,7 @@ import TextForSpeech
     """
 
     let normalized = TextForSpeech.Normalize.text(original)
-    let features = TextForSpeech.Forensics.features(
+    let features = SpeakSwiftly.DeepTrace.features(
         originalText: original,
         normalizedText: normalized
     )
@@ -337,7 +337,7 @@ import TextForSpeech
     #expect(features.repeatedLetterRunCount >= 2)
 }
 
-@Test func speechTextForensicSectionsAndWindowsTrackSegmentedMarkdownStructure() {
+@Test func speechTextDeepTraceSectionsAndWindowsTrackSegmentedMarkdownStructure() {
     let original = """
     # Section One
 
@@ -359,13 +359,13 @@ import TextForSpeech
     End this probe clearly and without looping.
     """
 
-    let sections = TextForSpeech.Forensics.sections(originalText: original)
+    let sections = SpeakSwiftly.DeepTrace.sections(originalText: original)
     #expect(sections.map(\.title) == ["Section One", "Section Two", "Section Three", "Footer"])
     #expect(sections.allSatisfy { $0.kind == .markdownHeader })
     #expect(sections.allSatisfy { $0.normalizedCharacterCount > 0 })
     #expect(abs(sections.map(\.normalizedCharacterShare).reduce(0, +) - 1.0) < 0.0001)
 
-    let windows = TextForSpeech.Forensics.sectionWindows(
+    let windows = SpeakSwiftly.DeepTrace.sectionWindows(
         originalText: original,
         totalDurationMS: 12_000,
         totalChunkCount: 75

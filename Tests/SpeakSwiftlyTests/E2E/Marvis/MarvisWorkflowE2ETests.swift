@@ -3,9 +3,9 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Marvis Workflow E2E")
+    @Suite("Marvis E2E")
     struct MarvisWorkflowSuite {
-        @Test func marvisVoiceDesignProfilesRouteFemmeToConversationalA() async throws {
+        @Test func femmeRoutesToConversationalA() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -57,7 +57,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func marvisCloneProfilesRouteMascToConversationalB() async throws {
+        @Test func mascCloneRoutesToConversationalB() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -114,7 +114,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func marvisVoiceDesignProfilesRouteAndrogenousToConversationalA() async throws {
+        @Test func androgenousRoutesToConversationalA() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -154,7 +154,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func marvisVoiceDesignProfilesRunAudibleLivePlaybackAcrossAllVibes() async throws {
+        @Test func audiblePlaybackAcrossVibes() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
@@ -241,7 +241,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func marvisAudibleLivePlaybackPrequeuesThreeJobsAndDrainsInOrder() async throws {
+        @Test func prequeuedJobsDrainInOrder() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 
             let sandbox = try E2ESandbox()
