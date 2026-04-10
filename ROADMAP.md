@@ -325,7 +325,7 @@ Tickets:
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
-- [ ] Investigate automatic audio-route and output-device change handling for live playback, including headphones, AirPods, and macOS default-output switches, and decide whether `SpeakSwiftly` should observe route-change or hardware-change notifications and rebuild or retarget the playback engine when those changes occur.
+- [x] Investigate automatic audio-route and output-device change handling for live playback, including headphones, AirPods, and macOS default-output switches, and decide whether `SpeakSwiftly` should observe route-change or hardware-change notifications and rebuild or retarget the playback engine when those changes occur.
 
 ## Milestone 16: `mlx-audio-swift` upgrade review
 
@@ -376,6 +376,10 @@ Tickets:
 - [x] Define the minimum playback control operations that are actually worth owning around `playback_pause`, `playback_resume`, and `playback_state`, and keep the contract narrow instead of growing a generic command surface.
 - [ ] Define typed `SpeakSwiftlyCore` API parity for playback control requests and events instead of forcing library callers back through ad-hoc JSONL handling.
 - [ ] Unify playback-state reporting under one controller-owned source of truth so `playback_state.state` and `playback_state.active_request` cannot diverge during preroll, rebuffer, interruption, or drain.
+- [ ] Add an explicit playback-route policy surface so worker owners can choose whether live playback follows the current system output immediately, waits for the original device class to return, or fails over only for specific route categories.
+- [ ] Keep the current default route policy as “follow the active system output device” until a narrower policy surface is implemented and documented.
+- [ ] Add targeted coverage for Bluetooth and default-output-device churn, including a simulated “AirPods leave for another device, then return” path that proves active requests recover without dying.
+- [ ] Once an iPhone companion app exists, revisit route policy with a smarter multi-device model that can see both endpoints at once and make better choices than blind speaker fallback.
 - [ ] Decide and document whether a stop request only interrupts the active request or can also affect queued playback requests.
 - [ ] Emit structured lifecycle output for control acceptance, playback interruption, and terminal request state so parent processes can reason about what happened without guessing.
 - [ ] Add runtime coverage for `playback_pause`, `playback_resume`, and `playback_state`, including no-op state transitions when nothing is currently playing and explicit state payload assertions for idle, paused, and resumed playback.
