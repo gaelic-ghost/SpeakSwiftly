@@ -129,6 +129,7 @@ extension SpeakSwiftly.Runtime {
                     outputPath: outputPath,
                     cwd: cwd
                 )
+                invalidateQwenConditioningCache()
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
@@ -146,6 +147,7 @@ extension SpeakSwiftly.Runtime {
                     transcript: transcript,
                     cwd: cwd
                 )
+                invalidateQwenConditioningCache()
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
@@ -173,6 +175,7 @@ extension SpeakSwiftly.Runtime {
                 await emitProgress(id: id, stage: .writingProfileAssets)
                 let renameStartedAt = dependencies.now()
                 let storedProfile = try profileStore.renameProfile(named: profileName, to: newProfileName)
+                invalidateQwenConditioningCache()
                 await logRequestEvent(
                     "profile_renamed",
                     requestID: id,
@@ -195,6 +198,7 @@ extension SpeakSwiftly.Runtime {
 
             case .rerollProfile(let id, let profileName):
                 let storedProfile = try await handleRerollProfile(id: id, profileName: profileName)
+                invalidateQwenConditioningCache()
                 disposition = .requestCompleted(.success(
                     WorkerSuccessPayload(
                         id: id,
@@ -207,6 +211,7 @@ extension SpeakSwiftly.Runtime {
                 await emitProgress(id: id, stage: .removingProfile)
                 let removeStartedAt = dependencies.now()
                 try profileStore.removeProfile(named: profileName)
+                invalidateQwenConditioningCache()
                 await logRequestEvent(
                     "profile_removed",
                     requestID: id,
@@ -870,6 +875,7 @@ extension SpeakSwiftly.Runtime {
     ) async throws -> WorkerStatusEvent? {
         preloadTask?.cancel()
         preloadTask = nil
+        invalidateQwenConditioningCache()
         speechBackend = requestedSpeechBackend
         residentState = .warming
         startResidentPreload()
@@ -888,6 +894,7 @@ extension SpeakSwiftly.Runtime {
     func performOrderedModelReload() async throws -> WorkerStatusEvent? {
         preloadTask?.cancel()
         preloadTask = nil
+        invalidateQwenConditioningCache()
         residentState = .warming
         startResidentPreload()
         await preloadTask?.value
@@ -904,9 +911,14 @@ extension SpeakSwiftly.Runtime {
         preloadTask?.cancel()
         preloadTask = nil
         residentPreloadToken = nil
+        invalidateQwenConditioningCache()
         residentState = .unloaded
         await emitStatus(.residentModelsUnloaded)
         return currentStatusSnapshot()
+    }
+
+    func invalidateQwenConditioningCache() {
+        qwenConditioningCache.removeAll(keepingCapacity: true)
     }
 
     func primaryResidentSampleRate(for models: ResidentSpeechModels) -> Int {

@@ -3,6 +3,11 @@ import Foundation
 // MARK: - Runtime Configuration
 
 public extension SpeakSwiftly {
+    enum QwenConditioningStrategy: String, Codable, Sendable, Equatable, CaseIterable {
+        case legacyRaw = "legacy_raw"
+        case preparedConditioning = "prepared_conditioning"
+    }
+
     // MARK: Configuration
 
     struct Configuration: Codable, Sendable {
@@ -26,29 +31,38 @@ public extension SpeakSwiftly {
         }
 
         public let speechBackend: SpeakSwiftly.SpeechBackend
+        public let qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
         public let textNormalizer: SpeakSwiftly.Normalizer?
 
         enum CodingKeys: String, CodingKey {
             case speechBackend
+            case qwenConditioningStrategy
         }
 
         public init(
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
+            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
             textNormalizer: SpeakSwiftly.Normalizer? = nil
         ) {
             self.speechBackend = speechBackend
+            self.qwenConditioningStrategy = qwenConditioningStrategy
             self.textNormalizer = textNormalizer
         }
 
         public init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             speechBackend = try container.decode(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
+            qwenConditioningStrategy = try container.decodeIfPresent(
+                SpeakSwiftly.QwenConditioningStrategy.self,
+                forKey: .qwenConditioningStrategy
+            ) ?? .legacyRaw
             textNormalizer = nil
         }
 
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(speechBackend, forKey: .speechBackend)
+            try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
         }
 
         public static func load(from persistenceURL: URL) throws -> Self {

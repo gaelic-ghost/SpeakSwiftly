@@ -58,6 +58,76 @@ extension SpeakSwiftlyE2ETests {
             }
         }
 
+        @Test func preparedConditioningPersistsAndReloadsAcrossWorkerRestart() async throws {
+            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+
+            let sandbox = try E2ESandbox()
+            defer { sandbox.cleanup() }
+            let profileName = "prepared-conditioning-profile"
+            let runtimeConfiguration = SpeakSwiftly.Configuration(
+                speechBackend: .qwen3,
+                qwenConditioningStrategy: .preparedConditioning
+            )
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: true,
+                    configuration: runtimeConfiguration
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+                    on: worker,
+                    id: "req-create-prepared-conditioning-profile",
+                    profileName: profileName,
+                    text: SpeakSwiftlyE2ETests.testingProfileText,
+                    vibe: .masc,
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                )
+                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                    on: worker,
+                    id: "req-live-prepared-conditioning-first-pass",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: profileName
+                )
+                #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
+                    $0["event"] as? String == "qwen_reference_conditioning_persisted"
+                        && $0["request_id"] as? String == "req-live-prepared-conditioning-first-pass"
+                } != nil)
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+
+            let store = ProfileStore(rootURL: sandbox.profileRootURL)
+            let storedProfile = try store.loadProfile(named: profileName)
+            #expect(storedProfile.qwenConditioningArtifact(for: .qwen3) != nil)
+
+            do {
+                let worker = try WorkerProcess(
+                    profileRootURL: sandbox.profileRootURL,
+                    silentPlayback: true,
+                    configuration: runtimeConfiguration
+                )
+                defer { Task { await worker.stop() } }
+
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                    on: worker,
+                    id: "req-live-prepared-conditioning-second-pass",
+                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    profileName: profileName
+                )
+                #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
+                    $0["event"] as? String == "qwen_reference_conditioning_loaded"
+                        && $0["request_id"] as? String == "req-live-prepared-conditioning-second-pass"
+                } != nil)
+                try worker.closeInput()
+                try await worker.waitForExit(timeout: .seconds(30))
+            }
+        }
+
         @Test func cloneWithProvidedTranscript() async throws {
             guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
 

@@ -58,6 +58,19 @@ final class AnySpeechModel: @unchecked Sendable {
         _ streamingInterval: Double
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error>
 
+    typealias PrepareQwenReferenceConditioningClosure = @Sendable (
+        _ refAudio: MLXArray,
+        _ refText: String,
+        _ language: String?
+    ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning
+
+    typealias GenerateConditionedEventStreamClosure = @Sendable (
+        _ text: String,
+        _ conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        _ generationParameters: GenerateParameters,
+        _ streamingInterval: Double
+    ) -> AsyncThrowingStream<ModelGenerationEvent, Error>
+
     private let sampleRateValue: Int
     private let generateImpl: @Sendable (
         _ text: String,
@@ -69,6 +82,8 @@ final class AnySpeechModel: @unchecked Sendable {
     ) async throws -> [Float]
     private let generateSamplesStreamImpl: GenerateSamplesStreamClosure
     private let generateEventStreamImpl: GenerateEventStreamClosure
+    private let prepareQwenReferenceConditioningImpl: PrepareQwenReferenceConditioningClosure?
+    private let generateConditionedEventStreamImpl: GenerateConditionedEventStreamClosure?
 
     var sampleRate: Int {
         sampleRateValue
@@ -85,7 +100,9 @@ final class AnySpeechModel: @unchecked Sendable {
             _ generationParameters: GenerateParameters
         ) async throws -> [Float],
         generateSamplesStream: @escaping GenerateSamplesStreamClosure,
-        generateEventStream: GenerateEventStreamClosure? = nil
+        generateEventStream: GenerateEventStreamClosure? = nil,
+        prepareQwenReferenceConditioning: PrepareQwenReferenceConditioningClosure? = nil,
+        generateConditionedEventStream: GenerateConditionedEventStreamClosure? = nil
     ) {
         sampleRateValue = sampleRate
         generateImpl = generate
@@ -116,10 +133,69 @@ final class AnySpeechModel: @unchecked Sendable {
                 continuation.onTermination = { _ in task.cancel() }
             }
         }
+        prepareQwenReferenceConditioningImpl = prepareQwenReferenceConditioning
+        generateConditionedEventStreamImpl = generateConditionedEventStream
     }
 
     convenience init(model: any SpeechGenerationModel) {
         let box = UnsafeSpeechGenerationModelBox(model: model)
+        let qwenModel = box.model as? Qwen3TTSModel
+        let prepareQwenReferenceConditioning: PrepareQwenReferenceConditioningClosure? = if let qwenModel {
+            { refAudio, refText, language in
+                try qwenModel.prepareReferenceConditioning(
+                    refAudio: refAudio,
+                    refText: refText,
+                    language: language
+                )
+            }
+        } else {
+            nil
+        }
+        let generateConditionedEventStream: GenerateConditionedEventStreamClosure? = if let qwenModel {
+            { text, conditioning, generationParameters, streamingInterval in
+                let stream = qwenModel.generateStream(
+                    text: text,
+                    conditioning: conditioning,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval
+                )
+                return AsyncThrowingStream { continuation in
+                    let task = Task {
+                        do {
+                            for try await event in stream {
+                                switch event {
+                                case .token(let token):
+                                    continuation.yield(.token(token))
+                                case .info(let info):
+                                    continuation.yield(
+                                        .info(
+                                            .init(
+                                                promptTokenCount: info.promptTokenCount,
+                                                generationTokenCount: info.generationTokenCount,
+                                                prefillTime: info.prefillTime,
+                                                generateTime: info.generateTime,
+                                                tokensPerSecond: info.tokensPerSecond,
+                                                peakMemoryUsage: info.peakMemoryUsage
+                                            )
+                                        )
+                                    )
+                                case .audio(let samples):
+                                    continuation.yield(.audio(samples.asArray(Float.self)))
+                                }
+                            }
+                            continuation.finish()
+                        } catch is CancellationError {
+                            continuation.finish(throwing: CancellationError())
+                        } catch {
+                            continuation.finish(throwing: error)
+                        }
+                    }
+                    continuation.onTermination = { _ in task.cancel() }
+                }
+            }
+        } else {
+            nil
+        }
 
         self.init(
             sampleRate: box.model.sampleRate,
@@ -187,7 +263,9 @@ final class AnySpeechModel: @unchecked Sendable {
                     }
                     continuation.onTermination = { _ in task.cancel() }
                 }
-            }
+            },
+            prepareQwenReferenceConditioning: prepareQwenReferenceConditioning,
+            generateConditionedEventStream: generateConditionedEventStream
         )
     }
 
@@ -224,6 +302,46 @@ final class AnySpeechModel: @unchecked Sendable {
         streamingInterval: Double
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error> {
         generateEventStreamImpl(text, voice, refAudio, refText, language, generationParameters, streamingInterval)
+    }
+
+    func prepareQwenReferenceConditioning(
+        refAudio: MLXArray,
+        refText: String,
+        language: String?
+    ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
+        guard let prepareQwenReferenceConditioningImpl else {
+            throw WorkerError(
+                code: .internalError,
+                message: "SpeakSwiftly attempted to prepare reusable Qwen reference conditioning with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug."
+            )
+        }
+
+        return try prepareQwenReferenceConditioningImpl(refAudio, refText, language)
+    }
+
+    func generateConditionedEventStream(
+        text: String,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double
+    ) -> AsyncThrowingStream<ModelGenerationEvent, Error> {
+        guard let generateConditionedEventStreamImpl else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish(
+                    throwing: WorkerError(
+                        code: .internalError,
+                        message: "SpeakSwiftly attempted to start conditioned Qwen generation with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug."
+                    )
+                )
+            }
+        }
+
+        return generateConditionedEventStreamImpl(
+            text,
+            conditioning,
+            generationParameters,
+            streamingInterval
+        )
     }
 }
 

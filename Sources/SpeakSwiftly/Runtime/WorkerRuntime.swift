@@ -1,4 +1,5 @@
 import Foundation
+import MLXAudioTTS
 import TextForSpeech
 
 // MARK: - Worker Runtime
@@ -37,6 +38,14 @@ public extension SpeakSwiftly {
         let token: UUID
         let request: WorkerRequest
         let task: Task<Void, Never>
+    }
+
+    struct QwenConditioningCacheKey: Hashable, Sendable {
+        let profileName: String
+        let backend: SpeakSwiftly.SpeechBackend
+        let modelRepo: String
+        let artifactVersion: Int
+        let artifactFile: String
     }
 
     struct RequestBroker {
@@ -279,6 +288,7 @@ public extension SpeakSwiftly {
 
     let dependencies: WorkerDependencies
     var speechBackend: SpeakSwiftly.SpeechBackend
+    var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
     let encoder = JSONEncoder()
     let profileStore: ProfileStore
     let generatedFileStore: GeneratedFileStore
@@ -299,12 +309,14 @@ public extension SpeakSwiftly {
     var terminalRequestBrokerOrder = [String]()
     var activeGenerations = [UUID: ActiveRequest]()
     var lastLoggedMarvisSchedulerState: String?
+    var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
 
     // MARK: Initialization
 
     init(
         dependencies: WorkerDependencies,
         speechBackend: SpeakSwiftly.SpeechBackend,
+        qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
         profileStore: ProfileStore,
         generatedFileStore: GeneratedFileStore,
         generationJobStore: GenerationJobStore,
@@ -313,6 +325,7 @@ public extension SpeakSwiftly {
     ) {
         self.dependencies = dependencies
         self.speechBackend = speechBackend
+        self.qwenConditioningStrategy = qwenConditioningStrategy
         self.profileStore = profileStore
         self.generatedFileStore = generatedFileStore
         self.generationJobStore = generationJobStore

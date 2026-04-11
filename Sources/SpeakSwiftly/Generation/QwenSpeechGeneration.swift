@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import MLX
+import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
 // MARK: - Qwen Speech Generation
@@ -31,6 +32,46 @@ extension SpeakSwiftly.Runtime {
             refAudio: refAudio,
             refText: materialization.manifest.referenceText,
             language: "English",
+            generationParameters: generationParameters,
+            streamingInterval: streamingInterval
+        )
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await event in eventStream {
+                        switch event {
+                        case .token(let token):
+                            recordGenerationEvent(.token(token), for: requestID)
+                        case .info(let info):
+                            recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                        case .audio(let samples):
+                            recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                            continuation.yield(samples)
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func qwenGenerationStream(
+        requestID: String,
+        model: AnySpeechModel,
+        text: String,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double
+    ) -> AsyncThrowingStream<[Float], Error> {
+        let eventStream = model.generateConditionedEventStream(
+            text: text,
+            conditioning: conditioning,
             generationParameters: generationParameters,
             streamingInterval: streamingInterval
         )

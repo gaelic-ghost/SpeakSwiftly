@@ -1,6 +1,8 @@
 import Foundation
+@preconcurrency import MLX
 import Testing
 @testable import SpeakSwiftlyCore
+import MLXAudioTTS
 
 // MARK: - Profile Lifecycle
 
@@ -284,4 +286,55 @@ import Testing
     #expect(loaded.manifest.backendMaterializations.count == 1)
     #expect(try loaded.qwenMaterialization().referenceAudioURL.lastPathComponent == "reference.wav")
     #expect(try loaded.qwenMaterialization().manifest.referenceText == "Legacy transcript")
+}
+
+@Test func storesAndLoadsPreparedQwenConditioningArtifacts() throws {
+    guard mlxConditioningPersistenceTestsEnabled() else { return }
+
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let audioData = Data([0x52, 0x49, 0x46, 0x46])
+
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+
+    let conditioning = Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+        speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+        referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
+        referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
+        resolvedLanguage: "English",
+        codecLanguageID: 7
+    )
+
+    let stored = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3CustomVoice,
+        modelRepo: ModelFactory.residentModelRepo(for: .qwen3CustomVoice),
+        conditioning: conditioning,
+        createdAt: Date(timeIntervalSince1970: 1_712_800_000)
+    )
+
+    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3CustomVoice))
+    #expect(stored.manifest.qwenConditioningArtifacts.count == 1)
+    #expect(fileManager.fileExists(atPath: artifact.artifactURL.path))
+
+    let reloadedConditioning = try store.loadQwenConditioningArtifact(artifact)
+
+    #expect(reloadedConditioning.resolvedLanguage == "English")
+    #expect(reloadedConditioning.codecLanguageID == 7)
+    #expect(reloadedConditioning.referenceSpeechCodes.asArray(Int32.self) == [10, 11, 12, 13])
+    #expect(reloadedConditioning.referenceSpeechCodes.shape == [1, 2, 2])
+    #expect(reloadedConditioning.referenceTextTokenIDs.asArray(Int32.self) == [101, 102, 103])
+    #expect(reloadedConditioning.referenceTextTokenIDs.shape == [1, 3])
+    #expect(reloadedConditioning.speakerEmbedding?.asArray(Float.self) == [0.25, 0.5])
 }
