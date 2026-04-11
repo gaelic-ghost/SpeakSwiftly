@@ -28,8 +28,8 @@ let package = Package(
             .upToNextMajor(from: "0.15.0")
         ),
         .package(
-            url: "https://github.com/Blaizzy/mlx-audio-swift.git",
-            revision: "9264f40bc21c1dd461feb1ce1206e5ff38e8b9f5"
+            url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
+            revision: "478707e1d726b011a44e9d61f15abefbf4aec137"
         )
     ],
     targets: [

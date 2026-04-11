@@ -1,9 +1,16 @@
 import Foundation
 @preconcurrency import MLX
 @preconcurrency import MLXLMCommon
+import MLXAudioTTS
 import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeech
+
+// MARK: - Opt-In Test Gates
+
+func mlxConditioningPersistenceTestsEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS"] == "1"
+}
 
 // MARK: - Locking Helpers
 
@@ -404,6 +411,8 @@ final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var lastRefText: String?
     private(set) var lastRefAudioWasProvided = false
     private(set) var audioLoadCallCount = 0
+    private(set) var prepareConditioningCallCount = 0
+    private(set) var conditionedGenerationCallCount = 0
     private(set) var lastGenerationParameters: GenerateParameters?
 
     func record(
@@ -427,12 +436,36 @@ final class ResidentModelRecorder: @unchecked Sendable {
             audioLoadCallCount += 1
         }
     }
+
+    func recordConditioningPreparation() {
+        lock.withLock {
+            prepareConditioningCallCount += 1
+        }
+    }
+
+    func recordConditionedGeneration(
+        text: String,
+        generationParameters: GenerateParameters
+    ) {
+        lock.withLock {
+            conditionedGenerationCallCount += 1
+            lastText = text
+            lastVoice = nil
+            lastRefAudioWasProvided = false
+            lastRefText = nil
+            lastGenerationParameters = generationParameters
+        }
+    }
 }
 
 // MARK: - Test Model and Runtime Factories
 
 func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
-    AnySpeechModel(
+    let conditionedReferenceAudio = MLXArray([Int32(11), 12, 13, 14]).reshaped([1, 2, 2])
+    let conditionedReferenceText = MLXArray([Int32(101), 102, 103]).reshaped([1, 3])
+    let conditionedSpeakerEmbedding = MLXArray([Float(0.25), 0.5]).reshaped([1, 2])
+
+    return AnySpeechModel(
         sampleRate: 24_000,
         generate: { _, _, _, _, _, _ in
             [0.1, 0.2]
@@ -474,6 +507,43 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                             generateTime: 0.34,
                             tokensPerSecond: 56.7,
                             peakMemoryUsage: 1.23
+                        )
+                    )
+                )
+                for chunkIndex in 0..<chunkCount {
+                    let base = Float(chunkIndex + 1) / 10
+                    continuation.yield(.audio([base, base + 0.1]))
+                }
+                continuation.finish()
+            }
+        },
+        prepareQwenReferenceConditioning: { _, _, language in
+            recorder?.recordConditioningPreparation()
+            return Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+                speakerEmbedding: conditionedSpeakerEmbedding,
+                referenceSpeechCodes: conditionedReferenceAudio,
+                referenceTextTokenIDs: conditionedReferenceText,
+                resolvedLanguage: language ?? "English",
+                codecLanguageID: 7
+            )
+        },
+        generateConditionedEventStream: { text, _, generationParameters, _ in
+            recorder?.recordConditionedGeneration(
+                text: text,
+                generationParameters: generationParameters
+            )
+
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.token(202))
+                continuation.yield(
+                    .info(
+                        .init(
+                            promptTokenCount: 8,
+                            generationTokenCount: chunkCount * 4,
+                            prefillTime: 0.08,
+                            generateTime: 0.21,
+                            tokensPerSecond: 73.2,
+                            peakMemoryUsage: 0.92
                         )
                     )
                 )
@@ -560,6 +630,7 @@ func makeRuntime<ResidentModelResult>(
     output: OutputRecorder,
     playback: PlaybackSpy,
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
+    qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
     loadedCloneAudioSamples: [Float] = [],
@@ -626,6 +697,7 @@ func makeRuntime<ResidentModelResult>(
     let runtime = WorkerRuntime(
         dependencies: dependencies,
         speechBackend: speechBackend,
+        qwenConditioningStrategy: qwenConditioningStrategy,
         profileStore: store,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,

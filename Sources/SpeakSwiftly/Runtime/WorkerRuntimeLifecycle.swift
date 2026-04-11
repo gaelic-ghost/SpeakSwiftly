@@ -53,10 +53,18 @@ extension SpeakSwiftly.Runtime {
     ) async -> SpeakSwiftly.Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
-        let configuredSpeechBackend = resolvedSpeechBackend(
+        let persistedConfiguration = resolvedPersistedConfiguration(
             dependencies: dependencies,
+            environment: environment
+        )
+        let configuredSpeechBackend = resolvedSpeechBackend(
             environment: environment,
             configuration: configuration
+                ?? persistedConfiguration
+        )
+        let configuredQwenConditioningStrategy = resolvedQwenConditioningStrategy(
+            configuration: configuration
+                ?? persistedConfiguration
         )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
@@ -82,6 +90,7 @@ extension SpeakSwiftly.Runtime {
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
             speechBackend: configuredSpeechBackend,
+            qwenConditioningStrategy: configuredQwenConditioningStrategy,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
@@ -93,7 +102,6 @@ extension SpeakSwiftly.Runtime {
     }
 
     static func resolvedSpeechBackend(
-        dependencies: WorkerDependencies,
         environment: [String: String],
         configuration: SpeakSwiftly.Configuration?
     ) -> SpeakSwiftly.SpeechBackend {
@@ -105,23 +113,44 @@ extension SpeakSwiftly.Runtime {
             return environmentBackend
         }
 
+        return .qwen3
+    }
+
+    static func resolvedSpeechBackend(
+        dependencies _: WorkerDependencies,
+        environment: [String: String],
+        configuration: SpeakSwiftly.Configuration?
+    ) -> SpeakSwiftly.SpeechBackend {
+        resolvedSpeechBackend(
+            environment: environment,
+            configuration: configuration
+        )
+    }
+
+    static func resolvedQwenConditioningStrategy(
+        configuration: SpeakSwiftly.Configuration?
+    ) -> SpeakSwiftly.QwenConditioningStrategy {
+        configuration?.qwenConditioningStrategy ?? .legacyRaw
+    }
+
+    private static func resolvedPersistedConfiguration(
+        dependencies: WorkerDependencies,
+        environment: [String: String]
+    ) -> SpeakSwiftly.Configuration? {
         do {
-            if let persistedConfiguration = try SpeakSwiftly.Configuration.loadDefault(
+            return try SpeakSwiftly.Configuration.loadDefault(
                 fileManager: dependencies.fileManager,
                 profileRootOverride: environment[Environment.profileRootOverride]
-            ) {
-                return persistedConfiguration.speechBackend
-            }
+            )
         } catch {
             let configurationPath = SpeakSwiftly.Configuration.defaultPersistenceURL(
                 fileManager: dependencies.fileManager,
                 profileRootOverride: environment[Environment.profileRootOverride]
             ).path
-            let message = "SpeakSwiftly could not load persisted runtime configuration from '\(configurationPath)'. Falling back to the default speech backend. \(error.localizedDescription)\n"
+            let message = "SpeakSwiftly could not load persisted runtime configuration from '\(configurationPath)'. Falling back to the default runtime configuration. \(error.localizedDescription)\n"
             dependencies.writeStderr(message)
+            return nil
         }
-
-        return .qwen3
     }
 
     func installPlaybackHooks() async {

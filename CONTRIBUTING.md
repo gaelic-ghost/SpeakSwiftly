@@ -88,7 +88,7 @@ Those concern handles should stay lightweight views over the shared runtime stat
 The current typed Swift startup and generation conventions are:
 
 - `SpeakSwiftly.liftoff(configuration:)` is the single startup entry point, with `configuration` optional so `liftoff()` remains the one obvious default path
-- `SpeakSwiftly.Configuration` carries startup inputs such as `speechBackend` and an optional `textNormalizer`
+- `SpeakSwiftly.Configuration` carries startup inputs such as `speechBackend`, `qwenConditioningStrategy`, and an optional `textNormalizer`
 - live playback and file rendering are separate generation calls, with `Generate.speech(...)` and `Generate.audio(...)`
 - generation-queue inspection lives under `Jobs`
 - playback-queue inspection lives under `Player.list(...)`
@@ -145,7 +145,9 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 ## Runtime Configuration
 
-`SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend` plus an optional startup `textNormalizer`.
+`SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend`, the Qwen conditioning strategy, and an optional startup `textNormalizer`.
+
+The current prepared-conditioning integration depends on a temporary frozen `mlx-audio-swift` fork pin while the matching `Qwen3TTS` API is being upstreamed. Keep that pin exact and intentional; do not loosen it back to a moving branch dependency.
 
 Default persisted configuration path:
 
@@ -161,6 +163,13 @@ Backend resolution precedence is:
 2. `SPEAKSWIFTLY_SPEECH_BACKEND`
 3. persisted `configuration.json`
 4. fallback `.qwen3`
+
+Qwen conditioning strategy values are:
+
+- `.legacyRaw`: keep passing raw `refAudio` and `refText` into the resident Qwen model on every request
+- `.preparedConditioning`: prepare Qwen reference conditioning once, persist it on the profile, cache it in memory after load, and reuse it on later requests
+
+The runtime currently reads `qwenConditioningStrategy` only from the explicit or persisted `SpeakSwiftly.Configuration` surface. There is no separate environment-variable override for that setting.
 
 ## Queueing and Resident Controls
 
@@ -418,6 +427,18 @@ One-shot qwen resident `generate_speech` verification:
 
 ```bash
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/voiceDesignSilentThenAudible
+```
+
+Prepared-conditioning qwen verification. This boots the worker in `prepared_conditioning` mode, confirms the first request persists a stored Qwen conditioning artifact on the profile, then restarts the worker and confirms the second request reloads that stored artifact instead of rebuilding it from raw reference inputs:
+
+```bash
+SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/preparedConditioningPersistsAndReloadsAcrossWorkerRestart
+```
+
+Opt-in MLX-backed persistence unit coverage. The plain SwiftPM runner does not ship the Metal bundle needed for direct MLX tensor persistence round-trips, so these tests stay out of the default `swift test` pass and should be run only when you explicitly want that narrow coverage:
+
+```bash
+SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter preparedQwenConditioning
 ```
 
 Force audible playback in the e2e suite:

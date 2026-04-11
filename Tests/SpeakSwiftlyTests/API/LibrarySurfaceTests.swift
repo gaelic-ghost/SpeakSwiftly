@@ -16,8 +16,12 @@ import TextForSpeech
 }
 
 @Test func publicLibrarySurfaceConstructsConfiguration() {
-    let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+    let configuration = SpeakSwiftly.Configuration(
+        speechBackend: .marvis,
+        qwenConditioningStrategy: .preparedConditioning
+    )
     #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -27,12 +31,16 @@ import TextForSpeech
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
     let persistenceURL = rootURL.appendingPathComponent("configuration.json")
-    let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+    let configuration = SpeakSwiftly.Configuration(
+        speechBackend: .marvis,
+        qwenConditioningStrategy: .preparedConditioning
+    )
 
     try configuration.save(to: persistenceURL)
     let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
 
     #expect(loaded.speechBackend == configuration.speechBackend)
+    #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.textNormalizer == nil)
 }
 
@@ -50,10 +58,12 @@ import TextForSpeech
     let normalizer = try SpeakSwiftly.Normalizer()
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
+        qwenConditioningStrategy: .legacyRaw,
         textNormalizer: normalizer
     )
 
     #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.qwenConditioningStrategy == .legacyRaw)
     #expect(configuration.textNormalizer != nil)
 }
 

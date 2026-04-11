@@ -1,4 +1,5 @@
 import Foundation
+import MLXAudioTTS
 
 // MARK: - Voice & Clone Profile Models
 
@@ -27,6 +28,65 @@ struct ProfileManifest: Codable, Sendable, Equatable {
     let sourceText: String
     let sampleRate: Int
     let backendMaterializations: [ProfileMaterializationManifest]
+    let qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case profileName
+        case vibe
+        case createdAt
+        case sourceKind
+        case modelRepo
+        case voiceDescription
+        case sourceText
+        case sampleRate
+        case backendMaterializations
+        case qwenConditioningArtifacts
+    }
+
+    init(
+        version: Int,
+        profileName: String,
+        vibe: SpeakSwiftly.Vibe,
+        createdAt: Date,
+        sourceKind: ProfileSourceKind,
+        modelRepo: String,
+        voiceDescription: String,
+        sourceText: String,
+        sampleRate: Int,
+        backendMaterializations: [ProfileMaterializationManifest],
+        qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
+    ) {
+        self.version = version
+        self.profileName = profileName
+        self.vibe = vibe
+        self.createdAt = createdAt
+        self.sourceKind = sourceKind
+        self.modelRepo = modelRepo
+        self.voiceDescription = voiceDescription
+        self.sourceText = sourceText
+        self.sampleRate = sampleRate
+        self.backendMaterializations = backendMaterializations
+        self.qwenConditioningArtifacts = qwenConditioningArtifacts
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        profileName = try container.decode(String.self, forKey: .profileName)
+        vibe = try container.decode(SpeakSwiftly.Vibe.self, forKey: .vibe)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        sourceKind = try container.decode(ProfileSourceKind.self, forKey: .sourceKind)
+        modelRepo = try container.decode(String.self, forKey: .modelRepo)
+        voiceDescription = try container.decode(String.self, forKey: .voiceDescription)
+        sourceText = try container.decode(String.self, forKey: .sourceText)
+        sampleRate = try container.decode(Int.self, forKey: .sampleRate)
+        backendMaterializations = try container.decode([ProfileMaterializationManifest].self, forKey: .backendMaterializations)
+        qwenConditioningArtifacts = try container.decodeIfPresent(
+            [QwenConditioningArtifactManifest].self,
+            forKey: .qwenConditioningArtifacts
+        ) ?? []
+    }
 }
 
 private struct LegacyProfileManifest: Codable, Sendable, Equatable {
@@ -102,20 +162,35 @@ struct StoredProfile: Sendable, Equatable {
     let manifest: ProfileManifest
     let directoryURL: URL
     let materializations: [StoredProfileMaterialization]
+    let conditioningArtifacts: [StoredQwenConditioningArtifact]
 
     var referenceAudioURL: URL {
-        try! qwenMaterialization().referenceAudioURL
+        try! qwenMaterialization(for: .qwen3).referenceAudioURL
     }
 
-    func qwenMaterialization() throws -> StoredProfileMaterialization {
-        if let materialization = materializations.first(where: { $0.manifest.backend == .qwen3 }) {
+    func qwenMaterialization(for backend: SpeakSwiftly.SpeechBackend) throws -> StoredProfileMaterialization {
+        if let materialization = materializations.first(where: { $0.manifest.backend == backend }) {
+            return materialization
+        }
+
+        if let materialization = materializations.first(where: { $0.manifest.backend.isQwenFamily }) {
             return materialization
         }
 
         throw WorkerError(
             code: .profileNotFound,
-            message: "Profile '\(manifest.profileName)' does not contain a stored 'qwen3' materialization. Recreate the profile to prepare Qwen assets for that profile."
+            message: "Profile '\(manifest.profileName)' does not contain a stored Qwen reference materialization for the '\(backend.rawValue)' backend. Recreate or reroll the profile to restore the canonical Qwen reference assets."
         )
+    }
+
+    func qwenMaterialization() throws -> StoredProfileMaterialization {
+        try qwenMaterialization(for: .qwen3)
+    }
+
+    func qwenConditioningArtifact(
+        for backend: SpeakSwiftly.SpeechBackend
+    ) -> StoredQwenConditioningArtifact? {
+        conditioningArtifacts.first(where: { $0.manifest.backend == backend })
     }
 }
 
@@ -128,7 +203,7 @@ struct ProfileStore: @unchecked Sendable {
     static let configurationFileName = "configuration.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
-    static let manifestVersion = 3
+    static let manifestVersion = 4
 
     let rootURL: URL
     let fileManager: FileManager
@@ -246,7 +321,8 @@ struct ProfileStore: @unchecked Sendable {
                     referenceText: $0.referenceText,
                     sampleRate: $0.sampleRate
                 )
-            }
+            },
+            qwenConditioningArtifacts: []
         )
 
         do {
@@ -283,10 +359,17 @@ struct ProfileStore: @unchecked Sendable {
                     referenceAudioURL: referenceAudioURL(for: directoryURL, fileName: $0.referenceAudioFile)
                 )
             }
+            let conditioningArtifacts = manifest.qwenConditioningArtifacts.map {
+                StoredQwenConditioningArtifact(
+                    manifest: $0,
+                    artifactURL: qwenConditioningArtifactURL(for: directoryURL, fileName: $0.artifactFile)
+                )
+            }
             return StoredProfile(
                 manifest: manifest,
                 directoryURL: directoryURL,
-                materializations: materializations
+                materializations: materializations,
+                conditioningArtifacts: conditioningArtifacts
             )
         } catch let workerError as WorkerError {
             throw workerError
@@ -397,7 +480,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: storedProfile.manifest.voiceDescription,
             sourceText: storedProfile.manifest.sourceText,
             sampleRate: storedProfile.manifest.sampleRate,
-            backendMaterializations: storedProfile.manifest.backendMaterializations
+            backendMaterializations: storedProfile.manifest.backendMaterializations,
+            qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts
         )
 
         do {
@@ -513,7 +597,8 @@ struct ProfileStore: @unchecked Sendable {
                     referenceText: $0.referenceText,
                     sampleRate: $0.sampleRate
                 )
-            }
+            },
+            qwenConditioningArtifacts: []
         )
 
         do {
@@ -566,6 +651,81 @@ struct ProfileStore: @unchecked Sendable {
         }
     }
 
+    func storeQwenConditioningArtifact(
+        named profileName: String,
+        backend: SpeakSwiftly.SpeechBackend,
+        modelRepo: String,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        createdAt: Date = Date()
+    ) throws -> StoredProfile {
+        let storedProfile = try loadProfile(named: profileName)
+        let artifactFile = Self.qwenConditioningArtifactFileName(for: backend)
+        let persistedArtifact = PersistedQwenConditioningArtifact(conditioning: conditioning)
+        let updatedArtifactManifest = QwenConditioningArtifactManifest(
+            backend: backend,
+            modelRepo: modelRepo,
+            createdAt: createdAt,
+            artifactVersion: PersistedQwenConditioningArtifact.currentVersion,
+            artifactFile: artifactFile
+        )
+        let updatedArtifacts = (
+            storedProfile.manifest.qwenConditioningArtifacts.filter { $0.backend != backend } + [updatedArtifactManifest]
+        )
+        .sorted { $0.backend.rawValue < $1.backend.rawValue }
+        let updatedManifest = ProfileManifest(
+            version: Self.manifestVersion,
+            profileName: storedProfile.manifest.profileName,
+            vibe: storedProfile.manifest.vibe,
+            createdAt: storedProfile.manifest.createdAt,
+            sourceKind: storedProfile.manifest.sourceKind,
+            modelRepo: storedProfile.manifest.modelRepo,
+            voiceDescription: storedProfile.manifest.voiceDescription,
+            sourceText: storedProfile.manifest.sourceText,
+            sampleRate: storedProfile.manifest.sampleRate,
+            backendMaterializations: storedProfile.manifest.backendMaterializations,
+            qwenConditioningArtifacts: updatedArtifacts
+        )
+
+        do {
+            try writeQwenConditioningArtifact(
+                persistedArtifact,
+                to: storedProfile.directoryURL,
+                fileName: artifactFile
+            )
+            try writeManifest(updatedManifest, to: storedProfile.directoryURL)
+        } catch {
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Profile '\(profileName)' could not persist the prepared Qwen conditioning artifact for the '\(backend.rawValue)' backend. \(error.localizedDescription)"
+            )
+        }
+
+        return try loadProfile(named: profileName)
+    }
+
+    func loadQwenConditioningArtifact(
+        _ storedArtifact: StoredQwenConditioningArtifact
+    ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
+        do {
+            let data = try Data(contentsOf: storedArtifact.artifactURL)
+            let artifact = try decoder.decode(PersistedQwenConditioningArtifact.self, from: data)
+            guard artifact.version == PersistedQwenConditioningArtifact.currentVersion else {
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "SpeakSwiftly found a prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)', but the artifact version '\(artifact.version)' is not supported by this runtime. Recreate or reroll the profile to rebuild the artifact."
+                )
+            }
+            return artifact.makeConditioning()
+        } catch let workerError as WorkerError {
+            throw workerError
+        } catch {
+            throw WorkerError(
+                code: .filesystemError,
+                message: "SpeakSwiftly could not load the prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)' for the '\(storedArtifact.manifest.backend.rawValue)' backend. \(error.localizedDescription)"
+            )
+        }
+    }
+
     func profileDirectoryURL(for profileName: String) -> URL {
         rootURL.appendingPathComponent(profileName, isDirectory: true)
     }
@@ -575,6 +735,13 @@ struct ProfileStore: @unchecked Sendable {
     }
 
     func referenceAudioURL(for directoryURL: URL, fileName: String = Self.audioFileName) -> URL {
+        directoryURL.appendingPathComponent(fileName)
+    }
+
+    func qwenConditioningArtifactURL(
+        for directoryURL: URL,
+        fileName: String
+    ) -> URL {
         directoryURL.appendingPathComponent(fileName)
     }
 
@@ -625,7 +792,11 @@ struct ProfileStore: @unchecked Sendable {
         let manifestData = try Data(contentsOf: manifestPath)
 
         if let manifest = try? decoder.decode(ProfileManifest.self, from: manifestData) {
-            return manifest
+            let upgradedManifest = upgradeStoredManifest(manifest)
+            if upgradedManifest != manifest {
+                try writeManifest(upgradedManifest, to: directoryURL)
+            }
+            return upgradedManifest
         }
 
         if let legacyManifest = try? decoder.decode(LegacyMultiBackendProfileManifest.self, from: manifestData) {
@@ -672,7 +843,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: legacyManifest.voiceDescription,
             sourceText: legacyManifest.sourceText,
             sampleRate: legacyManifest.sampleRate,
-            backendMaterializations: materializations
+            backendMaterializations: materializations,
+            qwenConditioningArtifacts: []
         )
     }
 
@@ -706,7 +878,28 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: legacyManifest.voiceDescription,
             sourceText: legacyManifest.sourceText,
             sampleRate: legacyManifest.sampleRate,
-            backendMaterializations: materializations
+            backendMaterializations: materializations,
+            qwenConditioningArtifacts: []
+        )
+    }
+
+    private func upgradeStoredManifest(_ manifest: ProfileManifest) -> ProfileManifest {
+        guard manifest.version < Self.manifestVersion else {
+            return manifest
+        }
+
+        return ProfileManifest(
+            version: Self.manifestVersion,
+            profileName: manifest.profileName,
+            vibe: manifest.vibe,
+            createdAt: manifest.createdAt,
+            sourceKind: manifest.sourceKind,
+            modelRepo: manifest.modelRepo,
+            voiceDescription: manifest.voiceDescription,
+            sourceText: manifest.sourceText,
+            sampleRate: manifest.sampleRate,
+            backendMaterializations: manifest.backendMaterializations,
+            qwenConditioningArtifacts: manifest.qwenConditioningArtifacts
         )
     }
 
@@ -756,6 +949,18 @@ struct ProfileStore: @unchecked Sendable {
         }
     }
 
+    private func writeQwenConditioningArtifact(
+        _ artifact: PersistedQwenConditioningArtifact,
+        to directoryURL: URL,
+        fileName: String
+    ) throws {
+        let data = try encoder.encode(artifact)
+        try data.write(
+            to: qwenConditioningArtifactURL(for: directoryURL, fileName: fileName),
+            options: .atomic
+        )
+    }
+
     private func writeManifest(_ manifest: ProfileManifest, to directoryURL: URL) throws {
         let manifestData = try encoder.encode(manifest)
         try manifestData.write(to: manifestURL(for: directoryURL), options: .atomic)
@@ -777,5 +982,11 @@ struct ProfileStore: @unchecked Sendable {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+
+    private static func qwenConditioningArtifactFileName(
+        for backend: SpeakSwiftly.SpeechBackend
+    ) -> String {
+        "qwen-conditioning-\(backend.rawValue).json"
     }
 }

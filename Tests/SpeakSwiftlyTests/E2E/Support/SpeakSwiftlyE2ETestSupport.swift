@@ -703,11 +703,13 @@ final class WorkerProcess: @unchecked Sendable {
         silentPlayback: Bool,
         playbackTrace: Bool = false,
         speechBackend: SpeakSwiftly.SpeechBackend? = nil,
+        configuration: SpeakSwiftly.Configuration? = nil,
         caller: StaticString = #function
     ) throws {
         let packageRootURL = try Self.packageRootURL()
-        let configuration = "Debug"
-        try Self.publishWorkerRuntime(packageRootURL: packageRootURL, configuration: configuration)
+        let buildConfiguration = "Debug"
+        let runtimeConfiguration = configuration
+        try Self.publishWorkerRuntime(packageRootURL: packageRootURL, configuration: buildConfiguration)
 
         process = Process()
         stdinPipe = Pipe()
@@ -720,15 +722,24 @@ final class WorkerProcess: @unchecked Sendable {
 
         let executableURL = try Self.workerExecutableURL(
             packageRootURL: packageRootURL,
-            configuration: configuration
+            configuration: buildConfiguration
         )
         artifacts = try E2EWorkerArtifacts(
             packageRootURL: packageRootURL,
-            configuration: configuration,
+            configuration: buildConfiguration,
             caller: String(describing: caller),
             executableURL: executableURL,
             profileRootURL: profileRootURL
         )
+        if let runtimeConfiguration {
+            try runtimeConfiguration.save(
+                to: SpeakSwiftly.Configuration.defaultPersistenceURL(
+                    fileManager: .default,
+                    profileRootOverride: profileRootURL.path
+                )
+            )
+        }
+
         process.executableURL = executableURL
         process.standardInput = stdinPipe
         process.standardOutput = stdoutPipe

@@ -44,4 +44,13 @@ extension SpeakSwiftly.SpeechBackend {
             ModelFactory.marvisResidentModelRepo
         }
     }
+
+    var isQwenFamily: Bool {
+        switch self {
+        case .qwen3, .qwen3CustomVoice:
+            true
+        case .marvis:
+            false
+        }
+    }
 }

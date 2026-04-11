@@ -396,6 +396,7 @@ final class LockedFlag: @unchecked Sendable {
             readRuntimeMemory: { nil }
         ),
         speechBackend: .qwen3,
+        qwenConditioningStrategy: .legacyRaw,
         profileStore: try makeProfileStore(rootURL: storeRoot),
         generatedFileStore: try makeGeneratedFileStore(rootURL: storeRoot),
         generationJobStore: try makeGenerationJobStore(rootURL: storeRoot),
@@ -504,6 +505,7 @@ final class LockedFlag: @unchecked Sendable {
     let runtime = WorkerRuntime(
         dependencies: dependencies,
         speechBackend: .qwen3,
+        qwenConditioningStrategy: .legacyRaw,
         profileStore: profileStore,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,

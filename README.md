@@ -112,11 +112,18 @@ Runtime preferences have a matching typed surface:
 ```swift
 import SpeakSwiftlyCore
 
-let configuration = SpeakSwiftly.Configuration(speechBackend: .qwen3CustomVoice)
+let configuration = SpeakSwiftly.Configuration(
+    speechBackend: .qwen3CustomVoice,
+    qwenConditioningStrategy: .preparedConditioning
+)
 try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration.json"))
 
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
+
+For Qwen backends, `qwenConditioningStrategy` lets hosts keep the existing raw reference-audio path or switch to the prepared-conditioning path that persists reusable Qwen reference conditioning on the voice profile and reloads it on later runs.
+
+Right now that prepared-conditioning path depends on a temporary frozen pin to Gale's `mlx-audio-swift` fork while the matching `Qwen3TTS` conditioning API is being upstreamed. The package is pinned to one exact fork revision rather than a moving branch tip.
 
 If a host needs the packaged MLX bundle or the exact metallib path, use the support-resource surface:
 

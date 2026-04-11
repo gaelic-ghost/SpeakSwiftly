@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import MLX
+import MLXAudioTTS
 import Testing
 @testable import SpeakSwiftlyCore
 import TextForSpeech
@@ -729,6 +730,158 @@ import TextForSpeech
 
     #expect(residentRecorder.lastRefAudioWasProvided == true)
     #expect(residentRecorder.audioLoadCallCount == 1)
+}
+
+@Test func speakLivePreparedQwenConditioningPersistsAndReloadsAcrossRuntimeRestarts() async throws {
+    guard mlxConditioningPersistenceTestsEnabled() else { return }
+
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let firstRecorder = ResidentModelRecorder()
+    let firstRuntime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        audioLoadRecorder: firstRecorder,
+        loadedAudioSamples: MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: firstRecorder)
+        }
+    )
+
+    await firstRuntime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await firstRuntime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    let storedAfterFirstRun = try store.loadProfile(named: "default-femme")
+    #expect(storedAfterFirstRun.qwenConditioningArtifact(for: .qwen3) != nil)
+    #expect(firstRecorder.prepareConditioningCallCount == 1)
+    #expect(firstRecorder.conditionedGenerationCallCount == 1)
+    #expect(firstRecorder.audioLoadCallCount == 1)
+
+    let secondOutput = OutputRecorder()
+    let secondRecorder = ResidentModelRecorder()
+    let secondRuntime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: secondOutput,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        audioLoadRecorder: secondRecorder,
+        loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: secondRecorder)
+        }
+    )
+
+    await secondRuntime.start()
+    #expect(await waitUntil {
+        secondOutput.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await secondRuntime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        secondOutput.containsJSONObject {
+            $0["id"] as? String == "req-2"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    #expect(secondRecorder.prepareConditioningCallCount == 0)
+    #expect(secondRecorder.conditionedGenerationCallCount == 1)
+    #expect(secondRecorder.audioLoadCallCount == 0)
+}
+
+@Test func speakLiveLegacyRawStrategyIgnoresPreparedQwenConditioningArtifacts() async throws {
+    guard mlxConditioningPersistenceTestsEnabled() else { return }
+
+    let output = OutputRecorder()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+    _ = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3,
+        modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+            speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+            referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
+            referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
+            resolvedLanguage: "English",
+            codecLanguageID: 7
+        )
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
+        audioLoadRecorder: residentRecorder,
+        loadedAudioSamples: MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: residentRecorder)
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-1"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    #expect(residentRecorder.prepareConditioningCallCount == 0)
+    #expect(residentRecorder.conditionedGenerationCallCount == 0)
+    #expect(residentRecorder.audioLoadCallCount == 1)
+    #expect(residentRecorder.lastRefAudioWasProvided == true)
+    #expect(residentRecorder.lastRefText == "Reference transcript")
 }
 
 @Test func speakLiveNormalizesCodeHeavyMarkdownBeforeResidentGeneration() async throws {
