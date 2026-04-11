@@ -45,30 +45,53 @@ public extension SpeakSwiftly {
         let profileName: String?
         let acceptedAt: Date
         var lastUpdatedAt: Date
-        var sequence = 0
+        var stateSequence = 0
+        var generationSequence = 0
         var latestState: SpeakSwiftly.RequestState?
         var replayUpdates = [SpeakSwiftly.RequestUpdate]()
         var subscriberContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error>.Continuation]()
+        var replayGenerationEvents = [SpeakSwiftly.GenerationEventUpdate]()
+        var generationContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>.Continuation]()
         var isTerminal = false
 
-        mutating func record(
+        mutating func recordState(
             state: SpeakSwiftly.RequestState,
             date: Date,
             maxReplayUpdates: Int
         ) -> SpeakSwiftly.RequestUpdate {
-            sequence += 1
+            stateSequence += 1
             lastUpdatedAt = date
             latestState = state
 
             let update = SpeakSwiftly.RequestUpdate(
                 id: id,
-                sequence: sequence,
+                sequence: stateSequence,
                 date: date,
                 state: state
             )
             replayUpdates.append(update)
             if replayUpdates.count > maxReplayUpdates {
                 replayUpdates.removeFirst(replayUpdates.count - maxReplayUpdates)
+            }
+            return update
+        }
+
+        mutating func recordGenerationEvent(
+            _ event: SpeakSwiftly.GenerationEvent,
+            date: Date,
+            maxReplayUpdates: Int
+        ) -> SpeakSwiftly.GenerationEventUpdate {
+            generationSequence += 1
+
+            let update = SpeakSwiftly.GenerationEventUpdate(
+                id: id,
+                sequence: generationSequence,
+                date: date,
+                event: event
+            )
+            replayGenerationEvents.append(update)
+            if replayGenerationEvents.count > maxReplayUpdates {
+                replayGenerationEvents.removeFirst(replayGenerationEvents.count - maxReplayUpdates)
             }
             return update
         }
@@ -81,7 +104,7 @@ public extension SpeakSwiftly {
                 profileName: profileName,
                 acceptedAt: acceptedAt,
                 lastUpdatedAt: lastUpdatedAt,
-                sequence: sequence,
+                sequence: stateSequence,
                 state: latestState
             )
         }
@@ -113,6 +136,7 @@ public extension SpeakSwiftly {
         let profiles: [ProfileSummary]?
         let textProfile: TextForSpeech.Profile?
         let textProfiles: [TextForSpeech.Profile]?
+        let replacements: [TextForSpeech.Replacement]?
         let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
         let textProfilePath: String?
         let activeRequest: ActiveWorkerRequestSummary?
@@ -138,6 +162,7 @@ public extension SpeakSwiftly {
             profiles: [ProfileSummary]? = nil,
             textProfile: TextForSpeech.Profile? = nil,
             textProfiles: [TextForSpeech.Profile]? = nil,
+            replacements: [TextForSpeech.Replacement]? = nil,
             textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveWorkerRequestSummary? = nil,
@@ -162,6 +187,7 @@ public extension SpeakSwiftly {
             self.profiles = profiles
             self.textProfile = textProfile
             self.textProfiles = textProfiles
+            self.replacements = replacements
             self.textProfileStyle = textProfileStyle
             self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest
@@ -190,6 +216,7 @@ public extension SpeakSwiftly {
         let items: [SpeakSwiftly.GenerationJobItem]?
         let text: String?
         let profileName: String?
+        let newProfileName: String?
         let textProfileName: String?
         let textProfileID: String?
         let textProfileDisplayName: String?
@@ -220,6 +247,7 @@ public extension SpeakSwiftly {
             case items
             case text
             case profileName = "profile_name"
+            case newProfileName = "new_profile_name"
             case textProfileName = "text_profile_name"
             case textProfileID = "text_profile_id"
             case textProfileDisplayName = "text_profile_display_name"

@@ -34,6 +34,7 @@ struct RawWorkerRequest: Decodable, Sendable {
     let items: [RawBatchItem]?
     let text: String?
     let profileName: String?
+    let newProfileName: String?
     let textProfileName: String?
     let textProfileID: String?
     let textProfileDisplayName: String?
@@ -199,6 +200,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         case items
         case text
         case profileName = "profile_name"
+        case newProfileName = "new_profile_name"
         case textProfileName = "text_profile_name"
         case textProfileID = "text_profile_id"
         case textProfileDisplayName = "text_profile_display_name"
@@ -232,6 +234,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         items = try container.decodeIfPresent([RawBatchItem].self, forKey: .items)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
+        newProfileName = try container.decodeIfPresent(String.self, forKey: .newProfileName)
         textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
         textProfileID = try container.decodeIfPresent(String.self, forKey: .textProfileID)
         textProfileDisplayName = try container.decodeIfPresent(String.self, forKey: .textProfileDisplayName)
@@ -476,6 +479,8 @@ enum WorkerRequest: Sendable, Equatable {
         cwd: String?
     )
     case listProfiles(id: String)
+    case renameProfile(id: String, profileName: String, newProfileName: String)
+    case rerollProfile(id: String, profileName: String)
     case removeProfile(id: String, profileName: String)
     case textProfileActive(id: String)
     case textProfile(id: String, name: String)
@@ -491,9 +496,11 @@ enum WorkerRequest: Sendable, Equatable {
     case useTextProfile(id: String, profile: TextForSpeech.Profile)
     case removeTextProfile(id: String, profileName: String)
     case resetTextProfile(id: String)
+    case textReplacements(id: String, profileName: String?)
     case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
     case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
     case removeTextReplacement(id: String, replacementID: String, profileName: String?)
+    case clearTextReplacements(id: String, profileName: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)
     case overview(id: String)
@@ -518,6 +525,8 @@ enum WorkerRequest: Sendable, Equatable {
              .createProfile(let id, _, _, _, _, _, _),
              .createClone(let id, _, _, _, _, _),
              .listProfiles(let id),
+             .renameProfile(let id, _, _),
+             .rerollProfile(let id, _),
              .removeProfile(let id, _),
              .textProfileActive(let id),
              .textProfile(let id, _),
@@ -533,9 +542,11 @@ enum WorkerRequest: Sendable, Equatable {
              .useTextProfile(let id, _),
              .removeTextProfile(let id, _),
              .resetTextProfile(let id),
+             .textReplacements(let id, _),
              .addTextReplacement(let id, _, _),
              .replaceTextReplacement(let id, _, _),
              .removeTextReplacement(let id, _, _),
+             .clearTextReplacements(let id, _),
              .listQueue(let id, _),
              .status(let id),
              .overview(let id),
@@ -577,6 +588,10 @@ enum WorkerRequest: Sendable, Equatable {
             "create_voice_profile_from_audio"
         case .listProfiles:
             "list_voice_profiles"
+        case .renameProfile:
+            "update_voice_profile_name"
+        case .rerollProfile:
+            "reroll_voice_profile"
         case .removeProfile:
             "delete_voice_profile"
         case .textProfileActive:
@@ -607,12 +622,16 @@ enum WorkerRequest: Sendable, Equatable {
             "delete_text_profile"
         case .resetTextProfile:
             "reset_text_profile"
+        case .textReplacements:
+            "list_text_replacements"
         case .addTextReplacement:
             "create_text_replacement"
         case .replaceTextReplacement:
             "replace_text_replacement"
         case .removeTextReplacement:
             "delete_text_replacement"
+        case .clearTextReplacements:
+            "clear_text_replacements"
         case .listQueue(_, .generation):
             "list_generation_queue"
         case .listQueue(_, .playback):
@@ -721,9 +740,11 @@ enum WorkerRequest: Sendable, Equatable {
              .useTextProfile,
              .removeTextProfile,
              .resetTextProfile,
+             .textReplacements,
              .addTextReplacement,
              .replaceTextReplacement,
              .removeTextReplacement,
+             .clearTextReplacements,
              .listQueue,
              .status,
              .overview,
@@ -759,6 +780,8 @@ enum WorkerRequest: Sendable, Equatable {
              .queueBatch(id: _, profileName: let profileName, items: _),
              .createProfile(_, let profileName, _, _, _, _, _),
              .createClone(_, let profileName, _, _, _, _),
+             .renameProfile(_, let profileName, _),
+             .rerollProfile(_, let profileName),
              .removeProfile(_, let profileName):
             profileName
         case .generatedFile,
@@ -793,9 +816,11 @@ enum WorkerRequest: Sendable, Equatable {
              .removeTextProfile(_, let name):
             name
         case .textProfileEffective(_, let name),
+             .textReplacements(_, let name),
              .addTextReplacement(_, _, let name),
              .replaceTextReplacement(_, _, let name),
-             .removeTextReplacement(_, _, let name):
+             .removeTextReplacement(_, _, let name),
+             .clearTextReplacements(_, let name):
             name
         case .createTextProfile(_, let profileID, _, _):
             profileID
@@ -819,6 +844,8 @@ enum WorkerRequest: Sendable, Equatable {
              .createProfile,
              .createClone,
              .listProfiles,
+             .renameProfile,
+             .rerollProfile,
              .removeProfile,
              .textProfileActive,
              .textProfile,
@@ -834,9 +861,11 @@ enum WorkerRequest: Sendable, Equatable {
              .useTextProfile,
              .removeTextProfile,
              .resetTextProfile,
+             .textReplacements,
              .addTextReplacement,
              .replaceTextReplacement,
              .removeTextReplacement,
+             .clearTextReplacements,
              .listQueue,
              .status,
              .overview,
@@ -866,6 +895,8 @@ enum WorkerRequest: Sendable, Equatable {
              .createProfile,
              .createClone,
              .listProfiles,
+             .renameProfile,
+             .rerollProfile,
              .removeProfile,
              .textProfileActive,
              .textProfile,
@@ -881,9 +912,11 @@ enum WorkerRequest: Sendable, Equatable {
              .useTextProfile,
              .removeTextProfile,
              .resetTextProfile,
+             .textReplacements,
              .addTextReplacement,
              .replaceTextReplacement,
              .removeTextReplacement,
+             .clearTextReplacements,
              .listQueue,
              .status,
              .overview,
@@ -913,6 +946,8 @@ enum WorkerRequest: Sendable, Equatable {
              .createProfile,
              .createClone,
              .listProfiles,
+             .renameProfile,
+             .rerollProfile,
              .removeProfile,
              .textProfileActive,
              .textProfile,
@@ -928,9 +963,11 @@ enum WorkerRequest: Sendable, Equatable {
              .useTextProfile,
              .removeTextProfile,
              .resetTextProfile,
+             .textReplacements,
              .addTextReplacement,
              .replaceTextReplacement,
              .removeTextReplacement,
+             .clearTextReplacements,
              .listQueue,
              .status,
              .overview,
@@ -1075,6 +1112,15 @@ enum WorkerRequest: Sendable, Equatable {
         case "list_voice_profiles":
             return .listProfiles(id: id)
 
+        case "update_voice_profile_name":
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            let newProfileName = try requireNonEmpty(raw.newProfileName, field: "new_profile_name", id: id)
+            return .renameProfile(id: id, profileName: profileName, newProfileName: newProfileName)
+
+        case "reroll_voice_profile":
+            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+            return .rerollProfile(id: id, profileName: profileName)
+
         case "delete_voice_profile":
             let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
             return .removeProfile(id: id, profileName: profileName)
@@ -1148,6 +1194,10 @@ enum WorkerRequest: Sendable, Equatable {
         case "reset_text_profile":
             return .resetTextProfile(id: id)
 
+        case "list_text_replacements":
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .textReplacements(id: id, profileName: textProfileName)
+
         case "create_text_replacement":
             guard let replacement = raw.replacement else {
                 throw WorkerError(
@@ -1172,6 +1222,10 @@ enum WorkerRequest: Sendable, Equatable {
             let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
             let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
+
+        case "clear_text_replacements":
+            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            return .clearTextReplacements(id: id, profileName: textProfileName)
 
         case "list_generation_queue":
             return .listQueue(id: id, queueType: .generation)

@@ -72,6 +72,68 @@ import Testing
     }
 }
 
+@Test func renamesProfilesAndRewritesTheStoredManifestName() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let audioData = Data([0x52, 0x49, 0x46, 0x46])
+
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+
+    let renamed = try store.renameProfile(named: "default-femme", to: "guide-femme")
+
+    #expect(renamed.manifest.profileName == "guide-femme")
+    #expect(renamed.directoryURL.lastPathComponent == "guide-femme")
+    #expect(fileManager.fileExists(atPath: store.profileDirectoryURL(for: "guide-femme").path))
+    #expect(!fileManager.fileExists(atPath: store.profileDirectoryURL(for: "default-femme").path))
+    #expect(try store.loadProfile(named: "guide-femme").manifest.profileName == "guide-femme")
+    #expect(throws: WorkerError.self) {
+        _ = try store.loadProfile(named: "default-femme")
+    }
+}
+
+@Test func renameRejectsAnExistingDestinationProfileName() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let audioData = Data([0x52, 0x49, 0x46, 0x46])
+
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+    _ = try store.createProfile(
+        profileName: "default-masc",
+        vibe: .masc,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and low.",
+        sourceText: "Hello again",
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+
+    #expect(throws: WorkerError.self) {
+        _ = try store.renameProfile(named: "default-femme", to: "default-masc")
+    }
+}
+
 // MARK: - Audio Export
 
 @Test func exportsCanonicalAudioWithoutOverwritingExistingFiles() throws {

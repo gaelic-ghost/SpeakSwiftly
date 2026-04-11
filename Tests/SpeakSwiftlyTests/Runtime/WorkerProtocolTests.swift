@@ -222,6 +222,20 @@ import TextForSpeech
     #expect(request == .listProfiles(id: "req-3"))
 }
 
+@Test func decodesRenameProfileRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-rename","op":"update_voice_profile_name","profile_name":"bright-guide","new_profile_name":"clear-guide"}"#
+    )
+    #expect(request == .renameProfile(id: "req-rename", profileName: "bright-guide", newProfileName: "clear-guide"))
+}
+
+@Test func decodesRerollProfileRequest() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-reroll","op":"reroll_voice_profile","profile_name":"bright-guide"}"#
+    )
+    #expect(request == .rerollProfile(id: "req-reroll", profileName: "bright-guide"))
+}
+
 @Test func decodesGeneratedFileRequests() throws {
     let file = try WorkerRequest.decode(
         from: #"{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-file"}"#
@@ -279,6 +293,11 @@ import TextForSpeech
         from: #"{"id":"req-text-effective","op":"get_effective_text_profile","text_profile_name":"logs"}"#
     )
     #expect(effective == .textProfileEffective(id: "req-text-effective", name: "logs"))
+
+    let replacements = try WorkerRequest.decode(
+        from: #"{"id":"req-text-replacements","op":"list_text_replacements","text_profile_name":"logs"}"#
+    )
+    #expect(replacements == .textReplacements(id: "req-text-replacements", profileName: "logs"))
 }
 
 @Test func decodesTextProfileMutationRequests() throws {
@@ -335,6 +354,16 @@ import TextForSpeech
         remove == .removeTextReplacement(
             id: "req-text-remove-replacement",
             replacementID: "logs-rule",
+            profileName: "logs"
+        )
+    )
+
+    let clear = try WorkerRequest.decode(
+        from: #"{"id":"req-text-clear","op":"clear_text_replacements","text_profile_name":"logs"}"#
+    )
+    #expect(
+        clear == .clearTextReplacements(
+            id: "req-text-clear",
             profileName: "logs"
         )
     )
@@ -538,11 +567,13 @@ import TextForSpeech
                 replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")]
             ),
             textProfiles: [TextForSpeech.Profile(id: "logs", name: "Logs")],
+            replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")],
             textProfilePath: "/tmp/text-profiles.json"
         )
     )
     #expect((textSuccess["text_profile"] as? [String: Any])?["id"] as? String == "logs")
     #expect((textSuccess["text_profiles"] as? [[String: Any]])?.count == 1)
+    #expect((textSuccess["replacements"] as? [[String: Any]])?.count == 1)
     #expect(textSuccess["text_profile_path"] as? String == "/tmp/text-profiles.json")
 
     let failure = try jsonObject(

@@ -325,6 +325,7 @@ Tickets:
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as implicit conventions.
+- [ ] Persist a little more voice-profile source provenance from `create_profile` and `create_clone`, especially whether clone transcripts were supplied or inferred plus any stable source-audio details that would make rerolls, diagnostics, and future profile introspection easier to explain.
 - [x] Investigate automatic audio-route and output-device change handling for live playback, including headphones, AirPods, and macOS default-output switches, and decide whether `SpeakSwiftly` should observe route-change or hardware-change notifications and rebuild or retarget the playback engine when those changes occur.
 
 ## Milestone 16: `mlx-audio-swift` upgrade review
@@ -339,9 +340,34 @@ Tickets:
 
 - [ ] Compare the currently pinned `mlx-audio-swift` revision with the latest available tagged release or stable candidate.
 - [ ] Review upstream changes to Qwen3 TTS defaults, generation controls, streaming behavior, and model-loading expectations for any impact on `SpeakSwiftly`.
+- [ ] Preserve upstream `AudioGeneration` event detail through a first-class side-channel, trace stream, or equivalent logging surface instead of collapsing every resident generation path down to raw sample chunks at the first wrapper boundary.
+- [ ] Evaluate whether the resident `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit` default is still the right MLX choice on Apple Silicon versus a `bf16` build or a different `0.6B` family member, and record the latency, memory, and audible tradeoffs explicitly.
+- [ ] Verify whether `Qwen3-TTS-12Hz-0.6B-CustomVoice` is a viable resident clone backend for `SpeakSwiftly`, including what `voice`, `ref_audio`, and `ref_text` semantics actually hold for that model family and whether it meaningfully changes startup or per-request conditioning cost.
+- [ ] Generalize stored Qwen materializations so `SpeakSwiftly` can load profile assets per resident backend or Qwen family instead of assuming one hard-coded `.qwen3` materialization shape.
+- [ ] Define a versioned persisted Qwen conditioning-artifact payload that captures reusable profile-side preparation work beyond raw `reference.wav` plus `referenceText`, and record what remains request-shaped versus profile-shaped explicitly.
+- [ ] Add resident runtime caching for the active profile's prepared Qwen conditioning artifact, with clear invalidation on profile switch, reroll, backend change, artifact-version change, and explicit unload or reload operations.
+- [ ] Re-run the resident Qwen benchmark suite only after persisted conditioning artifacts and active-profile caching land, and record that the post-artifact benchmark is the authoritative int8 versus bf16 comparison.
 - [ ] Re-run the resident playback, profile-generation, and typed-library integration checks against a candidate upgrade in an isolated branch.
 - [ ] Record any concrete reasons to upgrade, defer, or stay pinned, including behavior changes that affect playback stability or generation length.
 - [ ] If the upgrade is adopted, pin to an explicit stable revision or release instead of a moving branch tip.
+
+Variant B plan:
+
+- [ ] Keep the upstream patch model-specific and additive by introducing a `Qwen3TTS` semantic reference-conditioning type instead of changing `SpeechGenerationModel` or adding a cross-model conditioning abstraction.
+- [ ] Keep that conditioning type semantic and stable: expose reusable reference-side ingredients such as speaker embedding, encoded reference speech codes, prepared reference-text state, and resolved language data, but do not expose fused prompt embeddings, pad embeddings, trailing hidden state, or other final assembled talker-input machinery.
+- [ ] Split the current `prepareICLGenerationInputs(...)` implementation into two helpers:
+  - [ ] stage 1: prepare reusable reference conditioning from `refAudio`, `refText`, and `language`
+  - [ ] stage 2: assemble request-specific Qwen input tensors from `text` plus prepared reference conditioning
+- [ ] Keep `prepareICLGenerationInputs(...)` itself as the compatibility wrapper that composes stage 1 and stage 2 so the current implementation path stays readable and centralized.
+- [ ] Add additive `Qwen3TTSModel.generate(...)` and `generateStream(...)` overloads that accept prepared reference conditioning plus target text while leaving the existing `refAudio`/`refText` entry points untouched.
+- [ ] Route the existing raw-reference generation path through the new helpers so the new conditioning flow and the compatibility flow share one implementation instead of drifting.
+- [ ] Add focused upstream Qwen tests that prove:
+  - [ ] reference conditioning can be prepared successfully
+  - [ ] generation from prebuilt conditioning succeeds and remains behaviorally aligned with the raw-reference path
+  - [ ] existing generation entry points still work unchanged
+  - [ ] `CustomVoice` behavior stays separate from the clone-conditioning path
+- [ ] Keep persistence out of the upstream patch entirely; persistence remains a `SpeakSwiftly` follow-up after the new conditioning seam proves useful in memory.
+- [ ] After the upstreamable conditioning patch exists locally, add a `SpeakSwiftly` resident in-memory cache keyed by profile identity, backend, and artifact version before designing any on-disk profile artifact format.
 
 Exit criteria:
 
@@ -437,12 +463,12 @@ Tickets:
 - [ ] Define the smallest useful replacement-rule shape, likely simple exact-match and phrase-replacement entries before considering broader pattern support.
 - [ ] Add initial typed replacement rules with explicit phase and input-kind scoping before considering regex or broader pattern families.
 - [ ] Decide and document rule precedence between built-in normalization passes and custom replacement rules so downstream callers can predict the final spoken text.
-- [ ] Add worker operations for listing normalization replacements, adding or updating a replacement, removing a replacement, and clearing all custom replacements.
-- [ ] Add typed `SpeakSwiftlyCore` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
+- [x] Add worker operations for listing normalization replacements, adding or updating a replacement, removing a replacement, and clearing all custom replacements.
+- [x] Add typed `SpeakSwiftlyCore` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
 - [ ] Decide whether replacement rules are process-local, profile-store-local, or shared per-user state, and document the persistence boundary explicitly.
 - [ ] Emit structured success and failure output for replacement-rule mutations so callers can distinguish validation failures, duplicate-key behavior, and filesystem errors.
-- [ ] Add automated coverage for replacement listing, add/update, remove, clear, and precedence behavior against the built-in normalization pipeline.
-- [ ] Document the normalization-replacement semantics and examples in the README once the contract exists.
+- [ ] Add automated coverage for replacement precedence behavior against the built-in normalization pipeline.
+- [x] Document the normalization-replacement semantics and examples in the README once the contract exists.
 
 Exit criteria:
 

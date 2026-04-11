@@ -235,10 +235,193 @@ extension SpeakSwiftly.Runtime {
         return storedProfile
     }
 
+    func handleRerollProfile(
+        id: String,
+        profileName: String
+    ) async throws -> StoredProfile {
+        let op = WorkerRequest.rerollProfile(
+            id: id,
+            profileName: profileName
+        ).opName
+        let profileStore = self.profileStore
+
+        await emitProgress(id: id, stage: .loadingProfile)
+        let loadStartedAt = dependencies.now()
+        let storedProfile = try await runBlockingFilesystemOperation {
+            try profileStore.loadProfile(named: profileName)
+        }
+        await logRequestEvent(
+            "profile_loaded_for_reroll",
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
+                "path": .string(storedProfile.directoryURL.path),
+                "duration_ms": .int(elapsedMS(since: loadStartedAt)),
+            ]
+        )
+        try Task.checkCancellation()
+
+        switch storedProfile.manifest.sourceKind {
+        case .generated:
+            let rerolled = try await rerollGeneratedProfile(
+                id: id,
+                op: op,
+                storedProfile: storedProfile
+            )
+            return rerolled
+
+        case .importedClone:
+            let rerolled = try await rerollImportedCloneProfile(
+                id: id,
+                op: op,
+                storedProfile: storedProfile
+            )
+            return rerolled
+        }
+    }
+
     private func runBlockingFilesystemOperation<T: Sendable>(
         _ operation: @escaping @Sendable () throws -> T
     ) async throws -> T {
         try await Task.detached(operation: operation).value
+    }
+
+    private func rerollGeneratedProfile(
+        id: String,
+        op: String,
+        storedProfile: StoredProfile
+    ) async throws -> StoredProfile {
+        await emitProgress(id: id, stage: .loadingProfileModel)
+        let modelLoadStartedAt = dependencies.now()
+        let profileModel = try await dependencies.loadProfileModel()
+        await logRequestEvent(
+            "profile_model_loaded_for_reroll",
+            requestID: id,
+            op: op,
+            profileName: storedProfile.manifest.profileName,
+            details: [
+                "model_repo": .string(ModelFactory.profileModelRepo),
+                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
+            ]
+        )
+        try Task.checkCancellation()
+
+        await emitProgress(id: id, stage: .generatingProfileAudio)
+        let generationStartedAt = dependencies.now()
+        let audio = try await profileModel.generate(
+            text: storedProfile.manifest.sourceText,
+            voice: storedProfile.manifest.voiceDescription,
+            refAudio: nil,
+            refText: nil,
+            language: "English",
+            generationParameters: GenerationPolicy.profileParameters(for: storedProfile.manifest.sourceText)
+        )
+        await logRequestEvent(
+            "profile_audio_rerolled",
+            requestID: id,
+            op: op,
+            profileName: storedProfile.manifest.profileName,
+            details: [
+                "duration_ms": .int(elapsedMS(since: generationStartedAt)),
+                "sample_count": .int(audio.count),
+            ]
+        )
+        try Task.checkCancellation()
+
+        let canonicalAudioData = try await canonicalAudioData(
+            from: audio,
+            sampleRate: profileModel.sampleRate
+        )
+        try Task.checkCancellation()
+
+        await emitProgress(id: id, stage: .writingProfileAssets)
+        let replaceStartedAt = dependencies.now()
+        let profileStore = self.profileStore
+        let rerolledProfile = try await runBlockingFilesystemOperation {
+            try profileStore.replaceProfile(
+                named: storedProfile.manifest.profileName,
+                vibe: storedProfile.manifest.vibe,
+                modelRepo: storedProfile.manifest.modelRepo,
+                voiceDescription: storedProfile.manifest.voiceDescription,
+                sourceText: storedProfile.manifest.sourceText,
+                sampleRate: profileModel.sampleRate,
+                canonicalAudioData: canonicalAudioData,
+                createdAt: storedProfile.manifest.createdAt
+            )
+        }
+        await logRequestEvent(
+            "profile_rerolled",
+            requestID: id,
+            op: op,
+            profileName: storedProfile.manifest.profileName,
+            details: [
+                "path": .string(rerolledProfile.directoryURL.path),
+                "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
+                "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
+            ]
+        )
+        return rerolledProfile
+    }
+
+    private func rerollImportedCloneProfile(
+        id: String,
+        op: String,
+        storedProfile: StoredProfile
+    ) async throws -> StoredProfile {
+        let canonicalAudioData = try await runBlockingFilesystemOperation {
+            try Data(contentsOf: storedProfile.referenceAudioURL)
+        }
+        try Task.checkCancellation()
+
+        await emitProgress(id: id, stage: .writingProfileAssets)
+        let replaceStartedAt = dependencies.now()
+        let profileStore = self.profileStore
+        let rerolledProfile = try await runBlockingFilesystemOperation {
+            try profileStore.replaceProfile(
+                named: storedProfile.manifest.profileName,
+                vibe: storedProfile.manifest.vibe,
+                modelRepo: storedProfile.manifest.modelRepo,
+                voiceDescription: storedProfile.manifest.voiceDescription,
+                sourceText: storedProfile.manifest.sourceText,
+                sampleRate: storedProfile.manifest.sampleRate,
+                canonicalAudioData: canonicalAudioData,
+                createdAt: storedProfile.manifest.createdAt
+            )
+        }
+        await logRequestEvent(
+            "clone_profile_rerolled",
+            requestID: id,
+            op: op,
+            profileName: storedProfile.manifest.profileName,
+            details: [
+                "path": .string(rerolledProfile.directoryURL.path),
+                "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
+                "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
+            ]
+        )
+        return rerolledProfile
+    }
+
+    private func canonicalAudioData(
+        from audio: [Float],
+        sampleRate: Int
+    ) async throws -> Data {
+        let tempDirectory = dependencies.fileManager.temporaryDirectory
+            .appendingPathComponent("SpeakSwiftly", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
+
+        let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
+        let writeWAV = dependencies.writeWAV
+        try await runBlockingFilesystemOperation {
+            try writeWAV(audio, sampleRate, tempWavURL)
+        }
+        return try await runBlockingFilesystemOperation {
+            try Data(contentsOf: tempWavURL)
+        }
     }
 
     func resolvedCloneTranscript(

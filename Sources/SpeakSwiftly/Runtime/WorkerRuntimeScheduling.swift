@@ -176,7 +176,7 @@ extension SpeakSwiftly.Runtime {
         switch backend {
         case .marvis:
             2
-        case .qwen3:
+        case .qwen3, .qwen3CustomVoice:
             1
         }
     }
@@ -227,6 +227,10 @@ extension SpeakSwiftly.Runtime {
         case .createProfile(_, let activeProfileName, _, _, _, _, _):
             return activeProfileName == profileName
         case .createClone(_, let activeProfileName, _, _, _, _):
+            return activeProfileName == profileName
+        case .renameProfile(_, let activeProfileName, _):
+            return activeProfileName == profileName
+        case .rerollProfile(_, let activeProfileName):
             return activeProfileName == profileName
         default:
             return false

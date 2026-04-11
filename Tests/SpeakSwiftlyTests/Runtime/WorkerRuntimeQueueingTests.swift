@@ -443,9 +443,9 @@ import TextForSpeech
         inStoredProfileID: "logs"
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
+    #expect(await runtime.normalizer.profiles.replacements(inStoredProfileID: "logs")?.map(\.id) == ["stderr-rule"])
 
-    let emptied = try await runtime.normalizer.profiles.removeReplacement(
-        id: "stderr-rule",
+    let emptied = try await runtime.normalizer.profiles.clearReplacements(
         fromStoredProfileID: "logs"
     )
     #expect(emptied.replacements.isEmpty)
@@ -479,8 +479,9 @@ import TextForSpeech
         TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule")
     )
     #expect(replaced.replacements.first?.replacement == "standard out")
+    #expect(await runtime.normalizer.profiles.replacements().map(\.id) == ["stdout-rule"])
 
-    let emptied = try await runtime.normalizer.profiles.removeReplacement(id: "stdout-rule")
+    let emptied = try await runtime.normalizer.profiles.clearReplacements()
     #expect(emptied.replacements.isEmpty)
 
     let reloaded = try await makeRuntime(
@@ -522,6 +523,15 @@ import TextForSpeech
         output.containsJSONObject {
             $0["id"] as? String == "req-add-text"
                 && (($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.count == 1
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-list-replacements","op":"list_text_replacements","text_profile_name":"logs"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-list-replacements"
+                && (($0["replacements"] as? [[String: Any]])?.count ?? 0) == 1
+                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "logs"
         }
     })
 
@@ -576,6 +586,15 @@ import TextForSpeech
             $0["id"] as? String == "req-reset-text"
                 && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "default"
                 && ($0["text_profile_style"] as? String) == "explicit"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-clear-replacements","op":"clear_text_replacements"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-clear-replacements"
+                && (($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.isEmpty == true
+                && (($0["replacements"] as? [[String: Any]])?.isEmpty) == true
         }
     })
 }

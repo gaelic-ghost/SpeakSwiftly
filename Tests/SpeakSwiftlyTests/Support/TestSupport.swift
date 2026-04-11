@@ -453,6 +453,36 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                 }
                 continuation.finish()
             }
+        },
+        generateEventStream: { text, voice, refAudio, refText, _, generationParameters, _ in
+            recorder?.record(
+                text: text,
+                voice: voice,
+                refAudioWasProvided: refAudio != nil,
+                refText: refText,
+                generationParameters: generationParameters
+            )
+
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.token(101))
+                continuation.yield(
+                    .info(
+                        .init(
+                            promptTokenCount: 12,
+                            generationTokenCount: chunkCount * 4,
+                            prefillTime: 0.12,
+                            generateTime: 0.34,
+                            tokensPerSecond: 56.7,
+                            peakMemoryUsage: 1.23
+                        )
+                    )
+                )
+                for chunkIndex in 0..<chunkCount {
+                    let base = Float(chunkIndex + 1) / 10
+                    continuation.yield(.audio([base, base + 0.1]))
+                }
+                continuation.finish()
+            }
         }
     )
 }
@@ -463,7 +493,7 @@ func makeResidentModels(
     chunkCount: Int = 1
 ) -> ResidentSpeechModels {
     switch backend {
-    case .qwen3:
+    case .qwen3, .qwen3CustomVoice:
         .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
     case .marvis:
         .marvis(
@@ -558,7 +588,7 @@ func makeRuntime<ResidentModelResult>(
             }
             if let model = loaded as? AnySpeechModel {
                 switch backend {
-                case .qwen3:
+                case .qwen3, .qwen3CustomVoice:
                     return .qwen3(model)
                 case .marvis:
                     return .marvis(

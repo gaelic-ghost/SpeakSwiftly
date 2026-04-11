@@ -5,7 +5,19 @@ import Foundation
 // MARK: - Qwen Speech Generation
 
 extension SpeakSwiftly.Runtime {
+    func generationEventInfo(from info: ModelGenerationEvent.Info) -> SpeakSwiftly.GenerationEventInfo {
+        SpeakSwiftly.GenerationEventInfo(
+            promptTokenCount: info.promptTokenCount,
+            generationTokenCount: info.generationTokenCount,
+            prefillTime: info.prefillTime,
+            generateTime: info.generateTime,
+            tokensPerSecond: info.tokensPerSecond,
+            peakMemoryUsage: info.peakMemoryUsage
+        )
+    }
+
     func qwenGenerationStream(
+        requestID: String,
         model: AnySpeechModel,
         text: String,
         materialization: StoredProfileMaterialization,
@@ -13,7 +25,7 @@ extension SpeakSwiftly.Runtime {
         generationParameters: GenerateParameters,
         streamingInterval: Double
     ) -> AsyncThrowingStream<[Float], Error> {
-        model.generateSamplesStream(
+        let eventStream = model.generateEventStream(
             text: text,
             voice: nil,
             refAudio: refAudio,
@@ -22,5 +34,29 @@ extension SpeakSwiftly.Runtime {
             generationParameters: generationParameters,
             streamingInterval: streamingInterval
         )
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await event in eventStream {
+                        switch event {
+                        case .token(let token):
+                            recordGenerationEvent(.token(token), for: requestID)
+                        case .info(let info):
+                            recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                        case .audio(let samples):
+                            recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                            continuation.yield(samples)
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 }

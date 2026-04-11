@@ -37,7 +37,7 @@ The current intended runtime shape is:
 
 - a long-lived executable owned by another process
 - newline-delimited JSON over `stdin` and `stdout`
-- resident backend selection between `qwen3` and `marvis`
+- resident backend selection between `qwen3`, `qwen3_custom_voice`, and `marvis`
 - stored voice profiles selected by name
 - text-normalization profiles that can be edited independently
 - persisted runtime configuration for the preferred resident backend
@@ -132,8 +132,12 @@ Current examples of the broader convention are:
 - `get_active_text_profile`
 - `get_text_profile_style`
 - `list_text_profiles`
+- `list_text_replacements`
 - `set_text_profile_style`
 - `create_text_replacement`
+- `clear_text_replacements`
+- `update_voice_profile_name`
+- `reroll_voice_profile`
 - `replace_text_profile`
 - `delete_voice_profile`
 
@@ -209,6 +213,8 @@ The intended library-caller shape is:
 - `runtime.voices.create(design named: ...)`
 - `runtime.voices.create(clone named: ...)`
 - `runtime.voices.list(...)`
+- `runtime.voices.rename(_:to:)`
+- `runtime.voices.reroll(_:)`
 - `runtime.voices.delete(named: ...)`
 - `runtime.jobs.generationQueue(...)`
 - `runtime.jobs.expire(...)`
@@ -276,8 +282,10 @@ Representative request shapes:
 {"id":"req-6","op":"get_text_profile_style"}
 {"id":"req-7","op":"set_text_profile_style","text_profile_style":"compact"}
 {"id":"req-8","op":"list_text_profiles"}
+{"id":"req-8a","op":"list_text_replacements","text_profile_name":"logs"}
 {"id":"req-9","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
 {"id":"req-10","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-10a","op":"clear_text_replacements","text_profile_name":"logs"}
 {"id":"req-11","op":"replace_active_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
 {"id":"req-status","op":"get_status"}
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
@@ -403,6 +411,12 @@ Opt-in real-model e2e coverage. The root `SpeakSwiftlyE2ETests` suite is seriali
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
+One-shot qwen resident `generate_speech` verification:
+
+```bash
+SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/voiceDesignSilentThenAudible
+```
+
 Force audible playback in the e2e suite:
 
 ```bash
@@ -422,6 +436,20 @@ Long deep-trace playback probe:
 ```bash
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter SpeakSwiftlyE2ETests/longCodeHeavy
 ```
+
+Opt-in qwen resident benchmark comparison:
+
+```bash
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite
+```
+
+Run multiple comparison samples per backend:
+
+```bash
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite
+```
+
+Each benchmark run persists a timestamped JSON summary under `.local/benchmarks` and refreshes `.local/benchmarks/qwen-resident-benchmark-latest.json` for quick inspection.
 
 Section-aware weird-text deep-trace probes:
 

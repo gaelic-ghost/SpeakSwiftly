@@ -27,6 +27,7 @@ extension SpeakSwiftly.Runtime {
                 profiles: payload.profiles,
                 textProfile: payload.textProfile,
                 textProfiles: payload.textProfiles,
+                replacements: payload.replacements,
                 textProfileStyle: payload.textProfileStyle,
                 textProfilePath: payload.textProfilePath,
                 activeRequest: payload.activeRequest,
@@ -265,6 +266,7 @@ extension SpeakSwiftly.Runtime {
         items: [SpeakSwiftly.GenerationJobItem]? = nil,
         text: String? = nil,
         profileName: String? = nil,
+        newProfileName: String? = nil,
         textProfileName: String? = nil,
         textProfileID: String? = nil,
         textProfileDisplayName: String? = nil,
@@ -293,6 +295,7 @@ extension SpeakSwiftly.Runtime {
             items: items,
             text: text,
             profileName: profileName,
+            newProfileName: newProfileName,
             textProfileName: textProfileName,
             textProfileID: textProfileID,
             textProfileDisplayName: textProfileDisplayName,
@@ -416,6 +419,19 @@ extension SpeakSwiftly.Runtime {
             )
         case .listProfiles(let id):
             await submitRequest(id: id, op: request.opName)
+        case .renameProfile(let id, let profileName, let newProfileName):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                profileName: profileName,
+                newProfileName: newProfileName
+            )
+        case .rerollProfile(let id, let profileName):
+            await submitRequest(
+                id: id,
+                op: request.opName,
+                profileName: profileName
+            )
         case .removeProfile(let id, let profileName):
             await submitRequest(id: id, op: request.opName, profileName: profileName)
         case .textProfileActive(let id),
@@ -429,7 +445,9 @@ extension SpeakSwiftly.Runtime {
         case .textProfile(let id, let name),
              .removeTextProfile(let id, let name):
             await submitRequest(id: id, op: request.opName, textProfileName: name)
-        case .textProfileEffective(let id, let name):
+        case .textProfileEffective(let id, let name),
+             .textReplacements(let id, let name),
+             .clearTextReplacements(let id, let name):
             await submitRequest(id: id, op: request.opName, textProfileName: name)
         case .setTextProfileStyle(let id, let style):
             await submitRequest(
@@ -590,7 +608,8 @@ extension SpeakSwiftly.Runtime {
             id: request.id,
             operation: request.opName,
             profileName: request.profileName,
-            events: makeLegacyRequestEventStream(for: request.id)
+            events: makeLegacyRequestEventStream(for: request.id),
+            generationEvents: makeGenerationEventStream(for: request.id)
         )
     }
 
@@ -641,6 +660,37 @@ extension SpeakSwiftly.Runtime {
             continuation.onTermination = { [weak self] _ in
                 Task {
                     await self?.removeRequestUpdateSubscriber(subscriberID, for: requestID)
+                }
+            }
+        }
+    }
+
+    func makeGenerationEventStream(
+        for requestID: String,
+        replayBuffered: Bool = true
+    ) -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> {
+        guard let broker = requestBrokers[requestID] else {
+            return AsyncThrowingStream { continuation in
+                continuation.finish()
+            }
+        }
+
+        let subscriberID = UUID()
+        let replayEvents = replayBuffered ? broker.replayGenerationEvents : []
+        let isTerminal = broker.isTerminal
+
+        return AsyncThrowingStream { continuation in
+            replayEvents.forEach { continuation.yield($0) }
+
+            guard !isTerminal, requestBrokers[requestID] != nil else {
+                continuation.finish()
+                return
+            }
+
+            requestBrokers[requestID]?.generationContinuations[subscriberID] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeGenerationEventSubscriber(subscriberID, for: requestID)
                 }
             }
         }
@@ -709,6 +759,25 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
+    func recordGenerationEvent(
+        _ event: SpeakSwiftly.GenerationEvent,
+        for requestID: String
+    ) {
+        guard var broker = requestBrokers[requestID] else { return }
+
+        let update = broker.recordGenerationEvent(
+            event,
+            date: dependencies.now(),
+            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates
+        )
+        let continuations = Array(broker.generationContinuations.values)
+        requestBrokers[requestID] = broker
+
+        continuations.forEach { continuation in
+            continuation.yield(update)
+        }
+    }
+
     func failRequestStream(for requestID: String, error: WorkerError) {
         let failure = WorkerFailureResponse(
             id: requestID,
@@ -727,16 +796,18 @@ extension SpeakSwiftly.Runtime {
     ) {
         guard var broker = requestBrokers[requestID] else { return }
 
-        let update = broker.record(
+        let update = broker.recordState(
             state: state,
             date: dependencies.now(),
             maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates
         )
         let continuations = Array(broker.subscriberContinuations.values)
+        let generationContinuations = Array(broker.generationContinuations.values)
 
         if terminal {
             broker.isTerminal = true
             broker.subscriberContinuations.removeAll()
+            broker.generationContinuations.removeAll()
         }
 
         requestBrokers[requestID] = broker
@@ -744,6 +815,12 @@ extension SpeakSwiftly.Runtime {
         continuations.forEach { continuation in
             continuation.yield(update)
             if terminal {
+                continuation.finish()
+            }
+        }
+
+        if terminal {
+            generationContinuations.forEach { continuation in
                 continuation.finish()
             }
         }
@@ -766,6 +843,10 @@ extension SpeakSwiftly.Runtime {
 
     func removeRequestUpdateSubscriber(_ subscriberID: UUID, for requestID: String) {
         requestBrokers[requestID]?.subscriberContinuations.removeValue(forKey: subscriberID)
+    }
+
+    func removeGenerationEventSubscriber(_ subscriberID: UUID, for requestID: String) {
+        requestBrokers[requestID]?.generationContinuations.removeValue(forKey: subscriberID)
     }
 
     func broadcastStatus(_ status: WorkerStatusEvent) {

@@ -63,6 +63,7 @@ extension SpeakSwiftly.Runtime {
         await emitProgress(id: id, stage: .generatingFileAudio)
         let generationStartedAt = dependencies.now()
         let stream = residentGenerationStream(
+            requestID: id,
             text: normalizedText,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(for: normalizedText),
@@ -145,7 +146,7 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         switch speechBackend {
-        case .qwen3:
+        case .qwen3, .qwen3CustomVoice:
             let residentModel = try residentQwenModelOrThrow()
             let materialization = try profile.qwenMaterialization()
             let refAudioLoadStartedAt = dependencies.now()
@@ -188,6 +189,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func residentGenerationStream(
+        requestID: String,
         text: String,
         inputs: ResidentSpeechInputs,
         generationParameters: GenerateParameters,
@@ -196,6 +198,7 @@ extension SpeakSwiftly.Runtime {
         switch inputs {
         case .qwen(let model, _, let materialization, let refAudio):
             qwenGenerationStream(
+                requestID: requestID,
                 model: model,
                 text: text,
                 materialization: materialization,

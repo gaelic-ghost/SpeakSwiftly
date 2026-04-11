@@ -25,11 +25,11 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.13.0")
+            .upToNextMajor(from: "0.14.0")
         ),
         .package(
             url: "https://github.com/Blaizzy/mlx-audio-swift.git",
-            exact: "0.1.2"
+            revision: "9264f40bc21c1dd461feb1ce1206e5ff38e8b9f5"
         )
     ],
     targets: [

@@ -63,6 +63,28 @@ public extension SpeakSwiftly.Voices {
         await runtime.submit(.listProfiles(id: UUID().uuidString))
     }
 
+    func rename(
+        _ profileName: SpeakSwiftly.Name,
+        to newProfileName: SpeakSwiftly.Name
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .renameProfile(
+                id: UUID().uuidString,
+                profileName: profileName,
+                newProfileName: newProfileName
+            )
+        )
+    }
+
+    func reroll(_ profileName: SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .rerollProfile(
+                id: UUID().uuidString,
+                profileName: profileName
+            )
+        )
+    }
+
     func delete(named profileName: SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.removeProfile(id: UUID().uuidString, profileName: profileName))
     }

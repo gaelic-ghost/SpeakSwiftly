@@ -135,6 +135,12 @@ import TextForSpeech
     let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles, String?) async -> TextForSpeech.Profile? = { profiles, id in
         await profiles.effective(id: id)
     }
+    let activeReplacements: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> [TextForSpeech.Replacement] = { profiles in
+        await profiles.replacements()
+    }
+    let storedReplacements: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async -> [TextForSpeech.Replacement]? = { profiles, id in
+        await profiles.replacements(inStoredProfileID: id)
+    }
     let loadProfiles: @Sendable (SpeakSwiftly.Normalizer.Persistence) async throws -> Void = { persistence in
         try await persistence.load()
     }
@@ -193,6 +199,12 @@ import TextForSpeech
         profileID in
         try await profiles.removeReplacement(id: replacementID, fromStoredProfileID: profileID)
     }
+    let clearActiveReplacements: @Sendable (SpeakSwiftly.Normalizer.Profiles) async throws -> TextForSpeech.Profile = { profiles in
+        try await profiles.clearReplacements()
+    }
+    let clearStoredReplacements: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> TextForSpeech.Profile = { profiles, profileID in
+        try await profiles.clearReplacements(fromStoredProfileID: profileID)
+    }
     let createProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, String?) async -> SpeakSwiftly.RequestHandle = {
         voices,
         profileName,
@@ -223,6 +235,17 @@ import TextForSpeech
     }
     let profiles: @Sendable (SpeakSwiftly.Voices) async -> SpeakSwiftly.RequestHandle = { voices in
         await voices.list()
+    }
+    let renameProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = {
+        voices,
+        profileName,
+        newProfileName in
+        await voices.rename(profileName, to: newProfileName)
+    }
+    let rerollProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = {
+        voices,
+        profileName in
+        await voices.reroll(profileName)
     }
     let removeProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = { voices, profileName in
         await voices.delete(named: profileName)
@@ -271,6 +294,11 @@ import TextForSpeech
         requestID in
         await runtime.updates(for: requestID)
     }
+    let generationEvents: @Sendable (SpeakSwiftly.Runtime, String) async -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> = {
+        runtime,
+        requestID in
+        await runtime.generationEvents(for: requestID)
+    }
     let switchSpeechBackend: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = {
         runtime,
         speechBackend in
@@ -314,6 +342,8 @@ import TextForSpeech
     _ = createProfile
     _ = createClone
     _ = profiles
+    _ = renameProfile
+    _ = rerollProfile
     _ = removeProfile
     _ = generatedFile
     _ = generatedFiles
@@ -327,6 +357,8 @@ import TextForSpeech
     _ = profilesList
     _ = activeProfile
     _ = effectiveProfile
+    _ = activeReplacements
+    _ = storedReplacements
     _ = loadProfiles
     _ = saveProfiles
     _ = createProfileObject
@@ -340,11 +372,14 @@ import TextForSpeech
     _ = replaceStoredReplacement
     _ = removeActiveReplacement
     _ = removeStoredReplacement
+    _ = clearActiveReplacements
+    _ = clearStoredReplacements
     _ = generationQueue
     _ = status
     _ = overview
     _ = requestSnapshot
     _ = updates
+    _ = generationEvents
     _ = switchSpeechBackend
     _ = reloadModels
     _ = unloadModels
@@ -361,13 +396,25 @@ import TextForSpeech
     let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation
     let profileName: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.profileName
     let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
+    let generationEvents: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>> = \.generationEvents
 
     _ = operation
     _ = profileName
     _ = events
+    _ = generationEvents
 }
 
 @Test func publicRequestObservationSurfaceExposesStableMetadata() {
+    let generationInfoPromptTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.promptTokenCount
+    let generationInfoGenerationTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.generationTokenCount
+    let generationInfoPrefillTime: KeyPath<SpeakSwiftly.GenerationEventInfo, TimeInterval> = \.prefillTime
+    let generationInfoGenerateTime: KeyPath<SpeakSwiftly.GenerationEventInfo, TimeInterval> = \.generateTime
+    let generationInfoTokensPerSecond: KeyPath<SpeakSwiftly.GenerationEventInfo, Double> = \.tokensPerSecond
+    let generationInfoPeakMemoryUsage: KeyPath<SpeakSwiftly.GenerationEventInfo, Double> = \.peakMemoryUsage
+    let generationUpdateID: KeyPath<SpeakSwiftly.GenerationEventUpdate, String> = \.id
+    let generationUpdateSequence: KeyPath<SpeakSwiftly.GenerationEventUpdate, Int> = \.sequence
+    let generationUpdateDate: KeyPath<SpeakSwiftly.GenerationEventUpdate, Date> = \.date
+    let generationUpdateEvent: KeyPath<SpeakSwiftly.GenerationEventUpdate, SpeakSwiftly.GenerationEvent> = \.event
     let updateID: KeyPath<SpeakSwiftly.RequestUpdate, String> = \.id
     let updateSequence: KeyPath<SpeakSwiftly.RequestUpdate, Int> = \.sequence
     let updateDate: KeyPath<SpeakSwiftly.RequestUpdate, Date> = \.date
@@ -380,6 +427,16 @@ import TextForSpeech
     let snapshotSequence: KeyPath<SpeakSwiftly.RequestSnapshot, Int> = \.sequence
     let snapshotState: KeyPath<SpeakSwiftly.RequestSnapshot, SpeakSwiftly.RequestState> = \.state
 
+    _ = generationInfoPromptTokenCount
+    _ = generationInfoGenerationTokenCount
+    _ = generationInfoPrefillTime
+    _ = generationInfoGenerateTime
+    _ = generationInfoTokensPerSecond
+    _ = generationInfoPeakMemoryUsage
+    _ = generationUpdateID
+    _ = generationUpdateSequence
+    _ = generationUpdateDate
+    _ = generationUpdateEvent
     _ = updateID
     _ = updateSequence
     _ = updateDate
@@ -421,4 +478,10 @@ import TextForSpeech
     _ = successStatus
     _ = successSpeechBackend
     _ = successActiveRequests
+}
+
+@Test func publicTextNormalizationSurfaceExposesReplacementMetadata() {
+    let successReplacements: KeyPath<SpeakSwiftly.Success, [TextForSpeech.Replacement]?> = \.replacements
+
+    _ = successReplacements
 }

@@ -169,6 +169,40 @@ extension SpeakSwiftly.Runtime {
                 )
                 disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id, profiles: profiles)))
 
+            case .renameProfile(let id, let profileName, let newProfileName):
+                await emitProgress(id: id, stage: .writingProfileAssets)
+                let renameStartedAt = dependencies.now()
+                let storedProfile = try profileStore.renameProfile(named: profileName, to: newProfileName)
+                await logRequestEvent(
+                    "profile_renamed",
+                    requestID: id,
+                    op: request.opName,
+                    profileName: storedProfile.manifest.profileName,
+                    details: [
+                        "old_profile_name": .string(profileName),
+                        "new_profile_name": .string(newProfileName),
+                        "path": .string(storedProfile.directoryURL.path),
+                        "duration_ms": .int(elapsedMS(since: renameStartedAt)),
+                    ]
+                )
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        profileName: storedProfile.manifest.profileName,
+                        profilePath: storedProfile.directoryURL.path
+                    )
+                ))
+
+            case .rerollProfile(let id, let profileName):
+                let storedProfile = try await handleRerollProfile(id: id, profileName: profileName)
+                disposition = .requestCompleted(.success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        profileName: storedProfile.manifest.profileName,
+                        profilePath: storedProfile.directoryURL.path
+                    )
+                ))
+
             case .removeProfile(let id, let profileName):
                 await emitProgress(id: id, stage: .removingProfile)
                 let removeStartedAt = dependencies.now()
@@ -206,9 +240,11 @@ extension SpeakSwiftly.Runtime {
                  .useTextProfile,
                  .removeTextProfile,
                  .resetTextProfile,
+                 .textReplacements,
                  .addTextReplacement,
                  .replaceTextReplacement,
                  .removeTextReplacement,
+                 .clearTextReplacements,
                  .listQueue,
                  .status,
                  .overview,
@@ -447,6 +483,22 @@ extension SpeakSwiftly.Runtime {
                     )
                 )
 
+            case .textReplacements(let id, let profileName):
+                let profile = if let profileName {
+                    await normalizerRef.profiles.stored(id: profileName)
+                } else {
+                    await normalizerRef.profiles.active()
+                }
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        replacements: profile?.replacements ?? [],
+                        textProfileStyle: textProfileStyle,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
             case .addTextReplacement(let id, let replacement, let profileName):
                 let profile = if let profileName {
                     try await normalizerRef.profiles.add(
@@ -496,6 +548,24 @@ extension SpeakSwiftly.Runtime {
                     WorkerSuccessPayload(
                         id: id,
                         textProfile: profile,
+                        textProfileStyle: textProfileStyle,
+                        textProfilePath: textProfilePath
+                    )
+                )
+
+            case .clearTextReplacements(let id, let profileName):
+                let profile = if let profileName {
+                    try await normalizerRef.profiles.clearReplacements(
+                        fromStoredProfileID: profileName
+                    )
+                } else {
+                    try await normalizerRef.profiles.clearReplacements()
+                }
+                result = .success(
+                    WorkerSuccessPayload(
+                        id: id,
+                        textProfile: profile,
+                        replacements: profile.replacements,
                         textProfileStyle: textProfileStyle,
                         textProfilePath: textProfilePath
                     )
@@ -559,6 +629,8 @@ extension SpeakSwiftly.Runtime {
                  .createProfile,
                  .createClone,
                  .listProfiles,
+                 .renameProfile,
+                 .rerollProfile,
                  .removeProfile:
                 result = .failure(
                     WorkerError(
@@ -602,6 +674,7 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentGenerationStream(
+            requestID: id,
             text: speechJob.normalizedText,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(for: speechJob.normalizedText),
@@ -778,8 +851,8 @@ extension SpeakSwiftly.Runtime {
 
     func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
         switch speechBackend {
-        case .qwen3:
-            [ModelFactory.qwenResidentModelRepo]
+        case .qwen3, .qwen3CustomVoice:
+            [ModelFactory.residentModelRepo(for: speechBackend)]
         case .marvis:
             [ModelFactory.marvisResidentModelRepo, ModelFactory.marvisResidentModelRepo]
         }
@@ -889,7 +962,7 @@ extension SpeakSwiftly.Runtime {
         case .ready(.qwen3):
             throw WorkerError(
                 code: .internalError,
-                message: "SpeakSwiftly attempted to use the resident Marvis model bundle while the runtime is configured for the 'qwen3' backend. This indicates a backend-routing bug."
+                message: "SpeakSwiftly attempted to use the resident Marvis model bundle while the runtime is configured for the '\(speechBackend.rawValue)' backend. This indicates a backend-routing bug."
             )
         case .warming:
             throw WorkerError(code: .modelLoading, message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.")

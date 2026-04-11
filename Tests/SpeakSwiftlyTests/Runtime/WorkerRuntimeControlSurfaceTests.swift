@@ -625,6 +625,7 @@ private actor BackendLoadRecorder {
 
     let activeCreateID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
+        vibe: .femme,
         voice: "Warm and bright"
     ).id
     #expect(await waitUntil {
@@ -782,6 +783,7 @@ private actor BackendLoadRecorder {
 
     let activeCreateID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
+        vibe: .femme,
         voice: "Warm and bright"
     ).id
     #expect(await waitUntil {
@@ -852,6 +854,7 @@ private actor BackendLoadRecorder {
 
     let createID = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
+        vibe: .femme,
         voice: "Warm and bright",
         outputPath: nil
     ).id
@@ -878,9 +881,43 @@ private actor BackendLoadRecorder {
         }
     })
 
+    let renameID = await runtime.voices.rename("bright-guide", to: "clear-guide").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == renameID
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "clear-guide"
+        }
+    })
+
+    let renamedListID = await runtime.voices.list().id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == renamedListID,
+                $0["ok"] as? Bool == true,
+                let profiles = $0["profiles"] as? [[String: Any]]
+            else {
+                return false
+            }
+
+            let names = profiles.compactMap { $0["profile_name"] as? String }
+            return names.contains("clear-guide") && !names.contains("bright-guide")
+        }
+    })
+
+    let rerollID = await runtime.voices.reroll("clear-guide").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == rerollID
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "clear-guide"
+        }
+    })
+
     let speakFileID = await runtime.generate.audio(
         text: "Save this request as an artifact.",
-        with: "bright-guide"
+        with: "clear-guide"
     ).id
     let fileArtifactID = "\(speakFileID)-artifact-1"
     #expect(await waitUntil {
@@ -967,14 +1004,74 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let removeID = await runtime.voices.delete(named: "bright-guide").id
+    let removeID = await runtime.voices.delete(named: "clear-guide").id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == removeID
                 && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "clear-guide"
+        }
+    })
+}
+
+@Test func rerollRebuildsAnExistingProfileInPlaceFromItsStoredInputs() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let originalAudio = Data([0x01, 0x02, 0x03, 0x04])
+    _ = try store.createProfile(
+        profileName: "bright-guide",
+        vibe: .femme,
+        modelRepo: ModelFactory.profileModelRepo,
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24_000,
+        canonicalAudioData: originalAudio
+    )
+
+    let rerolledSamples: [Float] = [0.7, 0.8, 0.9]
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        profileModelLoader: {
+            AnySpeechModel(
+                sampleRate: 24_000,
+                generate: { _, _, _, _, _, _ in rerolledSamples },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                }
+            )
+        }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let rerollID = await runtime.voices.reroll("bright-guide").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == rerollID
+                && $0["ok"] as? Bool == true
                 && $0["profile_name"] as? String == "bright-guide"
         }
     })
+
+    let rerolledProfile = try store.loadProfile(named: "bright-guide")
+    #expect(rerolledProfile.manifest.profileName == "bright-guide")
+    #expect(rerolledProfile.manifest.sourceText == "Hello there")
+    #expect(rerolledProfile.manifest.voiceDescription == "Warm and bright.")
+    #expect(try Data(contentsOf: rerolledProfile.referenceAudioURL) == rawTestAudioData(for: rerolledSamples))
 }
 
 @Test func createProfileResolvesRelativeOutputPathAgainstExplicitCallerWorkingDirectory() async throws {
@@ -1458,6 +1555,99 @@ private actor BackendLoadRecorder {
     #expect(first == nil)
 }
 
+@Test func requestObservationExposesReplayableGenerationEventsForQwenRequests() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x01, 0x02])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) }
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let handle = await runtime.generate.audio(
+        text: "Hello from the generation event side channel.",
+        with: "default-femme"
+    )
+
+    let runtimeEvents = await runtime.generationEvents(for: handle.id)
+    var runtimeIterator = runtimeEvents.makeAsyncIterator()
+
+    if case .token(let token)? = try await runtimeIterator.next()?.event {
+        #expect(token == 101)
+    } else {
+        Issue.record("Expected the first replayed generation event to be a qwen token.")
+    }
+
+    if case .info(let info)? = try await runtimeIterator.next()?.event {
+        #expect(info.promptTokenCount == 12)
+        #expect(info.generationTokenCount == 8)
+        #expect(info.prefillTime == 0.12)
+        #expect(info.generateTime == 0.34)
+        #expect(info.tokensPerSecond == 56.7)
+        #expect(info.peakMemoryUsage == 1.23)
+    } else {
+        Issue.record("Expected the second replayed generation event to carry qwen generation info.")
+    }
+
+    if case .audioChunk(let sampleCount)? = try await runtimeIterator.next()?.event {
+        #expect(sampleCount == 2)
+    } else {
+        Issue.record("Expected the third replayed generation event to describe the first audio chunk.")
+    }
+
+    if case .audioChunk(let sampleCount)? = try await runtimeIterator.next()?.event {
+        #expect(sampleCount == 2)
+    } else {
+        Issue.record("Expected the fourth replayed generation event to describe the second audio chunk.")
+    }
+
+    #expect(try await runtimeIterator.next() == nil)
+
+    var handleIterator = handle.generationEvents.makeAsyncIterator()
+    if case .token(let token)? = try await handleIterator.next()?.event {
+        #expect(token == 101)
+    } else {
+        Issue.record("Expected the original RequestHandle generation stream to retain the qwen token event.")
+    }
+    if case .info(let info)? = try await handleIterator.next()?.event {
+        #expect(info.promptTokenCount == 12)
+    } else {
+        Issue.record("Expected the original RequestHandle generation stream to retain the qwen info event.")
+    }
+    if case .audioChunk(let sampleCount)? = try await handleIterator.next()?.event {
+        #expect(sampleCount == 2)
+    } else {
+        Issue.record("Expected the original RequestHandle generation stream to retain the first audio chunk event.")
+    }
+    if case .audioChunk(let sampleCount)? = try await handleIterator.next()?.event {
+        #expect(sampleCount == 2)
+    } else {
+        Issue.record("Expected the original RequestHandle generation stream to retain the second audio chunk event.")
+    }
+    #expect(try await handleIterator.next() == nil)
+}
+
 @Test func requestObservationReplaysQueuedStateAndFansOutToMultipleSubscribers() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
@@ -1605,6 +1795,7 @@ private actor BackendLoadRecorder {
 
     _ = await runtime.voices.create(design: "bright-guide",
         from: "Hello there",
+        vibe: .femme,
         voice: "Warm and bright"
     )
     #expect(await waitUntil {
@@ -2072,4 +2263,11 @@ private actor BackendLoadRecorder {
 
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:generate_speech", "req-3:list_voice_profiles"])
+}
+
+private func rawTestAudioData(for samples: [Float]) -> Data {
+    let bytes = samples.map(\.bitPattern).flatMap { value in
+        withUnsafeBytes(of: value.littleEndian, Array.init)
+    }
+    return Data(bytes)
 }

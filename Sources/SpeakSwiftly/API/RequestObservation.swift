@@ -14,4 +14,10 @@ public extension SpeakSwiftly.Runtime {
     ) -> AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error> {
         makeRequestUpdateStream(for: requestID)
     }
+
+    func generationEvents(
+        for requestID: String
+    ) -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> {
+        makeGenerationEventStream(for: requestID)
+    }
 }

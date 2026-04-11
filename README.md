@@ -103,6 +103,8 @@ The typed runtime is organized around stored concern handles that callers can ke
 - `runtime.jobs`
 - `runtime.artifacts`
 
+`runtime.normalizer.profiles` now includes first-class replacement-rule inspection and bulk-clear helpers, so hosts can list the active or stored profile replacements and clear them without dropping down to raw JSONL.
+
 When callers need to construct a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` now throws if the persisted text-profile archive cannot be loaded or decoded. The worker runtime still uses a best-effort recovery path for unreadable archives so `SpeakSwiftly.liftoff()` can continue starting in operator-facing environments.
 
 Runtime preferences have a matching typed surface:
@@ -110,7 +112,7 @@ Runtime preferences have a matching typed surface:
 ```swift
 import SpeakSwiftlyCore
 
-let configuration = SpeakSwiftly.Configuration(speechBackend: .marvis)
+let configuration = SpeakSwiftly.Configuration(speechBackend: .qwen3CustomVoice)
 try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration.json"))
 
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
@@ -161,6 +163,8 @@ Key typed runtime entry points include:
 - `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
 - `runtime.voices.list()`
+- `runtime.voices.rename(_:to:)`
+- `runtime.voices.reroll(_:)`
 - `runtime.voices.delete(named:)`
 - `runtime.player.list()`
 - `runtime.player.pause()`
@@ -197,7 +201,7 @@ Resident runtime controls currently map like this:
 
 | Typed Swift API | JSONL `op` | Notes |
 | --- | --- | --- |
-| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
+| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend` such as `"qwen3"`, `"qwen3_custom_voice"`, or `"marvis"`. |
 | `switchSpeechBackend(to:id:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
 | `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
 | `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
@@ -212,6 +216,8 @@ Representative request shapes:
 {"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
 {"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
 {"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
+{"id":"req-rename","op":"update_voice_profile_name","profile_name":"default-femme","new_profile_name":"guide-femme"}
+{"id":"req-reroll","op":"reroll_voice_profile","profile_name":"guide-femme"}
 {"id":"req-text-style","op":"get_text_profile_style"}
 {"id":"req-set-text-style","op":"set_text_profile_style","text_profile_style":"compact"}
 {"id":"req-status","op":"get_status"}

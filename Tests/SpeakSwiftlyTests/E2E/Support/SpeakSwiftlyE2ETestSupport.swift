@@ -3,6 +3,15 @@ import Testing
 @testable import SpeakSwiftlyCore
 
 extension SpeakSwiftlyE2ETests {
+    static var isQwenBenchmarkE2EEnabled: Bool {
+        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
+    }
+
+    static var qwenBenchmarkIterations: Int {
+        let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS"] ?? ""
+        return max(1, Int(rawValue) ?? 1)
+    }
+
     static let testingProfileName = "testing-profile"
     static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
     static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."

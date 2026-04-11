@@ -7,6 +7,7 @@ public extension SpeakSwiftly {
 
     enum SpeechBackend: String, Codable, Sendable, Equatable, CaseIterable {
         case qwen3
+        case qwen3CustomVoice = "qwen3_custom_voice"
         case marvis
     }
 }
@@ -37,6 +38,8 @@ extension SpeakSwiftly.SpeechBackend {
         switch self {
         case .qwen3:
             ModelFactory.qwenResidentModelRepo
+        case .qwen3CustomVoice:
+            ModelFactory.qwenCustomVoiceResidentModelRepo
         case .marvis:
             ModelFactory.marvisResidentModelRepo
         }

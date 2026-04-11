@@ -28,6 +28,14 @@ extension SpeakSwiftly.Normalizer {
         return textRuntime.profiles.effective()
     }
 
+    fileprivate func activeReplacements() -> [TextForSpeech.Replacement] {
+        textRuntime.profiles.active().replacements
+    }
+
+    fileprivate func storedReplacements(id: String) -> [TextForSpeech.Replacement]? {
+        textRuntime.profiles.stored(id: id)?.replacements
+    }
+
     fileprivate func setBuiltInStyle(
         _ style: TextForSpeech.BuiltInProfileStyle
     ) throws {
@@ -105,6 +113,30 @@ extension SpeakSwiftly.Normalizer {
         )
     }
 
+    fileprivate func clearReplacements() throws -> TextForSpeech.Profile {
+        var profile = textRuntime.profiles.active()
+        for replacement in profile.replacements {
+            profile = try textRuntime.profiles.removeReplacement(id: replacement.id)
+        }
+        return profile
+    }
+
+    fileprivate func clearReplacements(
+        fromStoredProfileID profileID: String
+    ) throws -> TextForSpeech.Profile {
+        guard var profile = textRuntime.profiles.stored(id: profileID) else {
+            throw TextForSpeech.RuntimeError.profileNotFound(profileID)
+        }
+
+        for replacement in profile.replacements {
+            profile = try textRuntime.profiles.removeReplacement(
+                id: replacement.id,
+                fromProfileID: profileID
+            )
+        }
+        return profile
+    }
+
     fileprivate func persistenceURL() -> URL? {
         textRuntime.persistenceURL
     }
@@ -159,6 +191,16 @@ public extension SpeakSwiftly.Normalizer.Profiles {
 
     func effective(id: String? = nil) async -> TextForSpeech.Profile? {
         await normalizer.effectiveProfile(id: id)
+    }
+
+    func replacements() async -> [TextForSpeech.Replacement] {
+        await normalizer.activeReplacements()
+    }
+
+    func replacements(
+        inStoredProfileID id: String
+    ) async -> [TextForSpeech.Replacement]? {
+        await normalizer.storedReplacements(id: id)
     }
 
     func setBuiltInStyle(
@@ -246,6 +288,20 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     ) async throws -> TextForSpeech.Profile {
         try await normalizer.removeReplacement(
             id: replacementID,
+            fromStoredProfileID: profileID
+        )
+    }
+
+    @discardableResult
+    func clearReplacements() async throws -> TextForSpeech.Profile {
+        try await normalizer.clearReplacements()
+    }
+
+    @discardableResult
+    func clearReplacements(
+        fromStoredProfileID profileID: String
+    ) async throws -> TextForSpeech.Profile {
+        try await normalizer.clearReplacements(
             fromStoredProfileID: profileID
         )
     }
