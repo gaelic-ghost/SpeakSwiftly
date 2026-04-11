@@ -138,7 +138,7 @@ extension SpeakSwiftly.Normalizer {
     }
 
     fileprivate func persistenceURL() -> URL? {
-        textRuntime.persistenceURL
+        configuredPersistenceURL
     }
 
     fileprivate func persistenceState() -> TextForSpeech.PersistedState {

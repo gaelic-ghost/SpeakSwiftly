@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import SpeakSwiftlyCore
+@testable import SpeakSwiftlyCore
 import TextForSpeech
 
 // MARK: - Runtime Construction
@@ -55,6 +55,18 @@ import TextForSpeech
 
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.textNormalizer != nil)
+}
+
+@Test func defaultPackagePersistencePathsUseTheDebugNamespaceOutsideProduction() async throws {
+    let rootURL = ProfileStore.defaultRootURL()
+    let configurationURL = ProfileStore.defaultConfigurationURL()
+    let textProfilesURL = ProfileStore.defaultTextProfilesURL()
+    let normalizer = try SpeakSwiftly.Normalizer()
+
+    #expect(rootURL.path.contains("/SpeakSwiftly-Debug/profiles"))
+    #expect(configurationURL.path.contains("/SpeakSwiftly-Debug/configuration.json"))
+    #expect(textProfilesURL.path.contains("/SpeakSwiftly-Debug/text-profiles.json"))
+    #expect(await normalizer.persistence.url() == textProfilesURL)
 }
 
 // MARK: - Runtime Helpers

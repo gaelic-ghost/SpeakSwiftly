@@ -149,8 +149,11 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 Default persisted configuration path:
 
-- macOS default: `~/Library/Application Support/SpeakSwiftly/configuration.json`
+- macOS production default: `~/Library/Application Support/SpeakSwiftly/configuration.json`
+- macOS debug and package-test default: `~/Library/Application Support/SpeakSwiftly-Debug/configuration.json`
 - with `SPEAKSWIFTLY_PROFILE_ROOT=/custom/profiles`: `/custom/configuration.json`
+
+The same namespace split applies to the default profile store and `text-profiles.json`, so debug builds, local package tests, and production runs do not reuse the same local storage root unless you explicitly point them at one with `SPEAKSWIFTLY_PROFILE_ROOT`.
 
 Backend resolution precedence is:
 

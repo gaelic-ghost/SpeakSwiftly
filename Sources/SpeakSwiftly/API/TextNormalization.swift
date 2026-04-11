@@ -8,6 +8,7 @@ public extension SpeakSwiftly {
 
     actor Normalizer {
         let textRuntime: TextForSpeech.Runtime
+        let configuredPersistenceURL: URL
 
         public init(
             builtInStyle: TextForSpeech.BuiltInProfileStyle = .balanced,
@@ -15,9 +16,21 @@ public extension SpeakSwiftly {
             profiles: [String: TextForSpeech.Profile] = [:],
             persistenceURL: URL? = nil
         ) throws {
+            let persistence: TextForSpeech.Runtime.PersistenceConfiguration
+            let resolvedPersistenceURL: URL
+            if let persistenceURL {
+                let standardizedURL = persistenceURL.standardizedFileURL
+                persistence = .file(standardizedURL)
+                resolvedPersistenceURL = standardizedURL
+            } else {
+                let defaultURL = ProfileStore.defaultTextProfilesURL()
+                persistence = .file(defaultURL)
+                resolvedPersistenceURL = defaultURL
+            }
+
             let runtime = try TextForSpeech.Runtime(
                 builtInStyle: builtInStyle,
-                persistenceURL: persistenceURL
+                persistence: persistence
             )
             if builtInStyle != .balanced || !profiles.isEmpty || activeProfile != .default {
                 try Self.seed(
@@ -28,6 +41,7 @@ public extension SpeakSwiftly {
                 )
             }
             textRuntime = runtime
+            configuredPersistenceURL = resolvedPersistenceURL
         }
 
         public nonisolated var profiles: Profiles {

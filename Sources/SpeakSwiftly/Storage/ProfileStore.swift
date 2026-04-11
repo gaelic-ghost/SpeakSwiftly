@@ -591,6 +591,14 @@ struct ProfileStore: @unchecked Sendable {
             .appendingPathComponent(configurationFileName, isDirectory: false)
     }
 
+    static func defaultTextProfilesURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil
+    ) -> URL {
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+            .appendingPathComponent(textProfilesFileName, isDirectory: false)
+    }
+
     private static func defaultBaseURL(
         fileManager: FileManager = .default,
         profileRootOverride: String? = nil
@@ -601,7 +609,15 @@ struct ProfileStore: @unchecked Sendable {
         }
 
         return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(directoryName, isDirectory: true)
+            .appendingPathComponent(defaultDirectoryName, isDirectory: true)
+    }
+
+    private static var defaultDirectoryName: String {
+        #if DEBUG
+            return "\(directoryName)-Debug"
+        #else
+            return directoryName
+        #endif
     }
 
     private func loadManifest(from directoryURL: URL) throws -> ProfileManifest {
