@@ -1,6 +1,0 @@
-schemaVersion: 1
-isCustomized: false
-settings:
-  copyAgentsTemplateWhenMissing: true
-  appendSectionWhenAgentsExists: true
-  validationMode: "full"
