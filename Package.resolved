@@ -1,5 +1,5 @@
 {
-  "originHash" : "8a95ba9fdbd885a160a40d84b5a943c9e2f7cd4f11e1d51d29c82797c67666c8",
+  "originHash" : "31edb4c7ba1ca1e5de46c4d7b2db9c9987ed04c79231dcd37b64448e88c8f8c8",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/mlx-audio-swift.git",
       "state" : {
-        "branch" : "add/qwenReferenceConditioning",
-        "revision" : "478707e1d726b011a44e9d61f15abefbf4aec137"
+        "revision" : "ab8d4fa7d732a38aed9ea8f8651a4a2679919d37",
+        "version" : "69.1.2"
       }
     },
     {
