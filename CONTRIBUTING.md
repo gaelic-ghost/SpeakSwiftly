@@ -1,6 +1,6 @@
 # CONTRIBUTING
 
-Contribution guide and contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/README.md) too dense.
+Contributor-facing project notes for SpeakSwiftly. This document holds the deeper architecture, repository workflow, operator guidance, and verification detail that would make the public [README.md](README.md) too dense.
 
 ## Purpose
 
@@ -11,25 +11,10 @@ SpeakSwiftly is intentionally two things at once:
 
 The repository tries to keep those two public surfaces aligned without forcing either one to become a compatibility wrapper over the other. Swift callers should get direct, readable APIs. Process-boundary callers should get stable JSONL operation names and predictable event semantics.
 
-## Public Surface Split
+Keep the doc split clean:
 
-The public-facing [README.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/README.md) should stay focused on:
-
-- what the project is
-- why it exists
-- how to set it up
-- how to use it
-- what the public API surfaces are called
-- how to perform baseline verification
-
-This document should hold:
-
-- deeper architecture and queueing details
-- repository layout and development expectations
-- contributor and integration guidance
-- full wire examples and operational behavior notes
-- extended verification and deep-trace workflows
-- rationale for public naming and runtime control design
+- [README.md](README.md) should stay focused on setup, usage, public API names, and baseline verification
+- this document should hold architecture notes, repository workflow, operator behavior, full wire examples, and extended verification paths
 
 ## Runtime Shape
 
@@ -60,21 +45,9 @@ That split matters:
 
 ### Swift Library API
 
-Current resident runtime controls intentionally use Cocoa-style method names:
+The typed Swift surface uses Cocoa-style method names and one root runtime object:
 
-- `status(id:)`
-- `switchSpeechBackend(to:id:)`
-- `reloadModels(id:)`
-- `unloadModels(id:)`
-
-The intent behind this shape is:
-
-- noun-driven and discoverable from `SpeakSwiftly.Runtime`
-- explicit enough to read well at the call site
-- aligned with the runtime concept being controlled, not the JSON transport name
-
-The broader typed runtime surface now uses one root startup result plus stored concern handles:
-
+- `SpeakSwiftly.liftoff(configuration:)` is the single startup entry point
 - `SpeakSwiftly.liftoff(...)` returns `SpeakSwiftly.Runtime`
 - `runtime.generate`
 - `runtime.player`
@@ -83,15 +56,15 @@ The broader typed runtime surface now uses one root startup result plus stored c
 - `runtime.jobs`
 - `runtime.artifacts`
 
-Those concern handles should stay lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
+Those concern handles should stay lightweight views over shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
 
-The current typed Swift startup and generation conventions are:
+Current typed-surface conventions:
 
-- `SpeakSwiftly.liftoff(configuration:)` is the single startup entry point, with `configuration` optional so `liftoff()` remains the one obvious default path
 - `SpeakSwiftly.Configuration` carries startup inputs such as `speechBackend`, `qwenConditioningStrategy`, and an optional `textNormalizer`
 - live playback and file rendering are separate generation calls, with `Generate.speech(...)` and `Generate.audio(...)`
 - generation-queue inspection lives under `Jobs`
 - playback-queue inspection lives under `Player.list(...)`
+- resident runtime controls use `status(id:)`, `switchSpeechBackend(to:id:)`, `reloadModels(id:)`, and `unloadModels(id:)`
 - decode/result model memberwise initializers should stay internal unless callers have a concrete need to construct those values themselves
 - `BatchItem` remains public only because batch submission is still intentionally caller-authored at that layer
 
@@ -203,72 +176,6 @@ Current resident-status stages:
 - `resident_models_unloaded`
 - `resident_model_failed`
 
-## Typed Swift Notes
-
-The typed runtime now uses concern-specific stored handles on the shared runtime object instead of one monolithic `SpeakSwiftly.Runtime` method surface.
-
-The intended concern split is:
-
-- generation work under `runtime.generate`
-- playback and queue work under `runtime.player`
-- voice-profile work under `runtime.voices`
-- text-normalization work under `runtime.normalizer`
-- generation-job reads and retention under `runtime.jobs`
-- generated-file and generated-batch reads under `runtime.artifacts`
-
-The intended library-caller shape is:
-
-- `runtime.generate.speech(...)`
-- `runtime.generate.audio(...)`
-- `runtime.generate.batch(...)`
-- `runtime.player.list(...)`
-- `runtime.voices.create(design named: ...)`
-- `runtime.voices.create(clone named: ...)`
-- `runtime.voices.list(...)`
-- `runtime.voices.rename(_:to:)`
-- `runtime.voices.reroll(_:)`
-- `runtime.voices.delete(named: ...)`
-- `runtime.jobs.generationQueue(...)`
-- `runtime.jobs.expire(...)`
-- `runtime.jobs.job(...)`
-- `runtime.jobs.list(...)`
-- `runtime.artifacts.file(...)`
-- `runtime.artifacts.files(...)`
-- `runtime.artifacts.batch(...)`
-- `runtime.artifacts.batches(...)`
-
-The typed text-normalization helpers live on grouped handles under `SpeakSwiftly.Normalizer`:
-
-- `try SpeakSwiftly.Normalizer(...)` now follows `TextForSpeech.Runtime` construction semantics, accepts an explicit built-in style, and can throw immediately if persisted text profiles are unreadable or undecodable.
-- `SpeakSwiftly.liftoff()` keeps a best-effort recovery path for unreadable text-profile archives so the worker can continue starting after quarantining a bad archive.
-
-- `normalizer.profiles.builtInStyle()`
-- `normalizer.profiles.active(id:)`
-- `normalizer.profiles.stored(id:)`
-- `normalizer.profiles.list()`
-- `normalizer.profiles.effective(id:)`
-- `normalizer.profiles.setBuiltInStyle(_:)`
-- `normalizer.profiles.create(id:name:replacements:)`
-- `normalizer.profiles.store(_:)`
-- `normalizer.profiles.use(_:)`
-- `normalizer.profiles.delete(id:)`
-- `normalizer.profiles.reset()`
-- `normalizer.profiles.add(_:)`
-- `normalizer.profiles.add(_:toStoredProfileID:)`
-- `normalizer.profiles.replace(_:)`
-- `normalizer.profiles.replace(_:inStoredProfileID:)`
-- `normalizer.profiles.removeReplacement(id:)`
-- `normalizer.profiles.removeReplacement(id:fromStoredProfileID:)`
-- `normalizer.persistence.url()`
-- `normalizer.persistence.state()`
-- `normalizer.persistence.restore(_:)`
-- `normalizer.persistence.load()`
-- `normalizer.persistence.load(from:)`
-- `normalizer.persistence.save()`
-- `normalizer.persistence.save(to:)`
-
-`runtime.normalizer` remains the intended way to reach the injected normalizer object when callers already have a runtime in hand.
-
 ## JSONL Reference
 
 Representative request shapes:
@@ -324,6 +231,8 @@ Representative response and event shapes:
 ```
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. SpeakSwiftly resolves those paths against caller-provided context, not the worker launch directory.
+
+When JSONL naming changes, update this file and `README.md` in the same pass so the public contract stays aligned across both docs.
 
 ## Runtime Behavior Notes
 

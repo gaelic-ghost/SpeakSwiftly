@@ -1,6 +1,6 @@
 # SpeakSwiftly
 
-A Swift package providing local, multi-speaker text-to-speech via a typed Swift API and a JSONL worker surface. Includes voice creation by design or clone, as well as custom text normalization via [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech)
+Local text-to-speech for Swift apps and local toolchains, with a typed Swift API and a long-lived JSONL worker executable.
 
 ## Table of Contents
 
@@ -15,31 +15,36 @@ A Swift package providing local, multi-speaker text-to-speech via a typed Swift 
 
 ## Overview
 
-SpeakSwiftly is a TTS-in-a-box solution for Swift app devs. It ships both an importable library product, and a worker executable, The library gives Swift callers a typed runtime surface, while the executable gives non-Swift hosts (Python, Rust, etc.) a newline-delimited JSON protocol over `stdio`.
+SpeakSwiftly ships two public surfaces from one Swift package:
+
+- `SpeakSwiftlyCore`, an importable Swift library for apps and tools that want a typed runtime
+- `SpeakSwiftly`, a long-lived worker executable that speaks newline-delimited JSON over `stdin` and `stdout`
+
+That split keeps Swift callers on a readable library surface while still giving non-Swift hosts a stable process boundary.
 
 ### Motivation
 
-This project was born from my desire for a simple, "plug-and-play" TTS option for other things I'm building. It's rapidly turned into something I think others will find useful as well.
+This repository exists to make local TTS ownership straightforward. The package is meant to be easy to embed in Swift code, easy to drive from another process, and explicit about runtime state, queueing, and stored voice resources.
 
-SpeakSwiftly currently supports:
+SpeakSwiftly currently includes:
 
-- Typed Swift runtime APIs through `SpeakSwiftlyCore`
-- A long-lived JSONL worker executable for non-Swift callers
-- Stored voice profiles and text-normalization profiles
-- Resident backend switching between `qwen3` and `marvis`
-- Resident model unload and reload controls
-- Managed generated-file and generated-batch artifacts
+- a typed runtime rooted at `SpeakSwiftly.liftoff(...)`
+- a JSONL worker surface for non-Swift hosts
+- stored voice profiles and text-normalization profiles
+- resident backend switching between `qwen3`, `qwen3_custom_voice`, and `marvis`
+- resident model unload and reload controls
+- retained generated-file and generated-batch artifacts
 
-For deeper contributor-facing architecture notes, runtime behavior details, development guidance, and full verification workflows, see [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+For contributor-facing architecture notes, repository workflow, runtime behavior details, and extended verification paths, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Setup
 
-SpeakSwiftly is a standard Swift package that depends on:
+SpeakSwiftly is a standard Swift package with two direct dependencies:
 
-- [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech.git)
-- [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift)
+- [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech)
+- [`mlx-audio-swift`](https://github.com/gaelic-ghost/mlx-audio-swift)
 
-Library consumers can add the package directly from GitHub:
+Library consumers can add the package from GitHub:
 
 ```swift
 .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "0.9.2")
@@ -47,7 +52,7 @@ Library consumers can add the package directly from GitHub:
 
 Then add `SpeakSwiftlyCore` to the target that will own the runtime.
 
-`SpeakSwiftlyCore` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without spelunking through DerivedData.
+`SpeakSwiftlyCore` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without digging through DerivedData.
 
 For package-local validation:
 
@@ -55,13 +60,13 @@ For package-local validation:
 swift build
 ```
 
-For real MLX-backed local worker runs, publish the Xcode-backed runtime first:
+For real MLX-backed worker runs, publish the Xcode-backed runtime first:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
-That produces stable local runtime launchers under `.local/xcode/current-debug` and `.local/xcode/current-release`.
+That publishes stable runtime launchers under `.local/xcode/current-debug` and `.local/xcode/current-release`.
 
 ## Usage
 
@@ -84,7 +89,7 @@ for try await event in handle.events {
 }
 ```
 
-When the whole input is source code rather than prose with embedded code, use `sourceFormat`:
+When the input is source code rather than prose with embedded snippets, pass `sourceFormat`:
 
 ```swift
 let sourceHandle = await runtime.generate.speech(
@@ -94,7 +99,7 @@ let sourceHandle = await runtime.generate.speech(
 )
 ```
 
-The typed runtime is organized around stored concern handles that callers can keep and reuse:
+The runtime is organized around stored concern handles that callers can keep and reuse:
 
 - `runtime.generate`
 - `runtime.player`
@@ -103,9 +108,9 @@ The typed runtime is organized around stored concern handles that callers can ke
 - `runtime.jobs`
 - `runtime.artifacts`
 
-`runtime.normalizer.profiles` now includes first-class replacement-rule inspection and bulk-clear helpers, so hosts can list the active or stored profile replacements and clear them without dropping down to raw JSONL.
+`runtime.normalizer.profiles` includes replacement-rule inspection and bulk-clear helpers, so hosts can inspect or reset the active or stored text-profile rules without dropping down to raw JSONL.
 
-When callers need to construct a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` now throws if the persisted text-profile archive cannot be loaded or decoded. The worker runtime still uses a best-effort recovery path for unreadable archives so `SpeakSwiftly.liftoff()` can continue starting in operator-facing environments.
+When callers need a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` throws if the persisted text-profile archive cannot be loaded or decoded. The worker runtime still uses a best-effort recovery path so `SpeakSwiftly.liftoff()` can continue starting in operator-facing environments.
 
 Runtime preferences have a matching typed surface:
 
@@ -121,11 +126,9 @@ try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
-For Qwen backends, `qwenConditioningStrategy` lets hosts keep the existing raw reference-audio path or switch to the prepared-conditioning path that persists reusable Qwen reference conditioning on the voice profile and reloads it on later runs.
+For Qwen backends, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile.
 
-Right now that prepared-conditioning path depends on a temporary frozen pin to Gale's `mlx-audio-swift` fork while the matching `Qwen3TTS` conditioning API is being upstreamed. The package is pinned to one exact fork revision rather than a moving branch tip.
-
-If a host needs the packaged MLX bundle or the exact metallib path, use the support-resource surface:
+If a host needs the packaged MLX bundle or metallib path directly, use the support-resource surface:
 
 ```swift
 let mlxBundleURL = try SpeakSwiftly.SupportResources.mlxBundleURL()
@@ -141,11 +144,11 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 "$PWD/.local/xcode/current-debug/run-speakswiftly"
 ```
 
-At startup the worker begins preloading the resident model and emits JSONL status events on `stdout`.
+At startup the worker begins warming the resident backend and emits JSONL status events on `stdout`.
 
 ### Consumer Test Harness
 
-The package also ships a small executable consumer harness, `SpeakSwiftlyTesting`, for package-level smoke tests:
+The package also ships a small executable consumer harness, `SpeakSwiftlyTesting`, for package-level smoke checks:
 
 ```bash
 swift run SpeakSwiftlyTesting resources
@@ -157,10 +160,11 @@ swift run SpeakSwiftlyTesting smoke
 
 ## API Notes
 
-The package currently publishes:
+The package publishes:
 
 - `SpeakSwiftlyCore` as the typed Swift runtime library
-- `SpeakSwiftly` as the worker executable
+- `SpeakSwiftly` as the worker executable product
+- `SpeakSwiftlyTesting` as the package-local smoke-test harness
 
 Key typed runtime entry points include:
 
@@ -195,20 +199,20 @@ Key typed runtime entry points include:
 - `runtime.reloadModels()`
 - `runtime.unloadModels()`
 
-The typed Swift library and the JSONL worker surface intentionally use different naming styles:
+The typed Swift API and the JSONL worker deliberately use different naming styles:
 
 - Swift keeps Cocoa-style method names that read naturally at the call site.
 - JSONL keeps snake_case, verb-first operation names.
 - JSONL read-one operations use `get_*`.
 - JSONL collection and queue reads use `list_*`.
-- JSONL CRUD-style writes use `create_*`, `replace_*`, and `delete_*`.
+- JSONL CRUD-style writes use `create_*`, `replace_*`, `update_*`, and `delete_*` where those verbs fit the real semantics.
 - JSONL lifecycle and control operations keep literal verbs like `generate_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
 
 Resident runtime controls currently map like this:
 
 | Typed Swift API | JSONL `op` | Notes |
 | --- | --- | --- |
-| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend` such as `"qwen3"`, `"qwen3_custom_voice"`, or `"marvis"`. |
+| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
 | `switchSpeechBackend(to:id:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
 | `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
 | `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
@@ -247,11 +251,11 @@ Representative response and event shapes:
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. The typed Swift helpers populate caller working-directory context automatically.
 
-For the full wire examples, detailed event flow, and operator-facing behavior notes, see [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+For fuller wire examples, queueing behavior, and operator-facing runtime notes, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 
-Use this repository as the primary development home for SpeakSwiftly. Keep the public README focused on product and usage information, and put contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+Use this repository as the source-of-truth development home for SpeakSwiftly. Keep the README focused on product and usage information, and keep contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 For package-focused development, prefer:
 
@@ -260,7 +264,7 @@ swift build
 swift test
 ```
 
-For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Verification
 
@@ -278,7 +282,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 ```
 
-Extended e2e, trace-capture, and deep-trace workflows are documented in [CONTRIBUTING.md](https://github.com/gaelic-ghost/SpeakSwiftly/blob/main/CONTRIBUTING.md).
+Extended e2e, trace-capture, and deep-trace workflows are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

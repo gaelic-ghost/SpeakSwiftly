@@ -1,31 +1,25 @@
 # AGENTS.md
 
-## Baseline Provenance
+## Purpose
 
-- This template is the full bootstrap `AGENTS.md` used for new Swift package repositories.
-- It intentionally incorporates the shared Swift/Apple baseline from `shared/agents-snippets/apple-swift-core.md`.
-- Keep baseline guidance aligned with the shared snippet and use this template for deterministic scaffold output.
-
-## Repository Expectations
-
-- Use Swift Package Manager (SPM) as the source of truth for package structure and dependencies.
-- Prefer `swift package` CLI commands for structural changes whenever the command exists.
-- Use `swift package add-dependency` to add dependencies instead of hand-editing package graphs.
-- Use `swift package add-target` to add library, executable, or test targets.
-- For package configuration not covered by CLI commands, update `Package.swift` intentionally and keep edits minimal.
-- Keep package graph updates together in the same change (`Package.swift`, `Package.resolved`, and target/test layout when applicable).
-- Validate package changes with:
-  - `swift build`
-  - `swift test`
-
-## Repository-Specific Workflow
-
-- Treat the standalone `SpeakSwiftly` repository as the source of truth for package development, tags, and releases.
+- This file is the repo-local guidance surface for the standalone `SpeakSwiftly` Swift package.
+- Treat this repository as the source of truth for `SpeakSwiftly` package development, tags, and releases.
 - Treat `../speak-to-user/packages/SpeakSwiftly` as the integration submodule copy, not the primary development home.
+
+## Swift Package Workflow
+
+- Use Swift Package Manager as the source of truth for package structure and dependencies.
+- Prefer `swift package` subcommands for dependency, target, and manifest-adjacent changes before hand-editing `Package.swift`.
+- Keep package graph updates cohesive across `Package.swift`, `Package.resolved`, and related source or test targets.
+- Run `swift build` and `swift test` as the default validation checks after package-level changes.
+- Use `xcodebuild` only when Apple-platform configuration details, test plans, SDK behavior, or Metal-toolchain behavior matter in a way plain SwiftPM cannot validate well.
+
+## Repository Workflow
+
 - Treat the local `../speak-to-user` checkout as a clean base checkout only. It must stay on `main`, and it must stay clean.
 - Never change the local branch of the base `../speak-to-user` checkout for feature work, experiments, release bumps, or submodule updates.
 - For any monorepo change, create a new branch in a new `git worktree` and do the work there instead of touching the base `../speak-to-user` checkout.
-- After a monorepo branch is merged, pull or fast-forward the base `../speak-to-user` checkout back to `main` and delete the merged worktree and branch.
+- After a monorepo branch is merged, fast-forward the base `../speak-to-user` checkout back to `main` and delete the merged worktree and branch.
 - When `speak-to-user` adopts a new `SpeakSwiftly` version, prefer updating the submodule pointer to a tagged `SpeakSwiftly` release rather than an arbitrary branch tip.
 - Land monorepo submodule bumps through a pull request against the monorepo instead of pushing those pointer updates directly to monorepo `main`.
 - Use tagged releases for the monorepo when publishing coordinated umbrella states that depend on specific submodule versions.
@@ -33,130 +27,74 @@
 ## Repository Structure
 
 - Keep `Sources/SpeakSwiftly/API` as the single home for public `SpeakSwiftly.Runtime` concern-handle accessors, `SpeakSwiftly.Name`, and other operator-facing library surface declarations.
-- Keep feature logic in its feature directory, not in `Runtime/`. For example, text-normalization logic belongs in `Normalization/`, generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
+- Keep feature logic in its feature directory, not in `Runtime/`. Text-normalization logic belongs in `Normalization/`, generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
 - Keep `Sources/SpeakSwiftly/Runtime` for runtime-only internals such as worker request handling, queue orchestration, lifecycle management, event emission, and other machinery that is genuinely part of the worker runtime itself.
 - Do not split one feature across three places when two will do. For any given feature, prefer one API file in `API/` plus one logic file in the relevant feature directory.
-- When reorganizing tests, mirror the source tree by feature area so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find.
+- Mirror the source tree by feature area in tests so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find.
+
+## Public Surface and Naming
+
 - For the JSONL worker surface, keep operation names snake_case and verb-first.
 - For JSONL reads, use `get_*` for one resource or snapshot and `list_*` for collections and queue snapshots.
-- For JSONL writes, prefer CRUD verbs where they fit the actual semantics: `create_*`, `update_*`, `replace_*`, and `delete_*`.
+- For JSONL writes, prefer `create_*`, `update_*`, `replace_*`, and `delete_*` when those verbs fit the real semantics.
 - Keep literal lifecycle and control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
 - When adding or renaming a JSONL operation, update both `README.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented.
-- For the typed Swift library surface, prefer one startup entry point that returns `SpeakSwiftly.Runtime`, then expose stored concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts` from that root object instead of growing one monolithic `Runtime` method namespace.
-- Keep those concern handles lightweight views over the shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
-- For the typed Swift library surface, prefer `SpeakSwiftly.liftoff(configuration:)` as the single startup entry point, with `configuration` optional and responsible for carrying startup-time choices such as `speechBackend` and an optional `textNormalizer`.
+- Keep `SpeakSwiftly.liftoff(configuration:)` as the single public startup entry point, with optional configuration carrying startup-time choices such as `speechBackend` and an optional `textNormalizer`.
+- Expose stored concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts` from `SpeakSwiftly.Runtime` instead of growing one monolithic method namespace.
+- Keep those concern handles lightweight views over shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
 - Prefer separate public generation verbs for live playback and file output, such as `Generate.speech(...)` and `Generate.audio(...)`, instead of exposing a public job-type switch.
-- Keep generation-queue inspection on `Jobs` and playback-queue inspection on `Player`; do not mirror internal queue routing details in the public typed surface when the domain handle already makes the ownership clearer.
-- Public transport/result model types may stay public for inspection, but make their memberwise construction internal unless callers have a concrete need to author those values directly.
-- Use `SpeakSwiftly.Name` as the operator-facing semantic name type for stored voice-profile names and similar stable user-named resources when the public API benefits from carrying that meaning explicitly.
-- For the voice-profile library surface, prefer one `Voices.create(...)` verb with overloaded first labels that keep the call site explicit, such as `create(design named: Name, ...)` and `create(clone named: Name, ...)`, instead of multiplying unrelated creation verbs.
+- Keep generation-queue inspection on `Jobs` and playback-queue inspection on `Player`; do not mirror internal queue routing details in the public typed surface when the domain handle already makes ownership clearer.
+- Public transport and result model types may stay public for inspection, but keep memberwise construction internal unless callers have a concrete reason to author those values directly.
+- Use `SpeakSwiftly.Name` as the semantic name type for stored voice-profile names and similar stable operator-facing resources.
+- For the voice-profile library surface, prefer one `Voices.create(...)` verb with explicit overloaded first labels, such as `create(design named: Name, ...)` and `create(clone named: Name, ...)`, instead of multiplying unrelated creation verbs.
 
-## Swift Coding Preferences
+## Swift and Architecture Baseline
 
+- Read the relevant Apple or Swift documentation first for any Swift, Apple-framework, Apple-platform, SwiftUI, SwiftData, Observation, AppKit, UIKit, Foundation-on-Apple, or Xcode-related task before planning or changing code.
+- Use Dash or local Apple documentation first, then official Apple or Swift web docs when local docs are insufficient.
+- Before proposing an architecture or implementation, state the documented API behavior, lifecycle rule, or workflow requirement being relied on.
+- If documentation and the current code disagree, stop and report the conflict before continuing.
 - Prefer the simplest correct Swift that is easiest to read, reason about, and maintain.
-- Treat idiomatic Swift and Cocoa-style naming conventions as tools in service of readability, not goals by themselves.
-- Prefer explicit, consistent, and unambiguous names.
-- Prefer compact and concise code; use shorthand syntax and trailing-closure syntax when readability improves.
-- Do not add boilerplate, helper types, or extra layers just to make code look more architectural or more "Swifty".
+- Treat idiomatic Swift and Cocoa conventions as tools in service of readability, not goals by themselves.
+- Do not add ceremony, abstraction, or boilerplate just to make code look more architectural, more generic, or more "Swifty".
 - Strongly prefer synthesized, implicit, and framework-provided behavior over handwritten setup code.
-- Prefer applicable existing framework or platform error types before inventing custom error wrappers or error hierarchies.
-- Prefer stable, source-of-truth naming across layers when the data and meaning have not changed.
-- Treat naming consistency as a reliability feature: if the same data still serves the same purpose, keep the same name.
-- Do not rename fields just to match local style conventions when the external schema is already clear and stable.
-- Do not use automatic case-conversion strategies such as `.convertFromSnakeCase` or `.convertToSnakeCase` unless the project explicitly wants that behavior and it clearly improves readability overall.
-- This guidance is optimized for an advanced Swift reader and may prefer dense but readable modern Swift over beginner-style explicitness.
-
-## Types and Architecture
-
-- Before adding a new layer, abstraction, wrapper, manager, bridge, coordinator, repository, store, helper type, service, dependency, or package, explicitly explain which real near-term use cases it unlocks here in `SpeakSwiftly`, which current pain, duplication, or design limitation it removes, and which simpler extension path was considered first.
-- Do not change this repository's core architecture casually or silently. If the design starts needing a new queue, subsystem, storage model, ownership boundary, or other architectural pivot, stop and make that pivot explicit to Gale before implementing it, or as soon as the need becomes clear.
-- When future scope is already visible and the current model will not compose cleanly, prefer strengthening the core primitives on purpose over shipping narrow stopgaps that are likely to block momentum soon after something starts working.
-- Distinguish durable building-block changes from local implementation details and conscious stopgaps. Name which one you are proposing whenever an architectural discussion starts to widen.
-- Prefer concrete, straightforward types and data flow that keep the code easy to follow.
-- Use `struct`, `enum`, `class`, `actor`, and protocols only when each one is the clearest fit for the actual problem.
-- Mark classes as `final` by default.
-- Prefer synthesized conformances (`Codable`, `Equatable`, `Hashable`, etc.) whenever they satisfy the actual requirements.
-- Prefer memberwise and otherwise synthesized initializers, default property values, and framework defaults over handwritten setup code.
+- Prefer synthesized conformances, memberwise initializers, default property values, and framework defaults whenever they satisfy the real requirements.
 - Do not add `CodingKeys`, manual `Codable`, custom initializers, wrappers, helper types, protocols, coordinators, or extra layers unless they are required by a concrete constraint or make the final code clearly easier to understand.
-- When an API, cloud service, or wire format already provides clear names, preserve those names directly in Swift models and nearby code unless the meaning actually changes or a concrete collision must be resolved.
+- Prefer stable, source-of-truth naming across layers when the data and meaning have not changed.
 - Preserve raw wire and persistence shapes by default; do not add DTO, domain, or view-model conversion layers unless meaning actually changes or a concrete boundary requires it.
-- Treat redundant wrappers, rename-and-copy layers, and duplicated logic as anti-patterns by default.
-- Use enums as namespaces only when they genuinely reduce clutter instead of adding indirection.
-- Keep code modular and cohesive without fragmenting simple logic across unnecessary files or types.
-- Prefer pure Swift solutions where practical.
-- Carry the global architecture guidance into this repository's Swift work too: prefer durable model changes and explicit pivots over speculative layering or short-lived stopgaps when the next real use cases are already visible.
+- Keep code compliant with Swift 6 language mode and strict concurrency checking.
+- Prefer modern structured concurrency (`async`/`await`, task groups, actors, `AsyncSequence`) when it keeps the flow clearer and more direct.
+- Before adding a new layer, abstraction, wrapper, manager, bridge, coordinator, repository, store, helper type, service, dependency, or package, explain which near-term use cases it unlocks here in `SpeakSwiftly`, which real pain or duplication it removes, and which simpler extension path was considered first.
+- Do not change this repository's core architecture casually or silently. If the design starts needing a new queue, subsystem, storage model, or ownership boundary, stop and make that pivot explicit to Gale before implementing it, or as soon as the need becomes clear.
+- When future scope is already visible and the current model will not compose cleanly, prefer strengthening the core primitives on purpose over shipping narrow stopgaps that will soon block momentum.
 
-## Concurrency and Language Mode
+## Dependencies, Logging, and State
 
-- Keep code compliant with Swift 6 language mode.
-- Keep strict concurrency checking enabled.
-- Use modern structured concurrency (`async`/`await`, task groups, actors, `AsyncSequence`) instead of legacy async patterns when it keeps the flow clearer and more direct.
-- Prefer compact syntax when it improves local reasoning, including shorthand syntax, ternary expressions, trailing closures, `switch`, `map`, `filter`, `forEach`, and async iteration.
-- Prefer explicit default values at initialization when they reduce optional-handling clutter and keep the code easier to follow.
-- When lines, chains, or expressions get long, prefer chopping them down into a clean vertical, top-down structure with straight visual flow.
-- For app-facing packages, prefer approachable concurrency defaults with main-actor isolation by default.
-- Introduce parallelism where it produces clear performance gains.
-
-## State, Frameworks, and Dependencies
-
-- Prefer `@Observation` over Combine for observation/state propagation.
-- For Apple app projects, prefer Apple-native logging facilities first and allow Swift Logging where it makes the project API clearer.
+- Prefer first-party and top-tier Swift ecosystem packages from Apple, `swiftlang`, the Swift Server Work Group, and similar trusted core Swift projects when they simplify the code and make it easier to reason about.
 - For packages, server-side, or cross-platform Swift, prefer Swift Logging as the primary logging API.
 - Prefer Swift OpenTelemetry for telemetry and instrumentation when telemetry is needed, and prefer existing ecosystem integrations over bespoke wrappers.
-- Prefer frameworks and packages from Swift.org, Swift on Server, Apple, and Apple Open Source ecosystems when they simplify the code and make it easier to reason about.
-- Commonly approved examples include packages such as `swift-configuration`, `swift-async-algorithms`, and `swift-algorithms`.
+- Prefer Nick Lockwood's SwiftFormat and/or SwiftLint as the baseline Swift formatting and linting tools; at least one should stay configured and used in this repository.
 
-## Testing and Tooling Baseline
+## Validation and Runtime Verification
 
-- Use Swift Testing (`import Testing`) as the default test framework.
-- Avoid XCTest unless an external constraint requires it.
-- Prefer Nick Lockwood's SwiftFormat and/or SwiftLint as baseline Swift formatting and linting tools; at least one should be configured and used in any Swift project.
-- Keep formatting consistent with `swift-format` conventions.
-- Keep linting clean against `swiftlint` with clear, maintainable rule intent.
+- Never run multiple build toolchains, package managers, test runners, or other heavy validation commands at the same time on Gale's machine.
+- Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
-- Never run multiple build toolchains, package managers, test runners, or heavy validation commands at the same time on Gale's machine. Commands such as `swift build`, `swift test`, `swift package`, and `xcodebuild` must be run strictly one at a time, with one process fully exited before another begins.
-- Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository. A second `swift build`, `swift test`, `swift package`, or `xcodebuild` invocation must never be started while another build or test invocation is still active.
+- Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`
   - `voice_description`: `A generic, warm, masculine, slow speaking voice.`
 - Expect generated `*.profraw` coverage artifacts from local test runs and do not commit them.
+- Treat `SPEAKSWIFTLY_PLAYBACK_TRACE=1` as the preferred way to get chunk, scheduling, and rebuffer trace events during deep-trace playback work.
 - For audible deep-trace playback verification, the standard opt-in path is:
   - `SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter longCodeHeavy`
-- Treat `SPEAKSWIFTLY_PLAYBACK_TRACE=1` as the preferred way to get chunk, scheduling, and rebuffer trace events during deep-trace playback work.
 
-## SwiftUI and State Architecture
+## Runtime Publishing and Deep-Trace Guidance
 
-- Treat SwiftUI views as component UI: keep them small, composable, reusable, and easy to scan from top to bottom.
-- Prefer straight, top-down data flow with small focused controller classes that own matching state for a view or small view cluster.
-- Do not build monolithic views, monolithic controllers, or broad shared mutable state when a smaller component boundary would be clearer.
-- Keep updates to view-driving state minimal and localized.
-- Prefer durable identity for types that drive SwiftUI state and view updates.
-- Treat `App` as the application entry and scene composition boundary, `Scene` as the container for scene-specific lifecycle and environment, and `View` as the component rendering layer.
-- Use app-level lifecycle concerns at the `App` boundary, scene lifecycle concerns at the `Scene` boundary, and view-local active or presentation behavior inside views.
-- Use `@Binding` to pass a focused writable piece of parent-owned state into a child view.
-- Use `@Bindable` when working with an observable model that should project bindings to its mutable properties in a view.
-- Prefer `@Query` for view-driven SwiftData fetching that should stay in sync with the model context; use explicit fetches only when the view should not be driven by a live query.
-- Prefer environment values for shared context that truly belongs to the surrounding hierarchy, not as a dumping ground for unrelated dependencies.
-- Prefer key-path-based APIs, predicates, and sort descriptors when they keep data access direct and readable.
-- Extract repeated chains of view modifiers into custom view modifiers early when that reduces clutter and clearly matches a view or family of views.
-
-## CLI Tooling Preferences
-
-- Prefer `swift package` for package-focused workflows (dependency graph, targets, manifest intent, and local package validation).
-- Prefer `swift package` subcommands for structural package edits before manually editing `Package.swift`.
-- Use `swift build` and `swift test` as the default first-pass validation commands.
-- Use `xcodebuild` when validating Apple platform integration details that `swift package` does not cover well (schemes, destinations, SDK-specific behavior, and configuration-specific builds/tests).
-- Keep `xcodebuild` invocations explicit and reproducible (always pass scheme, destination or SDK, and configuration when relevant).
-- Prefer deterministic non-interactive CLI usage in automation/CI for both `swift package` and `xcodebuild`.
-- For this repository specifically, use an Xcode-built worker product for real MLX-backed command-line runs and real-model e2e coverage. Upstream `mlx-swift` does not make the Metal shader bundle available to the plain SwiftPM command-line build.
+- For this repository, use an Xcode-built worker product for real MLX-backed command-line runs and real-model e2e coverage. Upstream `mlx-swift` does not make the Metal shader bundle available to the plain SwiftPM command-line build.
 - When launching the real worker from the shell, prefer the published runtime launcher and stable aliases under `.local/xcode/current-debug/run-speakswiftly` or `.local/xcode/current-release/run-speakswiftly`, or read the published runtime manifest first, instead of reconstructing `DYLD_FRAMEWORK_PATH` and `default.metallib` paths by hand.
 - If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, treat that as a build-and-launch-path problem first, not as evidence that the worker runtime itself is broken.
-- For direct deep-trace worker captures, prefer the proven held-open stdin pattern instead of sending one JSONL file and allowing stdin to close immediately. A working shape is:
-  - create or reuse a profile directory under `/tmp/.../profiles`
-  - prepare an `input.jsonl` request file
-  - run `sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug`
-  - then run `(cat input.jsonl; sleep 180) | env SPEAKSWIFTLY_PLAYBACK_TRACE=1 "$PWD/.local/xcode/current-debug/run-speakswiftly" --profiles-dir /tmp/.../profiles > /tmp/.../stdout.jsonl 2> /tmp/.../stderr.jsonl`
-  - inspect `stdout.jsonl` for worker lifecycle and request completion
-  - inspect `stderr.jsonl` for `playback_rebuffer_started`, `playback_rebuffer_resumed`, `playback_starved`, `playback_schedule_gap_warning`, and final `playback_finished` details
-- Important current behavior: if stdin closes before queued work is drained, the worker can cancel queued requests, including requests still waiting behind resident-model warmup. Do not treat that as normal playback failure; it is a current worker shutdown/queue-handling quirk that should be fixed soon.
+- For direct deep-trace worker captures, prefer the held-open stdin pattern instead of sending one JSONL file and allowing stdin to close immediately.
+- The current known worker behavior is that if stdin closes before queued work drains, the worker can cancel queued requests that are still waiting behind resident-model warmup. Treat that as a current shutdown-and-queue quirk to be fixed, not as normal playback failure.
+- Use the maintained scripts under `scripts/repo-maintenance/` for publish, verify, vendored-bundle refresh, release, and repo validation work instead of reconstructing those flows ad hoc.
