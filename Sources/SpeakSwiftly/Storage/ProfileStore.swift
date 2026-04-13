@@ -8,6 +8,17 @@ enum ProfileSourceKind: String, Codable, Sendable, Equatable {
     case importedClone = "imported_clone"
 }
 
+struct TranscriptProvenance: Codable, Sendable, Equatable {
+    enum Source: String, Codable, Sendable, Equatable {
+        case provided
+        case inferred
+    }
+
+    let source: Source
+    let createdAt: Date
+    let transcriptionModelRepo: String?
+}
+
 struct ProfileMaterializationManifest: Codable, Sendable, Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
@@ -26,6 +37,7 @@ struct ProfileManifest: Codable, Sendable, Equatable {
     let modelRepo: String
     let voiceDescription: String
     let sourceText: String
+    let transcriptProvenance: TranscriptProvenance?
     let sampleRate: Int
     let backendMaterializations: [ProfileMaterializationManifest]
     let qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
@@ -39,6 +51,7 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         case modelRepo
         case voiceDescription
         case sourceText
+        case transcriptProvenance
         case sampleRate
         case backendMaterializations
         case qwenConditioningArtifacts
@@ -53,6 +66,7 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         modelRepo: String,
         voiceDescription: String,
         sourceText: String,
+        transcriptProvenance: TranscriptProvenance?,
         sampleRate: Int,
         backendMaterializations: [ProfileMaterializationManifest],
         qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
@@ -65,6 +79,7 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         self.modelRepo = modelRepo
         self.voiceDescription = voiceDescription
         self.sourceText = sourceText
+        self.transcriptProvenance = transcriptProvenance
         self.sampleRate = sampleRate
         self.backendMaterializations = backendMaterializations
         self.qwenConditioningArtifacts = qwenConditioningArtifacts
@@ -80,6 +95,10 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         modelRepo = try container.decode(String.self, forKey: .modelRepo)
         voiceDescription = try container.decode(String.self, forKey: .voiceDescription)
         sourceText = try container.decode(String.self, forKey: .sourceText)
+        transcriptProvenance = try container.decodeIfPresent(
+            TranscriptProvenance.self,
+            forKey: .transcriptProvenance
+        )
         sampleRate = try container.decode(Int.self, forKey: .sampleRate)
         backendMaterializations = try container.decode([ProfileMaterializationManifest].self, forKey: .backendMaterializations)
         qwenConditioningArtifacts = try container.decodeIfPresent(
@@ -203,7 +222,7 @@ struct ProfileStore: @unchecked Sendable {
     static let configurationFileName = "configuration.json"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
-    static let manifestVersion = 4
+    static let manifestVersion = 5
 
     let rootURL: URL
     let fileManager: FileManager
@@ -244,6 +263,7 @@ struct ProfileStore: @unchecked Sendable {
         modelRepo: String,
         voiceDescription: String,
         sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         canonicalAudioData: Data
     ) throws -> StoredProfile {
@@ -266,6 +286,7 @@ struct ProfileStore: @unchecked Sendable {
             sourceModelRepo: modelRepo,
             voiceDescription: voiceDescription,
             sourceText: sourceText,
+            transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
             materializations: materializations
         )
@@ -278,6 +299,7 @@ struct ProfileStore: @unchecked Sendable {
         sourceModelRepo: String,
         voiceDescription: String,
         sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         materializations: [ProfileMaterializationDraft]
     ) throws -> StoredProfile {
@@ -311,6 +333,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: sourceModelRepo,
             voiceDescription: voiceDescription,
             sourceText: sourceText,
+            transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
             backendMaterializations: materializations.map {
                 ProfileMaterializationManifest(
@@ -479,6 +502,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: storedProfile.manifest.modelRepo,
             voiceDescription: storedProfile.manifest.voiceDescription,
             sourceText: storedProfile.manifest.sourceText,
+            transcriptProvenance: storedProfile.manifest.transcriptProvenance,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
             qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts
@@ -518,6 +542,7 @@ struct ProfileStore: @unchecked Sendable {
         modelRepo: String,
         voiceDescription: String,
         sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         canonicalAudioData: Data,
         createdAt: Date
@@ -541,6 +566,7 @@ struct ProfileStore: @unchecked Sendable {
             sourceModelRepo: modelRepo,
             voiceDescription: voiceDescription,
             sourceText: sourceText,
+            transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
             materializations: materializations,
             createdAt: createdAt
@@ -554,6 +580,7 @@ struct ProfileStore: @unchecked Sendable {
         sourceModelRepo: String,
         voiceDescription: String,
         sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         materializations: [ProfileMaterializationDraft],
         createdAt: Date
@@ -587,6 +614,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: sourceModelRepo,
             voiceDescription: voiceDescription,
             sourceText: sourceText,
+            transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
             backendMaterializations: materializations.map {
                 ProfileMaterializationManifest(
@@ -681,6 +709,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: storedProfile.manifest.modelRepo,
             voiceDescription: storedProfile.manifest.voiceDescription,
             sourceText: storedProfile.manifest.sourceText,
+            transcriptProvenance: storedProfile.manifest.transcriptProvenance,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
             qwenConditioningArtifacts: updatedArtifacts
@@ -842,6 +871,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: legacyManifest.modelRepo,
             voiceDescription: legacyManifest.voiceDescription,
             sourceText: legacyManifest.sourceText,
+            transcriptProvenance: nil,
             sampleRate: legacyManifest.sampleRate,
             backendMaterializations: materializations,
             qwenConditioningArtifacts: []
@@ -877,6 +907,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: legacyManifest.modelRepo,
             voiceDescription: legacyManifest.voiceDescription,
             sourceText: legacyManifest.sourceText,
+            transcriptProvenance: nil,
             sampleRate: legacyManifest.sampleRate,
             backendMaterializations: materializations,
             qwenConditioningArtifacts: []
@@ -897,6 +928,7 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: manifest.modelRepo,
             voiceDescription: manifest.voiceDescription,
             sourceText: manifest.sourceText,
+            transcriptProvenance: manifest.transcriptProvenance,
             sampleRate: manifest.sampleRate,
             backendMaterializations: manifest.backendMaterializations,
             qwenConditioningArtifacts: manifest.qwenConditioningArtifacts

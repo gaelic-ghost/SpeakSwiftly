@@ -3,6 +3,11 @@ import Foundation
 // MARK: - Voice Profile Generation Logic
 
 extension SpeakSwiftly.Runtime {
+    struct ResolvedCloneTranscript: Sendable, Equatable {
+        let text: String
+        let provenance: TranscriptProvenance
+    }
+
     func handleCreateProfile(
         id: String,
         profileName: String,
@@ -214,7 +219,8 @@ extension SpeakSwiftly.Runtime {
                 vibe: vibe,
                 modelRepo: ModelFactory.importedCloneModelRepo,
                 voiceDescription: ModelFactory.importedCloneVoiceDescription,
-                sourceText: resolvedTranscript,
+                sourceText: resolvedTranscript.text,
+                transcriptProvenance: resolvedTranscript.provenance,
                 sampleRate: ModelFactory.canonicalProfileSampleRate,
                 canonicalAudioData: canonicalAudioData
             )
@@ -346,6 +352,7 @@ extension SpeakSwiftly.Runtime {
                 modelRepo: storedProfile.manifest.modelRepo,
                 voiceDescription: storedProfile.manifest.voiceDescription,
                 sourceText: storedProfile.manifest.sourceText,
+                transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                 sampleRate: profileModel.sampleRate,
                 canonicalAudioData: canonicalAudioData,
                 createdAt: storedProfile.manifest.createdAt
@@ -385,6 +392,7 @@ extension SpeakSwiftly.Runtime {
                 modelRepo: storedProfile.manifest.modelRepo,
                 voiceDescription: storedProfile.manifest.voiceDescription,
                 sourceText: storedProfile.manifest.sourceText,
+                transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                 sampleRate: storedProfile.manifest.sampleRate,
                 canonicalAudioData: canonicalAudioData,
                 createdAt: storedProfile.manifest.createdAt
@@ -430,9 +438,16 @@ extension SpeakSwiftly.Runtime {
         profileName: String,
         referenceAudioURL: URL,
         transcript: String?
-    ) async throws -> String {
+    ) async throws -> ResolvedCloneTranscript {
         if let transcript = transcript?.trimmingCharacters(in: .whitespacesAndNewlines), !transcript.isEmpty {
-            return transcript
+            return ResolvedCloneTranscript(
+                text: transcript,
+                provenance: TranscriptProvenance(
+                    source: .provided,
+                    createdAt: dependencies.now(),
+                    transcriptionModelRepo: nil
+                )
+            )
         }
 
         await emitProgress(id: id, stage: .loadingCloneTranscriptionModel)
@@ -506,7 +521,14 @@ extension SpeakSwiftly.Runtime {
             )
         }
 
-        return inferredTranscript
+        return ResolvedCloneTranscript(
+            text: inferredTranscript,
+            provenance: TranscriptProvenance(
+                source: .inferred,
+                createdAt: dependencies.now(),
+                transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+            )
+        )
     }
 
     func resolveCloneReferenceAudioURL(

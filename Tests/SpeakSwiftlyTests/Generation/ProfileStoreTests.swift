@@ -26,6 +26,7 @@ import MLXAudioTTS
 
     #expect(stored.manifest.profileName == "default-femme")
     #expect(stored.manifest.vibe == .femme)
+    #expect(stored.manifest.transcriptProvenance == nil)
     #expect(stored.manifest.backendMaterializations.map(\.backend) == [.qwen3])
     #expect(try stored.qwenMaterialization().manifest.referenceText == "Hello there")
 
@@ -35,6 +36,7 @@ import MLXAudioTTS
 
     let loaded = try store.loadProfile(named: "default-femme")
     #expect(loaded.manifest.sourceText == "Hello there")
+    #expect(loaded.manifest.transcriptProvenance == nil)
     #expect(loaded.materializations.count == 1)
     #expect(try loaded.qwenMaterialization().manifest.referenceText == "Hello there")
 
@@ -283,9 +285,92 @@ import MLXAudioTTS
     #expect(loaded.manifest.version == ProfileStore.manifestVersion)
     #expect(loaded.manifest.sourceKind == .generated)
     #expect(loaded.manifest.vibe == .androgenous)
+    #expect(loaded.manifest.transcriptProvenance == nil)
     #expect(loaded.manifest.backendMaterializations.count == 1)
     #expect(try loaded.qwenMaterialization().referenceAudioURL.lastPathComponent == "reference.wav")
     #expect(try loaded.qwenMaterialization().manifest.referenceText == "Legacy transcript")
+}
+
+@Test func storesCloneTranscriptProvenanceOnNewProfilesAndLegacyUpgradeLeavesItUnknown() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let audioData = Data([0x52, 0x49, 0x46, 0x46])
+
+    let providedTranscriptProfile = try store.createProfile(
+        profileName: "provided-clone",
+        vibe: .masc,
+        modelRepo: ModelFactory.importedCloneModelRepo,
+        voiceDescription: ModelFactory.importedCloneVoiceDescription,
+        sourceText: "Provided transcript",
+        transcriptProvenance: TranscriptProvenance(
+            source: .provided,
+            createdAt: Date(timeIntervalSince1970: 1_712_345_678),
+            transcriptionModelRepo: nil
+        ),
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+    #expect(providedTranscriptProfile.manifest.sourceKind == .importedClone)
+    #expect(providedTranscriptProfile.manifest.transcriptProvenance?.source == .provided)
+    #expect(providedTranscriptProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
+
+    let inferredTranscriptProfile = try store.createProfile(
+        profileName: "inferred-clone",
+        vibe: .femme,
+        modelRepo: ModelFactory.importedCloneModelRepo,
+        voiceDescription: ModelFactory.importedCloneVoiceDescription,
+        sourceText: "Inferred transcript",
+        transcriptProvenance: TranscriptProvenance(
+            source: .inferred,
+            createdAt: Date(timeIntervalSince1970: 1_712_345_679),
+            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+        ),
+        sampleRate: 24_000,
+        canonicalAudioData: audioData
+    )
+    #expect(inferredTranscriptProfile.manifest.transcriptProvenance?.source == .inferred)
+    #expect(
+        inferredTranscriptProfile.manifest.transcriptProvenance?.transcriptionModelRepo
+            == ModelFactory.cloneTranscriptionModelRepo
+    )
+
+    try store.ensureRootExists()
+    let legacyCloneDirectory = store.profileDirectoryURL(for: "legacy-clone")
+    try fileManager.createDirectory(at: legacyCloneDirectory, withIntermediateDirectories: false)
+
+    let legacyCloneManifest = """
+    {
+      "backendMaterializations" : [
+        {
+          "backend" : "qwen3",
+          "createdAt" : "2026-04-07T12:00:00Z",
+          "modelRepo" : "\(ModelFactory.residentModelRepo(for: .qwen3))",
+          "referenceAudioFile" : "reference.wav",
+          "referenceText" : "Legacy clone transcript",
+          "sampleRate" : 24000
+        }
+      ],
+      "createdAt" : "2026-04-07T12:00:00Z",
+      "modelRepo" : "\(ModelFactory.importedCloneModelRepo)",
+      "profileName" : "legacy-clone",
+      "sampleRate" : 24000,
+      "sourceKind" : "imported_clone",
+      "sourceText" : "Legacy clone transcript",
+      "version" : 4,
+      "vibe" : "androgenous",
+      "voiceDescription" : "\(ModelFactory.importedCloneVoiceDescription)"
+    }
+    """
+    try Data(legacyCloneManifest.utf8).write(to: store.manifestURL(for: legacyCloneDirectory))
+    try Data([0x01, 0x02]).write(to: store.referenceAudioURL(for: legacyCloneDirectory))
+
+    let upgradedLegacyClone = try store.loadProfile(named: "legacy-clone")
+    #expect(upgradedLegacyClone.manifest.version == ProfileStore.manifestVersion)
+    #expect(upgradedLegacyClone.manifest.sourceKind == .importedClone)
+    #expect(upgradedLegacyClone.manifest.transcriptProvenance == nil)
 }
 
 @Test func storesAndLoadsPreparedQwenConditioningArtifacts() throws {

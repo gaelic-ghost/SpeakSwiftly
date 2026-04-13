@@ -170,6 +170,8 @@ extension SpeakSwiftlyE2ETests {
                 let storedProfile = try store.loadProfile(named: cloneProfileName)
                 #expect(storedProfile.manifest.sourceText == SpeakSwiftlyE2ETests.testingCloneSourceText)
                 #expect(storedProfile.manifest.vibe == .masc)
+                #expect(storedProfile.manifest.transcriptProvenance?.source == .provided)
+                #expect(storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
 
                 try await SpeakSwiftlyE2ETests.runSilentSpeech(
                     on: worker,
@@ -243,6 +245,11 @@ extension SpeakSwiftlyE2ETests {
                 let storedProfile = try store.loadProfile(named: cloneProfileName)
                 let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
                 #expect(storedProfile.manifest.vibe == .masc)
+                #expect(storedProfile.manifest.transcriptProvenance?.source == .inferred)
+                #expect(
+                    storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo
+                        == ModelFactory.cloneTranscriptionModelRepo
+                )
                 #expect(!inferredTranscript.isEmpty)
                 #expect(SpeakSwiftlyE2ETests.transcriptLooksCloseToCloneSource(inferredTranscript))
 
