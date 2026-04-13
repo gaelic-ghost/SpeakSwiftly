@@ -83,7 +83,7 @@ jobs:
         run: sh scripts/repo-maintenance/verify-runtime.sh --configuration "${{ matrix.configuration }}"
 
       - name: Upload published runtime artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: speakswiftly-runtime-${{ matrix.configuration }}
           path: |
