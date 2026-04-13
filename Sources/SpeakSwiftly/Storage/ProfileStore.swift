@@ -133,11 +133,19 @@ private struct LegacyMultiBackendProfileManifest: Codable, Sendable, Equatable {
 
 public extension SpeakSwiftly {
     struct ProfileSummary: Codable, Sendable, Equatable {
+        public enum TranscriptSource: String, Codable, Sendable {
+            case provided
+            case inferred
+        }
+
         public let profileName: String
         public let vibe: SpeakSwiftly.Vibe
         public let createdAt: Date
         public let voiceDescription: String
         public let sourceText: String
+        public let transcriptSource: TranscriptSource?
+        public let transcriptResolvedAt: Date?
+        public let transcriptionModelRepo: String?
 
         enum CodingKeys: String, CodingKey {
             case profileName = "profile_name"
@@ -145,6 +153,9 @@ public extension SpeakSwiftly {
             case createdAt = "created_at"
             case voiceDescription = "voice_description"
             case sourceText = "source_text"
+            case transcriptSource = "transcript_source"
+            case transcriptResolvedAt = "transcript_resolved_at"
+            case transcriptionModelRepo = "transcription_model_repo"
         }
 
         public init(
@@ -152,13 +163,19 @@ public extension SpeakSwiftly {
             vibe: SpeakSwiftly.Vibe,
             createdAt: Date,
             voiceDescription: String,
-            sourceText: String
+            sourceText: String,
+            transcriptSource: TranscriptSource? = nil,
+            transcriptResolvedAt: Date? = nil,
+            transcriptionModelRepo: String? = nil
         ) {
             self.profileName = profileName
             self.vibe = vibe
             self.createdAt = createdAt
             self.voiceDescription = voiceDescription
             self.sourceText = sourceText
+            self.transcriptSource = transcriptSource
+            self.transcriptResolvedAt = transcriptResolvedAt
+            self.transcriptionModelRepo = transcriptionModelRepo
         }
     }
 }
@@ -434,7 +451,17 @@ struct ProfileStore: @unchecked Sendable {
                 vibe: $0.vibe,
                 createdAt: $0.createdAt,
                 voiceDescription: $0.voiceDescription,
-                sourceText: $0.sourceText
+                sourceText: $0.sourceText,
+                transcriptSource: $0.transcriptProvenance.map {
+                    switch $0.source {
+                    case .provided:
+                        .provided
+                    case .inferred:
+                        .inferred
+                    }
+                },
+                transcriptResolvedAt: $0.transcriptProvenance?.createdAt,
+                transcriptionModelRepo: $0.transcriptProvenance?.transcriptionModelRepo
             )
         }
     }

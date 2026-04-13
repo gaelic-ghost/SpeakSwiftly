@@ -1521,7 +1521,10 @@ private actor BackendLoadRecorder {
                             vibe: .femme,
                             createdAt: createdAt,
                             voiceDescription: "Warm and bright.",
-                            sourceText: "Reference transcript"
+                            sourceText: "Reference transcript",
+                            transcriptSource: nil,
+                            transcriptResolvedAt: nil,
+                            transcriptionModelRepo: nil
                         )
                     ]
                 )
@@ -1536,6 +1539,74 @@ private actor BackendLoadRecorder {
 
     #expect(sawStarted)
     #expect(sawCompleted)
+}
+
+@Test func typedListProfilesResponseIncludesTranscriptProvenanceSummary() async throws {
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let transcriptResolvedAt = Date(timeIntervalSince1970: 1_712_345_679)
+
+    _ = try store.createProfile(
+        profileName: "clone-profile",
+        vibe: .masc,
+        modelRepo: ModelFactory.importedCloneModelRepo,
+        voiceDescription: ModelFactory.importedCloneVoiceDescription,
+        sourceText: "Recovered transcript",
+        transcriptProvenance: TranscriptProvenance(
+            source: .inferred,
+            createdAt: transcriptResolvedAt,
+            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+        ),
+        sampleRate: 24_000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46])
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() }
+    )
+
+    await runtime.start()
+
+    let createdAt = try store.loadProfile(named: "clone-profile").manifest.createdAt
+    let handle = await runtime.submit(WorkerRequest.listProfiles(id: "req-provenance"))
+    var iterator = handle.events.makeAsyncIterator()
+
+    while let event = try await iterator.next() {
+        switch event {
+        case .queued, .started:
+            continue
+
+        case .completed(let response):
+            #expect(
+                response == WorkerSuccessResponse(
+                    id: "req-provenance",
+                    profiles: [
+                        ProfileSummary(
+                            profileName: "clone-profile",
+                            vibe: .masc,
+                            createdAt: createdAt,
+                            voiceDescription: ModelFactory.importedCloneVoiceDescription,
+                            sourceText: "Recovered transcript",
+                            transcriptSource: .inferred,
+                            transcriptResolvedAt: transcriptResolvedAt,
+                            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+                        )
+                    ]
+                )
+            )
+            return
+
+        case .progress, .acknowledged:
+            Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
+        }
+    }
+
+    Issue.record("The typed list-voice-profiles request stream finished without emitting a completion event.")
 }
 
 @Test func requestObservationReturnsNilAndFinishedStreamForUnknownRequestID() async throws {

@@ -33,6 +33,9 @@ import MLXAudioTTS
     let listed = try store.listProfiles()
     #expect(listed.count == 1)
     #expect(listed.first?.profileName == "default-femme")
+    #expect(listed.first?.transcriptSource == nil)
+    #expect(listed.first?.transcriptResolvedAt == nil)
+    #expect(listed.first?.transcriptionModelRepo == nil)
 
     let loaded = try store.loadProfile(named: "default-femme")
     #expect(loaded.manifest.sourceText == "Hello there")
@@ -336,6 +339,17 @@ import MLXAudioTTS
         inferredTranscriptProfile.manifest.transcriptProvenance?.transcriptionModelRepo
             == ModelFactory.cloneTranscriptionModelRepo
     )
+
+    let listedProfiles = try store.listProfiles()
+    let inferredSummary = try #require(listedProfiles.first(where: { $0.profileName == "inferred-clone" }))
+    #expect(inferredSummary.transcriptSource == .inferred)
+    #expect(inferredSummary.transcriptResolvedAt == Date(timeIntervalSince1970: 1_712_345_679))
+    #expect(inferredSummary.transcriptionModelRepo == ModelFactory.cloneTranscriptionModelRepo)
+
+    let providedSummary = try #require(listedProfiles.first(where: { $0.profileName == "provided-clone" }))
+    #expect(providedSummary.transcriptSource == .provided)
+    #expect(providedSummary.transcriptResolvedAt == Date(timeIntervalSince1970: 1_712_345_678))
+    #expect(providedSummary.transcriptionModelRepo == nil)
 
     try store.ensureRootExists()
     let legacyCloneDirectory = store.profileDirectoryURL(for: "legacy-clone")
