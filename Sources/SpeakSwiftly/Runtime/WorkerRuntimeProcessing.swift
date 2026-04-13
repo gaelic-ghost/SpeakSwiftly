@@ -859,7 +859,7 @@ extension SpeakSwiftly.Runtime {
         case .qwen3, .qwen3CustomVoice:
             [ModelFactory.residentModelRepo(for: speechBackend)]
         case .marvis:
-            [ModelFactory.marvisResidentModelRepo, ModelFactory.marvisResidentModelRepo]
+            [ModelFactory.marvisResidentModelRepo]
         }
     }
 

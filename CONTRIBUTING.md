@@ -6,8 +6,8 @@ Contributor-facing project notes for SpeakSwiftly. This document holds the deepe
 
 SpeakSwiftly is intentionally two things at once:
 
-- a typed Swift runtime library through `SpeakSwiftlyCore`
-- a long-lived JSONL worker executable through `SpeakSwiftly`
+- a typed Swift runtime library through `SpeakSwiftly`
+- a long-lived JSONL worker executable through `SpeakSwiftlyTool`
 
 The repository tries to keep those two public surfaces aligned without forcing either one to become a compatibility wrapper over the other. Swift callers should get direct, readable APIs. Process-boundary callers should get stable JSONL operation names and predictable event semantics.
 

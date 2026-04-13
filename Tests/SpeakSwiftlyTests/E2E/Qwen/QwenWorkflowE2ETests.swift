@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SpeakSwiftlyCore
+@testable import SpeakSwiftly
 
 extension SpeakSwiftlyE2ETests {
     @Suite("Qwen E2E")

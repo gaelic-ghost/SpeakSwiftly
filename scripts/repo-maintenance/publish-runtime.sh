@@ -49,9 +49,9 @@ lower_configuration=$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')
 metadata_path="$runtime_root/SpeakSwiftly.$lower_configuration.json"
 alias_path="$runtime_root/current-$lower_configuration"
 products_path="$derived_data_path/Build/Products/$configuration"
-binary_path="$products_path/SpeakSwiftly"
+binary_path="$products_path/SpeakSwiftlyTool"
 metallib_path="$products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
-published_binary_path="$published_products_path/SpeakSwiftly"
+published_binary_path="$published_products_path/SpeakSwiftlyTool"
 published_metallib_path="$published_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 published_bundle_path="$published_products_path/mlx-swift_Cmlx.bundle"
 published_launcher_path="$published_products_path/run-speakswiftly"
@@ -76,7 +76,7 @@ fi
 mkdir -p "$runtime_root" "$source_packages_path"
 
 xcodebuild build \
-  -scheme SpeakSwiftly \
+  -scheme SpeakSwiftlyTool \
   -destination "platform=macOS" \
   -configuration "$configuration" \
   -derivedDataPath "$derived_data_path" \
@@ -94,11 +94,11 @@ cat > "$temporary_products_path/run-speakswiftly" <<'EOF'
 set -eu
 
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec env DYLD_FRAMEWORK_PATH="$SELF_DIR" "$SELF_DIR/SpeakSwiftly" "$@"
+exec env DYLD_FRAMEWORK_PATH="$SELF_DIR" "$SELF_DIR/SpeakSwiftlyTool" "$@"
 EOF
 chmod +x "$temporary_products_path/run-speakswiftly"
 
-[ -x "$temporary_products_path/SpeakSwiftly" ] || die "The published runtime staging directory does not contain an executable SpeakSwiftly binary."
+[ -x "$temporary_products_path/SpeakSwiftlyTool" ] || die "The published runtime staging directory does not contain an executable SpeakSwiftlyTool binary."
 [ -f "$temporary_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" ] || die "The published runtime staging directory does not contain default.metallib."
 [ -x "$temporary_products_path/run-speakswiftly" ] || die "The published runtime staging directory does not contain the runtime launcher script."
 

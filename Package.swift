@@ -10,12 +10,12 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "SpeakSwiftlyCore",
-            targets: ["SpeakSwiftlyCore"]
+            name: "SpeakSwiftly",
+            targets: ["SpeakSwiftly"]
         ),
         .executable(
-            name: "SpeakSwiftly",
-            targets: ["SpeakSwiftlyCLI"]
+            name: "SpeakSwiftlyTool",
+            targets: ["SpeakSwiftlyTool"]
         ),
         .executable(
             name: "SpeakSwiftlyTesting",
@@ -29,12 +29,12 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            from: "69.1.2"
+            from: "69.1.3"
         )
     ],
     targets: [
         .target(
-            name: "SpeakSwiftlyCore",
+            name: "SpeakSwiftly",
             dependencies: [
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
@@ -47,19 +47,19 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "SpeakSwiftlyCLI",
-            dependencies: ["SpeakSwiftlyCore"]
+            name: "SpeakSwiftlyTool",
+            dependencies: ["SpeakSwiftly"]
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
             dependencies: [
-                "SpeakSwiftlyCore",
+                "SpeakSwiftly",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ]
         ),
         .executableTarget(
             name: "SpeakSwiftlyTesting",
-            dependencies: ["SpeakSwiftlyCore"]
+            dependencies: ["SpeakSwiftly"]
         ),
     ]
 )

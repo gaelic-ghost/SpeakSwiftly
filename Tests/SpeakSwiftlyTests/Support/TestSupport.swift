@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import MLXLMCommon
 import MLXAudioTTS
 import Testing
-@testable import SpeakSwiftlyCore
+@testable import SpeakSwiftly
 import TextForSpeech
 
 // MARK: - Opt-In Test Gates

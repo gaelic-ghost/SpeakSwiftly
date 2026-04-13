@@ -39,7 +39,7 @@ enum ResidentSpeechModels: Sendable {
         case .qwen3:
             [ModelFactory.qwenResidentModelRepo]
         case .marvis:
-            [ModelFactory.marvisResidentModelRepo, ModelFactory.marvisResidentModelRepo]
+            [ModelFactory.marvisResidentModelRepo]
         }
     }
 }

@@ -458,6 +458,9 @@ enum ModelFactory {
         case .qwen3, .qwen3CustomVoice:
             return .qwen3(try await loadModel(modelRepo: residentModelRepo(for: backend)))
         case .marvis:
+            // Marvis keeps mutable generation caches on the model instance, so each
+            // resident lane needs its own model object even though both lanes load
+            // the same published weights.
             async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
             async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
             return .marvis(

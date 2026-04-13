@@ -1,10 +1,10 @@
 import Foundation
-import SpeakSwiftlyCore
+import SpeakSwiftly
 
 // MARK: - Entry Point
 
 @main
-enum SpeakSwiftlyCLI {
+enum SpeakSwiftlyTool {
     static func main() async {
         let runtime = await SpeakSwiftly.liftoff()
         await runtime.start()

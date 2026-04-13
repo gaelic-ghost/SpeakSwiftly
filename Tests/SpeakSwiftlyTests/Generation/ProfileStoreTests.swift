@@ -1,7 +1,7 @@
 import Foundation
 @preconcurrency import MLX
 import Testing
-@testable import SpeakSwiftlyCore
+@testable import SpeakSwiftly
 import MLXAudioTTS
 
 // MARK: - Profile Lifecycle

@@ -252,7 +252,7 @@ Scope:
 
 Tickets:
 
-- [ ] Add a first DocC catalog for `SpeakSwiftlyCore` with entry points for runtime ownership, top-level normalizer ownership, and the JSONL worker contract.
+- [ ] Add a first DocC catalog for `SpeakSwiftly` with entry points for runtime ownership, top-level normalizer ownership, and the JSONL worker contract.
 - [ ] Add baseline DocC coverage for text-profile management, live playback requests, and voice-profile creation operations.
 - [ ] Add SwiftFormat to the repository with checked-in configuration and a documented formatting command.
 - [ ] Decide whether SwiftLint belongs in the same pass or should remain a separate follow-up once SwiftFormat is in place.
@@ -394,13 +394,13 @@ Exit criteria:
 Scope:
 
 - [ ] Add a small, explicit playback-control surface for long-lived worker owners.
-- [ ] Make active-playback interruption and lifecycle observation predictable from both the executable and `SpeakSwiftlyCore`.
+- [ ] Make active-playback interruption and lifecycle observation predictable from both the executable and `SpeakSwiftly`.
 - [ ] Preserve the current thin worker shape instead of turning playback control into a manager or coordinator layer.
 
 Tickets:
 
 - [x] Define the minimum playback control operations that are actually worth owning around `playback_pause`, `playback_resume`, and `playback_state`, and keep the contract narrow instead of growing a generic command surface.
-- [ ] Define typed `SpeakSwiftlyCore` API parity for playback control requests and events instead of forcing library callers back through ad-hoc JSONL handling.
+- [ ] Define typed `SpeakSwiftly` API parity for playback control requests and events instead of forcing library callers back through ad-hoc JSONL handling.
 - [ ] Unify playback-state reporting under one controller-owned source of truth so `playback_state.state` and `playback_state.active_request` cannot diverge during preroll, rebuffer, interruption, or drain.
 - [ ] Add an explicit playback-route policy surface so worker owners can choose whether live playback follows the current system output immediately, waits for the original device class to return, or fails over only for specific route categories.
 - [ ] Add a wake-recovery grace policy for Bluetooth routes so the runtime can remember the pre-sleep device, wait briefly after wake when that device is likely to auto-reconnect, and only then fall back to speakers if the preferred route does not return in time.
@@ -434,7 +434,7 @@ Tickets:
 - [ ] Add a lightweight queue-inspection operation that reports the active request id, queued request ids, queue length, and enough operation metadata for an owner process to explain what is waiting.
 - [ ] Add an explicit `clear_queue` operation that removes waiting requests without interrupting the currently active request unless a separate control request says otherwise.
 - [ ] Define how cleared requests surface terminal failure or cancellation output so callers can distinguish queue removal from playback or generation failure.
-- [ ] Add typed `SpeakSwiftlyCore` parity for queue inspection and clearing instead of exposing those behaviors only through raw JSONL.
+- [ ] Add typed `SpeakSwiftly` parity for queue inspection and clearing instead of exposing those behaviors only through raw JSONL.
 - [ ] Add coverage for the accepted live-speech queue bound so the ninth accepted job is rejected clearly and capacity reopens after playback drain, cancellation, or queue clearing.
 - [ ] Add automated coverage for clearing an empty queue, clearing multiple waiting requests, and clearing while active playback continues.
 - [ ] Document the queue-inspection and queue-clearing semantics in the README once the contract exists.
@@ -464,7 +464,7 @@ Tickets:
 - [ ] Add initial typed replacement rules with explicit phase and input-kind scoping before considering regex or broader pattern families.
 - [ ] Decide and document rule precedence between built-in normalization passes and custom replacement rules so downstream callers can predict the final spoken text.
 - [x] Add worker operations for listing normalization replacements, adding or updating a replacement, removing a replacement, and clearing all custom replacements.
-- [x] Add typed `SpeakSwiftlyCore` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
+- [x] Add typed `SpeakSwiftly` parity for normalization-replacement management instead of exposing those behaviors only through raw JSONL.
 - [ ] Decide whether replacement rules are process-local, profile-store-local, or shared per-user state, and document the persistence boundary explicitly.
 - [ ] Emit structured success and failure output for replacement-rule mutations so callers can distinguish validation failures, duplicate-key behavior, and filesystem errors.
 - [ ] Add automated coverage for replacement precedence behavior against the built-in normalization pipeline.
@@ -487,7 +487,7 @@ Scope:
 
 Tickets:
 
-- [ ] Audit the `SpeakSwiftlyCore` public API for the minimum supported downstream surface before advertising broader package distribution.
+- [ ] Audit the `SpeakSwiftly` public API for the minimum supported downstream surface before advertising broader package distribution.
 - [ ] Document SwiftPM dependency examples for both the library product and the executable product in the README.
 - [ ] Add a package-consumer verification path that exercises dependency resolution from a clean external package instead of relying only on sibling-checkout integration.
 - [ ] Decide whether package-registry publication is in scope or whether Git-based SwiftPM distribution is the intended first supported path.
@@ -496,7 +496,7 @@ Tickets:
 
 Exit criteria:
 
-- [ ] A downstream Swift package can adopt `SpeakSwiftlyCore` through a documented supported distribution path without relying on repo-local adjacency assumptions.
+- [ ] A downstream Swift package can adopt `SpeakSwiftly` through a documented supported distribution path without relying on repo-local adjacency assumptions.
 - [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
 - [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
 

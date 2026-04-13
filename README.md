@@ -17,8 +17,8 @@ Local text-to-speech for Swift apps and local toolchains, with a typed Swift API
 
 SpeakSwiftly ships two public surfaces from one Swift package:
 
-- `SpeakSwiftlyCore`, an importable Swift library for apps and tools that want a typed runtime
-- `SpeakSwiftly`, a long-lived worker executable that speaks newline-delimited JSON over `stdin` and `stdout`
+- `SpeakSwiftly`, an importable Swift library for apps and tools that want a typed runtime
+- `SpeakSwiftlyTool`, a long-lived worker executable that speaks newline-delimited JSON over `stdin` and `stdout`
 
 That split keeps Swift callers on a readable library surface while still giving non-Swift hosts a stable process boundary.
 
@@ -47,12 +47,12 @@ SpeakSwiftly is a standard Swift package with two direct dependencies:
 Library consumers can add the package from GitHub:
 
 ```swift
-.package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "0.9.2")
+    .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "3.0.0")
 ```
 
-Then add `SpeakSwiftlyCore` to the target that will own the runtime.
+Then add `SpeakSwiftly` to the target that will own the runtime.
 
-`SpeakSwiftlyCore` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without digging through DerivedData.
+`SpeakSwiftly` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without digging through DerivedData.
 
 For package-local validation:
 
@@ -73,7 +73,7 @@ That publishes stable runtime launchers under `.local/xcode/current-debug` and `
 ### Typed Swift Runtime
 
 ```swift
-import SpeakSwiftlyCore
+import SpeakSwiftly
 import TextForSpeech
 
 let runtime = await SpeakSwiftly.liftoff()
@@ -115,7 +115,7 @@ When callers need a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` t
 Runtime preferences have a matching typed surface:
 
 ```swift
-import SpeakSwiftlyCore
+import SpeakSwiftly
 
 let configuration = SpeakSwiftly.Configuration(
     speechBackend: .qwen3CustomVoice,
@@ -162,8 +162,8 @@ swift run SpeakSwiftlyTesting smoke
 
 The package publishes:
 
-- `SpeakSwiftlyCore` as the typed Swift runtime library
-- `SpeakSwiftly` as the worker executable product
+- `SpeakSwiftly` as the typed Swift runtime library
+- `SpeakSwiftlyTool` as the worker executable product
 - `SpeakSwiftlyTesting` as the package-local smoke-test harness
 
 Key typed runtime entry points include:

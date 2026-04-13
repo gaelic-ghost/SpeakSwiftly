@@ -1,5 +1,5 @@
 import Foundation
-import SpeakSwiftlyCore
+import SpeakSwiftly
 
 @main
 struct SpeakSwiftlyTestingMain {

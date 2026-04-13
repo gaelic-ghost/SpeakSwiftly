@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SpeakSwiftlyCore
+@testable import SpeakSwiftly
 
 // MARK: - Structured Logging
 

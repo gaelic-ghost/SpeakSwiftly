@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioTTS
 import Testing
-@testable import SpeakSwiftlyCore
+@testable import SpeakSwiftly
 import TextForSpeech
 
 // MARK: - Adaptive Playback Thresholds
