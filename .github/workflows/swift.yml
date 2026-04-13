@@ -33,6 +33,24 @@ jobs:
       - name: Build package
         run: swift build
 
+      - name: Prepare vendored MLX metallib for SwiftPM tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          resources_output="$(swift run SpeakSwiftlyTesting resources)"
+          mlx_bundle_path="$(printf '%s\n' "$resources_output" | awk -F': ' '/^mlx_bundle: / { print $2 }')"
+          default_metallib_path="$(printf '%s\n' "$resources_output" | awk -F': ' '/^default_metallib: / { print $2 }')"
+
+          if [[ -z "$mlx_bundle_path" || -z "$default_metallib_path" ]]; then
+            printf 'SpeakSwiftly CI could not resolve the vendored MLX resource paths needed for swift test.\n' >&2
+            printf '%s\n' "$resources_output" >&2
+            exit 1
+          fi
+
+          ln -sf Contents/Resources/default.metallib "$mlx_bundle_path/default.metallib"
+          printf 'Prepared SwiftPM MLX metallib shim at %s/default.metallib -> %s\n' "$mlx_bundle_path" "$default_metallib_path"
+
       - name: Run test suite
         run: swift test
 
