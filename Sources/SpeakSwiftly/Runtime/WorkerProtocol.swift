@@ -1,9 +1,9 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - Request Envelope
+// MARK: - RawBatchItem
 
-struct RawBatchItem: Decodable, Sendable {
+struct RawBatchItem: Decodable {
     let artifactID: String?
     let text: String?
     let textProfileName: String?
@@ -25,172 +25,9 @@ struct RawBatchItem: Decodable, Sendable {
     }
 }
 
-struct RawWorkerRequest: Decodable, Sendable {
-    let id: String?
-    let op: String?
-    let artifactID: String?
-    let batchID: String?
-    let jobID: String?
-    let items: [RawBatchItem]?
-    let text: String?
-    let profileName: String?
-    let newProfileName: String?
-    let textProfileName: String?
-    let textProfileID: String?
-    let textProfileDisplayName: String?
-    let textProfile: TextForSpeech.Profile?
-    let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-    let replacements: [TextForSpeech.Replacement]?
-    let replacement: TextForSpeech.Replacement?
-    let replacementID: String?
-    let cwd: String?
-    let repoRoot: String?
-    let textFormat: TextForSpeech.TextFormat?
-    let nestedSourceFormat: TextForSpeech.SourceFormat?
-    let sourceFormat: TextForSpeech.SourceFormat?
-    let requestID: String?
-    let vibe: SpeakSwiftly.Vibe?
-    let voiceDescription: String?
-    let outputPath: String?
-    let referenceAudioPath: String?
-    let transcript: String?
-    let speechBackend: SpeakSwiftly.SpeechBackend?
+// MARK: - RawWorkerRequest
 
-    private struct LegacyReplacementPayload: Decodable, Sendable {
-        private enum LegacyMatchPayload: Decodable, Sendable {
-            case match(TextForSpeech.Replacement.Match)
-
-            init(from decoder: any Decoder) throws {
-                if let match = try? TextForSpeech.Replacement.Match(from: decoder) {
-                    self = .match(match)
-                    return
-                }
-
-                let container = try decoder.singleValueContainer()
-                let rawValue = try container.decode(String.self)
-
-                switch rawValue {
-                case "exact_phrase":
-                    self = .match(.exactPhrase)
-                case "whole_token":
-                    self = .match(.wholeToken)
-                default:
-                    throw DecodingError.dataCorruptedError(
-                        in: container,
-                        debugDescription: "Unsupported legacy replacement match '\(rawValue)'."
-                    )
-                }
-            }
-
-            var resolved: TextForSpeech.Replacement.Match {
-                switch self {
-                case .match(let match):
-                    match
-                }
-            }
-        }
-
-        private enum LegacyTransformPayload: Decodable, Sendable {
-            case transform(TextForSpeech.Replacement.Transform)
-
-            init(from decoder: any Decoder) throws {
-                if let transform = try? TextForSpeech.Replacement.Transform(from: decoder) {
-                    self = .transform(transform)
-                    return
-                }
-
-                let container = try decoder.singleValueContainer()
-                let rawValue = try container.decode(String.self)
-
-                switch rawValue {
-                case "spoken_path":
-                    self = .transform(.spokenPath)
-                case "spoken_url":
-                    self = .transform(.spokenURL)
-                case "spoken_identifier":
-                    self = .transform(.spokenIdentifier)
-                case "spoken_code":
-                    self = .transform(.spokenCode)
-                case "spell_out":
-                    self = .transform(.spellOut)
-                default:
-                    throw DecodingError.dataCorruptedError(
-                        in: container,
-                        debugDescription: "Unsupported legacy replacement transform '\(rawValue)'."
-                    )
-                }
-            }
-
-            var resolved: TextForSpeech.Replacement.Transform {
-                switch self {
-                case .transform(let transform):
-                    transform
-                }
-            }
-        }
-
-        let id: String
-        let text: String
-        private let transform: LegacyTransformPayload?
-        let replacement: String?
-        private let match: LegacyMatchPayload
-        let phase: TextForSpeech.Replacement.Phase
-        let isCaseSensitive: Bool
-        let textFormats: Set<TextForSpeech.TextFormat>
-        let sourceFormats: Set<TextForSpeech.SourceFormat>
-        let priority: Int
-
-        func resolved() throws -> TextForSpeech.Replacement {
-            if let replacement {
-                return TextForSpeech.Replacement(
-                    text,
-                    with: replacement,
-                    id: id,
-                    matching: match.resolved,
-                    during: phase,
-                    caseSensitive: isCaseSensitive,
-                    forTextFormats: textFormats,
-                    forSourceFormats: sourceFormats,
-                    priority: priority
-                )
-            }
-
-            guard let transform else {
-                throw DecodingError.dataCorrupted(
-                    DecodingError.Context(
-                        codingPath: [],
-                        debugDescription: "Replacement payload must provide either a literal 'replacement' or a 'transform'."
-                    )
-                )
-            }
-
-            if case .literal(let literal) = transform.resolved {
-                return TextForSpeech.Replacement(
-                    text,
-                    with: literal,
-                    id: id,
-                    matching: match.resolved,
-                    during: phase,
-                    caseSensitive: isCaseSensitive,
-                    forTextFormats: textFormats,
-                    forSourceFormats: sourceFormats,
-                    priority: priority
-                )
-            }
-
-            return TextForSpeech.Replacement(
-                id: id,
-                matching: match.resolved,
-                using: transform.resolved,
-                during: phase,
-                caseSensitive: isCaseSensitive,
-                forTextFormats: textFormats,
-                forSourceFormats: sourceFormats,
-                priority: priority
-            )
-        }
-    }
-
+struct RawWorkerRequest: Decodable {
     enum CodingKeys: String, CodingKey {
         case id
         case op
@@ -223,6 +60,172 @@ struct RawWorkerRequest: Decodable, Sendable {
         case speechBackend = "speech_backend"
     }
 
+    private struct LegacyReplacementPayload: Decodable {
+        private enum LegacyMatchPayload: Decodable {
+            case match(TextForSpeech.Replacement.Match)
+
+            init(from decoder: any Decoder) throws {
+                if let match = try? TextForSpeech.Replacement.Match(from: decoder) {
+                    self = .match(match)
+                    return
+                }
+
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self)
+
+                switch rawValue {
+                    case "exact_phrase":
+                        self = .match(.exactPhrase)
+                    case "whole_token":
+                        self = .match(.wholeToken)
+                    default:
+                        throw DecodingError.dataCorruptedError(
+                            in: container,
+                            debugDescription: "Unsupported legacy replacement match '\(rawValue)'.",
+                        )
+                }
+            }
+
+            var resolved: TextForSpeech.Replacement.Match {
+                switch self {
+                    case let .match(match):
+                        match
+                }
+            }
+        }
+
+        private enum LegacyTransformPayload: Decodable {
+            case transform(TextForSpeech.Replacement.Transform)
+
+            init(from decoder: any Decoder) throws {
+                if let transform = try? TextForSpeech.Replacement.Transform(from: decoder) {
+                    self = .transform(transform)
+                    return
+                }
+
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self)
+
+                switch rawValue {
+                    case "spoken_path":
+                        self = .transform(.spokenPath)
+                    case "spoken_url":
+                        self = .transform(.spokenURL)
+                    case "spoken_identifier":
+                        self = .transform(.spokenIdentifier)
+                    case "spoken_code":
+                        self = .transform(.spokenCode)
+                    case "spell_out":
+                        self = .transform(.spellOut)
+                    default:
+                        throw DecodingError.dataCorruptedError(
+                            in: container,
+                            debugDescription: "Unsupported legacy replacement transform '\(rawValue)'.",
+                        )
+                }
+            }
+
+            var resolved: TextForSpeech.Replacement.Transform {
+                switch self {
+                    case let .transform(transform):
+                        transform
+                }
+            }
+        }
+
+        let id: String
+        let text: String
+        let replacement: String?
+        let phase: TextForSpeech.Replacement.Phase
+        let isCaseSensitive: Bool
+        let textFormats: Set<TextForSpeech.TextFormat>
+        let sourceFormats: Set<TextForSpeech.SourceFormat>
+        let priority: Int
+
+        private let transform: LegacyTransformPayload?
+        private let match: LegacyMatchPayload
+
+        func resolved() throws -> TextForSpeech.Replacement {
+            if let replacement {
+                return TextForSpeech.Replacement(
+                    text,
+                    with: replacement,
+                    id: id,
+                    matching: match.resolved,
+                    during: phase,
+                    caseSensitive: isCaseSensitive,
+                    forTextFormats: textFormats,
+                    forSourceFormats: sourceFormats,
+                    priority: priority,
+                )
+            }
+
+            guard let transform else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Replacement payload must provide either a literal 'replacement' or a 'transform'.",
+                    ),
+                )
+            }
+
+            if case let .literal(literal) = transform.resolved {
+                return TextForSpeech.Replacement(
+                    text,
+                    with: literal,
+                    id: id,
+                    matching: match.resolved,
+                    during: phase,
+                    caseSensitive: isCaseSensitive,
+                    forTextFormats: textFormats,
+                    forSourceFormats: sourceFormats,
+                    priority: priority,
+                )
+            }
+
+            return TextForSpeech.Replacement(
+                id: id,
+                matching: match.resolved,
+                using: transform.resolved,
+                during: phase,
+                caseSensitive: isCaseSensitive,
+                forTextFormats: textFormats,
+                forSourceFormats: sourceFormats,
+                priority: priority,
+            )
+        }
+    }
+
+    let id: String?
+    let op: String?
+    let artifactID: String?
+    let batchID: String?
+    let jobID: String?
+    let items: [RawBatchItem]?
+    let text: String?
+    let profileName: String?
+    let newProfileName: String?
+    let textProfileName: String?
+    let textProfileID: String?
+    let textProfileDisplayName: String?
+    let textProfile: TextForSpeech.Profile?
+    let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+    let replacements: [TextForSpeech.Replacement]?
+    let replacement: TextForSpeech.Replacement?
+    let replacementID: String?
+    let cwd: String?
+    let repoRoot: String?
+    let textFormat: TextForSpeech.TextFormat?
+    let nestedSourceFormat: TextForSpeech.SourceFormat?
+    let sourceFormat: TextForSpeech.SourceFormat?
+    let requestID: String?
+    let vibe: SpeakSwiftly.Vibe?
+    let voiceDescription: String?
+    let outputPath: String?
+    let referenceAudioPath: String?
+    let transcript: String?
+    let speechBackend: SpeakSwiftly.SpeechBackend?
+
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -241,7 +244,7 @@ struct RawWorkerRequest: Decodable, Sendable {
         textProfile = try container.decodeIfPresent(TextForSpeech.Profile.self, forKey: .textProfile)
         textProfileStyle = try container.decodeIfPresent(
             TextForSpeech.BuiltInProfileStyle.self,
-            forKey: .textProfileStyle
+            forKey: .textProfileStyle,
         )
         replacements = try Self.decodeReplacementsIfPresent(in: container, forKey: .replacements)
         replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
@@ -259,11 +262,11 @@ struct RawWorkerRequest: Decodable, Sendable {
         let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
         let explicitNestedSourceFormat = try Self.decodeSourceFormat(
             in: container,
-            forKey: .nestedSourceFormat
+            forKey: .nestedSourceFormat,
         )
         let explicitSourceFormat = try Self.decodeSourceFormat(
             in: container,
-            forKey: .sourceFormat
+            forKey: .sourceFormat,
         )
 
         if let rawTextFormat {
@@ -277,7 +280,7 @@ struct RawWorkerRequest: Decodable, Sendable {
                 throw DecodingError.dataCorruptedError(
                     forKey: .textFormat,
                     in: container,
-                    debugDescription: "Unsupported text_format value '\(rawTextFormat)'."
+                    debugDescription: "Unsupported text_format value '\(rawTextFormat)'.",
                 )
             }
         } else {
@@ -288,73 +291,6 @@ struct RawWorkerRequest: Decodable, Sendable {
         nestedSourceFormat = explicitNestedSourceFormat
     }
 
-    private static func decodeSourceFormat(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys
-    ) throws -> TextForSpeech.SourceFormat? {
-        guard let raw = try container.decodeIfPresent(String.self, forKey: key) else {
-            return nil
-        }
-
-        guard let format = TextForSpeech.SourceFormat(rawValue: raw) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: key,
-                in: container,
-                debugDescription: "Unsupported \(key.stringValue) value '\(raw)'."
-            )
-        }
-
-        return format
-    }
-
-    private static func decodeReplacementIfPresent(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys
-    ) throws -> TextForSpeech.Replacement? {
-        guard container.contains(key) else { return nil }
-
-        do {
-            return try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: key)
-        } catch {
-            return try container
-                .decodeIfPresent(LegacyReplacementPayload.self, forKey: key)?
-                .resolved()
-        }
-    }
-
-    private static func decodeReplacementsIfPresent(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys
-    ) throws -> [TextForSpeech.Replacement]? {
-        guard container.contains(key) else { return nil }
-
-        do {
-            return try container.decodeIfPresent([TextForSpeech.Replacement].self, forKey: key)
-        } catch {
-            return try container
-                .decodeIfPresent([LegacyReplacementPayload].self, forKey: key)?
-                .map { try $0.resolved() }
-        }
-    }
-
-    private static func legacyCompatibility(
-        forRawValue rawValue: String
-    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?)? {
-        switch rawValue {
-        case TextForSpeech.TextFormat.plain.rawValue: (.plain, nil)
-        case TextForSpeech.TextFormat.markdown.rawValue: (.markdown, nil)
-        case TextForSpeech.TextFormat.html.rawValue: (.html, nil)
-        case TextForSpeech.TextFormat.log.rawValue: (.log, nil)
-        case TextForSpeech.TextFormat.cli.rawValue: (.cli, nil)
-        case TextForSpeech.TextFormat.list.rawValue: (.list, nil)
-        case TextForSpeech.SourceFormat.generic.rawValue: (nil, .generic)
-        case TextForSpeech.SourceFormat.swift.rawValue: (nil, .swift)
-        case TextForSpeech.SourceFormat.python.rawValue: (nil, .python)
-        case TextForSpeech.SourceFormat.rust.rawValue: (nil, .rust)
-        default: nil
-        }
-    }
-
     static func resolveSpeechTextInput(
         id: String,
         text: String?,
@@ -363,44 +299,45 @@ struct RawWorkerRequest: Decodable, Sendable {
         repoRoot: String?,
         textFormat: TextForSpeech.TextFormat?,
         nestedSourceFormat: TextForSpeech.SourceFormat?,
-        sourceFormat: TextForSpeech.SourceFormat?
+        sourceFormat: TextForSpeech.SourceFormat?,
     ) throws -> (
         text: String,
         textProfileName: String?,
         textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?
+        sourceFormat: TextForSpeech.SourceFormat?,
     ) {
         let resolvedText = try WorkerRequest.requireNonEmpty(text, field: "text", id: id)
         let resolvedTextProfileName = textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        if sourceFormat != nil && (textFormat != nil || nestedSourceFormat != nil) {
+        if sourceFormat != nil, textFormat != nil || nestedSourceFormat != nil {
             throw WorkerError(
                 code: .invalidRequest,
-                message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`)."
+                message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`).",
             )
         }
         let textContext = TextForSpeech.Context(
             cwd: cwd,
             repoRoot: repoRoot,
             textFormat: textFormat,
-            nestedSourceFormat: nestedSourceFormat
-        ).nilIfEmpty
+            nestedSourceFormat: nestedSourceFormat,
+        )
+        .nilIfEmpty
 
         return (
             text: resolvedText,
             textProfileName: resolvedTextProfileName,
             textContext: textContext,
-            sourceFormat: sourceFormat
+            sourceFormat: sourceFormat,
         )
     }
 
     static func resolveBatchItems(
         id: String,
-        rawItems: [RawBatchItem]?
+        rawItems: [RawBatchItem]?,
     ) throws -> [SpeakSwiftly.GenerationJobItem] {
         guard let rawItems, !rawItems.isEmpty else {
             throw WorkerError(
                 code: .invalidRequest,
-                message: "Request '\(id)' must include a non-empty 'items' array for batch generation."
+                message: "Request '\(id)' must include a non-empty 'items' array for batch generation.",
             )
         }
 
@@ -415,14 +352,14 @@ struct RawWorkerRequest: Decodable, Sendable {
                 repoRoot: rawItem.repoRoot,
                 textFormat: rawItem.textFormat,
                 nestedSourceFormat: rawItem.nestedSourceFormat,
-                sourceFormat: rawItem.sourceFormat
+                sourceFormat: rawItem.sourceFormat,
             )
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
                 ?? "\(id)-artifact-\(index + 1)"
             guard seenArtifactIDs.insert(artifactID).inserted else {
                 throw WorkerError(
                     code: .invalidRequest,
-                    message: "Request '\(id)' contains duplicate batch artifact id '\(artifactID)'. Each batch item must resolve to a unique artifact id."
+                    message: "Request '\(id)' contains duplicate batch artifact id '\(artifactID)'. Each batch item must resolve to a unique artifact id.",
                 )
             }
 
@@ -431,15 +368,81 @@ struct RawWorkerRequest: Decodable, Sendable {
                 text: resolved.text,
                 textProfileName: resolved.textProfileName,
                 textContext: resolved.textContext,
-                sourceFormat: resolved.sourceFormat
+                sourceFormat: resolved.sourceFormat,
             )
+        }
+    }
+
+    private static func decodeSourceFormat(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys,
+    ) throws -> TextForSpeech.SourceFormat? {
+        guard let raw = try container.decodeIfPresent(String.self, forKey: key) else {
+            return nil
+        }
+        guard let format = TextForSpeech.SourceFormat(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: container,
+                debugDescription: "Unsupported \(key.stringValue) value '\(raw)'.",
+            )
+        }
+
+        return format
+    }
+
+    private static func decodeReplacementIfPresent(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys,
+    ) throws -> TextForSpeech.Replacement? {
+        guard container.contains(key) else { return nil }
+
+        do {
+            return try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: key)
+        } catch {
+            return try container
+                .decodeIfPresent(LegacyReplacementPayload.self, forKey: key)?
+                .resolved()
+        }
+    }
+
+    private static func decodeReplacementsIfPresent(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys,
+    ) throws -> [TextForSpeech.Replacement]? {
+        guard container.contains(key) else { return nil }
+
+        do {
+            return try container.decodeIfPresent([TextForSpeech.Replacement].self, forKey: key)
+        } catch {
+            return try container
+                .decodeIfPresent([LegacyReplacementPayload].self, forKey: key)?
+                .map { try $0.resolved() }
+        }
+    }
+
+    private static func legacyCompatibility(
+        forRawValue rawValue: String,
+    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?)? {
+        switch rawValue {
+            case TextForSpeech.TextFormat.plain.rawValue: (.plain, nil)
+            case TextForSpeech.TextFormat.markdown.rawValue: (.markdown, nil)
+            case TextForSpeech.TextFormat.html.rawValue: (.html, nil)
+            case TextForSpeech.TextFormat.log.rawValue: (.log, nil)
+            case TextForSpeech.TextFormat.cli.rawValue: (.cli, nil)
+            case TextForSpeech.TextFormat.list.rawValue: (.list, nil)
+            case TextForSpeech.SourceFormat.generic.rawValue: (nil, .generic)
+            case TextForSpeech.SourceFormat.swift.rawValue: (nil, .swift)
+            case TextForSpeech.SourceFormat.python.rawValue: (nil, .python)
+            case TextForSpeech.SourceFormat.rust.rawValue: (nil, .rust)
+            default: nil
         }
     }
 }
 
-// MARK: - Worker Request
+// MARK: - WorkerRequest
 
-enum WorkerRequest: Sendable, Equatable {
+enum WorkerRequest: Equatable {
     case queueSpeech(
         id: String,
         text: String,
@@ -447,12 +450,12 @@ enum WorkerRequest: Sendable, Equatable {
         textProfileName: String?,
         jobType: SpeechJobType,
         textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?
+        sourceFormat: TextForSpeech.SourceFormat?,
     )
     case queueBatch(
         id: String,
         profileName: String,
-        items: [SpeakSwiftly.GenerationJobItem]
+        items: [SpeakSwiftly.GenerationJobItem],
     )
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
@@ -468,7 +471,7 @@ enum WorkerRequest: Sendable, Equatable {
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
         outputPath: String?,
-        cwd: String?
+        cwd: String?,
     )
     case createClone(
         id: String,
@@ -476,7 +479,7 @@ enum WorkerRequest: Sendable, Equatable {
         referenceAudioPath: String,
         vibe: SpeakSwiftly.Vibe,
         transcript: String?,
-        cwd: String?
+        cwd: String?,
     )
     case listProfiles(id: String)
     case renameProfile(id: String, profileName: String, newProfileName: String)
@@ -513,256 +516,256 @@ enum WorkerRequest: Sendable, Equatable {
 
     var id: String {
         switch self {
-        case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
-             .queueBatch(id: let id, profileName: _, items: _),
-             .generatedFile(let id, _),
-             .generatedFiles(let id),
-             .generatedBatch(let id, _),
-             .generatedBatches(let id),
-             .expireGenerationJob(let id, _),
-             .generationJob(let id, _),
-             .generationJobs(let id),
-             .createProfile(let id, _, _, _, _, _, _),
-             .createClone(let id, _, _, _, _, _),
-             .listProfiles(let id),
-             .renameProfile(let id, _, _),
-             .rerollProfile(let id, _),
-             .removeProfile(let id, _),
-             .textProfileActive(let id),
-             .textProfile(let id, _),
-             .textProfiles(let id),
-             .textProfileStyle(let id),
-             .textProfileEffective(let id, _),
-             .textProfilePersistence(let id),
-             .loadTextProfiles(let id),
-             .saveTextProfiles(let id),
-             .setTextProfileStyle(let id, _),
-             .createTextProfile(let id, _, _, _),
-             .storeTextProfile(let id, _),
-             .useTextProfile(let id, _),
-             .removeTextProfile(let id, _),
-             .resetTextProfile(let id),
-             .textReplacements(let id, _),
-             .addTextReplacement(let id, _, _),
-             .replaceTextReplacement(let id, _, _),
-             .removeTextReplacement(let id, _, _),
-             .clearTextReplacements(let id, _),
-             .listQueue(let id, _),
-             .status(let id),
-             .overview(let id),
-             .switchSpeechBackend(let id, _),
-             .reloadModels(let id),
-             .unloadModels(let id),
-             .playback(let id, _),
-             .clearQueue(let id),
-             .cancelRequest(let id, _):
-            id
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+                 .queueBatch(id: let id, profileName: _, items: _),
+                 let .generatedFile(id, _),
+                 let .generatedFiles(id),
+                 let .generatedBatch(id, _),
+                 let .generatedBatches(id),
+                 let .expireGenerationJob(id, _),
+                 let .generationJob(id, _),
+                 let .generationJobs(id),
+                 let .createProfile(id, _, _, _, _, _, _),
+                 let .createClone(id, _, _, _, _, _),
+                 let .listProfiles(id),
+                 let .renameProfile(id, _, _),
+                 let .rerollProfile(id, _),
+                 let .removeProfile(id, _),
+                 let .textProfileActive(id),
+                 let .textProfile(id, _),
+                 let .textProfiles(id),
+                 let .textProfileStyle(id),
+                 let .textProfileEffective(id, _),
+                 let .textProfilePersistence(id),
+                 let .loadTextProfiles(id),
+                 let .saveTextProfiles(id),
+                 let .setTextProfileStyle(id, _),
+                 let .createTextProfile(id, _, _, _),
+                 let .storeTextProfile(id, _),
+                 let .useTextProfile(id, _),
+                 let .removeTextProfile(id, _),
+                 let .resetTextProfile(id),
+                 let .textReplacements(id, _),
+                 let .addTextReplacement(id, _, _),
+                 let .replaceTextReplacement(id, _, _),
+                 let .removeTextReplacement(id, _, _),
+                 let .clearTextReplacements(id, _),
+                 let .listQueue(id, _),
+                 let .status(id),
+                 let .overview(id),
+                 let .switchSpeechBackend(id, _),
+                 let .reloadModels(id),
+                 let .unloadModels(id),
+                 let .playback(id, _),
+                 let .clearQueue(id),
+                 let .cancelRequest(id, _):
+                id
         }
     }
 
     var opName: String {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
-            "generate_speech"
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
-            "generate_audio_file"
-        case .queueBatch:
-            "generate_batch"
-        case .generatedFile:
-            "get_generated_file"
-        case .generatedFiles:
-            "list_generated_files"
-        case .generatedBatch:
-            "get_generated_batch"
-        case .generatedBatches:
-            "list_generated_batches"
-        case .expireGenerationJob:
-            "expire_generation_job"
-        case .generationJob:
-            "get_generation_job"
-        case .generationJobs:
-            "list_generation_jobs"
-        case .createProfile:
-            "create_voice_profile_from_description"
-        case .createClone:
-            "create_voice_profile_from_audio"
-        case .listProfiles:
-            "list_voice_profiles"
-        case .renameProfile:
-            "update_voice_profile_name"
-        case .rerollProfile:
-            "reroll_voice_profile"
-        case .removeProfile:
-            "delete_voice_profile"
-        case .textProfileActive:
-            "get_active_text_profile"
-        case .textProfile:
-            "get_text_profile"
-        case .textProfiles:
-            "list_text_profiles"
-        case .textProfileStyle:
-            "get_text_profile_style"
-        case .textProfileEffective:
-            "get_effective_text_profile"
-        case .textProfilePersistence:
-            "get_text_profile_persistence"
-        case .loadTextProfiles:
-            "load_text_profiles"
-        case .saveTextProfiles:
-            "save_text_profiles"
-        case .setTextProfileStyle:
-            "set_text_profile_style"
-        case .createTextProfile:
-            "create_text_profile"
-        case .storeTextProfile:
-            "replace_text_profile"
-        case .useTextProfile:
-            "replace_active_text_profile"
-        case .removeTextProfile:
-            "delete_text_profile"
-        case .resetTextProfile:
-            "reset_text_profile"
-        case .textReplacements:
-            "list_text_replacements"
-        case .addTextReplacement:
-            "create_text_replacement"
-        case .replaceTextReplacement:
-            "replace_text_replacement"
-        case .removeTextReplacement:
-            "delete_text_replacement"
-        case .clearTextReplacements:
-            "clear_text_replacements"
-        case .listQueue(_, .generation):
-            "list_generation_queue"
-        case .listQueue(_, .playback):
-            "list_playback_queue"
-        case .status:
-            "get_status"
-        case .overview:
-            "get_runtime_overview"
-        case .switchSpeechBackend:
-            "set_speech_backend"
-        case .reloadModels:
-            "reload_models"
-        case .unloadModels:
-            "unload_models"
-        case .playback(_, .pause):
-            "playback_pause"
-        case .playback(_, .resume):
-            "playback_resume"
-        case .playback(_, .state):
-            "get_playback_state"
-        case .clearQueue:
-            "clear_queue"
-        case .cancelRequest:
-            "cancel_request"
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+                "generate_speech"
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+                "generate_audio_file"
+            case .queueBatch:
+                "generate_batch"
+            case .generatedFile:
+                "get_generated_file"
+            case .generatedFiles:
+                "list_generated_files"
+            case .generatedBatch:
+                "get_generated_batch"
+            case .generatedBatches:
+                "list_generated_batches"
+            case .expireGenerationJob:
+                "expire_generation_job"
+            case .generationJob:
+                "get_generation_job"
+            case .generationJobs:
+                "list_generation_jobs"
+            case .createProfile:
+                "create_voice_profile_from_description"
+            case .createClone:
+                "create_voice_profile_from_audio"
+            case .listProfiles:
+                "list_voice_profiles"
+            case .renameProfile:
+                "update_voice_profile_name"
+            case .rerollProfile:
+                "reroll_voice_profile"
+            case .removeProfile:
+                "delete_voice_profile"
+            case .textProfileActive:
+                "get_active_text_profile"
+            case .textProfile:
+                "get_text_profile"
+            case .textProfiles:
+                "list_text_profiles"
+            case .textProfileStyle:
+                "get_text_profile_style"
+            case .textProfileEffective:
+                "get_effective_text_profile"
+            case .textProfilePersistence:
+                "get_text_profile_persistence"
+            case .loadTextProfiles:
+                "load_text_profiles"
+            case .saveTextProfiles:
+                "save_text_profiles"
+            case .setTextProfileStyle:
+                "set_text_profile_style"
+            case .createTextProfile:
+                "create_text_profile"
+            case .storeTextProfile:
+                "replace_text_profile"
+            case .useTextProfile:
+                "replace_active_text_profile"
+            case .removeTextProfile:
+                "delete_text_profile"
+            case .resetTextProfile:
+                "reset_text_profile"
+            case .textReplacements:
+                "list_text_replacements"
+            case .addTextReplacement:
+                "create_text_replacement"
+            case .replaceTextReplacement:
+                "replace_text_replacement"
+            case .removeTextReplacement:
+                "delete_text_replacement"
+            case .clearTextReplacements:
+                "clear_text_replacements"
+            case .listQueue(_, .generation):
+                "list_generation_queue"
+            case .listQueue(_, .playback):
+                "list_playback_queue"
+            case .status:
+                "get_status"
+            case .overview:
+                "get_runtime_overview"
+            case .switchSpeechBackend:
+                "set_speech_backend"
+            case .reloadModels:
+                "reload_models"
+            case .unloadModels:
+                "unload_models"
+            case .playback(_, .pause):
+                "playback_pause"
+            case .playback(_, .resume):
+                "playback_resume"
+            case .playback(_, .state):
+                "get_playback_state"
+            case .clearQueue:
+                "clear_queue"
+            case .cancelRequest:
+                "cancel_request"
         }
     }
 
     var isSpeechRequest: Bool {
         switch self {
-        case .queueSpeech, .queueBatch:
-            return true
-        default:
-            return false
+            case .queueSpeech, .queueBatch:
+                true
+            default:
+                false
         }
     }
 
     var requiresResidentModels: Bool {
         switch self {
-        case .queueSpeech, .queueBatch:
-            return true
-        default:
-            return false
+            case .queueSpeech, .queueBatch:
+                true
+            default:
+                false
         }
     }
 
     var mutatesResidentState: Bool {
         switch self {
-        case .switchSpeechBackend, .reloadModels, .unloadModels:
-            return true
-        default:
-            return false
+            case .switchSpeechBackend, .reloadModels, .unloadModels:
+                true
+            default:
+                false
         }
     }
 
     var requiresPlayback: Bool {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
-            return true
-        default:
-            return false
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+                true
+            default:
+                false
         }
     }
 
     var acknowledgesEnqueueImmediately: Bool {
         switch self {
-        case .queueSpeech, .queueBatch, .switchSpeechBackend, .reloadModels, .unloadModels:
-            return true
-        default:
-            return false
+            case .queueSpeech, .queueBatch, .switchSpeechBackend, .reloadModels, .unloadModels:
+                true
+            default:
+                false
         }
     }
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
-             .queueBatch,
-             .switchSpeechBackend,
-             .reloadModels,
-             .unloadModels:
-            return true
-        default:
-            return false
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
+                 .queueBatch,
+                 .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels:
+                true
+            default:
+                false
         }
     }
 
     var isImmediateControlOperation: Bool {
         switch self {
-        case .generatedFile,
-             .generatedFiles,
-             .generatedBatch,
-             .generatedBatches,
-             .expireGenerationJob,
-             .generationJob,
-             .generationJobs,
-             .textProfileActive,
-             .textProfile,
-             .textProfiles,
-             .textProfileStyle,
-             .textProfileEffective,
-             .textProfilePersistence,
-             .loadTextProfiles,
-             .saveTextProfiles,
-             .setTextProfileStyle,
-             .createTextProfile,
-             .storeTextProfile,
-             .useTextProfile,
-             .removeTextProfile,
-             .resetTextProfile,
-             .textReplacements,
-             .addTextReplacement,
-             .replaceTextReplacement,
-             .removeTextReplacement,
-             .clearTextReplacements,
-             .listQueue,
-             .status,
-             .overview,
-             .playback,
-             .clearQueue,
-             .cancelRequest:
-            return true
-        default:
-            return false
+            case .generatedFile,
+                 .generatedFiles,
+                 .generatedBatch,
+                 .generatedBatches,
+                 .expireGenerationJob,
+                 .generationJob,
+                 .generationJobs,
+                 .textProfileActive,
+                 .textProfile,
+                 .textProfiles,
+                 .textProfileStyle,
+                 .textProfileEffective,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .setTextProfileStyle,
+                 .createTextProfile,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .removeTextProfile,
+                 .resetTextProfile,
+                 .textReplacements,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement,
+                 .clearTextReplacements,
+                 .listQueue,
+                 .status,
+                 .overview,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
+                true
+            default:
+                false
         }
     }
 
     var requiresPlaybackDrainBeforeStart: Bool {
         switch self {
-        case .switchSpeechBackend, .reloadModels, .unloadModels:
-            return true
-        default:
-            return false
+            case .switchSpeechBackend, .reloadModels, .unloadModels:
+                true
+            default:
+                false
         }
     }
 
@@ -776,208 +779,208 @@ enum WorkerRequest: Sendable, Equatable {
 
     var profileName: String? {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
-             .queueBatch(id: _, profileName: let profileName, items: _),
-             .createProfile(_, let profileName, _, _, _, _, _),
-             .createClone(_, let profileName, _, _, _, _),
-             .renameProfile(_, let profileName, _),
-             .rerollProfile(_, let profileName),
-             .removeProfile(_, let profileName):
-            profileName
-        case .generatedFile,
-             .generatedFiles,
-             .generatedBatch,
-             .generatedBatches,
-             .expireGenerationJob,
-             .generationJob,
-             .generationJobs,
-             .textProfileActive,
-             .textProfiles,
-             .textProfileStyle,
-             .textProfilePersistence,
-             .loadTextProfiles,
-             .saveTextProfiles,
-             .setTextProfileStyle,
-             .storeTextProfile,
-             .useTextProfile,
-             .resetTextProfile,
-             .listProfiles,
-             .listQueue,
-             .status,
-             .overview,
-             .switchSpeechBackend,
-             .reloadModels,
-             .unloadModels,
-             .playback,
-             .clearQueue,
-             .cancelRequest:
-            nil
-        case .textProfile(_, let name),
-             .removeTextProfile(_, let name):
-            name
-        case .textProfileEffective(_, let name),
-             .textReplacements(_, let name),
-             .addTextReplacement(_, _, let name),
-             .replaceTextReplacement(_, _, let name),
-             .removeTextReplacement(_, _, let name),
-             .clearTextReplacements(_, let name):
-            name
-        case .createTextProfile(_, let profileID, _, _):
-            profileID
+            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+                 .queueBatch(id: _, profileName: let profileName, items: _),
+                 let .createProfile(_, profileName, _, _, _, _, _),
+                 let .createClone(_, profileName, _, _, _, _),
+                 let .renameProfile(_, profileName, _),
+                 let .rerollProfile(_, profileName),
+                 let .removeProfile(_, profileName):
+                profileName
+            case .generatedFile,
+                 .generatedFiles,
+                 .generatedBatch,
+                 .generatedBatches,
+                 .expireGenerationJob,
+                 .generationJob,
+                 .generationJobs,
+                 .textProfileActive,
+                 .textProfiles,
+                 .textProfileStyle,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .setTextProfileStyle,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .resetTextProfile,
+                 .listProfiles,
+                 .listQueue,
+                 .status,
+                 .overview,
+                 .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
+                nil
+            case let .textProfile(_, name),
+                 let .removeTextProfile(_, name):
+                name
+            case let .textProfileEffective(_, name),
+                 let .textReplacements(_, name),
+                 let .addTextReplacement(_, _, name),
+                 let .replaceTextReplacement(_, _, name),
+                 let .removeTextReplacement(_, _, name),
+                 let .clearTextReplacements(_, name):
+                name
+            case let .createTextProfile(_, profileID, _, _):
+                profileID
         }
     }
 
     var textProfileName: String? {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
-            return textProfileName
-        case .queueBatch(id: _, profileName: _, items: let items):
-            let names = Set(items.compactMap(\.textProfileName))
-            return names.count == 1 ? names.first : nil
-        case .generatedFile,
-             .generatedFiles,
-             .generatedBatch,
-             .generatedBatches,
-             .expireGenerationJob,
-             .generationJob,
-             .generationJobs,
-             .createProfile,
-             .createClone,
-             .listProfiles,
-             .renameProfile,
-             .rerollProfile,
-             .removeProfile,
-             .textProfileActive,
-             .textProfile,
-             .textProfiles,
-             .textProfileStyle,
-             .textProfileEffective,
-             .textProfilePersistence,
-             .loadTextProfiles,
-             .saveTextProfiles,
-             .setTextProfileStyle,
-             .createTextProfile,
-             .storeTextProfile,
-             .useTextProfile,
-             .removeTextProfile,
-             .resetTextProfile,
-             .textReplacements,
-             .addTextReplacement,
-             .replaceTextReplacement,
-             .removeTextReplacement,
-             .clearTextReplacements,
-             .listQueue,
-             .status,
-             .overview,
-             .switchSpeechBackend,
-             .reloadModels,
-             .unloadModels,
-             .playback,
-             .clearQueue,
-             .cancelRequest:
-            return nil
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
+                return textProfileName
+            case .queueBatch(id: _, profileName: _, items: let items):
+                let names = Set(items.compactMap(\.textProfileName))
+                return names.count == 1 ? names.first : nil
+            case .generatedFile,
+                 .generatedFiles,
+                 .generatedBatch,
+                 .generatedBatches,
+                 .expireGenerationJob,
+                 .generationJob,
+                 .generationJobs,
+                 .createProfile,
+                 .createClone,
+                 .listProfiles,
+                 .renameProfile,
+                 .rerollProfile,
+                 .removeProfile,
+                 .textProfileActive,
+                 .textProfile,
+                 .textProfiles,
+                 .textProfileStyle,
+                 .textProfileEffective,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .setTextProfileStyle,
+                 .createTextProfile,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .removeTextProfile,
+                 .resetTextProfile,
+                 .textReplacements,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement,
+                 .clearTextReplacements,
+                 .listQueue,
+                 .status,
+                 .overview,
+                 .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
+                return nil
         }
     }
 
     var textContext: TextForSpeech.Context? {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
-            textContext
-        case .queueBatch:
-            nil
-        case .generatedFile,
-             .generatedFiles,
-             .generatedBatch,
-             .generatedBatches,
-             .expireGenerationJob,
-             .generationJob,
-             .generationJobs,
-             .createProfile,
-             .createClone,
-             .listProfiles,
-             .renameProfile,
-             .rerollProfile,
-             .removeProfile,
-             .textProfileActive,
-             .textProfile,
-             .textProfiles,
-             .textProfileStyle,
-             .textProfileEffective,
-             .textProfilePersistence,
-             .loadTextProfiles,
-             .saveTextProfiles,
-             .setTextProfileStyle,
-             .createTextProfile,
-             .storeTextProfile,
-             .useTextProfile,
-             .removeTextProfile,
-             .resetTextProfile,
-             .textReplacements,
-             .addTextReplacement,
-             .replaceTextReplacement,
-             .removeTextReplacement,
-             .clearTextReplacements,
-             .listQueue,
-             .status,
-             .overview,
-             .switchSpeechBackend,
-             .reloadModels,
-             .unloadModels,
-             .playback,
-             .clearQueue,
-             .cancelRequest:
-            nil
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
+                textContext
+            case .queueBatch:
+                nil
+            case .generatedFile,
+                 .generatedFiles,
+                 .generatedBatch,
+                 .generatedBatches,
+                 .expireGenerationJob,
+                 .generationJob,
+                 .generationJobs,
+                 .createProfile,
+                 .createClone,
+                 .listProfiles,
+                 .renameProfile,
+                 .rerollProfile,
+                 .removeProfile,
+                 .textProfileActive,
+                 .textProfile,
+                 .textProfiles,
+                 .textProfileStyle,
+                 .textProfileEffective,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .setTextProfileStyle,
+                 .createTextProfile,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .removeTextProfile,
+                 .resetTextProfile,
+                 .textReplacements,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement,
+                 .clearTextReplacements,
+                 .listQueue,
+                 .status,
+                 .overview,
+                 .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
+                nil
         }
     }
 
     var sourceFormat: TextForSpeech.SourceFormat? {
         switch self {
-        case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
-            sourceFormat
-        case .queueBatch:
-            nil
-        case .generatedFile,
-             .generatedFiles,
-             .generatedBatch,
-             .generatedBatches,
-             .expireGenerationJob,
-             .generationJob,
-             .generationJobs,
-             .createProfile,
-             .createClone,
-             .listProfiles,
-             .renameProfile,
-             .rerollProfile,
-             .removeProfile,
-             .textProfileActive,
-             .textProfile,
-             .textProfiles,
-             .textProfileStyle,
-             .textProfileEffective,
-             .textProfilePersistence,
-             .loadTextProfiles,
-             .saveTextProfiles,
-             .setTextProfileStyle,
-             .createTextProfile,
-             .storeTextProfile,
-             .useTextProfile,
-             .removeTextProfile,
-             .resetTextProfile,
-             .textReplacements,
-             .addTextReplacement,
-             .replaceTextReplacement,
-             .removeTextReplacement,
-             .clearTextReplacements,
-             .listQueue,
-             .status,
-             .overview,
-             .switchSpeechBackend,
-             .reloadModels,
-             .unloadModels,
-             .playback,
-             .clearQueue,
-             .cancelRequest:
-            nil
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
+                sourceFormat
+            case .queueBatch:
+                nil
+            case .generatedFile,
+                 .generatedFiles,
+                 .generatedBatch,
+                 .generatedBatches,
+                 .expireGenerationJob,
+                 .generationJob,
+                 .generationJobs,
+                 .createProfile,
+                 .createClone,
+                 .listProfiles,
+                 .renameProfile,
+                 .rerollProfile,
+                 .removeProfile,
+                 .textProfileActive,
+                 .textProfile,
+                 .textProfiles,
+                 .textProfileStyle,
+                 .textProfileEffective,
+                 .textProfilePersistence,
+                 .loadTextProfiles,
+                 .saveTextProfiles,
+                 .setTextProfileStyle,
+                 .createTextProfile,
+                 .storeTextProfile,
+                 .useTextProfile,
+                 .removeTextProfile,
+                 .resetTextProfile,
+                 .textReplacements,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement,
+                 .clearTextReplacements,
+                 .listQueue,
+                 .status,
+                 .overview,
+                 .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels,
+                 .playback,
+                 .clearQueue,
+                 .cancelRequest:
+                nil
         }
     }
 
@@ -990,7 +993,7 @@ enum WorkerRequest: Sendable, Equatable {
         } catch let error as DecodingError {
             throw WorkerError(
                 code: .invalidRequest,
-                message: "The request line contains an invalid field value or shape. \(describeDecodingError(error))"
+                message: "The request line contains an invalid field value or shape. \(describeDecodingError(error))",
             )
         } catch {
             throw WorkerError(code: .invalidJSON, message: "The request line is not valid JSON. Each request must be a single JSON object on one line.")
@@ -999,274 +1002,277 @@ enum WorkerRequest: Sendable, Equatable {
         guard let id = raw.id?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty else {
             throw WorkerError(code: .invalidRequest, message: "The request is missing a non-empty 'id' field.")
         }
-
         guard let op = raw.op?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty else {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty 'op' field.")
         }
 
         switch op {
-        case "generate_speech":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let resolved = try RawWorkerRequest.resolveSpeechTextInput(
-                id: id,
-                text: raw.text,
-                textProfileName: raw.textProfileName,
-                cwd: raw.cwd,
-                repoRoot: raw.repoRoot,
-                textFormat: raw.textFormat,
-                nestedSourceFormat: raw.nestedSourceFormat,
-                sourceFormat: raw.sourceFormat
-            )
-            return .queueSpeech(
-                id: id,
-                text: resolved.text,
-                profileName: profileName,
-                textProfileName: resolved.textProfileName,
-                jobType: .live,
-                textContext: resolved.textContext,
-                sourceFormat: resolved.sourceFormat
-            )
-
-        case "generate_audio_file":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let resolved = try RawWorkerRequest.resolveSpeechTextInput(
-                id: id,
-                text: raw.text,
-                textProfileName: raw.textProfileName,
-                cwd: raw.cwd,
-                repoRoot: raw.repoRoot,
-                textFormat: raw.textFormat,
-                nestedSourceFormat: raw.nestedSourceFormat,
-                sourceFormat: raw.sourceFormat
-            )
-            return .queueSpeech(
-                id: id,
-                text: resolved.text,
-                profileName: profileName,
-                textProfileName: resolved.textProfileName,
-                jobType: .file,
-                textContext: resolved.textContext,
-                sourceFormat: resolved.sourceFormat
-            )
-
-        case "generate_batch":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
-            return .queueBatch(id: id, profileName: profileName, items: items)
-
-        case "get_generated_file":
-            let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
-            return .generatedFile(id: id, artifactID: artifactID)
-
-        case "list_generated_files":
-            return .generatedFiles(id: id)
-
-        case "get_generated_batch":
-            let batchID = try requireNonEmpty(raw.batchID ?? raw.jobID, field: "batch_id", id: id)
-            return .generatedBatch(id: id, batchID: batchID)
-
-        case "list_generated_batches":
-            return .generatedBatches(id: id)
-
-        case "expire_generation_job":
-            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
-            return .expireGenerationJob(id: id, jobID: jobID)
-
-        case "get_generation_job":
-            let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
-            return .generationJob(id: id, jobID: jobID)
-
-        case "list_generation_jobs":
-            return .generationJobs(id: id)
-
-        case "create_voice_profile_from_description":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let text = try requireNonEmpty(raw.text, field: "text", id: id)
-            let vibe = try require(raw.vibe, field: "vibe", id: id)
-            let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
-            let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .createProfile(
-                id: id,
-                profileName: profileName,
-                text: text,
-                vibe: vibe,
-                voiceDescription: voiceDescription,
-                outputPath: outputPath,
-                cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            )
-
-        case "create_voice_profile_from_audio":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
-            let vibe = try require(raw.vibe, field: "vibe", id: id)
-            let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .createClone(
-                id: id,
-                profileName: profileName,
-                referenceAudioPath: referenceAudioPath,
-                vibe: vibe,
-                transcript: transcript,
-                cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            )
-
-        case "list_voice_profiles":
-            return .listProfiles(id: id)
-
-        case "update_voice_profile_name":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            let newProfileName = try requireNonEmpty(raw.newProfileName, field: "new_profile_name", id: id)
-            return .renameProfile(id: id, profileName: profileName, newProfileName: newProfileName)
-
-        case "reroll_voice_profile":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            return .rerollProfile(id: id, profileName: profileName)
-
-        case "delete_voice_profile":
-            let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
-            return .removeProfile(id: id, profileName: profileName)
-
-        case "get_active_text_profile":
-            return .textProfileActive(id: id)
-
-        case "get_text_profile":
-            let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
-            return .textProfile(id: id, name: textProfileName)
-
-        case "list_text_profiles":
-            return .textProfiles(id: id)
-
-        case "get_text_profile_style":
-            return .textProfileStyle(id: id)
-
-        case "get_effective_text_profile":
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .textProfileEffective(id: id, name: textProfileName)
-
-        case "get_text_profile_persistence":
-            return .textProfilePersistence(id: id)
-
-        case "load_text_profiles":
-            return .loadTextProfiles(id: id)
-
-        case "save_text_profiles":
-            return .saveTextProfiles(id: id)
-
-        case "set_text_profile_style":
-            let style = try require(raw.textProfileStyle, field: "text_profile_style", id: id)
-            return .setTextProfileStyle(id: id, style: style)
-
-        case "create_text_profile":
-            let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
-            let textProfileDisplayName = try requireNonEmpty(
-                raw.textProfileDisplayName,
-                field: "text_profile_display_name",
-                id: id
-            )
-            return .createTextProfile(
-                id: id,
-                profileID: textProfileID,
-                profileName: textProfileDisplayName,
-                replacements: raw.replacements ?? []
-            )
-
-        case "replace_text_profile":
-            guard let textProfile = raw.textProfile else {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' is missing a 'text_profile' object."
+            case "generate_speech":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let resolved = try RawWorkerRequest.resolveSpeechTextInput(
+                    id: id,
+                    text: raw.text,
+                    textProfileName: raw.textProfileName,
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    textFormat: raw.textFormat,
+                    nestedSourceFormat: raw.nestedSourceFormat,
+                    sourceFormat: raw.sourceFormat,
                 )
-            }
-            return .storeTextProfile(id: id, profile: textProfile)
-
-        case "replace_active_text_profile":
-            guard let textProfile = raw.textProfile else {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' is missing a 'text_profile' object."
+                return .queueSpeech(
+                    id: id,
+                    text: resolved.text,
+                    profileName: profileName,
+                    textProfileName: resolved.textProfileName,
+                    jobType: .live,
+                    textContext: resolved.textContext,
+                    sourceFormat: resolved.sourceFormat,
                 )
-            }
-            return .useTextProfile(id: id, profile: textProfile)
 
-        case "delete_text_profile":
-            let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
-            return .removeTextProfile(id: id, profileName: textProfileName)
-
-        case "reset_text_profile":
-            return .resetTextProfile(id: id)
-
-        case "list_text_replacements":
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .textReplacements(id: id, profileName: textProfileName)
-
-        case "create_text_replacement":
-            guard let replacement = raw.replacement else {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' is missing a 'replacement' object."
+            case "generate_audio_file":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let resolved = try RawWorkerRequest.resolveSpeechTextInput(
+                    id: id,
+                    text: raw.text,
+                    textProfileName: raw.textProfileName,
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    textFormat: raw.textFormat,
+                    nestedSourceFormat: raw.nestedSourceFormat,
+                    sourceFormat: raw.sourceFormat,
                 )
-            }
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .addTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
-
-        case "replace_text_replacement":
-            guard let replacement = raw.replacement else {
-                throw WorkerError(
-                    code: .invalidRequest,
-                    message: "Request '\(id)' is missing a 'replacement' object."
+                return .queueSpeech(
+                    id: id,
+                    text: resolved.text,
+                    profileName: profileName,
+                    textProfileName: resolved.textProfileName,
+                    jobType: .file,
+                    textContext: resolved.textContext,
+                    sourceFormat: resolved.sourceFormat,
                 )
-            }
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .replaceTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
 
-        case "delete_text_replacement":
-            let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
+            case "generate_batch":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
+                return .queueBatch(id: id, profileName: profileName, items: items)
 
-        case "clear_text_replacements":
-            let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-            return .clearTextReplacements(id: id, profileName: textProfileName)
+            case "get_generated_file":
+                let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
+                return .generatedFile(id: id, artifactID: artifactID)
 
-        case "list_generation_queue":
-            return .listQueue(id: id, queueType: .generation)
+            case "list_generated_files":
+                return .generatedFiles(id: id)
 
-        case "list_playback_queue":
-            return .listQueue(id: id, queueType: .playback)
+            case "get_generated_batch":
+                let batchID = try requireNonEmpty(raw.batchID ?? raw.jobID, field: "batch_id", id: id)
+                return .generatedBatch(id: id, batchID: batchID)
 
-        case "get_status":
-            return .status(id: id)
+            case "list_generated_batches":
+                return .generatedBatches(id: id)
 
-        case "get_runtime_overview":
-            return .overview(id: id)
+            case "expire_generation_job":
+                let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+                return .expireGenerationJob(id: id, jobID: jobID)
 
-        case "set_speech_backend":
-            let speechBackend = try require(raw.speechBackend, field: "speech_backend", id: id)
-            return .switchSpeechBackend(id: id, speechBackend: speechBackend)
+            case "get_generation_job":
+                let jobID = try requireNonEmpty(raw.jobID, field: "job_id", id: id)
+                return .generationJob(id: id, jobID: jobID)
 
-        case "reload_models":
-            return .reloadModels(id: id)
+            case "list_generation_jobs":
+                return .generationJobs(id: id)
 
-        case "unload_models":
-            return .unloadModels(id: id)
+            case "create_voice_profile_from_description":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let text = try requireNonEmpty(raw.text, field: "text", id: id)
+                let vibe = try require(raw.vibe, field: "vibe", id: id)
+                let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
+                let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .createProfile(
+                    id: id,
+                    profileName: profileName,
+                    text: text,
+                    vibe: vibe,
+                    voiceDescription: voiceDescription,
+                    outputPath: outputPath,
+                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                )
 
-        case "playback_pause":
-            return .playback(id: id, action: .pause)
+            case "create_voice_profile_from_audio":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
+                let vibe = try require(raw.vibe, field: "vibe", id: id)
+                let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .createClone(
+                    id: id,
+                    profileName: profileName,
+                    referenceAudioPath: referenceAudioPath,
+                    vibe: vibe,
+                    transcript: transcript,
+                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                )
 
-        case "playback_resume":
-            return .playback(id: id, action: .resume)
+            case "list_voice_profiles":
+                return .listProfiles(id: id)
 
-        case "get_playback_state":
-            return .playback(id: id, action: .state)
+            case "update_voice_profile_name":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let newProfileName = try requireNonEmpty(raw.newProfileName, field: "new_profile_name", id: id)
+                return .renameProfile(id: id, profileName: profileName, newProfileName: newProfileName)
 
-        case "clear_queue":
-            return .clearQueue(id: id)
+            case "reroll_voice_profile":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                return .rerollProfile(id: id, profileName: profileName)
 
-        case "cancel_request":
-            let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
-            return .cancelRequest(id: id, requestID: requestID)
+            case "delete_voice_profile":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                return .removeProfile(id: id, profileName: profileName)
 
-        default:
-            throw WorkerError(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")
+            case "get_active_text_profile":
+                return .textProfileActive(id: id)
+
+            case "get_text_profile":
+                let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
+                return .textProfile(id: id, name: textProfileName)
+
+            case "list_text_profiles":
+                return .textProfiles(id: id)
+
+            case "get_text_profile_style":
+                return .textProfileStyle(id: id)
+
+            case "get_effective_text_profile":
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .textProfileEffective(id: id, name: textProfileName)
+
+            case "get_text_profile_persistence":
+                return .textProfilePersistence(id: id)
+
+            case "load_text_profiles":
+                return .loadTextProfiles(id: id)
+
+            case "save_text_profiles":
+                return .saveTextProfiles(id: id)
+
+            case "set_text_profile_style":
+                let style = try require(raw.textProfileStyle, field: "text_profile_style", id: id)
+                return .setTextProfileStyle(id: id, style: style)
+
+            case "create_text_profile":
+                let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+                let textProfileDisplayName = try requireNonEmpty(
+                    raw.textProfileDisplayName,
+                    field: "text_profile_display_name",
+                    id: id,
+                )
+                return .createTextProfile(
+                    id: id,
+                    profileID: textProfileID,
+                    profileName: textProfileDisplayName,
+                    replacements: raw.replacements ?? [],
+                )
+
+            case "replace_text_profile":
+                guard let textProfile = raw.textProfile else {
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "Request '\(id)' is missing a 'text_profile' object.",
+                    )
+                }
+
+                return .storeTextProfile(id: id, profile: textProfile)
+
+            case "replace_active_text_profile":
+                guard let textProfile = raw.textProfile else {
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "Request '\(id)' is missing a 'text_profile' object.",
+                    )
+                }
+
+                return .useTextProfile(id: id, profile: textProfile)
+
+            case "delete_text_profile":
+                let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
+                return .removeTextProfile(id: id, profileName: textProfileName)
+
+            case "reset_text_profile":
+                return .resetTextProfile(id: id)
+
+            case "list_text_replacements":
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .textReplacements(id: id, profileName: textProfileName)
+
+            case "create_text_replacement":
+                guard let replacement = raw.replacement else {
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "Request '\(id)' is missing a 'replacement' object.",
+                    )
+                }
+
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .addTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+
+            case "replace_text_replacement":
+                guard let replacement = raw.replacement else {
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "Request '\(id)' is missing a 'replacement' object.",
+                    )
+                }
+
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .replaceTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+
+            case "delete_text_replacement":
+                let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
+
+            case "clear_text_replacements":
+                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .clearTextReplacements(id: id, profileName: textProfileName)
+
+            case "list_generation_queue":
+                return .listQueue(id: id, queueType: .generation)
+
+            case "list_playback_queue":
+                return .listQueue(id: id, queueType: .playback)
+
+            case "get_status":
+                return .status(id: id)
+
+            case "get_runtime_overview":
+                return .overview(id: id)
+
+            case "set_speech_backend":
+                let speechBackend = try require(raw.speechBackend, field: "speech_backend", id: id)
+                return .switchSpeechBackend(id: id, speechBackend: speechBackend)
+
+            case "reload_models":
+                return .reloadModels(id: id)
+
+            case "unload_models":
+                return .unloadModels(id: id)
+
+            case "playback_pause":
+                return .playback(id: id, action: .pause)
+
+            case "playback_resume":
+                return .playback(id: id, action: .resume)
+
+            case "get_playback_state":
+                return .playback(id: id, action: .state)
+
+            case "clear_queue":
+                return .clearQueue(id: id)
+
+            case "cancel_request":
+                let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
+                return .cancelRequest(id: id, requestID: requestID)
+
+            default:
+                throw WorkerError(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")
         }
     }
 
@@ -1274,6 +1280,7 @@ enum WorkerRequest: Sendable, Equatable {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
         }
+
         return trimmed
     }
 
@@ -1281,19 +1288,20 @@ enum WorkerRequest: Sendable, Equatable {
         guard let value else {
             throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a '\(field)' field.")
         }
+
         return value
     }
 
     private static func describeDecodingError(_ error: DecodingError) -> String {
         switch error {
-        case .dataCorrupted(let context):
-            context.debugDescription
-        case .keyNotFound(let key, let context):
-            "Missing key '\(key.stringValue)'. \(context.debugDescription)"
-        case .typeMismatch(_, let context), .valueNotFound(_, let context):
-            context.debugDescription
-        @unknown default:
-            "The request payload could not be decoded."
+            case let .dataCorrupted(context):
+                context.debugDescription
+            case let .keyNotFound(key, context):
+                "Missing key '\(key.stringValue)'. \(context.debugDescription)"
+            case let .typeMismatch(_, context), let .valueNotFound(_, context):
+                context.debugDescription
+            @unknown default:
+                "The request payload could not be decoded."
         }
     }
 }

@@ -10,7 +10,7 @@ extension SpeakSwiftly.Runtime {
         text: String,
         voice: MarvisResidentVoice,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
         model.generateSamplesStream(
             text: text,
@@ -19,7 +19,7 @@ extension SpeakSwiftly.Runtime {
             refText: nil,
             language: nil,
             generationParameters: generationParameters,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
         )
     }
 }

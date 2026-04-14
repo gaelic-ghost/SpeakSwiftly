@@ -6,7 +6,7 @@ import TextForSpeech
 extension SpeakSwiftly.Runtime {
     private static func makeDefaultNormalizer(
         persistenceURL: URL,
-        dependencies: WorkerDependencies
+        dependencies: WorkerDependencies,
     ) -> SpeakSwiftly.Normalizer {
         do {
             return try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
@@ -17,18 +17,18 @@ extension SpeakSwiftly.Runtime {
                 do {
                     try dependencies.fileManager.moveItem(at: persistenceURL, to: archiveURL)
                     dependencies.writeStderr(
-                        "SpeakSwiftly could not load persisted text profiles from '\(persistenceURL.path)'. The unreadable archive was moved to '\(archiveURL.path)', and SpeakSwiftly will continue with a fresh text-profile state. \(error.localizedDescription)\n"
+                        "SpeakSwiftly could not load persisted text profiles from '\(persistenceURL.path)'. The unreadable archive was moved to '\(archiveURL.path)', and SpeakSwiftly will continue with a fresh text-profile state. \(error.localizedDescription)\n",
                     )
 
                     return try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
                 } catch {
                     dependencies.writeStderr(
-                        "SpeakSwiftly could not recover the unreadable text-profile archive at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n"
+                        "SpeakSwiftly could not recover the unreadable text-profile archive at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n",
                     )
                 }
             } else {
                 dependencies.writeStderr(
-                    "SpeakSwiftly could not initialize text-profile persistence at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n"
+                    "SpeakSwiftly could not initialize text-profile persistence at '\(persistenceURL.path)'. SpeakSwiftly will continue without that archive. \(error.localizedDescription)\n",
                 )
             }
 
@@ -36,7 +36,13 @@ extension SpeakSwiftly.Runtime {
                 .deletingLastPathComponent()
                 .appending(path: "text-profiles.recovery.\(UUID().uuidString).json")
 
-            return try! SpeakSwiftly.Normalizer(persistenceURL: recoveryURL)
+            do {
+                return try SpeakSwiftly.Normalizer(persistenceURL: recoveryURL)
+            } catch {
+                fatalError(
+                    "SpeakSwiftly could not create a recovery text normalizer at '\(recoveryURL.path)' after the primary archive failed to load. SpeakSwiftly cannot continue without a writable text-profile archive. \(error.localizedDescription)",
+                )
+            }
         }
     }
 
@@ -49,43 +55,43 @@ extension SpeakSwiftly.Runtime {
     // MARK: - Lifecycle
 
     static func liftoff(
-        configuration: SpeakSwiftly.Configuration? = nil
+        configuration: SpeakSwiftly.Configuration? = nil,
     ) async -> SpeakSwiftly.Runtime {
         let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
         let persistedConfiguration = resolvedPersistedConfiguration(
             dependencies: dependencies,
-            environment: environment
+            environment: environment,
         )
         let configuredSpeechBackend = resolvedSpeechBackend(
             environment: environment,
             configuration: configuration
-                ?? persistedConfiguration
+                ?? persistedConfiguration,
         )
         let configuredQwenConditioningStrategy = resolvedQwenConditioningStrategy(
             configuration: configuration
-                ?? persistedConfiguration
+                ?? persistedConfiguration,
         )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
                 fileManager: dependencies.fileManager,
-                overridePath: environment[Environment.profileRootOverride]
+                overridePath: environment[Environment.profileRootOverride],
             ),
-            fileManager: dependencies.fileManager
+            fileManager: dependencies.fileManager,
         )
         let generatedFileStore = GeneratedFileStore(
-            rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true)
+            rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
         )
         let generationJobStore = GenerationJobStore(
-            rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true)
+            rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
         )
         let textProfilesURL = profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
         let normalizer = configuration?.textNormalizer
             ?? makeDefaultNormalizer(
                 persistenceURL: textProfilesURL,
-                dependencies: dependencies
+                dependencies: dependencies,
             )
-        let playbackController = PlaybackController(driver: await dependencies.makePlaybackController())
+        let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
 
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
@@ -95,7 +101,7 @@ extension SpeakSwiftly.Runtime {
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
-            playbackController: playbackController
+            playbackController: playbackController,
         )
         await runtime.installPlaybackHooks()
         return runtime
@@ -103,7 +109,7 @@ extension SpeakSwiftly.Runtime {
 
     static func resolvedSpeechBackend(
         environment: [String: String],
-        configuration: SpeakSwiftly.Configuration?
+        configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.SpeechBackend {
         if let configuration {
             return configuration.speechBackend
@@ -119,34 +125,35 @@ extension SpeakSwiftly.Runtime {
     static func resolvedSpeechBackend(
         dependencies _: WorkerDependencies,
         environment: [String: String],
-        configuration: SpeakSwiftly.Configuration?
+        configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.SpeechBackend {
         resolvedSpeechBackend(
             environment: environment,
-            configuration: configuration
+            configuration: configuration,
         )
     }
 
     static func resolvedQwenConditioningStrategy(
-        configuration: SpeakSwiftly.Configuration?
+        configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.QwenConditioningStrategy {
         configuration?.qwenConditioningStrategy ?? .legacyRaw
     }
 
     private static func resolvedPersistedConfiguration(
         dependencies: WorkerDependencies,
-        environment: [String: String]
+        environment: [String: String],
     ) -> SpeakSwiftly.Configuration? {
         do {
             return try SpeakSwiftly.Configuration.loadDefault(
                 fileManager: dependencies.fileManager,
-                profileRootOverride: environment[Environment.profileRootOverride]
+                profileRootOverride: environment[Environment.profileRootOverride],
             )
         } catch {
             let configurationPath = SpeakSwiftly.Configuration.defaultPersistenceURL(
                 fileManager: dependencies.fileManager,
-                profileRootOverride: environment[Environment.profileRootOverride]
-            ).path
+                profileRootOverride: environment[Environment.profileRootOverride],
+            )
+            .path
             let message = "SpeakSwiftly could not load persisted runtime configuration from '\(configurationPath)'. Falling back to the default runtime configuration. \(error.localizedDescription)\n"
             dependencies.writeStderr(message)
             return nil
@@ -171,10 +178,11 @@ extension SpeakSwiftly.Runtime {
                 },
                 resumeQueue: { [weak self] in
                     guard let self else { return }
-                    try? await self.startNextGenerationIfPossible()
-                    await self.playbackController.startNextIfPossible()
-                }
-            )
+
+                    try? await startNextGenerationIfPossible()
+                    await playbackController.startNextIfPossible()
+                },
+            ),
         )
     }
 
@@ -202,6 +210,7 @@ extension SpeakSwiftly.Runtime {
 
     public func start() {
         guard preloadTask == nil else { return }
+
         startResidentPreload()
     }
 
@@ -220,16 +229,17 @@ extension SpeakSwiftly.Runtime {
                     "speech_backend": .string(targetSpeechBackend.rawValue),
                     "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                     "profile_root": .string(profileStore.rootURL.path),
-                ]
+                ],
             )
 
             do {
                 try profileStore.ensureRootExists()
                 let residentModels = try await dependencies.loadResidentModels(targetSpeechBackend)
                 let playbackEngineWasPrepared = try await playbackController.prepare(
-                    sampleRate: Double(primaryResidentSampleRate(for: residentModels))
+                    sampleRate: Double(primaryResidentSampleRate(for: residentModels)),
                 )
                 guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
+
                 residentState = .ready(residentModels)
                 await emitStatus(.residentModelReady)
                 await logEvent(
@@ -238,7 +248,7 @@ extension SpeakSwiftly.Runtime {
                         "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                    ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
+                    ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
                 if playbackEngineWasPrepared {
                     await logEvent(
@@ -246,7 +256,7 @@ extension SpeakSwiftly.Runtime {
                         details: [
                             "sample_rate": .int(primaryResidentSampleRate(for: residentModels)),
                             "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                        ].merging(memoryDetails(), uniquingKeysWith: { _, new in new })
+                        ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                     )
                 }
                 try await startNextGenerationIfPossible()
@@ -257,7 +267,7 @@ extension SpeakSwiftly.Runtime {
 
                 let workerError = WorkerError(
                     code: .modelGenerationFailed,
-                    message: "Resident model preload was cancelled before \(preloadModelRepos.joined(separator: ", ")) finished loading for the '\(targetSpeechBackend.rawValue)' backend."
+                    message: "Resident model preload was cancelled before \(preloadModelRepos.joined(separator: ", ")) finished loading for the '\(targetSpeechBackend.rawValue)' backend.",
                 )
                 residentState = .failed(workerError)
                 await logError(
@@ -266,12 +276,13 @@ extension SpeakSwiftly.Runtime {
                         "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                    ]
+                    ],
                 )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch let workerError as WorkerError {
                 guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
+
                 residentState = .failed(workerError)
                 await logError(
                     "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(targetSpeechBackend.rawValue)' backend. \(workerError.message)",
@@ -280,15 +291,16 @@ extension SpeakSwiftly.Runtime {
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                         "failure_code": .string(workerError.code.rawValue),
-                    ]
+                    ],
                 )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
             } catch {
                 guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
+
                 let workerError = WorkerError(
                     code: .modelGenerationFailed,
-                    message: "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(targetSpeechBackend.rawValue)' backend. \(error.localizedDescription)"
+                    message: "Resident model preload failed while loading \(preloadModelRepos.joined(separator: ", ")) for the '\(targetSpeechBackend.rawValue)' backend. \(error.localizedDescription)",
                 )
                 residentState = .failed(workerError)
                 await logError(
@@ -297,7 +309,7 @@ extension SpeakSwiftly.Runtime {
                         "speech_backend": .string(targetSpeechBackend.rawValue),
                         "model_repos": .string(preloadModelRepos.joined(separator: ",")),
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                    ]
+                    ],
                 )
                 await emitStatus(.residentModelFailed)
                 await failQueuedRequests(with: workerError)
@@ -319,12 +331,12 @@ extension SpeakSwiftly.Runtime {
             let id = bestEffortID(from: line)
             let workerError = WorkerError(
                 code: .internalError,
-                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)"
+                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
             )
             failRequestStream(for: id, error: workerError)
             await emitFailure(
                 id: id,
-                error: workerError
+                error: workerError,
             )
             return
         }
@@ -334,12 +346,12 @@ extension SpeakSwiftly.Runtime {
         if isShuttingDown {
             let workerError = WorkerError(
                 code: .workerShuttingDown,
-                message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down."
+                message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down.",
             )
             failRequestStream(for: request.id, error: workerError)
             await emitFailure(
                 id: request.id,
-                error: workerError
+                error: workerError,
             )
             return
         }
@@ -350,7 +362,7 @@ extension SpeakSwiftly.Runtime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: await generationQueueDepth()
+                queueDepth: generationQueueDepth(),
             )
             await emitStarted(for: request)
             yieldRequestEvent(.started(WorkerStartedEvent(id: request.id, op: request.opName)), for: request.id)
@@ -359,7 +371,7 @@ extension SpeakSwiftly.Runtime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: await generationQueueDepth()
+                queueDepth: generationQueueDepth(),
             )
             Task {
                 await self.processImmediateControlRequest(request)
@@ -367,10 +379,10 @@ extension SpeakSwiftly.Runtime {
             return
         }
 
-        if case .failed(let error) = residentState, request.requiresResidentModels {
+        if case let .failed(error) = residentState, request.requiresResidentModels {
             let workerError = WorkerError(
                 code: error.code,
-                message: "Request '\(request.id)' cannot start because the resident model state is failed. Queue `reload_models` or `set_speech_backend` first, then retry the generation request."
+                message: "Request '\(request.id)' cannot start because the resident model state is failed. Queue `reload_models` or `set_speech_backend` first, then retry the generation request.",
             )
             failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
@@ -380,7 +392,7 @@ extension SpeakSwiftly.Runtime {
         if request.requiresPlayback, await playbackController.jobCount() >= maxAcceptedSpeechJobs {
             let workerError = WorkerError(
                 code: .invalidRequest,
-                message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more."
+                message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more.",
             )
             failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
@@ -397,7 +409,7 @@ extension SpeakSwiftly.Runtime {
         } catch {
             let workerError = WorkerError(
                 code: .filesystemError,
-                message: "Request '\(request.id)' could not create a persisted generation job record before queueing generation work. \(error.localizedDescription)"
+                message: "Request '\(request.id)' could not create a persisted generation job record before queueing generation work. \(error.localizedDescription)",
             )
             failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
@@ -409,7 +421,7 @@ extension SpeakSwiftly.Runtime {
             requestID: request.id,
             op: request.opName,
             profileName: request.profileName,
-            queueDepth: await generationQueueDepth()
+            queueDepth: generationQueueDepth(),
         )
         if request.requiresPlayback {
             let speechJob = await makeSpeechJobState(for: request)
@@ -424,17 +436,17 @@ extension SpeakSwiftly.Runtime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: await generationQueueDepth(),
+                queueDepth: generationQueueDepth(),
                 details: [
                     "park_reason": .string(queuedEvent.reason.rawValue),
-                    "queue_position": .int(queuedEvent.queuePosition)
-                ]
+                    "queue_position": .int(queuedEvent.queuePosition),
+                ],
             )
         }
         if request.acknowledgesEnqueueImmediately {
             let acknowledgement = WorkerSuccessResponse(
                 id: request.id,
-                generationJob: queuedGenerationJob
+                generationJob: queuedGenerationJob,
             )
             yieldRequestEvent(.acknowledged(acknowledgement), for: request.id)
             await logRequestEvent(
@@ -442,7 +454,7 @@ extension SpeakSwiftly.Runtime {
                 requestID: request.id,
                 op: request.opName,
                 profileName: request.profileName,
-                queueDepth: await generationQueueDepth()
+                queueDepth: generationQueueDepth(),
             )
             await emit(acknowledgement)
         }

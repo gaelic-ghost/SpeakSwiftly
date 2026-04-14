@@ -6,12 +6,9 @@ import TextForSpeech
 public extension SpeakSwiftly {
     // MARK: Batch Input
 
+    /// One batch-generation item to synthesize under a shared voice profile.
     struct BatchItem: Codable, Sendable, Equatable {
-        public let artifactID: String?
-        public let text: String
-        public let textProfileName: String?
-        public let textContext: TextForSpeech.Context?
-        public let sourceFormat: TextForSpeech.SourceFormat?
+        // MARK: Nested Types
 
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
@@ -21,12 +18,22 @@ public extension SpeakSwiftly {
             case sourceFormat = "source_format"
         }
 
+        // MARK: Properties
+
+        public let artifactID: String?
+        public let text: String
+        public let textProfileName: String?
+        public let textContext: TextForSpeech.Context?
+        public let sourceFormat: TextForSpeech.SourceFormat?
+
+        // MARK: Lifecycle
+
         public init(
             artifactID: String? = nil,
             text: String,
             textProfileName: String? = nil,
             textContext: TextForSpeech.Context? = nil,
-            sourceFormat: TextForSpeech.SourceFormat? = nil
+            sourceFormat: TextForSpeech.SourceFormat? = nil,
         ) {
             self.artifactID = artifactID
             self.text = text
@@ -38,23 +45,8 @@ public extension SpeakSwiftly {
 
     // MARK: Batch Output
 
+    /// A retained batch-generation snapshot.
     struct GeneratedBatch: Codable, Sendable, Equatable {
-        public let batchID: String
-        public let profileName: String
-        public let textProfileName: String?
-        public let speechBackend: SpeechBackend
-        public let state: GenerationJobState
-        public let items: [GenerationJobItem]
-        public let artifacts: [GeneratedFile]
-        public let failure: GenerationJobFailure?
-        public let createdAt: Date
-        public let updatedAt: Date
-        public let startedAt: Date?
-        public let completedAt: Date?
-        public let failedAt: Date?
-        public let expiresAt: Date?
-        public let retentionPolicy: GenerationRetentionPolicy
-
         enum CodingKeys: String, CodingKey {
             case batchID = "batch_id"
             case profileName = "profile_name"
@@ -73,6 +65,22 @@ public extension SpeakSwiftly {
             case retentionPolicy = "retention_policy"
         }
 
+        public let batchID: String
+        public let profileName: String
+        public let textProfileName: String?
+        public let speechBackend: SpeechBackend
+        public let state: GenerationJobState
+        public let items: [GenerationJobItem]
+        public let artifacts: [GeneratedFile]
+        public let failure: GenerationJobFailure?
+        public let createdAt: Date
+        public let updatedAt: Date
+        public let startedAt: Date?
+        public let completedAt: Date?
+        public let failedAt: Date?
+        public let expiresAt: Date?
+        public let retentionPolicy: GenerationRetentionPolicy
+
         init(
             batchID: String,
             profileName: String,
@@ -88,7 +96,7 @@ public extension SpeakSwiftly {
             completedAt: Date?,
             failedAt: Date?,
             expiresAt: Date?,
-            retentionPolicy: GenerationRetentionPolicy
+            retentionPolicy: GenerationRetentionPolicy,
         ) {
             self.batchID = batchID
             self.profileName = profileName
@@ -112,10 +120,12 @@ public extension SpeakSwiftly {
 public extension SpeakSwiftly.Artifacts {
     // MARK: Batch Queries
 
+    /// Fetches one retained generated batch by identifier.
     func batch(id batchID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.generatedBatch(id: UUID().uuidString, batchID: batchID))
     }
 
+    /// Lists the retained generated batches known to the runtime.
     func batches() async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.generatedBatches(id: UUID().uuidString))
     }
@@ -124,9 +134,10 @@ public extension SpeakSwiftly.Artifacts {
 public extension SpeakSwiftly.Runtime {
     // MARK: Batch Helpers
 
+    /// Resolves batch items into retained job items with concrete artifact identifiers.
     static func resolveBatchItems(
         _ items: [SpeakSwiftly.BatchItem],
-        batchID: String
+        batchID: String,
     ) -> [SpeakSwiftly.GenerationJobItem] {
         items.enumerated().map { index, item in
             SpeakSwiftly.GenerationJobItem(
@@ -134,7 +145,7 @@ public extension SpeakSwiftly.Runtime {
                 text: item.text,
                 textProfileName: item.textProfileName,
                 textContext: item.textContext,
-                sourceFormat: item.sourceFormat
+                sourceFormat: item.sourceFormat,
             )
         }
     }

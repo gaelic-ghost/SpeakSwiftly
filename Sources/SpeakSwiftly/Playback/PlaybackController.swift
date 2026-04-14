@@ -1,7 +1,7 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - Playback Jobs
+// MARK: - PlaybackJob
 
 final class PlaybackJob: @unchecked Sendable {
     let requestID: String
@@ -32,7 +32,7 @@ final class PlaybackJob: @unchecked Sendable {
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
         stream: AsyncThrowingStream<[Float], any Swift.Error>,
-        continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
+        continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation,
     ) {
         self.requestID = requestID
         self.op = op
@@ -49,7 +49,9 @@ final class PlaybackJob: @unchecked Sendable {
     }
 }
 
-struct PlaybackHooks: Sendable {
+// MARK: - PlaybackHooks
+
+struct PlaybackHooks {
     let handleEvent: @Sendable (PlaybackEvent, PlaybackJob) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
     let logFinished: @Sendable (PlaybackJob, PlaybackSummary, Double) async -> Void
@@ -57,13 +59,15 @@ struct PlaybackHooks: Sendable {
     let resumeQueue: @Sendable () async -> Void
 }
 
+// MARK: - PlaybackController
+
 actor PlaybackController {
-    struct ActivePlayback: Sendable {
+    struct ActivePlayback {
         let requestID: String
         let task: Task<Void, Never>
     }
 
-    struct ConcurrencySnapshot: Sendable, Equatable {
+    struct ConcurrencySnapshot: Equatable {
         let activeRequestID: String?
         let isStableForConcurrentGeneration: Bool
         let stableBufferedAudioMS: Int?
@@ -92,7 +96,8 @@ actor PlaybackController {
         Task {
             await driver.bindEnvironmentEvents { [weak self] (event: PlaybackEnvironmentEvent) in
                 guard let self else { return }
-                let activeRequest = await self.activeRequestSummary()
+
+                let activeRequest = await activeRequestSummary()
                 await hooks.handleEnvironmentEvent(event, activeRequest)
             }
         }
@@ -106,15 +111,15 @@ actor PlaybackController {
 
     func handle(_ action: PlaybackAction) async -> PlaybackState {
         switch action {
-        case .pause:
-            let driverState = await driver.pause()
-            return resolvedPlaybackState(driverState: driverState)
-        case .resume:
-            let driverState = await driver.resume()
-            return resolvedPlaybackState(driverState: driverState)
-        case .state:
-            let driverState = await driver.state()
-            return resolvedPlaybackState(driverState: driverState)
+            case .pause:
+                let driverState = await driver.pause()
+                return resolvedPlaybackState(driverState: driverState)
+            case .resume:
+                let driverState = await driver.resume()
+                return resolvedPlaybackState(driverState: driverState)
+            case .state:
+                let driverState = await driver.state()
+                return resolvedPlaybackState(driverState: driverState)
         }
     }
 
@@ -139,6 +144,7 @@ actor PlaybackController {
 
     func activeRequestSummary() -> ActiveWorkerRequestSummary? {
         guard let requestID = activePlayback?.requestID, let job = jobs[requestID] else { return nil }
+
         return ActiveWorkerRequestSummary(id: requestID, op: job.op, profileName: job.profileName)
     }
 
@@ -148,7 +154,7 @@ actor PlaybackController {
             isStableForConcurrentGeneration: activePlaybackIsStableForConcurrentGeneration,
             stableBufferedAudioMS: activePlaybackStableBufferedAudioMS,
             stableBufferTargetMS: activePlaybackStableBufferTargetMS,
-            isRebuffering: activePlaybackIsRebuffering
+            isRebuffering: activePlaybackIsRebuffering,
         )
     }
 
@@ -160,11 +166,12 @@ actor PlaybackController {
         let waitingQueue = queue.filter { $0 != activePlayback?.requestID }
         return waitingQueue.enumerated().compactMap { offset, requestID in
             guard let job = jobs[requestID] else { return nil }
+
             return QueuedWorkerRequestSummary(
                 id: requestID,
                 op: job.op,
                 profileName: job.profileName,
-                queuePosition: offset + 1
+                queuePosition: offset + 1,
             )
         }
     }
@@ -179,34 +186,17 @@ actor PlaybackController {
             isStableForConcurrentGeneration: concurrency.isStableForConcurrentGeneration,
             isRebuffering: concurrency.isRebuffering,
             stableBufferedAudioMS: concurrency.stableBufferedAudioMS,
-            stableBufferTargetMS: concurrency.stableBufferTargetMS
+            stableBufferTargetMS: concurrency.stableBufferTargetMS,
         )
-    }
-
-    private func resolvedPlaybackState(
-        driverState: PlaybackState,
-        activeRequest: ActiveWorkerRequestSummary? = nil
-    ) -> PlaybackState {
-        let resolvedActiveRequest = activeRequest ?? activeRequestSummary()
-        guard resolvedActiveRequest != nil else {
-            return .idle
-        }
-
-        if driverState == .paused {
-            return .paused
-        }
-
-        return .playing
     }
 
     func clearQueued(excluding protectedRequestIDs: Set<String>) -> [PlaybackJob] {
         let waitingRequestIDs = queue.filter { !protectedRequestIDs.contains($0) }
-        let removedJobs = waitingRequestIDs.compactMap { requestID in
+        return waitingRequestIDs.compactMap { requestID in
             let job = jobs.removeValue(forKey: requestID)
             queue.removeAll { $0 == requestID }
             return job
         }
-        return removedJobs
     }
 
     func cancel(requestID: String) async -> PlaybackJob? {
@@ -266,10 +256,26 @@ actor PlaybackController {
         job.playbackTask = task
     }
 
+    private func resolvedPlaybackState(
+        driverState: PlaybackState,
+        activeRequest: ActiveWorkerRequestSummary? = nil,
+    ) -> PlaybackState {
+        let resolvedActiveRequest = activeRequest ?? activeRequestSummary()
+        guard resolvedActiveRequest != nil else {
+            return .idle
+        }
+
+        if driverState == .paused {
+            return .paused
+        }
+
+        return .playing
+    }
+
     private func runPlayback(
         for job: PlaybackJob,
         sampleRate: Double,
-        hooks: PlaybackHooks
+        hooks: PlaybackHooks,
     ) async {
         let result: Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>
 
@@ -277,7 +283,7 @@ actor PlaybackController {
             let playbackSummary = try await driver.play(
                 sampleRate: sampleRate,
                 text: job.normalizedText,
-                stream: job.stream
+                stream: job.stream,
             ) { event in
                 await self.recordConcurrencyEvent(event, for: job.requestID)
                 await hooks.handleEvent(event, job)
@@ -288,8 +294,8 @@ actor PlaybackController {
             result = .failure(
                 WorkerError(
                     code: .requestCancelled,
-                    message: "Request '\(job.requestID)' was cancelled before it could complete."
-                )
+                    message: "Request '\(job.requestID)' was cancelled before it could complete.",
+                ),
             )
         } catch let workerError as WorkerError {
             result = .failure(workerError)
@@ -297,8 +303,8 @@ actor PlaybackController {
             result = .failure(
                 WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "Live playback failed for request '\(job.requestID)' due to an unexpected internal error. \(error.localizedDescription)"
-                )
+                    message: "Live playback failed for request '\(job.requestID)' due to an unexpected internal error. \(error.localizedDescription)",
+                ),
             )
         }
 
@@ -308,7 +314,7 @@ actor PlaybackController {
     private func finishPlayback(
         requestID: String,
         result: Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>,
-        hooks: PlaybackHooks
+        hooks: PlaybackHooks,
     ) async {
         guard activePlayback?.requestID == requestID else { return }
 
@@ -334,32 +340,32 @@ actor PlaybackController {
         guard activePlayback?.requestID == requestID else { return }
 
         switch event {
-        case .prerollReady(let startupBufferedAudioMS, let thresholds):
-            activePlaybackIsStableForConcurrentGeneration = true
-            activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
-            activePlaybackStableBufferTargetMS = thresholds.startupBufferTargetMS
-            activePlaybackIsRebuffering = false
-        case .rebufferStarted:
-            activePlaybackIsStableForConcurrentGeneration = false
-            activePlaybackIsRebuffering = true
-        case .rebufferResumed(let bufferedAudioMS, let thresholds):
-            activePlaybackIsStableForConcurrentGeneration = true
-            activePlaybackStableBufferedAudioMS = bufferedAudioMS
-            activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
-            activePlaybackIsRebuffering = false
-        case .starved:
-            activePlaybackIsStableForConcurrentGeneration = false
-            activePlaybackIsRebuffering = true
-        case .firstChunk,
-             .queueDepthLow,
-             .chunkGapWarning,
-             .scheduleGapWarning,
-             .rebufferThrashWarning,
-             .outputDeviceChanged,
-             .engineConfigurationChanged,
-             .bufferShapeSummary,
-             .trace:
-            break
+            case let .prerollReady(startupBufferedAudioMS, thresholds):
+                activePlaybackIsStableForConcurrentGeneration = true
+                activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
+                activePlaybackStableBufferTargetMS = thresholds.startupBufferTargetMS
+                activePlaybackIsRebuffering = false
+            case .rebufferStarted:
+                activePlaybackIsStableForConcurrentGeneration = false
+                activePlaybackIsRebuffering = true
+            case let .rebufferResumed(bufferedAudioMS, thresholds):
+                activePlaybackIsStableForConcurrentGeneration = true
+                activePlaybackStableBufferedAudioMS = bufferedAudioMS
+                activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
+                activePlaybackIsRebuffering = false
+            case .starved:
+                activePlaybackIsStableForConcurrentGeneration = false
+                activePlaybackIsRebuffering = true
+            case .firstChunk,
+                 .queueDepthLow,
+                 .chunkGapWarning,
+                 .scheduleGapWarning,
+                 .rebufferThrashWarning,
+                 .outputDeviceChanged,
+                 .engineConfigurationChanged,
+                 .bufferShapeSummary,
+                 .trace:
+                break
         }
     }
 }

@@ -13,7 +13,7 @@ extension SpeakSwiftly.Runtime {
             prefillTime: info.prefillTime,
             generateTime: info.generateTime,
             tokensPerSecond: info.tokensPerSecond,
-            peakMemoryUsage: info.peakMemoryUsage
+            peakMemoryUsage: info.peakMemoryUsage,
         )
     }
 
@@ -24,7 +24,7 @@ extension SpeakSwiftly.Runtime {
         materialization: StoredProfileMaterialization,
         refAudio: MLXArray?,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
         let eventStream = model.generateEventStream(
             text: text,
@@ -33,7 +33,7 @@ extension SpeakSwiftly.Runtime {
             refText: materialization.manifest.referenceText,
             language: "English",
             generationParameters: generationParameters,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
         )
 
         return AsyncThrowingStream { continuation in
@@ -41,13 +41,13 @@ extension SpeakSwiftly.Runtime {
                 do {
                     for try await event in eventStream {
                         switch event {
-                        case .token(let token):
-                            recordGenerationEvent(.token(token), for: requestID)
-                        case .info(let info):
-                            recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
-                        case .audio(let samples):
-                            recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                            continuation.yield(samples)
+                            case let .token(token):
+                                recordGenerationEvent(.token(token), for: requestID)
+                            case let .info(info):
+                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                            case let .audio(samples):
+                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                continuation.yield(samples)
                         }
                     }
                     continuation.finish()
@@ -67,13 +67,13 @@ extension SpeakSwiftly.Runtime {
         text: String,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
         let eventStream = model.generateConditionedEventStream(
             text: text,
             conditioning: conditioning,
             generationParameters: generationParameters,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
         )
 
         return AsyncThrowingStream { continuation in
@@ -81,13 +81,13 @@ extension SpeakSwiftly.Runtime {
                 do {
                     for try await event in eventStream {
                         switch event {
-                        case .token(let token):
-                            recordGenerationEvent(.token(token), for: requestID)
-                        case .info(let info):
-                            recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
-                        case .audio(let samples):
-                            recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                            continuation.yield(samples)
+                            case let .token(token):
+                                recordGenerationEvent(.token(token), for: requestID)
+                            case let .info(info):
+                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                            case let .audio(samples):
+                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                continuation.yield(samples)
                         }
                     }
                     continuation.finish()

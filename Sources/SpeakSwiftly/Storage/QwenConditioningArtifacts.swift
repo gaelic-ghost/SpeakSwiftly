@@ -2,9 +2,9 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioTTS
 
-// MARK: - Qwen Conditioning Artifact Models
+// MARK: - QwenConditioningArtifactManifest
 
-struct QwenConditioningArtifactManifest: Codable, Sendable, Equatable {
+struct QwenConditioningArtifactManifest: Codable, Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
     let createdAt: Date
@@ -12,12 +12,16 @@ struct QwenConditioningArtifactManifest: Codable, Sendable, Equatable {
     let artifactFile: String
 }
 
-struct StoredQwenConditioningArtifact: Sendable, Equatable {
+// MARK: - StoredQwenConditioningArtifact
+
+struct StoredQwenConditioningArtifact: Equatable {
     let manifest: QwenConditioningArtifactManifest
     let artifactURL: URL
 }
 
-struct QwenConditioningFloatTensor: Codable, Sendable, Equatable {
+// MARK: - QwenConditioningFloatTensor
+
+struct QwenConditioningFloatTensor: Codable, Equatable {
     let values: [Float]
     let shape: [Int]
 
@@ -31,7 +35,9 @@ struct QwenConditioningFloatTensor: Codable, Sendable, Equatable {
     }
 }
 
-struct QwenConditioningInt32Tensor: Codable, Sendable, Equatable {
+// MARK: - QwenConditioningInt32Tensor
+
+struct QwenConditioningInt32Tensor: Codable, Equatable {
     let values: [Int32]
     let shape: [Int]
 
@@ -45,7 +51,9 @@ struct QwenConditioningInt32Tensor: Codable, Sendable, Equatable {
     }
 }
 
-struct PersistedQwenConditioningArtifact: Codable, Sendable, Equatable {
+// MARK: - PersistedQwenConditioningArtifact
+
+struct PersistedQwenConditioningArtifact: Codable, Equatable {
     static let currentVersion = 1
 
     let version: Int
@@ -70,7 +78,7 @@ struct PersistedQwenConditioningArtifact: Codable, Sendable, Equatable {
             referenceSpeechCodes: referenceSpeechCodes.makeArray(),
             referenceTextTokenIDs: referenceTextTokenIDs.makeArray(),
             resolvedLanguage: resolvedLanguage,
-            codecLanguageID: codecLanguageID
+            codecLanguageID: codecLanguageID,
         )
     }
 }

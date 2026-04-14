@@ -4,7 +4,7 @@ import MLXAudioSTT
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
-// MARK: - Model Client
+// MARK: - UnsafeSpeechGenerationModelBox
 
 private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     let model: any SpeechGenerationModel
@@ -14,6 +14,8 @@ private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     }
 }
 
+// MARK: - UnsafeCloneTranscriptionModelBox
+
 private final class UnsafeCloneTranscriptionModelBox: @unchecked Sendable {
     let model: GLMASRModel
 
@@ -22,8 +24,10 @@ private final class UnsafeCloneTranscriptionModelBox: @unchecked Sendable {
     }
 }
 
-enum ModelGenerationEvent: Sendable, Equatable {
-    struct Info: Sendable, Equatable {
+// MARK: - ModelGenerationEvent
+
+enum ModelGenerationEvent: Equatable {
+    struct Info: Equatable {
         let promptTokenCount: Int
         let generationTokenCount: Int
         let prefillTime: TimeInterval
@@ -37,6 +41,8 @@ enum ModelGenerationEvent: Sendable, Equatable {
     case audio([Float])
 }
 
+// MARK: - AnySpeechModel
+
 final class AnySpeechModel: @unchecked Sendable {
     typealias GenerateSamplesStreamClosure = @Sendable (
         _ text: String,
@@ -45,7 +51,7 @@ final class AnySpeechModel: @unchecked Sendable {
         _ refText: String?,
         _ language: String?,
         _ generationParameters: GenerateParameters,
-        _ streamingInterval: Double
+        _ streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error>
 
     typealias GenerateEventStreamClosure = @Sendable (
@@ -55,20 +61,20 @@ final class AnySpeechModel: @unchecked Sendable {
         _ refText: String?,
         _ language: String?,
         _ generationParameters: GenerateParameters,
-        _ streamingInterval: Double
+        _ streamingInterval: Double,
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error>
 
     typealias PrepareQwenReferenceConditioningClosure = @Sendable (
         _ refAudio: MLXArray,
         _ refText: String,
-        _ language: String?
+        _ language: String?,
     ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning
 
     typealias GenerateConditionedEventStreamClosure = @Sendable (
         _ text: String,
         _ conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         _ generationParameters: GenerateParameters,
-        _ streamingInterval: Double
+        _ streamingInterval: Double,
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error>
 
     private let sampleRateValue: Int
@@ -78,7 +84,7 @@ final class AnySpeechModel: @unchecked Sendable {
         _ refAudio: MLXArray?,
         _ refText: String?,
         _ language: String?,
-        _ generationParameters: GenerateParameters
+        _ generationParameters: GenerateParameters,
     ) async throws -> [Float]
     private let generateSamplesStreamImpl: GenerateSamplesStreamClosure
     private let generateEventStreamImpl: GenerateEventStreamClosure
@@ -97,12 +103,12 @@ final class AnySpeechModel: @unchecked Sendable {
             _ refAudio: MLXArray?,
             _ refText: String?,
             _ language: String?,
-            _ generationParameters: GenerateParameters
+            _ generationParameters: GenerateParameters,
         ) async throws -> [Float],
         generateSamplesStream: @escaping GenerateSamplesStreamClosure,
         generateEventStream: GenerateEventStreamClosure? = nil,
         prepareQwenReferenceConditioning: PrepareQwenReferenceConditioningClosure? = nil,
-        generateConditionedEventStream: GenerateConditionedEventStreamClosure? = nil
+        generateConditionedEventStream: GenerateConditionedEventStreamClosure? = nil,
     ) {
         sampleRateValue = sampleRate
         generateImpl = generate
@@ -115,7 +121,7 @@ final class AnySpeechModel: @unchecked Sendable {
                 refText,
                 language,
                 generationParameters,
-                streamingInterval
+                streamingInterval,
             )
             return AsyncThrowingStream { continuation in
                 let task = Task {
@@ -145,7 +151,7 @@ final class AnySpeechModel: @unchecked Sendable {
                 try qwenModel.prepareReferenceConditioning(
                     refAudio: refAudio,
                     refText: refText,
-                    language: language
+                    language: language,
                 )
             }
         } else {
@@ -157,30 +163,30 @@ final class AnySpeechModel: @unchecked Sendable {
                     text: text,
                     conditioning: conditioning,
                     generationParameters: generationParameters,
-                    streamingInterval: streamingInterval
+                    streamingInterval: streamingInterval,
                 )
                 return AsyncThrowingStream { continuation in
                     let task = Task {
                         do {
                             for try await event in stream {
                                 switch event {
-                                case .token(let token):
-                                    continuation.yield(.token(token))
-                                case .info(let info):
-                                    continuation.yield(
-                                        .info(
-                                            .init(
-                                                promptTokenCount: info.promptTokenCount,
-                                                generationTokenCount: info.generationTokenCount,
-                                                prefillTime: info.prefillTime,
-                                                generateTime: info.generateTime,
-                                                tokensPerSecond: info.tokensPerSecond,
-                                                peakMemoryUsage: info.peakMemoryUsage
-                                            )
+                                    case let .token(token):
+                                        continuation.yield(.token(token))
+                                    case let .info(info):
+                                        continuation.yield(
+                                            .info(
+                                                .init(
+                                                    promptTokenCount: info.promptTokenCount,
+                                                    generationTokenCount: info.generationTokenCount,
+                                                    prefillTime: info.prefillTime,
+                                                    generateTime: info.generateTime,
+                                                    tokensPerSecond: info.tokensPerSecond,
+                                                    peakMemoryUsage: info.peakMemoryUsage,
+                                                ),
+                                            ),
                                         )
-                                    )
-                                case .audio(let samples):
-                                    continuation.yield(.audio(samples.asArray(Float.self)))
+                                    case let .audio(samples):
+                                        continuation.yield(.audio(samples.asArray(Float.self)))
                                 }
                             }
                             continuation.finish()
@@ -200,14 +206,16 @@ final class AnySpeechModel: @unchecked Sendable {
         self.init(
             sampleRate: box.model.sampleRate,
             generate: { text, voice, refAudio, refText, language, generationParameters in
-                try await box.model.generate(
-                    text: text,
-                    voice: voice,
-                    refAudio: refAudio,
-                    refText: refText,
-                    language: language,
-                    generationParameters: generationParameters
-                ).asArray(Float.self)
+                try await box.model
+                    .generate(
+                        text: text,
+                        voice: voice,
+                        refAudio: refAudio,
+                        refText: refText,
+                        language: language,
+                        generationParameters: generationParameters,
+                    )
+                    .asArray(Float.self)
             },
             generateSamplesStream: { text, voice, refAudio, refText, language, generationParameters, streamingInterval in
                 box.model.generateSamplesStream(
@@ -217,7 +225,7 @@ final class AnySpeechModel: @unchecked Sendable {
                     refText: refText,
                     language: language,
                     generationParameters: generationParameters,
-                    streamingInterval: streamingInterval
+                    streamingInterval: streamingInterval,
                 )
             },
             generateEventStream: { text, voice, refAudio, refText, language, generationParameters, streamingInterval in
@@ -228,30 +236,30 @@ final class AnySpeechModel: @unchecked Sendable {
                     refText: refText,
                     language: language,
                     generationParameters: generationParameters,
-                    streamingInterval: streamingInterval
+                    streamingInterval: streamingInterval,
                 )
                 return AsyncThrowingStream { continuation in
                     let task = Task {
                         do {
                             for try await event in stream {
                                 switch event {
-                                case .token(let token):
-                                    continuation.yield(.token(token))
-                                case .info(let info):
-                                    continuation.yield(
-                                        .info(
-                                            .init(
-                                                promptTokenCount: info.promptTokenCount,
-                                                generationTokenCount: info.generationTokenCount,
-                                                prefillTime: info.prefillTime,
-                                                generateTime: info.generateTime,
-                                                tokensPerSecond: info.tokensPerSecond,
-                                                peakMemoryUsage: info.peakMemoryUsage
-                                            )
+                                    case let .token(token):
+                                        continuation.yield(.token(token))
+                                    case let .info(info):
+                                        continuation.yield(
+                                            .info(
+                                                .init(
+                                                    promptTokenCount: info.promptTokenCount,
+                                                    generationTokenCount: info.generationTokenCount,
+                                                    prefillTime: info.prefillTime,
+                                                    generateTime: info.generateTime,
+                                                    tokensPerSecond: info.tokensPerSecond,
+                                                    peakMemoryUsage: info.peakMemoryUsage,
+                                                ),
+                                            ),
                                         )
-                                    )
-                                case .audio(let samples):
-                                    continuation.yield(.audio(samples.asArray(Float.self)))
+                                    case let .audio(samples):
+                                        continuation.yield(.audio(samples.asArray(Float.self)))
                                 }
                             }
                             continuation.finish()
@@ -265,7 +273,7 @@ final class AnySpeechModel: @unchecked Sendable {
                 }
             },
             prepareQwenReferenceConditioning: prepareQwenReferenceConditioning,
-            generateConditionedEventStream: generateConditionedEventStream
+            generateConditionedEventStream: generateConditionedEventStream,
         )
     }
 
@@ -275,7 +283,7 @@ final class AnySpeechModel: @unchecked Sendable {
         refAudio: MLXArray?,
         refText: String?,
         language: String?,
-        generationParameters: GenerateParameters
+        generationParameters: GenerateParameters,
     ) async throws -> [Float] {
         try await generateImpl(text, voice, refAudio, refText, language, generationParameters)
     }
@@ -287,7 +295,7 @@ final class AnySpeechModel: @unchecked Sendable {
         refText: String?,
         language: String?,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
         generateSamplesStreamImpl(text, voice, refAudio, refText, language, generationParameters, streamingInterval)
     }
@@ -299,7 +307,7 @@ final class AnySpeechModel: @unchecked Sendable {
         refText: String?,
         language: String?,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error> {
         generateEventStreamImpl(text, voice, refAudio, refText, language, generationParameters, streamingInterval)
     }
@@ -307,12 +315,12 @@ final class AnySpeechModel: @unchecked Sendable {
     func prepareQwenReferenceConditioning(
         refAudio: MLXArray,
         refText: String,
-        language: String?
+        language: String?,
     ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
         guard let prepareQwenReferenceConditioningImpl else {
             throw WorkerError(
                 code: .internalError,
-                message: "SpeakSwiftly attempted to prepare reusable Qwen reference conditioning with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug."
+                message: "SpeakSwiftly attempted to prepare reusable Qwen reference conditioning with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug.",
             )
         }
 
@@ -323,15 +331,15 @@ final class AnySpeechModel: @unchecked Sendable {
         text: String,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         generationParameters: GenerateParameters,
-        streamingInterval: Double
+        streamingInterval: Double,
     ) -> AsyncThrowingStream<ModelGenerationEvent, Error> {
         guard let generateConditionedEventStreamImpl else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(
                     throwing: WorkerError(
                         code: .internalError,
-                        message: "SpeakSwiftly attempted to start conditioned Qwen generation with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug."
-                    )
+                        message: "SpeakSwiftly attempted to start conditioned Qwen generation with a resident model that does not support the Qwen conditioning API. This indicates a model-routing bug.",
+                    ),
                 )
             }
         }
@@ -340,16 +348,18 @@ final class AnySpeechModel: @unchecked Sendable {
             text,
             conditioning,
             generationParameters,
-            streamingInterval
+            streamingInterval,
         )
     }
 }
+
+// MARK: - AnyCloneTranscriptionModel
 
 final class AnyCloneTranscriptionModel: @unchecked Sendable {
     private let sampleRateValue: Int
     private let transcribeImpl: @Sendable (
         _ audio: [Float],
-        _ generationParameters: STTGenerateParameters
+        _ generationParameters: STTGenerateParameters,
     ) -> String
 
     var sampleRate: Int {
@@ -360,8 +370,8 @@ final class AnyCloneTranscriptionModel: @unchecked Sendable {
         sampleRate: Int,
         transcribe: @escaping @Sendable (
             _ audio: [Float],
-            _ generationParameters: STTGenerateParameters
-        ) -> String
+            _ generationParameters: STTGenerateParameters,
+        ) -> String,
     ) {
         sampleRateValue = sampleRate
         transcribeImpl = transcribe
@@ -373,21 +383,25 @@ final class AnyCloneTranscriptionModel: @unchecked Sendable {
         self.init(
             sampleRate: ModelFactory.cloneTranscriptionSampleRate,
             transcribe: { audio, generationParameters in
-                box.model.generate(
-                    audio: MLXArray(audio),
-                    generationParameters: generationParameters
-                ).text
-            }
+                box.model
+                    .generate(
+                        audio: MLXArray(audio),
+                        generationParameters: generationParameters,
+                    )
+                    .text
+            },
         )
     }
 
     func transcribe(
         audio: [Float],
-        generationParameters: STTGenerateParameters
+        generationParameters: STTGenerateParameters,
     ) -> String {
         transcribeImpl(audio, generationParameters)
     }
 }
+
+// MARK: - GenerationPolicy
 
 enum GenerationPolicy {
     private static let residentTemperature: Float = 0.9
@@ -405,7 +419,7 @@ enum GenerationPolicy {
             maxTokens: residentMaxTokens(for: text),
             temperature: residentTemperature,
             topP: residentTopP,
-            repetitionPenalty: residentRepetitionPenalty
+            repetitionPenalty: residentRepetitionPenalty,
         )
     }
 
@@ -414,7 +428,7 @@ enum GenerationPolicy {
             maxTokens: profileMaxTokens(for: text),
             temperature: profileTemperature,
             topP: profileTopP,
-            repetitionPenalty: profileRepetitionPenalty
+            repetitionPenalty: profileRepetitionPenalty,
         )
     }
 
@@ -427,20 +441,22 @@ enum GenerationPolicy {
             verbose: false,
             language: "English",
             chunkDuration: cloneTranscriptionChunkDuration,
-            minChunkDuration: cloneTranscriptionMinimumChunkDuration
+            minChunkDuration: cloneTranscriptionMinimumChunkDuration,
         )
     }
 
     private static func residentMaxTokens(for text: String) -> Int {
         let wordCount = max(SpeakSwiftly.DeepTrace.words(in: text).count, 1)
-        return min(2_048, max(56, wordCount * 8))
+        return min(2048, max(56, wordCount * 8))
     }
 
     private static func profileMaxTokens(for text: String) -> Int {
         let wordCount = max(SpeakSwiftly.DeepTrace.words(in: text).count, 1)
-        return min(3_072, max(96, wordCount * 10))
+        return min(3072, max(96, wordCount * 10))
     }
 }
+
+// MARK: - ModelFactory
 
 enum ModelFactory {
     static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
@@ -448,27 +464,27 @@ enum ModelFactory {
     static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
     static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
-    static let canonicalProfileSampleRate = 24_000
-    static let cloneTranscriptionSampleRate = 16_000
+    static let canonicalProfileSampleRate = 24000
+    static let cloneTranscriptionSampleRate = 16000
     static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
     static let importedCloneVoiceDescription = "Imported reference audio clone."
 
     static func loadResidentModels(for backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels {
         switch backend {
-        case .qwen3, .qwen3CustomVoice:
-            return .qwen3(try await loadModel(modelRepo: residentModelRepo(for: backend)))
-        case .marvis:
-            // Marvis keeps mutable generation caches on the model instance, so each
-            // resident lane needs its own model object even though both lanes load
-            // the same published weights.
-            async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
-            async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
-            return .marvis(
-                MarvisResidentModels(
-                    conversationalA: try await conversationalA,
-                    conversationalB: try await conversationalB
+            case .qwen3, .qwen3CustomVoice:
+                return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
+            case .marvis:
+                // Marvis keeps mutable generation caches on the model instance, so each
+                // resident lane needs its own model object even though both lanes load
+                // the same published weights.
+                async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
+                async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
+                return try await .marvis(
+                    MarvisResidentModels(
+                        conversationalA: conversationalA,
+                        conversationalB: conversationalB,
+                    ),
                 )
-            )
         }
     }
 

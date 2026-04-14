@@ -6,333 +6,331 @@ import TextForSpeech
 
 public extension SpeakSwiftly {
     actor Runtime {
-    // MARK: Environment
+        // MARK: Environment
 
-    enum Environment {
-        static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
-    }
+        enum Environment {
+            static let profileRootOverride = "SPEAKSWIFTLY_PROFILE_ROOT"
+        }
 
-    enum RequestObservationConfiguration {
-        static let maxReplayUpdates = 16
-        static let maxRetainedTerminalRequests = 128
-    }
+        enum RequestObservationConfiguration {
+            static let maxReplayUpdates = 16
+            static let maxRetainedTerminalRequests = 128
+        }
 
-    // MARK: Configuration
+        // MARK: Configuration
 
-    enum PlaybackConfiguration {
-        // Shorter chunk cadence gives playback a second chunk in reserve before
-        // the first one drains, which reduces audible shudder from one-chunk starts.
-        static let residentStreamingInterval = 0.18
-    }
+        enum PlaybackConfiguration {
+            /// Shorter chunk cadence gives playback a second chunk in reserve before
+            /// the first one drains, which reduces audible shudder from one-chunk starts.
+            static let residentStreamingInterval = 0.18
+        }
 
-    // MARK: Runtime State
+        // MARK: Runtime State
 
-    enum ResidentState: Sendable {
-        case warming
-        case ready(ResidentSpeechModels)
-        case unloaded
-        case failed(WorkerError)
-    }
+        enum ResidentState {
+            case warming
+            case ready(ResidentSpeechModels)
+            case unloaded
+            case failed(WorkerError)
+        }
 
-    struct ActiveRequest: Sendable {
-        let token: UUID
-        let request: WorkerRequest
-        let task: Task<Void, Never>
-    }
+        struct ActiveRequest {
+            let token: UUID
+            let request: WorkerRequest
+            let task: Task<Void, Never>
+        }
 
-    struct QwenConditioningCacheKey: Hashable, Sendable {
-        let profileName: String
-        let backend: SpeakSwiftly.SpeechBackend
-        let modelRepo: String
-        let artifactVersion: Int
-        let artifactFile: String
-    }
+        struct QwenConditioningCacheKey: Hashable {
+            let profileName: String
+            let backend: SpeakSwiftly.SpeechBackend
+            let modelRepo: String
+            let artifactVersion: Int
+            let artifactFile: String
+        }
 
-    struct RequestBroker {
-        let id: String
-        let operation: String
-        let profileName: String?
-        let acceptedAt: Date
-        var lastUpdatedAt: Date
-        var stateSequence = 0
-        var generationSequence = 0
-        var latestState: SpeakSwiftly.RequestState?
-        var replayUpdates = [SpeakSwiftly.RequestUpdate]()
-        var subscriberContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error>.Continuation]()
-        var replayGenerationEvents = [SpeakSwiftly.GenerationEventUpdate]()
-        var generationContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>.Continuation]()
-        var isTerminal = false
+        struct RequestBroker {
+            let id: String
+            let operation: String
+            let profileName: String?
+            let acceptedAt: Date
+            var lastUpdatedAt: Date
+            var stateSequence = 0
+            var generationSequence = 0
+            var latestState: SpeakSwiftly.RequestState?
+            var replayUpdates = [SpeakSwiftly.RequestUpdate]()
+            var subscriberContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error>.Continuation]()
+            var replayGenerationEvents = [SpeakSwiftly.GenerationEventUpdate]()
+            var generationContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>.Continuation]()
+            var isTerminal = false
 
-        mutating func recordState(
-            state: SpeakSwiftly.RequestState,
-            date: Date,
-            maxReplayUpdates: Int
-        ) -> SpeakSwiftly.RequestUpdate {
-            stateSequence += 1
-            lastUpdatedAt = date
-            latestState = state
+            mutating func recordState(
+                state: SpeakSwiftly.RequestState,
+                date: Date,
+                maxReplayUpdates: Int,
+            ) -> SpeakSwiftly.RequestUpdate {
+                stateSequence += 1
+                lastUpdatedAt = date
+                latestState = state
 
-            let update = SpeakSwiftly.RequestUpdate(
-                id: id,
-                sequence: stateSequence,
-                date: date,
-                state: state
-            )
-            replayUpdates.append(update)
-            if replayUpdates.count > maxReplayUpdates {
-                replayUpdates.removeFirst(replayUpdates.count - maxReplayUpdates)
+                let update = SpeakSwiftly.RequestUpdate(
+                    id: id,
+                    sequence: stateSequence,
+                    date: date,
+                    state: state,
+                )
+                replayUpdates.append(update)
+                if replayUpdates.count > maxReplayUpdates {
+                    replayUpdates.removeFirst(replayUpdates.count - maxReplayUpdates)
+                }
+                return update
             }
-            return update
-        }
 
-        mutating func recordGenerationEvent(
-            _ event: SpeakSwiftly.GenerationEvent,
-            date: Date,
-            maxReplayUpdates: Int
-        ) -> SpeakSwiftly.GenerationEventUpdate {
-            generationSequence += 1
+            mutating func recordGenerationEvent(
+                _ event: SpeakSwiftly.GenerationEvent,
+                date: Date,
+                maxReplayUpdates: Int,
+            ) -> SpeakSwiftly.GenerationEventUpdate {
+                generationSequence += 1
 
-            let update = SpeakSwiftly.GenerationEventUpdate(
-                id: id,
-                sequence: generationSequence,
-                date: date,
-                event: event
-            )
-            replayGenerationEvents.append(update)
-            if replayGenerationEvents.count > maxReplayUpdates {
-                replayGenerationEvents.removeFirst(replayGenerationEvents.count - maxReplayUpdates)
+                let update = SpeakSwiftly.GenerationEventUpdate(
+                    id: id,
+                    sequence: generationSequence,
+                    date: date,
+                    event: event,
+                )
+                replayGenerationEvents.append(update)
+                if replayGenerationEvents.count > maxReplayUpdates {
+                    replayGenerationEvents.removeFirst(replayGenerationEvents.count - maxReplayUpdates)
+                }
+                return update
             }
-            return update
+
+            func snapshot() -> SpeakSwiftly.RequestSnapshot? {
+                guard let latestState else { return nil }
+
+                return SpeakSwiftly.RequestSnapshot(
+                    id: id,
+                    operation: operation,
+                    profileName: profileName,
+                    acceptedAt: acceptedAt,
+                    lastUpdatedAt: lastUpdatedAt,
+                    sequence: stateSequence,
+                    state: latestState,
+                )
+            }
         }
 
-        func snapshot() -> SpeakSwiftly.RequestSnapshot? {
-            guard let latestState else { return nil }
-            return SpeakSwiftly.RequestSnapshot(
-                id: id,
-                operation: operation,
-                profileName: profileName,
-                acceptedAt: acceptedAt,
-                lastUpdatedAt: lastUpdatedAt,
-                sequence: stateSequence,
-                state: latestState
-            )
+        enum GenerationParkReason: String {
+            case waitingForResidentModel = "waiting_for_resident_model"
+            case waitingForResidentModels = "waiting_for_resident_models"
+            case waitingForActiveRequest = "waiting_for_active_request"
+            case waitingForPlaybackStability = "waiting_for_playback_stability"
+            case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
         }
-    }
 
-    enum GenerationParkReason: String, Sendable {
-        case waitingForResidentModel = "waiting_for_resident_model"
-        case waitingForResidentModels = "waiting_for_resident_models"
-        case waitingForActiveRequest = "waiting_for_active_request"
-        case waitingForPlaybackStability = "waiting_for_playback_stability"
-        case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
-    }
+        struct GenerationScheduleDecision {
+            let runnableJobs: [GenerationController.Job]
+            let parkReasons: [UUID: GenerationParkReason]
+        }
 
-    struct GenerationScheduleDecision: Sendable {
-        let runnableJobs: [GenerationController.Job]
-        let parkReasons: [UUID: GenerationParkReason]
-    }
+        struct WorkerSuccessPayload {
+            let id: String
+            let generatedFile: SpeakSwiftly.GeneratedFile?
+            let generatedFiles: [SpeakSwiftly.GeneratedFile]?
+            let generatedBatch: SpeakSwiftly.GeneratedBatch?
+            let generatedBatches: [SpeakSwiftly.GeneratedBatch]?
+            let generationJob: SpeakSwiftly.GenerationJob?
+            let generationJobs: [SpeakSwiftly.GenerationJob]?
+            let profileName: String?
+            let profilePath: String?
+            let profiles: [ProfileSummary]?
+            let textProfile: TextForSpeech.Profile?
+            let textProfiles: [TextForSpeech.Profile]?
+            let replacements: [TextForSpeech.Replacement]?
+            let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+            let textProfilePath: String?
+            let activeRequest: ActiveWorkerRequestSummary?
+            let activeRequests: [ActiveWorkerRequestSummary]?
+            let queue: [QueuedWorkerRequestSummary]?
+            let playbackState: PlaybackStateSummary?
+            let runtimeOverview: SpeakSwiftly.RuntimeOverview?
+            let status: WorkerStatusEvent?
+            let speechBackend: SpeakSwiftly.SpeechBackend?
+            let clearedCount: Int?
+            let cancelledRequestID: String?
 
-    struct WorkerSuccessPayload: Sendable {
-        let id: String
-        let generatedFile: SpeakSwiftly.GeneratedFile?
-        let generatedFiles: [SpeakSwiftly.GeneratedFile]?
-        let generatedBatch: SpeakSwiftly.GeneratedBatch?
-        let generatedBatches: [SpeakSwiftly.GeneratedBatch]?
-        let generationJob: SpeakSwiftly.GenerationJob?
-        let generationJobs: [SpeakSwiftly.GenerationJob]?
-        let profileName: String?
-        let profilePath: String?
-        let profiles: [ProfileSummary]?
-        let textProfile: TextForSpeech.Profile?
-        let textProfiles: [TextForSpeech.Profile]?
-        let replacements: [TextForSpeech.Replacement]?
-        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-        let textProfilePath: String?
-        let activeRequest: ActiveWorkerRequestSummary?
-        let activeRequests: [ActiveWorkerRequestSummary]?
-        let queue: [QueuedWorkerRequestSummary]?
-        let playbackState: PlaybackStateSummary?
-        let runtimeOverview: SpeakSwiftly.RuntimeOverview?
-        let status: WorkerStatusEvent?
-        let speechBackend: SpeakSwiftly.SpeechBackend?
-        let clearedCount: Int?
-        let cancelledRequestID: String?
+            init(
+                id: String,
+                generatedFile: SpeakSwiftly.GeneratedFile? = nil,
+                generatedFiles: [SpeakSwiftly.GeneratedFile]? = nil,
+                generatedBatch: SpeakSwiftly.GeneratedBatch? = nil,
+                generatedBatches: [SpeakSwiftly.GeneratedBatch]? = nil,
+                generationJob: SpeakSwiftly.GenerationJob? = nil,
+                generationJobs: [SpeakSwiftly.GenerationJob]? = nil,
+                profileName: String? = nil,
+                profilePath: String? = nil,
+                profiles: [ProfileSummary]? = nil,
+                textProfile: TextForSpeech.Profile? = nil,
+                textProfiles: [TextForSpeech.Profile]? = nil,
+                replacements: [TextForSpeech.Replacement]? = nil,
+                textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
+                textProfilePath: String? = nil,
+                activeRequest: ActiveWorkerRequestSummary? = nil,
+                activeRequests: [ActiveWorkerRequestSummary]? = nil,
+                queue: [QueuedWorkerRequestSummary]? = nil,
+                playbackState: PlaybackStateSummary? = nil,
+                runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
+                status: WorkerStatusEvent? = nil,
+                speechBackend: SpeakSwiftly.SpeechBackend? = nil,
+                clearedCount: Int? = nil,
+                cancelledRequestID: String? = nil,
+            ) {
+                self.id = id
+                self.generatedFile = generatedFile
+                self.generatedFiles = generatedFiles
+                self.generatedBatch = generatedBatch
+                self.generatedBatches = generatedBatches
+                self.generationJob = generationJob
+                self.generationJobs = generationJobs
+                self.profileName = profileName
+                self.profilePath = profilePath
+                self.profiles = profiles
+                self.textProfile = textProfile
+                self.textProfiles = textProfiles
+                self.replacements = replacements
+                self.textProfileStyle = textProfileStyle
+                self.textProfilePath = textProfilePath
+                self.activeRequest = activeRequest
+                self.activeRequests = activeRequests
+                self.queue = queue
+                self.playbackState = playbackState
+                self.runtimeOverview = runtimeOverview
+                self.status = status
+                self.speechBackend = speechBackend
+                self.clearedCount = clearedCount
+                self.cancelledRequestID = cancelledRequestID
+            }
+        }
+
+        enum GenerationCompletionDisposition {
+            case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
+            case requestStillPendingPlayback(String)
+        }
+
+        struct OutgoingWorkerRequest: Encodable {
+            enum CodingKeys: String, CodingKey {
+                case id
+                case op
+                case artifactID = "artifact_id"
+                case batchID = "batch_id"
+                case jobID = "job_id"
+                case items
+                case text
+                case profileName = "profile_name"
+                case newProfileName = "new_profile_name"
+                case textProfileName = "text_profile_name"
+                case textProfileID = "text_profile_id"
+                case textProfileDisplayName = "text_profile_display_name"
+                case textProfile = "text_profile"
+                case textProfileStyle = "text_profile_style"
+                case replacements
+                case replacement
+                case replacementID = "replacement_id"
+                case cwd
+                case repoRoot = "repo_root"
+                case textFormat = "text_format"
+                case nestedSourceFormat = "nested_source_format"
+                case sourceFormat = "source_format"
+                case requestID = "request_id"
+                case speechBackend = "speech_backend"
+                case vibe
+                case voiceDescription = "voice_description"
+                case outputPath = "output_path"
+                case referenceAudioPath = "reference_audio_path"
+                case transcript
+            }
+
+            let id: String
+            let op: String
+            let artifactID: String?
+            let batchID: String?
+            let jobID: String?
+            let items: [SpeakSwiftly.GenerationJobItem]?
+            let text: String?
+            let profileName: String?
+            let newProfileName: String?
+            let textProfileName: String?
+            let textProfileID: String?
+            let textProfileDisplayName: String?
+            let textProfile: TextForSpeech.Profile?
+            let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+            let replacements: [TextForSpeech.Replacement]?
+            let replacement: TextForSpeech.Replacement?
+            let replacementID: String?
+            let cwd: String?
+            let repoRoot: String?
+            let textFormat: TextForSpeech.TextFormat?
+            let nestedSourceFormat: TextForSpeech.SourceFormat?
+            let sourceFormat: TextForSpeech.SourceFormat?
+            let requestID: String?
+            let speechBackend: SpeakSwiftly.SpeechBackend?
+            let vibe: SpeakSwiftly.Vibe?
+            let voiceDescription: String?
+            let outputPath: String?
+            let referenceAudioPath: String?
+            let transcript: String?
+        }
+
+        typealias LogLevel = WorkerLogLevel
+        typealias LogValue = WorkerLogValue
+        typealias LogEvent = WorkerLogEvent
+
+        let dependencies: WorkerDependencies
+        var speechBackend: SpeakSwiftly.SpeechBackend
+        var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let encoder = JSONEncoder()
+        let profileStore: ProfileStore
+        let generatedFileStore: GeneratedFileStore
+        let generationJobStore: GenerationJobStore
+        let normalizerRef: SpeakSwiftly.Normalizer
+        let playbackController: PlaybackController
+        let generationController = GenerationController()
+        let logTimestampFormatter = ISO8601DateFormatter()
+        let maxAcceptedSpeechJobs = 8
+
+        var residentState: ResidentState = .warming
+        var isShuttingDown = false
+        var preloadTask: Task<Void, Never>?
+        var residentPreloadToken: UUID?
+        var lastQueuedGenerationParkReason = [String: GenerationParkReason]()
+        var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
+        var requestBrokers = [String: RequestBroker]()
+        var terminalRequestBrokerOrder = [String]()
+        var activeGenerations = [UUID: ActiveRequest]()
+        var lastLoggedMarvisSchedulerState: String?
+        var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
+
+        // MARK: Initialization
 
         init(
-            id: String,
-            generatedFile: SpeakSwiftly.GeneratedFile? = nil,
-            generatedFiles: [SpeakSwiftly.GeneratedFile]? = nil,
-            generatedBatch: SpeakSwiftly.GeneratedBatch? = nil,
-            generatedBatches: [SpeakSwiftly.GeneratedBatch]? = nil,
-            generationJob: SpeakSwiftly.GenerationJob? = nil,
-            generationJobs: [SpeakSwiftly.GenerationJob]? = nil,
-            profileName: String? = nil,
-            profilePath: String? = nil,
-            profiles: [ProfileSummary]? = nil,
-            textProfile: TextForSpeech.Profile? = nil,
-            textProfiles: [TextForSpeech.Profile]? = nil,
-            replacements: [TextForSpeech.Replacement]? = nil,
-            textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
-            textProfilePath: String? = nil,
-            activeRequest: ActiveWorkerRequestSummary? = nil,
-            activeRequests: [ActiveWorkerRequestSummary]? = nil,
-            queue: [QueuedWorkerRequestSummary]? = nil,
-            playbackState: PlaybackStateSummary? = nil,
-            runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
-            status: WorkerStatusEvent? = nil,
-            speechBackend: SpeakSwiftly.SpeechBackend? = nil,
-            clearedCount: Int? = nil,
-            cancelledRequestID: String? = nil
+            dependencies: WorkerDependencies,
+            speechBackend: SpeakSwiftly.SpeechBackend,
+            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
+            profileStore: ProfileStore,
+            generatedFileStore: GeneratedFileStore,
+            generationJobStore: GenerationJobStore,
+            normalizer: SpeakSwiftly.Normalizer,
+            playbackController: PlaybackController,
         ) {
-            self.id = id
-            self.generatedFile = generatedFile
-            self.generatedFiles = generatedFiles
-            self.generatedBatch = generatedBatch
-            self.generatedBatches = generatedBatches
-            self.generationJob = generationJob
-            self.generationJobs = generationJobs
-            self.profileName = profileName
-            self.profilePath = profilePath
-            self.profiles = profiles
-            self.textProfile = textProfile
-            self.textProfiles = textProfiles
-            self.replacements = replacements
-            self.textProfileStyle = textProfileStyle
-            self.textProfilePath = textProfilePath
-            self.activeRequest = activeRequest
-            self.activeRequests = activeRequests
-            self.queue = queue
-            self.playbackState = playbackState
-            self.runtimeOverview = runtimeOverview
-            self.status = status
+            self.dependencies = dependencies
             self.speechBackend = speechBackend
-            self.clearedCount = clearedCount
-            self.cancelledRequestID = cancelledRequestID
+            self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.profileStore = profileStore
+            self.generatedFileStore = generatedFileStore
+            self.generationJobStore = generationJobStore
+            normalizerRef = normalizer
+            self.playbackController = playbackController
+            encoder.outputFormatting = [.sortedKeys]
         }
-    }
-
-    enum GenerationCompletionDisposition: Sendable {
-        case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
-        case requestStillPendingPlayback(String)
-    }
-
-    struct OutgoingWorkerRequest: Encodable {
-        let id: String
-        let op: String
-        let artifactID: String?
-        let batchID: String?
-        let jobID: String?
-        let items: [SpeakSwiftly.GenerationJobItem]?
-        let text: String?
-        let profileName: String?
-        let newProfileName: String?
-        let textProfileName: String?
-        let textProfileID: String?
-        let textProfileDisplayName: String?
-        let textProfile: TextForSpeech.Profile?
-        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-        let replacements: [TextForSpeech.Replacement]?
-        let replacement: TextForSpeech.Replacement?
-        let replacementID: String?
-        let cwd: String?
-        let repoRoot: String?
-        let textFormat: TextForSpeech.TextFormat?
-        let nestedSourceFormat: TextForSpeech.SourceFormat?
-        let sourceFormat: TextForSpeech.SourceFormat?
-        let requestID: String?
-        let speechBackend: SpeakSwiftly.SpeechBackend?
-        let vibe: SpeakSwiftly.Vibe?
-        let voiceDescription: String?
-        let outputPath: String?
-        let referenceAudioPath: String?
-        let transcript: String?
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case op
-            case artifactID = "artifact_id"
-            case batchID = "batch_id"
-            case jobID = "job_id"
-            case items
-            case text
-            case profileName = "profile_name"
-            case newProfileName = "new_profile_name"
-            case textProfileName = "text_profile_name"
-            case textProfileID = "text_profile_id"
-            case textProfileDisplayName = "text_profile_display_name"
-            case textProfile = "text_profile"
-            case textProfileStyle = "text_profile_style"
-            case replacements
-            case replacement
-            case replacementID = "replacement_id"
-            case cwd
-            case repoRoot = "repo_root"
-            case textFormat = "text_format"
-            case nestedSourceFormat = "nested_source_format"
-            case sourceFormat = "source_format"
-            case requestID = "request_id"
-            case speechBackend = "speech_backend"
-            case vibe
-            case voiceDescription = "voice_description"
-            case outputPath = "output_path"
-            case referenceAudioPath = "reference_audio_path"
-            case transcript
-        }
-    }
-
-    typealias LogLevel = WorkerLogLevel
-    typealias LogValue = WorkerLogValue
-    typealias LogEvent = WorkerLogEvent
-
-    // MARK: Stored Properties
-
-    let dependencies: WorkerDependencies
-    var speechBackend: SpeakSwiftly.SpeechBackend
-    var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
-    let encoder = JSONEncoder()
-    let profileStore: ProfileStore
-    let generatedFileStore: GeneratedFileStore
-    let generationJobStore: GenerationJobStore
-    let normalizerRef: SpeakSwiftly.Normalizer
-    let playbackController: PlaybackController
-    let generationController = GenerationController()
-    let logTimestampFormatter = ISO8601DateFormatter()
-    let maxAcceptedSpeechJobs = 8
-
-    var residentState: ResidentState = .warming
-    var isShuttingDown = false
-    var preloadTask: Task<Void, Never>?
-    var residentPreloadToken: UUID?
-    var lastQueuedGenerationParkReason = [String: GenerationParkReason]()
-    var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
-    var requestBrokers = [String: RequestBroker]()
-    var terminalRequestBrokerOrder = [String]()
-    var activeGenerations = [UUID: ActiveRequest]()
-    var lastLoggedMarvisSchedulerState: String?
-    var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
-
-    // MARK: Initialization
-
-    init(
-        dependencies: WorkerDependencies,
-        speechBackend: SpeakSwiftly.SpeechBackend,
-        qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
-        profileStore: ProfileStore,
-        generatedFileStore: GeneratedFileStore,
-        generationJobStore: GenerationJobStore,
-        normalizer: SpeakSwiftly.Normalizer,
-        playbackController: PlaybackController
-    ) {
-        self.dependencies = dependencies
-        self.speechBackend = speechBackend
-        self.qwenConditioningStrategy = qwenConditioningStrategy
-        self.profileStore = profileStore
-        self.generatedFileStore = generatedFileStore
-        self.generationJobStore = generationJobStore
-        normalizerRef = normalizer
-        self.playbackController = playbackController
-        encoder.outputFormatting = [.sortedKeys]
-    }
-
     }
 }

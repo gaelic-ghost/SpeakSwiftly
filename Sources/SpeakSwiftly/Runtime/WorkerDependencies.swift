@@ -4,7 +4,7 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
 
-// MARK: - Worker Dependencies
+// MARK: - WorkerDependencies
 
 struct WorkerDependencies: @unchecked Sendable {
     private enum Environment {
@@ -39,14 +39,14 @@ struct WorkerDependencies: @unchecked Sendable {
                 }
 
                 return AnyPlaybackController(
-                    AudioPlaybackDriver(traceEnabled: environment[Environment.playbackTrace] == "1")
+                    AudioPlaybackDriver(traceEnabled: environment[Environment.playbackTrace] == "1"),
                 )
             },
             writeWAV: { samples, sampleRate, url in
                 try AudioUtils.writeWavFile(
                     samples: samples,
                     sampleRate: Double(sampleRate),
-                    fileURL: url
+                    fileURL: url,
                 )
             },
             loadAudioSamples: { url, sampleRate in
@@ -65,7 +65,7 @@ struct WorkerDependencies: @unchecked Sendable {
                 }
             },
             now: Date.init,
-            readRuntimeMemory: currentRuntimeMemorySnapshot
+            readRuntimeMemory: currentRuntimeMemorySnapshot,
         )
     }
 }
@@ -79,7 +79,7 @@ private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Fl
     guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
         throw WorkerError(
             code: .filesystemError,
-            message: "SpeakSwiftly could not allocate an audio buffer while reading '\(url.path)'."
+            message: "SpeakSwiftly could not allocate an audio buffer while reading '\(url.path)'.",
         )
     }
 
@@ -88,7 +88,7 @@ private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Fl
     guard let channelData = buffer.floatChannelData else {
         throw WorkerError(
             code: .filesystemError,
-            message: "SpeakSwiftly could not access floating-point samples while decoding '\(url.path)'. The file may use an unsupported audio format."
+            message: "SpeakSwiftly could not access floating-point samples while decoding '\(url.path)'. The file may use an unsupported audio format.",
         )
     }
 
@@ -114,7 +114,7 @@ private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Fl
     guard sampleRate > 0 else {
         throw WorkerError(
             code: .filesystemError,
-            message: "SpeakSwiftly was asked to decode '\(url.path)' with invalid target sample rate \(sampleRate)."
+            message: "SpeakSwiftly was asked to decode '\(url.path)' with invalid target sample rate \(sampleRate).",
         )
     }
 
@@ -127,7 +127,7 @@ private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Fl
     } catch {
         throw WorkerError(
             code: .filesystemError,
-            message: "SpeakSwiftly could not resample '\(url.path)' from \(sourceSampleRate) Hz to \(sampleRate) Hz. \(error.localizedDescription)"
+            message: "SpeakSwiftly could not resample '\(url.path)' from \(sourceSampleRate) Hz to \(sampleRate) Hz. \(error.localizedDescription)",
         )
     }
 }
@@ -150,6 +150,6 @@ private func currentRuntimeMemorySnapshot() -> RuntimeMemorySnapshot? {
         mlxCacheMemoryBytes: snapshot.cacheMemory,
         mlxPeakMemoryBytes: snapshot.peakMemory,
         mlxCacheLimitBytes: Memory.cacheLimit,
-        mlxMemoryLimitBytes: Memory.memoryLimit
+        mlxMemoryLimitBytes: Memory.memoryLimit,
     )
 }

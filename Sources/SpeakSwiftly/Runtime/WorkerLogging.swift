@@ -1,13 +1,15 @@
 import Foundation
 
-// MARK: - Structured Worker Logging
+// MARK: - WorkerLogLevel
 
 package enum WorkerLogLevel: String, Encodable {
     case info
     case error
 }
 
-package enum WorkerLogValue: Encodable, Sendable {
+// MARK: - WorkerLogValue
+
+package enum WorkerLogValue: Encodable {
     case string(String)
     case int(Int)
     case double(Double)
@@ -16,29 +18,21 @@ package enum WorkerLogValue: Encodable, Sendable {
     package func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case .string(let value):
-            try container.encode(value)
-        case .int(let value):
-            try container.encode(value)
-        case .double(let value):
-            try container.encode(value)
-        case .bool(let value):
-            try container.encode(value)
+            case let .string(value):
+                try container.encode(value)
+            case let .int(value):
+                try container.encode(value)
+            case let .double(value):
+                try container.encode(value)
+            case let .bool(value):
+                try container.encode(value)
         }
     }
 }
 
-package struct WorkerLogEvent: Encodable {
-    package let event: String
-    package let level: WorkerLogLevel
-    package let ts: String
-    package let requestID: String?
-    package let op: String?
-    package let profileName: String?
-    package let queueDepth: Int?
-    package let elapsedMS: Int?
-    package let details: [String: WorkerLogValue]?
+// MARK: - WorkerLogEvent
 
+package struct WorkerLogEvent: Encodable {
     package enum CodingKeys: String, CodingKey {
         case event
         case level
@@ -51,6 +45,16 @@ package struct WorkerLogEvent: Encodable {
         case details
     }
 
+    package let event: String
+    package let level: WorkerLogLevel
+    package let ts: String
+    package let requestID: String?
+    package let op: String?
+    package let profileName: String?
+    package let queueDepth: Int?
+    package let elapsedMS: Int?
+    package let details: [String: WorkerLogValue]?
+
     package init(
         event: String,
         level: WorkerLogLevel,
@@ -60,7 +64,7 @@ package struct WorkerLogEvent: Encodable {
         profileName: String?,
         queueDepth: Int?,
         elapsedMS: Int?,
-        details: [String: WorkerLogValue]?
+        details: [String: WorkerLogValue]?,
     ) {
         self.event = event
         self.level = level
@@ -74,16 +78,18 @@ package struct WorkerLogEvent: Encodable {
     }
 }
 
+// MARK: - WorkerStructuredLogSupport
+
 package enum WorkerStructuredLogSupport {
     package static func encode(_ event: WorkerLogEvent) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        return String(decoding: try encoder.encode(event), as: UTF8.self)
+        return try String(decoding: encoder.encode(event), as: UTF8.self)
     }
 
     package static func encodingFailureLine(
         timestamp: String,
-        errorDescription: String
+        errorDescription: String,
     ) -> String {
         #"{"event":"worker_error","level":"error","ts":"\#(timestamp)","details":{"message":"SpeakSwiftly could not encode a stderr log event.","error":"\#(errorDescription)"}}"#
     }

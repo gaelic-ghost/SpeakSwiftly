@@ -8,14 +8,14 @@ final class AnyPlaybackController: @unchecked Sendable {
         _ sampleRate: Double,
         _ text: String,
         _ stream: AsyncThrowingStream<[Float], Error>,
-        _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+        _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary
     private let stopImpl: @Sendable () async -> Void
     private let pauseImpl: @Sendable () async -> PlaybackState
     private let resumeImpl: @Sendable () async -> PlaybackState
     private let stateImpl: @Sendable () async -> PlaybackState
     private let bindEnvironmentEventsImpl: @Sendable (
-        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
     ) async -> Void
 
     init(
@@ -24,15 +24,15 @@ final class AnyPlaybackController: @unchecked Sendable {
             _ sampleRate: Double,
             _ text: String,
             _ stream: AsyncThrowingStream<[Float], Error>,
-            _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+            _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
         ) async throws -> PlaybackSummary,
         stop: @escaping @Sendable () async -> Void,
         pause: @escaping @Sendable () async -> PlaybackState,
         resume: @escaping @Sendable () async -> PlaybackState,
         state: @escaping @Sendable () async -> PlaybackState,
         bindEnvironmentEvents: @escaping @Sendable (
-            _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
-        ) async -> Void = { _ in }
+            _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
+        ) async -> Void = { _ in },
     ) {
         prepareImpl = prepare
         playImpl = play
@@ -53,7 +53,7 @@ final class AnyPlaybackController: @unchecked Sendable {
                     sampleRate: sampleRate,
                     text: text,
                     stream: stream,
-                    onEvent: onEvent
+                    onEvent: onEvent,
                 )
             },
             stop: {
@@ -70,14 +70,8 @@ final class AnyPlaybackController: @unchecked Sendable {
             },
             bindEnvironmentEvents: { sink in
                 await controller.setEnvironmentEventSink(sink)
-            }
+            },
         )
-    }
-
-    func bindEnvironmentEvents(
-        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
-    ) async {
-        await bindEnvironmentEventsImpl(sink)
     }
 
     static func silent(traceEnabled: Bool = false) -> AnyPlaybackController {
@@ -110,7 +104,7 @@ final class AnyPlaybackController: @unchecked Sendable {
                 var previousTrailingSample: Float?
 
                 func bufferedAudioMS() -> Int {
-                    Int((Double(pendingSampleCount) / sampleRate * 1_000).rounded())
+                    Int((Double(pendingSampleCount) / sampleRate * 1000).rounded())
                 }
 
                 func recordQueueDepth() {
@@ -123,6 +117,7 @@ final class AnyPlaybackController: @unchecked Sendable {
 
                 for try await chunk in stream {
                     guard !chunk.isEmpty else { continue }
+
                     let now = Date()
                     chunkCount += 1
                     sampleCount += chunk.count
@@ -175,14 +170,14 @@ final class AnyPlaybackController: @unchecked Sendable {
                                     chunkIndex: chunkCount,
                                     bufferIndex: nil,
                                     sampleCount: chunk.count,
-                                    durationMS: Int((Double(chunk.count) / sampleRate * 1_000).rounded()),
+                                    durationMS: Int((Double(chunk.count) / sampleRate * 1000).rounded()),
                                     queuedAudioBeforeMS: nil,
                                     queuedAudioAfterMS: bufferedAudioMS(),
                                     gapMS: maxInterChunkGapMS,
                                     isRebuffering: false,
-                                    fadeInApplied: chunkCount == 1
-                                )
-                            )
+                                    fadeInApplied: chunkCount == 1,
+                                ),
+                            ),
                         )
                     }
                 }
@@ -195,11 +190,10 @@ final class AnyPlaybackController: @unchecked Sendable {
                     await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
                 }
 
-                let timeFromPrerollReadyToDrainMS: Int?
-                if let timeToPrerollReadyMS {
-                    timeFromPrerollReadyToDrainMS = max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
+                let timeFromPrerollReadyToDrainMS: Int? = if let timeToPrerollReadyMS {
+                    max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
                 } else {
-                    timeFromPrerollReadyToDrainMS = nil
+                    nil
                 }
 
                 if let maxBoundaryDiscontinuity, let maxLeadingAbsAmplitude, let maxTrailingAbsAmplitude {
@@ -208,8 +202,8 @@ final class AnyPlaybackController: @unchecked Sendable {
                             maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
                             maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
                             maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                            fadeInChunkCount: fadeInChunkCount
-                        )
+                            fadeInChunkCount: fadeInChunkCount,
+                        ),
                     )
                 }
 
@@ -238,14 +232,20 @@ final class AnyPlaybackController: @unchecked Sendable {
                     maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
                     maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
                     maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                    fadeInChunkCount: fadeInChunkCount
+                    fadeInChunkCount: fadeInChunkCount,
                 )
             },
             stop: {},
             pause: { .idle },
             resume: { .idle },
-            state: { .idle }
+            state: { .idle },
         )
+    }
+
+    func bindEnvironmentEvents(
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
+    ) async {
+        await bindEnvironmentEventsImpl(sink)
     }
 
     func prepare(sampleRate: Double) async throws -> Bool {
@@ -256,7 +256,7 @@ final class AnyPlaybackController: @unchecked Sendable {
         sampleRate: Double,
         text: String,
         stream: AsyncThrowingStream<[Float], Error>,
-        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary {
         try await playImpl(sampleRate, text, stream, onEvent)
     }

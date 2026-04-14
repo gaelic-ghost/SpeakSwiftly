@@ -4,9 +4,9 @@ import CoreAudio
 import Foundation
 import TextForSpeech
 
-// MARK: - Playback Environment
+// MARK: - PlaybackEvent
 
-enum PlaybackEvent: Sendable {
+enum PlaybackEvent {
     case firstChunk
     case prerollReady(startupBufferedAudioMS: Int, thresholds: PlaybackAdaptiveThresholds)
     case queueDepthLow(queuedAudioMS: Int)
@@ -21,13 +21,15 @@ enum PlaybackEvent: Sendable {
         maxBoundaryDiscontinuity: Double,
         maxLeadingAbsAmplitude: Double,
         maxTrailingAbsAmplitude: Double,
-        fadeInChunkCount: Int
+        fadeInChunkCount: Int,
     )
     case trace(PlaybackTraceEvent)
     case starved
 }
 
-enum PlaybackEnvironmentEvent: Sendable {
+// MARK: - PlaybackEnvironmentEvent
+
+enum PlaybackEnvironmentEvent {
     case outputDeviceObserved(currentDevice: String?)
     case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
     case engineConfigurationChanged(engineIsRunning: Bool)
@@ -38,7 +40,9 @@ enum PlaybackEnvironmentEvent: Sendable {
     case interJobBoopPlayed(durationMS: Int, frequencyHz: Double, sampleRate: Double)
 }
 
-struct PlaybackTraceEvent: Sendable {
+// MARK: - PlaybackTraceEvent
+
+struct PlaybackTraceEvent {
     let name: String
     let chunkIndex: Int?
     let bufferIndex: Int?
@@ -51,13 +55,17 @@ struct PlaybackTraceEvent: Sendable {
     let fadeInApplied: Bool?
 }
 
-enum PlaybackComplexityClass: String, Sendable {
+// MARK: - PlaybackComplexityClass
+
+enum PlaybackComplexityClass: String {
     case compact
     case balanced
     case extended
 }
 
-struct PlaybackAdaptiveThresholds: Sendable, Equatable {
+// MARK: - PlaybackAdaptiveThresholds
+
+struct PlaybackAdaptiveThresholds: Equatable {
     let complexityClass: PlaybackComplexityClass
     let startupBufferTargetMS: Int
     let lowWaterTargetMS: Int
@@ -66,25 +74,34 @@ struct PlaybackAdaptiveThresholds: Sendable, Equatable {
     let scheduleGapWarningMS: Int
 }
 
-enum PlaybackPhase: String, Sendable {
+// MARK: - PlaybackPhase
+
+enum PlaybackPhase: String {
     case warmup
     case steady
     case recovery
 }
 
-struct PlaybackThresholdController: Sendable {
+// MARK: - PlaybackThresholdController
+
+struct PlaybackThresholdController {
     private static let codecTokenRateHz = 12.5
     private static let adaptationSampleCount = 6
     private static let warmupStableChunkRequirement = 6
     private static let recoveryStableChunkRequirement = 4
-    private static let maxStartupBufferTargetMS = 20_000
-    private static let maxResumeBufferTargetMS = 24_000
-    private static let maxLowWaterTargetMS = 12_000
-    private static let maxChunkGapWarningMS = 1_200
+    private static let maxStartupBufferTargetMS = 20000
+    private static let maxResumeBufferTargetMS = 24000
+    private static let maxLowWaterTargetMS = 12000
+    private static let maxChunkGapWarningMS = 1200
     private static let maxScheduleGapWarningMS = 900
+
+    private static var defaultChunkDurationMS: Int {
+        Int((2.0 / codecTokenRateHz * 1000).rounded())
+    }
 
     private(set) var thresholds: PlaybackAdaptiveThresholds
     private(set) var phase: PlaybackPhase = .warmup
+
     private var chunkDurationsMS = [Int]()
     private var interChunkGapsMS = [Int]()
     private var rebufferCount = 0
@@ -103,6 +120,92 @@ struct PlaybackThresholdController: Sendable {
         resumeBufferFloorMS = thresholds.resumeBufferTargetMS
         chunkGapWarningFloorMS = thresholds.chunkGapWarningMS
         scheduleGapWarningFloorMS = thresholds.scheduleGapWarningMS
+    }
+
+    private static func seedThresholds(
+        for text: String,
+        phase: PlaybackPhase,
+    ) -> PlaybackAdaptiveThresholds {
+        seededThresholds(for: classify(text: text), phase: phase)
+    }
+
+    private static func seededThresholds(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> PlaybackAdaptiveThresholds {
+        let base = switch complexityClass {
+            case .compact:
+                PlaybackAdaptiveThresholds(
+                    complexityClass: .compact,
+                    startupBufferTargetMS: 360,
+                    lowWaterTargetMS: 140,
+                    resumeBufferTargetMS: 360,
+                    chunkGapWarningMS: 450,
+                    scheduleGapWarningMS: 180,
+                )
+            case .balanced:
+                PlaybackAdaptiveThresholds(
+                    complexityClass: .balanced,
+                    startupBufferTargetMS: 520,
+                    lowWaterTargetMS: 220,
+                    resumeBufferTargetMS: 520,
+                    chunkGapWarningMS: 520,
+                    scheduleGapWarningMS: 220,
+                )
+            case .extended:
+                PlaybackAdaptiveThresholds(
+                    complexityClass: .extended,
+                    startupBufferTargetMS: 12800,
+                    lowWaterTargetMS: 4800,
+                    resumeBufferTargetMS: 16000,
+                    chunkGapWarningMS: 900,
+                    scheduleGapWarningMS: 400,
+                )
+        }
+
+        let phaseBias = phaseThresholdBias(for: complexityClass, phase: phase)
+        return PlaybackAdaptiveThresholds(
+            complexityClass: base.complexityClass,
+            startupBufferTargetMS: min(Self.maxStartupBufferTargetMS, base.startupBufferTargetMS + phaseBias.startupBufferMS),
+            lowWaterTargetMS: min(Self.maxLowWaterTargetMS, base.lowWaterTargetMS + phaseBias.lowWaterMS),
+            resumeBufferTargetMS: min(Self.maxResumeBufferTargetMS, base.resumeBufferTargetMS + phaseBias.resumeBufferMS),
+            chunkGapWarningMS: min(Self.maxChunkGapWarningMS, base.chunkGapWarningMS + phaseBias.chunkGapWarningMS),
+            scheduleGapWarningMS: min(Self.maxScheduleGapWarningMS, base.scheduleGapWarningMS + phaseBias.scheduleGapWarningMS),
+        )
+    }
+
+    private static func phaseThresholdBias(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> (
+        startupBufferMS: Int,
+        lowWaterMS: Int,
+        resumeBufferMS: Int,
+        chunkGapWarningMS: Int,
+        scheduleGapWarningMS: Int,
+    ) {
+        switch (complexityClass, phase) {
+            case (_, .steady):
+                (0, 0, 0, 0, 0)
+            case (.compact, .warmup):
+                (120, 80, 180, 40, 20)
+            case (.balanced, .warmup):
+                (200, 120, 280, 50, 30)
+            case (.extended, .warmup):
+                (320, 200, 480, 60, 40)
+            case (.compact, .recovery):
+                (80, 60, 140, 30, 20)
+            case (.balanced, .recovery):
+                (140, 100, 220, 40, 30)
+            case (.extended, .recovery):
+                (220, 160, 360, 50, 40)
+        }
+    }
+
+    private static func classify(text: String) -> PlaybackComplexityClass {
+        let textLength = text.count
+        return switch textLength {
+            case ..<220:
+                PlaybackComplexityClass.compact
+            case ..<620:
+                PlaybackComplexityClass.balanced
+            default:
+                PlaybackComplexityClass.extended
+        }
     }
 
     mutating func recordChunk(durationMS: Int, interChunkGapMS: Int?) {
@@ -133,7 +236,7 @@ struct PlaybackThresholdController: Sendable {
             avgChunkDurationMS: avgChunkDurationMS,
             avgInterChunkGapMS: avgInterChunkGapMS,
             jitterMS: jitterMS,
-            cadenceDeficitMS: cadenceDeficitMS
+            cadenceDeficitMS: cadenceDeficitMS,
         )
 
         let seeded = Self.seededThresholds(for: thresholds.complexityClass, phase: phase)
@@ -141,7 +244,7 @@ struct PlaybackThresholdController: Sendable {
             for: phase,
             avgChunkDurationMS: avgChunkDurationMS,
             avgInterChunkGapMS: avgInterChunkGapMS,
-            cadenceDeficitMS: cadenceDeficitMS
+            cadenceDeficitMS: cadenceDeficitMS,
         )
         let startupBufferTargetMS = min(
             Self.maxStartupBufferTargetMS,
@@ -152,8 +255,8 @@ struct PlaybackThresholdController: Sendable {
                     + avgChunkDurationMS
                     + jitterMS
                     + cadenceDeficitMS * 4
-                    + phaseMargins.startupBufferMS
-            )
+                    + phaseMargins.startupBufferMS,
+            ),
         )
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
@@ -163,8 +266,8 @@ struct PlaybackThresholdController: Sendable {
                 avgInterChunkGapMS
                     + max(jitterMS, avgChunkDurationMS / 2)
                     + cadenceDeficitMS * 2
-                    + phaseMargins.lowWaterMS
-            )
+                    + phaseMargins.lowWaterMS,
+            ),
         )
         let resumeBufferTargetMS = min(
             Self.maxResumeBufferTargetMS,
@@ -175,16 +278,16 @@ struct PlaybackThresholdController: Sendable {
                 lowWaterTargetMS
                     + max(avgChunkDurationMS * 2, avgInterChunkGapMS)
                     + cadenceDeficitMS * 4
-                    + phaseMargins.resumeBufferMS
-            )
+                    + phaseMargins.resumeBufferMS,
+            ),
         )
         let chunkGapWarningMS = min(
             Self.maxChunkGapWarningMS,
-            max(chunkGapWarningFloorMS, seeded.chunkGapWarningMS, avgInterChunkGapMS + avgChunkDurationMS)
+            max(chunkGapWarningFloorMS, seeded.chunkGapWarningMS, avgInterChunkGapMS + avgChunkDurationMS),
         )
         let scheduleGapWarningMS = min(
             Self.maxScheduleGapWarningMS,
-            max(scheduleGapWarningFloorMS, seeded.scheduleGapWarningMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8))
+            max(scheduleGapWarningFloorMS, seeded.scheduleGapWarningMS, avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8)),
         )
 
         applyThresholds(
@@ -194,9 +297,9 @@ struct PlaybackThresholdController: Sendable {
                 lowWaterTargetMS: lowWaterTargetMS,
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: chunkGapWarningMS,
-                scheduleGapWarningMS: scheduleGapWarningMS
+                scheduleGapWarningMS: scheduleGapWarningMS,
             ),
-            preserveFloors: false
+            preserveFloors: false,
         )
     }
 
@@ -212,19 +315,19 @@ struct PlaybackThresholdController: Sendable {
             max(
                 thresholds.resumeBufferTargetMS,
                 avgInterChunkGapMS * (3 + starvationCount),
-                avgChunkDurationMS * (4 + starvationCount)
-            )
+                avgChunkDurationMS * (4 + starvationCount),
+            ),
         )
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
             max(
                 thresholds.lowWaterTargetMS,
-                resumeBufferTargetMS - max(avgChunkDurationMS * 2, avgInterChunkGapMS)
-            )
+                resumeBufferTargetMS - max(avgChunkDurationMS * 2, avgInterChunkGapMS),
+            ),
         )
         let startupBufferTargetMS = min(
             Self.maxStartupBufferTargetMS,
-            max(thresholds.startupBufferTargetMS, resumeBufferTargetMS)
+            max(thresholds.startupBufferTargetMS, resumeBufferTargetMS),
         )
 
         applyThresholds(
@@ -234,9 +337,9 @@ struct PlaybackThresholdController: Sendable {
                 lowWaterTargetMS: lowWaterTargetMS,
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: thresholds.chunkGapWarningMS,
-                scheduleGapWarningMS: thresholds.scheduleGapWarningMS
+                scheduleGapWarningMS: thresholds.scheduleGapWarningMS,
             ),
-            preserveFloors: true
+            preserveFloors: true,
         )
     }
 
@@ -258,7 +361,7 @@ struct PlaybackThresholdController: Sendable {
         let repeatedRebufferMargins = (
             startupBufferMS: max(rebufferPenaltyMS * 8, avgChunkDurationMS),
             lowWaterMS: max(rebufferPenaltyMS * 3, avgChunkDurationMS / 2),
-            resumeBufferMS: max(rebufferPenaltyMS * 4, avgChunkDurationMS)
+            resumeBufferMS: max(rebufferPenaltyMS * 4, avgChunkDurationMS),
         )
 
         let startupBufferTargetMS = min(
@@ -270,8 +373,8 @@ struct PlaybackThresholdController: Sendable {
                     + avgChunkDurationMS
                     + jitterMS
                     + cadenceDeficitMS * 4
-                    + repeatedRebufferMargins.startupBufferMS
-            )
+                    + repeatedRebufferMargins.startupBufferMS,
+            ),
         )
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
@@ -282,8 +385,8 @@ struct PlaybackThresholdController: Sendable {
                     + jitterMS
                     + max(avgChunkDurationMS / 2, 20)
                     + cadenceDeficitMS * 2
-                    + repeatedRebufferMargins.lowWaterMS
-            )
+                    + repeatedRebufferMargins.lowWaterMS,
+            ),
         )
         let resumeBufferTargetMS = min(
             Self.maxResumeBufferTargetMS,
@@ -294,24 +397,24 @@ struct PlaybackThresholdController: Sendable {
                 lowWaterTargetMS
                     + max(avgChunkDurationMS * 2, avgInterChunkGapMS)
                     + cadenceDeficitMS * 4
-                    + repeatedRebufferMargins.resumeBufferMS
-            )
+                    + repeatedRebufferMargins.resumeBufferMS,
+            ),
         )
         let chunkGapWarningMS = min(
             Self.maxChunkGapWarningMS,
             max(
                 thresholds.chunkGapWarningMS,
                 chunkGapWarningFloorMS,
-                avgInterChunkGapMS + avgChunkDurationMS + rebufferPenaltyMS
-            )
+                avgInterChunkGapMS + avgChunkDurationMS + rebufferPenaltyMS,
+            ),
         )
         let scheduleGapWarningMS = min(
             Self.maxScheduleGapWarningMS,
             max(
                 thresholds.scheduleGapWarningMS,
                 scheduleGapWarningFloorMS,
-                avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8) + max(rebufferPenaltyMS / 2, 12)
-            )
+                avgInterChunkGapMS - max(avgChunkDurationMS / 4, 8) + max(rebufferPenaltyMS / 2, 12),
+            ),
         )
 
         applyThresholds(
@@ -321,9 +424,9 @@ struct PlaybackThresholdController: Sendable {
                 lowWaterTargetMS: lowWaterTargetMS,
                 resumeBufferTargetMS: resumeBufferTargetMS,
                 chunkGapWarningMS: chunkGapWarningMS,
-                scheduleGapWarningMS: scheduleGapWarningMS
+                scheduleGapWarningMS: scheduleGapWarningMS,
             ),
-            preserveFloors: true
+            preserveFloors: true,
         )
     }
 
@@ -342,86 +445,8 @@ struct PlaybackThresholdController: Sendable {
             lowWaterTargetMS: max(thresholds.lowWaterTargetMS, lowWaterFloorMS),
             resumeBufferTargetMS: max(thresholds.resumeBufferTargetMS, resumeBufferFloorMS),
             chunkGapWarningMS: max(thresholds.chunkGapWarningMS, chunkGapWarningFloorMS),
-            scheduleGapWarningMS: max(thresholds.scheduleGapWarningMS, scheduleGapWarningFloorMS)
+            scheduleGapWarningMS: max(thresholds.scheduleGapWarningMS, scheduleGapWarningFloorMS),
         )
-    }
-
-    private static var defaultChunkDurationMS: Int {
-        Int((2.0 / codecTokenRateHz * 1_000).rounded())
-    }
-
-    private static func seedThresholds(
-        for text: String,
-        phase: PlaybackPhase
-    ) -> PlaybackAdaptiveThresholds {
-        seededThresholds(for: classify(text: text), phase: phase)
-    }
-
-    private static func seededThresholds(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> PlaybackAdaptiveThresholds {
-        let base = switch complexityClass {
-        case .compact:
-            PlaybackAdaptiveThresholds(
-                complexityClass: .compact,
-                startupBufferTargetMS: 360,
-                lowWaterTargetMS: 140,
-                resumeBufferTargetMS: 360,
-                chunkGapWarningMS: 450,
-                scheduleGapWarningMS: 180
-            )
-        case .balanced:
-            PlaybackAdaptiveThresholds(
-                complexityClass: .balanced,
-                startupBufferTargetMS: 520,
-                lowWaterTargetMS: 220,
-                resumeBufferTargetMS: 520,
-                chunkGapWarningMS: 520,
-                scheduleGapWarningMS: 220
-            )
-        case .extended:
-            PlaybackAdaptiveThresholds(
-                complexityClass: .extended,
-                startupBufferTargetMS: 12_800,
-                lowWaterTargetMS: 4_800,
-                resumeBufferTargetMS: 16_000,
-                chunkGapWarningMS: 900,
-                scheduleGapWarningMS: 400
-            )
-        }
-
-        let phaseBias = phaseThresholdBias(for: complexityClass, phase: phase)
-        return PlaybackAdaptiveThresholds(
-            complexityClass: base.complexityClass,
-            startupBufferTargetMS: min(Self.maxStartupBufferTargetMS, base.startupBufferTargetMS + phaseBias.startupBufferMS),
-            lowWaterTargetMS: min(Self.maxLowWaterTargetMS, base.lowWaterTargetMS + phaseBias.lowWaterMS),
-            resumeBufferTargetMS: min(Self.maxResumeBufferTargetMS, base.resumeBufferTargetMS + phaseBias.resumeBufferMS),
-            chunkGapWarningMS: min(Self.maxChunkGapWarningMS, base.chunkGapWarningMS + phaseBias.chunkGapWarningMS),
-            scheduleGapWarningMS: min(Self.maxScheduleGapWarningMS, base.scheduleGapWarningMS + phaseBias.scheduleGapWarningMS)
-        )
-    }
-
-    private static func phaseThresholdBias(for complexityClass: PlaybackComplexityClass, phase: PlaybackPhase) -> (
-        startupBufferMS: Int,
-        lowWaterMS: Int,
-        resumeBufferMS: Int,
-        chunkGapWarningMS: Int,
-        scheduleGapWarningMS: Int
-    ) {
-        switch (complexityClass, phase) {
-        case (_, .steady):
-            (0, 0, 0, 0, 0)
-        case (.compact, .warmup):
-            (120, 80, 180, 40, 20)
-        case (.balanced, .warmup):
-            (200, 120, 280, 50, 30)
-        case (.extended, .warmup):
-            (320, 200, 480, 60, 40)
-        case (.compact, .recovery):
-            (80, 60, 140, 30, 20)
-        case (.balanced, .recovery):
-            (140, 100, 220, 40, 30)
-        case (.extended, .recovery):
-            (220, 160, 360, 50, 40)
-        }
     }
 
     private mutating func updatePhase(
@@ -429,7 +454,7 @@ struct PlaybackThresholdController: Sendable {
         avgChunkDurationMS: Int,
         avgInterChunkGapMS: Int,
         jitterMS: Int,
-        cadenceDeficitMS: Int
+        cadenceDeficitMS: Int,
     ) {
         guard let latestInterChunkGapMS else { return }
 
@@ -438,7 +463,7 @@ struct PlaybackThresholdController: Sendable {
             avgChunkDurationMS: avgChunkDurationMS,
             avgInterChunkGapMS: avgInterChunkGapMS,
             jitterMS: jitterMS,
-            cadenceDeficitMS: cadenceDeficitMS
+            cadenceDeficitMS: cadenceDeficitMS,
         ) {
             stableChunkStreak += 1
         } else {
@@ -446,12 +471,12 @@ struct PlaybackThresholdController: Sendable {
         }
 
         let requiredStableChunkCount = switch phase {
-        case .warmup:
-            Self.warmupStableChunkRequirement
-        case .recovery:
-            Self.recoveryStableChunkRequirement
-        case .steady:
-            Int.max
+            case .warmup:
+                Self.warmupStableChunkRequirement
+            case .recovery:
+                Self.recoveryStableChunkRequirement
+            case .steady:
+                Int.max
         }
 
         guard phase != .steady else { return }
@@ -467,7 +492,7 @@ struct PlaybackThresholdController: Sendable {
         avgChunkDurationMS: Int,
         avgInterChunkGapMS: Int,
         jitterMS: Int,
-        cadenceDeficitMS: Int
+        cadenceDeficitMS: Int,
     ) -> Bool {
         let allowedJitterMS = max(avgChunkDurationMS / 2, 40)
         guard jitterMS <= allowedJitterMS else { return false }
@@ -487,56 +512,47 @@ struct PlaybackThresholdController: Sendable {
         for phase: PlaybackPhase,
         avgChunkDurationMS: Int,
         avgInterChunkGapMS: Int,
-        cadenceDeficitMS: Int
+        cadenceDeficitMS: Int,
     ) -> (
         startupBufferMS: Int,
         lowWaterMS: Int,
-        resumeBufferMS: Int
+        resumeBufferMS: Int,
     ) {
         switch phase {
-        case .warmup:
-            (
-                max(avgInterChunkGapMS, cadenceDeficitMS * 6),
-                max(avgChunkDurationMS / 2, cadenceDeficitMS * 2),
-                max(avgChunkDurationMS, cadenceDeficitMS * 3)
-            )
-        case .recovery:
-            (
-                max(avgChunkDurationMS / 2, cadenceDeficitMS * 3),
-                max(avgChunkDurationMS / 3, cadenceDeficitMS),
-                max(avgChunkDurationMS / 2, cadenceDeficitMS * 2)
-            )
-        case .steady:
-            (0, 0, 0)
-        }
-    }
-
-    private static func classify(text: String) -> PlaybackComplexityClass {
-        let textLength = text.count
-        return switch textLength {
-        case ..<220:
-            PlaybackComplexityClass.compact
-        case ..<620:
-            PlaybackComplexityClass.balanced
-        default:
-            PlaybackComplexityClass.extended
+            case .warmup:
+                (
+                    max(avgInterChunkGapMS, cadenceDeficitMS * 6),
+                    max(avgChunkDurationMS / 2, cadenceDeficitMS * 2),
+                    max(avgChunkDurationMS, cadenceDeficitMS * 3),
+                )
+            case .recovery:
+                (
+                    max(avgChunkDurationMS / 2, cadenceDeficitMS * 3),
+                    max(avgChunkDurationMS / 3, cadenceDeficitMS),
+                    max(avgChunkDurationMS / 2, cadenceDeficitMS * 2),
+                )
+            case .steady:
+                (0, 0, 0)
         }
     }
 
     private func average(_ values: [Int]) -> Int? {
         guard !values.isEmpty else { return nil }
+
         return values.reduce(0, +) / values.count
     }
 }
 
-// MARK: - Playback Metrics
+// MARK: - PlaybackMetricsConfiguration
 
 enum PlaybackMetricsConfiguration {
     static let rebufferThrashWarningCount = 3
-    static let rebufferThrashWindowMS = 2_000
+    static let rebufferThrashWindowMS = 2000
 }
 
-struct PlaybackSummary: Sendable {
+// MARK: - PlaybackSummary
+
+struct PlaybackSummary {
     let thresholds: PlaybackAdaptiveThresholds
     let chunkCount: Int
     let sampleCount: Int
@@ -564,7 +580,9 @@ struct PlaybackSummary: Sendable {
     let fadeInChunkCount: Int
 }
 
-struct RuntimeMemorySnapshot: Sendable {
+// MARK: - RuntimeMemorySnapshot
+
+struct RuntimeMemorySnapshot {
     let processResidentBytes: Int?
     let processPhysFootprintBytes: Int?
     let processUserCPUTimeNS: Int?
@@ -576,10 +594,32 @@ struct RuntimeMemorySnapshot: Sendable {
     let mlxMemoryLimitBytes: Int?
 }
 
-// MARK: - AVFoundation Playback Driver
+// MARK: - AudioPlaybackDriver
 
 @MainActor
 final class AudioPlaybackDriver {
+    fileprivate enum PlaybackConfiguration {
+        static let minimumDrainTimeout: Duration = .seconds(5)
+        static let drainTimeoutPaddingMS = 3000
+        static let drainProgressCheckIntervalMS = 500
+        static let drainProgressStallTimeoutMS = 8000
+        static let environmentInstabilityWindowMS = 8000
+        static let recoveryStabilizationDelayMS = 900
+        static let recoveryMaximumAttempts = 3
+        static let lowQueueThresholdMS = 100
+        static let channels: AVAudioChannelCount = 1
+        static let interJobBoopDurationMS = 90
+        static let interJobBoopFrequencyHz = 1176.0
+        static let interJobBoopAmplitude: Float = 0.14
+        static let interJobBoopFadeMS = 10
+        static let interJobBoopTimeout: Duration = .seconds(2)
+
+        static func drainTimeout(forQueuedAudioMS queuedAudioMS: Int) -> Duration {
+            let paddedQueuedAudioMS = queuedAudioMS + drainTimeoutPaddingMS
+            return max(minimumDrainTimeout, .milliseconds(paddedQueuedAudioMS))
+        }
+    }
+
     // MARK: - Request State
 
     @MainActor
@@ -630,7 +670,7 @@ final class AudioPlaybackDriver {
         }
 
         func queuedAudioMS(sampleRate: Double) -> Int {
-            Int((Double(max(queuedSampleCount, 0)) / sampleRate * 1_000).rounded())
+            Int((Double(max(queuedSampleCount, 0)) / sampleRate * 1000).rounded())
         }
 
         func recordQueuedAudioDepth(sampleRate: Double) {
@@ -647,7 +687,7 @@ final class AudioPlaybackDriver {
             firstSample: Float,
             lastSample: Float,
             fadeInApplied: Bool,
-            chunkIndex: Int
+            chunkIndex: Int,
         ) {
             queuedBuffers.append(
                 QueuedBuffer(
@@ -658,14 +698,15 @@ final class AudioPlaybackDriver {
                     fadeInApplied: fadeInApplied,
                     chunkIndex: chunkIndex,
                     bufferIndex: nil,
-                    engineGeneration: nil
-                )
+                    engineGeneration: nil,
+                ),
             )
             queuedSampleCount += frameCount
         }
 
         func reserveQueuedBufferIndicesForCurrentGeneration() -> [QueuedBuffer] {
             guard !queuedBuffers.isEmpty else { return [] }
+
             var reserved = [QueuedBuffer]()
             for index in queuedBuffers.indices where queuedBuffers[index].bufferIndex == nil {
                 let bufferIndex = nextBufferIndex + 1
@@ -687,7 +728,7 @@ final class AudioPlaybackDriver {
 
         func completeQueuedBuffer(
             bufferIndex: Int,
-            engineGeneration: Int
+            engineGeneration: Int,
         ) -> QueuedBuffer? {
             guard let queueIndex = queuedBuffers.firstIndex(where: {
                 $0.bufferIndex == bufferIndex && $0.engineGeneration == engineGeneration
@@ -698,28 +739,6 @@ final class AudioPlaybackDriver {
             let completedBuffer = queuedBuffers.remove(at: queueIndex)
             queuedSampleCount = max(0, queuedSampleCount - completedBuffer.frameCount)
             return completedBuffer
-        }
-    }
-
-    fileprivate enum PlaybackConfiguration {
-        static let minimumDrainTimeout: Duration = .seconds(5)
-        static let drainTimeoutPaddingMS = 3_000
-        static let drainProgressCheckIntervalMS = 500
-        static let drainProgressStallTimeoutMS = 8_000
-        static let environmentInstabilityWindowMS = 8_000
-        static let recoveryStabilizationDelayMS = 900
-        static let recoveryMaximumAttempts = 3
-        static let lowQueueThresholdMS = 100
-        static let channels: AVAudioChannelCount = 1
-        static let interJobBoopDurationMS = 90
-        static let interJobBoopFrequencyHz = 1_176.0
-        static let interJobBoopAmplitude: Float = 0.14
-        static let interJobBoopFadeMS = 10
-        static let interJobBoopTimeout: Duration = .seconds(2)
-
-        static func drainTimeout(forQueuedAudioMS queuedAudioMS: Int) -> Duration {
-            let paddedQueuedAudioMS = queuedAudioMS + drainTimeoutPaddingMS
-            return max(minimumDrainTimeout, .milliseconds(paddedQueuedAudioMS))
         }
     }
 
@@ -740,7 +759,7 @@ final class AudioPlaybackDriver {
     private var defaultOutputDeviceAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
         mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
+        mElement: kAudioObjectPropertyElementMain,
     )
     private var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
     private var lastEnvironmentInstabilityAt: Date?
@@ -760,7 +779,19 @@ final class AudioPlaybackDriver {
     private var environmentEventSink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
     private var shouldPlayInterJobBoop = false
 
-    // MARK: - Lifecycle
+    private var isPlaybackRecoveryActive: Bool {
+        playbackRecoveryReason != nil || isSystemSleeping
+    }
+
+    private var shouldSuppressDrainProgressTimeout: Bool {
+        if isPlaybackRecoveryActive || isScreenSleeping || !isSessionActive {
+            return true
+        }
+        guard let lastEnvironmentInstabilityAt else { return false }
+
+        return Date().timeIntervalSince(lastEnvironmentInstabilityAt) * 1000
+            <= Double(PlaybackConfiguration.environmentInstabilityWindowMS)
+    }
 
     init(traceEnabled: Bool = false) {
         self.traceEnabled = traceEnabled
@@ -771,10 +802,11 @@ final class AudioPlaybackDriver {
     }
 
     func setEnvironmentEventSink(
-        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
+        _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
     ) {
         environmentEventSink = sink
         guard let sink else { return }
+
         Task {
             await sink(PlaybackEnvironmentEvent.outputDeviceObserved(currentDevice: lastObservedOutputDeviceDescription))
         }
@@ -799,7 +831,7 @@ final class AudioPlaybackDriver {
         sampleRate: Double,
         text: String,
         stream: AsyncThrowingStream<[Float], Error>,
-        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void
+        onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary {
         _ = try await prepare(sampleRate: sampleRate)
         try await playInterJobBoopIfNeeded(sampleRate: sampleRate)
@@ -842,7 +874,7 @@ final class AudioPlaybackDriver {
         }
 
         func scheduleQueuedBuffer(
-            _ queuedBuffer: RequestPlaybackState.QueuedBuffer
+            _ queuedBuffer: RequestPlaybackState.QueuedBuffer,
         ) async throws {
             try throwIfActivePlaybackInterrupted()
             let queuedAudioBeforeMS = state.queuedAudioMS(sampleRate: sampleRate)
@@ -856,14 +888,13 @@ final class AudioPlaybackDriver {
                 scheduleGapCount += 1
                 if startedPlayback,
                    let bufferIndex = queuedBuffer.bufferIndex,
-                   gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS
-                {
+                   gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS {
                     await onEvent(
                         .scheduleGapWarning(
                             gapMS: gapMS,
                             bufferIndex: bufferIndex,
-                            queuedAudioMS: queuedAudioBeforeMS
-                        )
+                            queuedAudioMS: queuedAudioBeforeMS,
+                        ),
                     )
                 }
             } else {
@@ -897,24 +928,25 @@ final class AudioPlaybackDriver {
                             chunkIndex: queuedBuffer.chunkIndex,
                             bufferIndex: currentBufferIndex,
                             sampleCount: queuedBuffer.frameCount,
-                            durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1_000).rounded()),
+                            durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1000).rounded()),
                             queuedAudioBeforeMS: queuedAudioBeforeMS,
                             queuedAudioAfterMS: queuedAudioAfterMS,
                             gapMS: scheduleGapMS,
                             isRebuffering: state.isRebuffering,
-                            fadeInApplied: queuedBuffer.fadeInApplied
-                        )
-                    )
+                            fadeInApplied: queuedBuffer.fadeInApplied,
+                        ),
+                    ),
                 )
             }
             scheduleBuffer(queuedBuffer.pcmBuffer, callbackType: .dataPlayedBack) { callbackType in
                 guard callbackType == .dataPlayedBack else { return }
+
                 Task { @MainActor in
                     guard requestID + 1 == self.nextRequestID else { return }
                     guard
                         state.completeQueuedBuffer(
                             bufferIndex: currentBufferIndex,
-                            engineGeneration: currentEngineGeneration
+                            engineGeneration: currentEngineGeneration,
                         ) != nil
                     else {
                         return
@@ -932,14 +964,14 @@ final class AudioPlaybackDriver {
                                     chunkIndex: queuedBuffer.chunkIndex,
                                     bufferIndex: currentBufferIndex,
                                     sampleCount: queuedBuffer.frameCount,
-                                    durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1_000).rounded()),
+                                    durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1000).rounded()),
                                     queuedAudioBeforeMS: nil,
                                     queuedAudioAfterMS: currentQueuedAudioMS,
                                     gapMS: nil,
                                     isRebuffering: state.isRebuffering,
-                                    fadeInApplied: queuedBuffer.fadeInApplied
-                                )
-                            )
+                                    fadeInApplied: queuedBuffer.fadeInApplied,
+                                ),
+                            ),
                         )
                     }
                     if !state.generationFinished, currentQueuedAudioMS <= 0 {
@@ -953,7 +985,7 @@ final class AudioPlaybackDriver {
                             state.rebufferStartedAt = now
                             state.recentRebufferStartTimes.append(now)
                             state.recentRebufferStartTimes.removeAll {
-                                now.timeIntervalSince($0) * 1_000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
+                                now.timeIntervalSince($0) * 1000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
                             }
                             await onEvent(.rebufferStarted(queuedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                         }
@@ -963,8 +995,7 @@ final class AudioPlaybackDriver {
 
                     if !state.generationFinished,
                        currentQueuedAudioMS <= state.thresholdsController.thresholds.lowWaterTargetMS,
-                       !state.isRebuffering
-                    {
+                       !state.isRebuffering {
                         state.isRebuffering = true
                         state.rebufferEventCount += 1
                         state.thresholdsController.recordRebuffer()
@@ -972,27 +1003,25 @@ final class AudioPlaybackDriver {
                         state.rebufferStartedAt = now
                         state.recentRebufferStartTimes.append(now)
                         state.recentRebufferStartTimes.removeAll {
-                            now.timeIntervalSince($0) * 1_000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
+                            now.timeIntervalSince($0) * 1000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
                         }
                         self.playerNode?.pause()
                         await onEvent(.rebufferStarted(queuedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                         if !state.emittedRebufferThrashWarning,
-                           state.recentRebufferStartTimes.count >= PlaybackMetricsConfiguration.rebufferThrashWarningCount
-                        {
+                           state.recentRebufferStartTimes.count >= PlaybackMetricsConfiguration.rebufferThrashWarningCount {
                             state.emittedRebufferThrashWarning = true
                             await onEvent(
                                 .rebufferThrashWarning(
                                     rebufferEventCount: state.rebufferEventCount,
-                                    windowMS: PlaybackMetricsConfiguration.rebufferThrashWindowMS
-                                )
+                                    windowMS: PlaybackMetricsConfiguration.rebufferThrashWindowMS,
+                                ),
                             )
                         }
                     }
 
                     if !state.generationFinished,
                        currentQueuedAudioMS <= PlaybackConfiguration.lowQueueThresholdMS,
-                       !state.emittedLowQueueWarning
-                    {
+                       !state.emittedLowQueueWarning {
                         state.emittedLowQueueWarning = true
                         await onEvent(.queueDepthLow(queuedAudioMS: currentQueuedAudioMS))
                     } else if currentQueuedAudioMS > PlaybackConfiguration.lowQueueThresholdMS {
@@ -1000,8 +1029,7 @@ final class AudioPlaybackDriver {
                     }
 
                     if state.isRebuffering,
-                       (currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS || state.generationFinished)
-                    {
+                       currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS || state.generationFinished {
                         if !self.isPlaybackPausedManually {
                             self.playerNode?.play()
                         }
@@ -1025,6 +1053,7 @@ final class AudioPlaybackDriver {
 
         func scheduleQueuedBuffersIfPossible() async throws {
             guard !isPlaybackRecoveryActive else { return }
+
             let queuedBuffers = state.reserveQueuedBufferIndicesForCurrentGeneration()
             for queuedBuffer in queuedBuffers {
                 try throwIfActivePlaybackInterrupted()
@@ -1036,8 +1065,9 @@ final class AudioPlaybackDriver {
             for try await chunk in stream {
                 try throwIfActivePlaybackInterrupted()
                 guard !chunk.isEmpty else { continue }
+
                 let now = Date()
-                let chunkDurationMS = Int((Double(chunk.count) / sampleRate * 1_000).rounded())
+                let chunkDurationMS = Int((Double(chunk.count) / sampleRate * 1000).rounded())
                 let interChunkGapMS: Int?
                 chunkCount += 1
                 sampleCount += chunk.count
@@ -1069,16 +1099,16 @@ final class AudioPlaybackDriver {
                                 queuedAudioAfterMS: nil,
                                 gapMS: interChunkGapMS,
                                 isRebuffering: state.isRebuffering,
-                                fadeInApplied: !emittedFirstChunk
-                            )
-                        )
+                                fadeInApplied: !emittedFirstChunk,
+                            ),
+                        ),
                     )
                 }
                 if let buffer = makePCMBuffer(
                     from: chunk,
                     sampleRate: sampleRate,
                     previousTrailingSample: lastPreparedTrailingSample,
-                    applyFadeIn: !emittedFirstChunk
+                    applyFadeIn: !emittedFirstChunk,
                 ) {
                     lastPreparedTrailingSample = buffer.lastSample
                     state.enqueueBuffer(
@@ -1087,14 +1117,14 @@ final class AudioPlaybackDriver {
                         firstSample: buffer.firstSample,
                         lastSample: buffer.lastSample,
                         fadeInApplied: buffer.fadeInApplied,
-                        chunkIndex: chunkCount
+                        chunkIndex: chunkCount,
                     )
                     if startedPlayback {
                         try await scheduleQueuedBuffersIfPossible()
                         if state.isRebuffering {
                             let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
                             if currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS {
-                                if !isPlaybackPausedManually && !isPlaybackRecoveryActive {
+                                if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
                                     playerNode?.play()
                                 }
                                 state.isRebuffering = false
@@ -1150,7 +1180,7 @@ final class AudioPlaybackDriver {
                 try await scheduleQueuedBuffersIfPossible()
                 if state.isRebuffering {
                     let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
-                    if !isPlaybackPausedManually && !isPlaybackRecoveryActive {
+                    if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
                         playerNode?.play()
                     }
                     state.isRebuffering = false
@@ -1177,26 +1207,24 @@ final class AudioPlaybackDriver {
             try throwIfActivePlaybackInterrupted()
             try await waitForPlaybackDrain(
                 state: state,
-                sampleRate: sampleRate
+                sampleRate: sampleRate,
             )
             if let maxBoundaryDiscontinuity = state.maxBoundaryDiscontinuity,
                let maxLeadingAbsAmplitude = state.maxLeadingAbsAmplitude,
-               let maxTrailingAbsAmplitude = state.maxTrailingAbsAmplitude
-            {
+               let maxTrailingAbsAmplitude = state.maxTrailingAbsAmplitude {
                 await onEvent(
                     .bufferShapeSummary(
                         maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
                         maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
                         maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                        fadeInChunkCount: state.fadeInChunkCount
-                    )
+                        fadeInChunkCount: state.fadeInChunkCount,
+                    ),
                 )
             }
-            let timeFromPrerollReadyToDrainMS: Int?
-            if let timeToPrerollReadyMS {
-                timeFromPrerollReadyToDrainMS = max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
+            let timeFromPrerollReadyToDrainMS: Int? = if let timeToPrerollReadyMS {
+                max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
             } else {
-                timeFromPrerollReadyToDrainMS = nil
+                nil
             }
 
             resetPlayerNodeForNextRequest()
@@ -1227,7 +1255,7 @@ final class AudioPlaybackDriver {
                 maxBoundaryDiscontinuity: state.maxBoundaryDiscontinuity,
                 maxLeadingAbsAmplitude: state.maxLeadingAbsAmplitude,
                 maxTrailingAbsAmplitude: state.maxTrailingAbsAmplitude,
-                fadeInChunkCount: state.fadeInChunkCount
+                fadeInChunkCount: state.fadeInChunkCount,
             )
         } catch is CancellationError {
             resetPlayerNodeForNextRequest()
@@ -1242,7 +1270,7 @@ final class AudioPlaybackDriver {
 
             throw WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback failed while scheduling generated audio into the local audio player. \(error.localizedDescription)"
+                message: "Live playback failed while scheduling generated audio into the local audio player. \(error.localizedDescription)",
             )
         }
     }
@@ -1279,11 +1307,10 @@ final class AudioPlaybackDriver {
         }
 
         isPlaybackPausedManually = false
-        let queuedAudioMS = activeRequestState.queuedAudioMS(sampleRate: engineSampleRate ?? 24_000)
+        let queuedAudioMS = activeRequestState.queuedAudioMS(sampleRate: engineSampleRate ?? 24000)
         if !activeRequestState.isRebuffering
             || queuedAudioMS >= activeRequestState.thresholdsController.thresholds.resumeBufferTargetMS
-            || activeRequestState.generationFinished
-        {
+            || activeRequestState.generationFinished {
             playerNode?.play()
         }
         playbackState = .playing
@@ -1298,7 +1325,7 @@ final class AudioPlaybackDriver {
 
     private func waitForPlaybackDrain(
         state: RequestPlaybackState,
-        sampleRate: Double
+        sampleRate: Double,
     ) async throws {
         let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
         if currentQueuedAudioMS == 0 {
@@ -1322,7 +1349,7 @@ final class AudioPlaybackDriver {
                 try await Task.sleep(for: drainTimeout)
                 throw WorkerError(
                     code: .audioPlaybackTimeout,
-                    message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(drainTimeout.components.seconds) seconds."
+                    message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(drainTimeout.components.seconds) seconds.",
                 )
             }
             group.addTask {
@@ -1337,7 +1364,7 @@ final class AudioPlaybackDriver {
                         (
                             playedBackCallbackCount: state.playedBackCallbackCount,
                             queuedAudioMS: state.queuedAudioMS(sampleRate: sampleRate),
-                            isPausedManually: self.isPlaybackPausedManually
+                            isPausedManually: self.isPlaybackPausedManually,
                         )
                     }
 
@@ -1358,11 +1385,11 @@ final class AudioPlaybackDriver {
                         continue
                     }
 
-                    let stalledForMS = Int((Date().timeIntervalSince(lastProgressAt) * 1_000).rounded())
+                    let stalledForMS = Int((Date().timeIntervalSince(lastProgressAt) * 1000).rounded())
                     if stalledForMS >= PlaybackConfiguration.drainProgressStallTimeoutMS {
                         throw WorkerError(
                             code: .audioPlaybackTimeout,
-                            message: "Live playback stalled after generated audio finished because the local audio player stopped reporting drain progress for \(PlaybackConfiguration.drainProgressStallTimeoutMS / 1_000) seconds while \(snapshot.queuedAudioMS) ms of audio remained queued."
+                            message: "Live playback stalled after generated audio finished because the local audio player stopped reporting drain progress for \(PlaybackConfiguration.drainProgressStallTimeoutMS / 1000) seconds while \(snapshot.queuedAudioMS) ms of audio remained queued.",
                         )
                     }
                 }
@@ -1383,13 +1410,13 @@ final class AudioPlaybackDriver {
         let node = AVAudioPlayerNode()
         let format = AVAudioFormat(
             standardFormatWithSampleRate: sampleRate,
-            channels: PlaybackConfiguration.channels
+            channels: PlaybackConfiguration.channels,
         )
 
         guard let format else {
             throw WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback could not create an AVAudioFormat for sample rate \(sampleRate)."
+                message: "Live playback could not create an AVAudioFormat for sample rate \(sampleRate).",
             )
         }
 
@@ -1429,8 +1456,8 @@ final class AudioPlaybackDriver {
                     continuation.resume(
                         throwing: WorkerError(
                             code: .audioPlaybackFailed,
-                            message: "SpeakSwiftly could not begin macOS audio routing arbitration before starting local playback. \(error.localizedDescription)"
-                        )
+                            message: "SpeakSwiftly could not begin macOS audio routing arbitration before starting local playback. \(error.localizedDescription)",
+                        ),
                     )
                 } else {
                     continuation.resume(returning: ())
@@ -1445,11 +1472,11 @@ final class AudioPlaybackDriver {
         engineConfigurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: nil,
-            queue: nil
+            queue: nil,
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard let engine = self.audioEngine else { return }
+                guard let engine = audioEngine else { return }
 
                 let engineIsRunning = engine.isRunning
                 markEnvironmentInstability()
@@ -1471,67 +1498,67 @@ final class AudioPlaybackDriver {
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.willSleepNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleSystemSleepStateChange(isSleeping: true)
                 }
-            }
+            },
         )
         workspaceObservers.append(
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.didWakeNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleSystemSleepStateChange(isSleeping: false)
                 }
-            }
+            },
         )
         workspaceObservers.append(
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.screensDidSleepNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleScreenSleepStateChange(isSleeping: true)
                 }
-            }
+            },
         )
         workspaceObservers.append(
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.screensDidWakeNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleScreenSleepStateChange(isSleeping: false)
                 }
-            }
+            },
         )
         workspaceObservers.append(
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.sessionDidResignActiveNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleSessionActivityChange(isActive: false)
                 }
-            }
+            },
         )
         workspaceObservers.append(
             workspaceNotificationCenter.addObserver(
                 forName: NSWorkspace.sessionDidBecomeActiveNotification,
                 object: nil,
-                queue: nil
+                queue: nil,
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.handleSessionActivityChange(isActive: true)
                 }
-            }
+            },
         )
     }
 
@@ -1546,7 +1573,7 @@ final class AudioPlaybackDriver {
             AudioObjectID(kAudioObjectSystemObject),
             &defaultOutputDeviceAddress,
             DispatchQueue.main,
-            listener
+            listener,
         )
     }
 
@@ -1554,13 +1581,14 @@ final class AudioPlaybackDriver {
         let previousDevice = lastObservedOutputDeviceDescription
         let currentDevice = currentDefaultOutputDeviceDescription()
         guard previousDevice != currentDevice else { return }
+
         lastObservedOutputDeviceDescription = currentDevice
         markEnvironmentInstability()
 
         if let environmentEventSink {
             Task {
                 await environmentEventSink(
-                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice)
+                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice),
                 )
             }
         }
@@ -1568,7 +1596,7 @@ final class AudioPlaybackDriver {
         if let activeEventSink {
             Task {
                 await activeEventSink(
-                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice)
+                    .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice),
                 )
             }
         }
@@ -1582,6 +1610,7 @@ final class AudioPlaybackDriver {
         emitEnvironmentEvent(.systemSleepStateChanged(isSleeping: isSleeping))
 
         guard activeRequestState != nil else { return }
+
         if isSleeping {
             playerNode?.pause()
             return
@@ -1604,6 +1633,7 @@ final class AudioPlaybackDriver {
 
     private func emitEnvironmentEvent(_ event: PlaybackEnvironmentEvent) {
         guard let environmentEventSink else { return }
+
         Task {
             await environmentEventSink(event)
         }
@@ -1611,19 +1641,6 @@ final class AudioPlaybackDriver {
 
     private func markEnvironmentInstability() {
         lastEnvironmentInstabilityAt = Date()
-    }
-
-    private var isPlaybackRecoveryActive: Bool {
-        playbackRecoveryReason != nil || isSystemSleeping
-    }
-
-    private var shouldSuppressDrainProgressTimeout: Bool {
-        if isPlaybackRecoveryActive || isScreenSleeping || !isSessionActive {
-            return true
-        }
-        guard let lastEnvironmentInstabilityAt else { return false }
-        return Date().timeIntervalSince(lastEnvironmentInstabilityAt) * 1_000
-            <= Double(PlaybackConfiguration.environmentInstabilityWindowMS)
     }
 
     private func beginPlaybackRecovery(reason: RecoveryReason) {
@@ -1641,13 +1658,14 @@ final class AudioPlaybackDriver {
                 reason: reason.rawValue,
                 stage: "scheduled",
                 attempt: nil,
-                currentDevice: lastObservedOutputDeviceDescription
-            )
+                currentDevice: lastObservedOutputDeviceDescription,
+            ),
         )
 
         recoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.performPlaybackRecovery(reason: reason)
+
+            await performPlaybackRecovery(reason: reason)
         }
     }
 
@@ -1660,8 +1678,8 @@ final class AudioPlaybackDriver {
             interruptActivePlayback(
                 with: WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "SpeakSwiftly could not recover local playback after a \(reason.rawValue) event because the active playback sample rate was no longer available."
-                )
+                    message: "SpeakSwiftly could not recover local playback after a \(reason.rawValue) event because the active playback sample rate was no longer available.",
+                ),
             )
             return
         }
@@ -1674,8 +1692,8 @@ final class AudioPlaybackDriver {
                     reason: reason.rawValue,
                     stage: "attempting",
                     attempt: attempt,
-                    currentDevice: lastObservedOutputDeviceDescription
-                )
+                    currentDevice: lastObservedOutputDeviceDescription,
+                ),
             )
 
             do {
@@ -1686,8 +1704,7 @@ final class AudioPlaybackDriver {
                 try await rescheduleActiveRequestBuffers(activeRequestState)
                 if !isPlaybackPausedManually,
                    !activeRequestState.isRebuffering,
-                   !isSystemSleeping
-                {
+                   !isSystemSleeping {
                     playerNode?.play()
                 }
                 playbackRecoveryReason = nil
@@ -1697,8 +1714,8 @@ final class AudioPlaybackDriver {
                         reason: reason.rawValue,
                         stage: "recovered",
                         attempt: attempt,
-                        currentDevice: lastObservedOutputDeviceDescription
-                    )
+                        currentDevice: lastObservedOutputDeviceDescription,
+                    ),
                 )
                 return
             } catch is CancellationError {
@@ -1710,8 +1727,8 @@ final class AudioPlaybackDriver {
                         reason: reason.rawValue,
                         stage: "attempt_failed",
                         attempt: attempt,
-                        currentDevice: lastObservedOutputDeviceDescription
-                    )
+                        currentDevice: lastObservedOutputDeviceDescription,
+                    ),
                 )
             }
         }
@@ -1719,8 +1736,8 @@ final class AudioPlaybackDriver {
         interruptActivePlayback(
             with: WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(PlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request."
-            )
+                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(PlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request.",
+            ),
         )
     }
 
@@ -1730,16 +1747,18 @@ final class AudioPlaybackDriver {
             try throwIfActivePlaybackInterrupted()
             scheduleBuffer(queuedBuffer.pcmBuffer, callbackType: .dataPlayedBack) { [weak self] callbackType in
                 guard callbackType == .dataPlayedBack else { return }
+
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     guard state.completeQueuedBuffer(
                         bufferIndex: queuedBuffer.bufferIndex ?? 0,
-                        engineGeneration: queuedBuffer.engineGeneration ?? state.engineGeneration
+                        engineGeneration: queuedBuffer.engineGeneration ?? state.engineGeneration,
                     ) != nil else {
                         return
                     }
+
                     state.playedBackCallbackCount += 1
-                    state.recordQueuedAudioDepth(sampleRate: self.engineSampleRate ?? 24_000)
+                    state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24000)
                     if state.generationFinished, state.queuedSampleCount == 0 {
                         state.drainContinuation?.resume()
                         state.drainContinuation = nil
@@ -1747,7 +1766,7 @@ final class AudioPlaybackDriver {
                 }
             }
             state.scheduleCallbackCount += 1
-            state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24_000)
+            state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24000)
         }
     }
 
@@ -1778,7 +1797,7 @@ final class AudioPlaybackDriver {
         var deviceAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
+            mElement: kAudioObjectPropertyElementMain,
         )
         let deviceStatus = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
@@ -1786,7 +1805,7 @@ final class AudioPlaybackDriver {
             0,
             nil,
             &dataSize,
-            &deviceID
+            &deviceID,
         )
 
         guard deviceStatus == noErr, deviceID != AudioObjectID(kAudioObjectUnknown) else {
@@ -1798,7 +1817,7 @@ final class AudioPlaybackDriver {
         var nameAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceNameCFString,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
+            mElement: kAudioObjectPropertyElementMain,
         )
         let nameStatus = withUnsafeMutablePointer(to: &deviceName) { pointer in
             AudioObjectGetPropertyData(
@@ -1807,7 +1826,7 @@ final class AudioPlaybackDriver {
                 0,
                 nil,
                 &nameSize,
-                UnsafeMutableRawPointer(pointer)
+                UnsafeMutableRawPointer(pointer),
             )
         }
 
@@ -1827,11 +1846,11 @@ final class AudioPlaybackDriver {
         from samples: [Float],
         sampleRate: Double,
         previousTrailingSample: Float?,
-        applyFadeIn: Bool
+        applyFadeIn: Bool,
     ) -> (buffer: AVAudioPCMBuffer, frameCount: Int, firstSample: Float, lastSample: Float, fadeInApplied: Bool)? {
         guard let format = streamingFormat ?? AVAudioFormat(
             standardFormatWithSampleRate: sampleRate,
-            channels: PlaybackConfiguration.channels
+            channels: PlaybackConfiguration.channels,
         ) else {
             return nil
         }
@@ -1840,15 +1859,14 @@ final class AudioPlaybackDriver {
             samples,
             sampleRate: format.sampleRate,
             previousTrailingSample: previousTrailingSample,
-            applyFadeIn: applyFadeIn
+            applyFadeIn: applyFadeIn,
         )
         guard let firstSample = processedSamples.first, let lastSample = processedSamples.last else {
             return nil
         }
-
         guard let buffer = AVAudioPCMBuffer(
             pcmFormat: format,
-            frameCapacity: AVAudioFrameCount(processedSamples.count)
+            frameCapacity: AVAudioFrameCount(processedSamples.count),
         ) else {
             return nil
         }
@@ -1856,7 +1874,11 @@ final class AudioPlaybackDriver {
         buffer.frameLength = AVAudioFrameCount(processedSamples.count)
         if let channelData = buffer.floatChannelData {
             processedSamples.withUnsafeBufferPointer { src in
-                channelData[0].update(from: src.baseAddress!, count: processedSamples.count)
+                guard let baseAddress = src.baseAddress else {
+                    return
+                }
+
+                channelData[0].update(from: baseAddress, count: processedSamples.count)
             }
         }
 
@@ -1865,19 +1887,19 @@ final class AudioPlaybackDriver {
             frameCount: Int(buffer.frameLength),
             firstSample: firstSample,
             lastSample: lastSample,
-            fadeInApplied: applyFadeIn
+            fadeInApplied: applyFadeIn,
         )
     }
 
     private func scheduleBuffer(
         _ buffer: AVAudioPCMBuffer,
         callbackType: AVAudioPlayerNodeCompletionCallbackType,
-        completion: @escaping @Sendable (AVAudioPlayerNodeCompletionCallbackType) -> Void
+        completion: @escaping @Sendable (AVAudioPlayerNodeCompletionCallbackType) -> Void,
     ) {
         playerNode?.scheduleBuffer(
             buffer,
             completionCallbackType: callbackType,
-            completionHandler: completion
+            completionHandler: completion,
         )
     }
 
@@ -1885,6 +1907,7 @@ final class AudioPlaybackDriver {
 
     private func playInterJobBoopIfNeeded(sampleRate: Double) async throws {
         guard shouldPlayInterJobBoop else { return }
+
         shouldPlayInterJobBoop = false
 
         guard
@@ -1892,12 +1915,12 @@ final class AudioPlaybackDriver {
                 from: makeInterJobBoopSamples(sampleRate: sampleRate),
                 sampleRate: sampleRate,
                 previousTrailingSample: nil,
-                applyFadeIn: false
+                applyFadeIn: false,
             )?.buffer
         else {
             throw WorkerError(
                 code: .audioPlaybackFailed,
-                message: "SpeakSwiftly could not synthesize the short inter-job playback boop buffer for sample rate \(sampleRate)."
+                message: "SpeakSwiftly could not synthesize the short inter-job playback boop buffer for sample rate \(sampleRate).",
             )
         }
 
@@ -1909,6 +1932,7 @@ final class AudioPlaybackDriver {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 scheduleBuffer(buffer, callbackType: .dataPlayedBack) { callbackType in
                     guard callbackType == .dataPlayedBack else { return }
+
                     continuation.resume()
                 }
             }
@@ -1919,7 +1943,7 @@ final class AudioPlaybackDriver {
             try await Task.sleep(for: PlaybackConfiguration.interJobBoopTimeout)
             throw WorkerError(
                 code: .audioPlaybackTimeout,
-                message: "SpeakSwiftly timed out while trying to play the short inter-job playback boop before the next live request could begin."
+                message: "SpeakSwiftly timed out while trying to play the short inter-job playback boop before the next live request could begin.",
             )
         }
         defer { timeoutTask.cancel() }
@@ -1937,8 +1961,8 @@ final class AudioPlaybackDriver {
                 .interJobBoopPlayed(
                     durationMS: PlaybackConfiguration.interJobBoopDurationMS,
                     frequencyHz: PlaybackConfiguration.interJobBoopFrequencyHz,
-                    sampleRate: sampleRate
-                )
+                    sampleRate: sampleRate,
+                ),
             )
         }
     }
@@ -1949,24 +1973,22 @@ final class AudioPlaybackDriver {
 func makeInterJobBoopSamples(sampleRate: Double) -> [Float] {
     let sampleCount = max(
         1,
-        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopDurationMS)) / 1_000.0)
+        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopDurationMS)) / 1000.0),
     )
     let fadeSampleCount = max(
         1,
-        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFadeMS)) / 1_000.0)
+        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFadeMS)) / 1000.0),
     )
 
     return (0..<sampleCount).map { index in
         let time = Double(index) / sampleRate
         let phase = 2.0 * Double.pi * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFrequencyHz * time
-        let fadeEnvelope: Double
-
-        if index < fadeSampleCount {
-            fadeEnvelope = Double(index) / Double(fadeSampleCount)
+        let fadeEnvelope: Double = if index < fadeSampleCount {
+            Double(index) / Double(fadeSampleCount)
         } else if index >= sampleCount - fadeSampleCount {
-            fadeEnvelope = Double(sampleCount - index) / Double(fadeSampleCount)
+            Double(sampleCount - index) / Double(fadeSampleCount)
         } else {
-            fadeEnvelope = 1
+            1
         }
 
         return Float(sin(phase) * fadeEnvelope) * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopAmplitude
@@ -1977,7 +1999,7 @@ func shapePlaybackSamples(
     _ samples: [Float],
     sampleRate: Double,
     previousTrailingSample: Float?,
-    applyFadeIn: Bool
+    applyFadeIn: Bool,
 ) -> [Float] {
     guard !samples.isEmpty else { return [] }
 
@@ -2002,7 +2024,7 @@ func shapePlaybackSamples(
                     let correction = boundaryJump * (1 - progress)
                     processedSamples[index] = min(
                         max(processedSamples[index] - correction, minimumSampleValue),
-                        maximumSampleValue
+                        maximumSampleValue,
                     )
                 }
             }
@@ -2024,5 +2046,5 @@ func shapePlaybackSamples(
 }
 
 func milliseconds(since start: Date) -> Int {
-    Int((Date().timeIntervalSince(start) * 1_000).rounded())
+    Int((Date().timeIntervalSince(start) * 1000).rounded())
 }

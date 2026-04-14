@@ -15,12 +15,25 @@ struct GenerationJobStore {
         rootURL: URL,
         fileManager: FileManager = .default,
         encoder: JSONEncoder = GenerationJobStore.makeEncoder(),
-        decoder: JSONDecoder = GenerationJobStore.makeDecoder()
+        decoder: JSONDecoder = GenerationJobStore.makeDecoder(),
     ) {
         self.rootURL = rootURL
         self.fileManager = fileManager
         self.encoder = encoder
         self.decoder = decoder
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 
     func ensureRootExists() throws {
@@ -33,7 +46,7 @@ struct GenerationJobStore {
         textProfileName: String?,
         speechBackend: SpeakSwiftly.SpeechBackend,
         item: SpeakSwiftly.GenerationJobItem,
-        createdAt: Date
+        createdAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try createJob(
             jobID: jobID,
@@ -42,7 +55,7 @@ struct GenerationJobStore {
             textProfileName: textProfileName,
             speechBackend: speechBackend,
             items: [item],
-            createdAt: createdAt
+            createdAt: createdAt,
         )
     }
 
@@ -52,7 +65,7 @@ struct GenerationJobStore {
         textProfileName: String?,
         speechBackend: SpeakSwiftly.SpeechBackend,
         items: [SpeakSwiftly.GenerationJobItem],
-        createdAt: Date
+        createdAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try createJob(
             jobID: jobID,
@@ -61,61 +74,8 @@ struct GenerationJobStore {
             textProfileName: textProfileName,
             speechBackend: speechBackend,
             items: items,
-            createdAt: createdAt
-        )
-    }
-
-    private func createJob(
-        jobID: String,
-        jobKind: SpeakSwiftly.GenerationJobKind,
-        profileName: String,
-        textProfileName: String?,
-        speechBackend: SpeakSwiftly.SpeechBackend,
-        items: [SpeakSwiftly.GenerationJobItem],
-        createdAt: Date
-    ) throws -> SpeakSwiftly.GenerationJob {
-        try ensureRootExists()
-
-        let directoryURL = generationJobDirectoryURL(for: jobID)
-        guard !fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .generationJobAlreadyExists,
-                message: "Generation job '\(jobID)' already exists in the SpeakSwiftly generation-job store and cannot be overwritten."
-            )
-        }
-
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
-
-        let job = SpeakSwiftly.GenerationJob(
-            jobID: jobID,
-            jobKind: jobKind,
             createdAt: createdAt,
-            updatedAt: createdAt,
-            profileName: profileName,
-            textProfileName: textProfileName,
-            speechBackend: speechBackend,
-            state: .queued,
-            items: items,
-            artifacts: [],
-            failure: nil,
-            startedAt: nil,
-            completedAt: nil,
-            failedAt: nil,
-            expiresAt: nil,
-            retentionPolicy: .manual
         )
-
-        do {
-            try write(job, to: directoryURL)
-        } catch {
-            try? fileManager.removeItem(at: directoryURL)
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Generation job '\(jobID)' could not be written to disk. \(error.localizedDescription)"
-            )
-        }
-
-        return job
     }
 
     func loadGenerationJob(id jobID: String) throws -> SpeakSwiftly.GenerationJob {
@@ -124,7 +84,7 @@ struct GenerationJobStore {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .generationJobNotFound,
-                message: "Generation job '\(jobID)' was not found in the SpeakSwiftly generation-job store."
+                message: "Generation job '\(jobID)' was not found in the SpeakSwiftly generation-job store.",
             )
         }
 
@@ -136,7 +96,7 @@ struct GenerationJobStore {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Generation job '\(jobID)' exists, but its metadata could not be read. \(error.localizedDescription)"
+                message: "Generation job '\(jobID)' exists, but its metadata could not be read. \(error.localizedDescription)",
             )
         }
     }
@@ -147,7 +107,7 @@ struct GenerationJobStore {
         let urls = try fileManager.contentsOfDirectory(
             at: rootURL,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles],
         )
 
         let jobs = try urls.map { directoryURL in
@@ -157,7 +117,7 @@ struct GenerationJobStore {
             } catch {
                 throw WorkerError(
                     code: .filesystemError,
-                    message: "SpeakSwiftly could not list generation jobs because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)"
+                    message: "SpeakSwiftly could not list generation jobs because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)",
                 )
             }
         }
@@ -173,7 +133,7 @@ struct GenerationJobStore {
     func markRunning(
         id jobID: String,
         speechBackend: SpeakSwiftly.SpeechBackend,
-        startedAt: Date
+        startedAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try updateGenerationJob(id: jobID) { job in
             SpeakSwiftly.GenerationJob(
@@ -192,7 +152,7 @@ struct GenerationJobStore {
                 completedAt: nil,
                 failedAt: nil,
                 expiresAt: job.expiresAt,
-                retentionPolicy: job.retentionPolicy
+                retentionPolicy: job.retentionPolicy,
             )
         }
     }
@@ -202,14 +162,14 @@ struct GenerationJobStore {
         return try markRunning(
             id: jobID,
             speechBackend: current.speechBackend,
-            startedAt: startedAt
+            startedAt: startedAt,
         )
     }
 
     func markCompleted(
         id jobID: String,
         artifacts: [SpeakSwiftly.GenerationArtifact],
-        completedAt: Date
+        completedAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try updateGenerationJob(id: jobID) { job in
             SpeakSwiftly.GenerationJob(
@@ -228,7 +188,7 @@ struct GenerationJobStore {
                 completedAt: completedAt,
                 failedAt: nil,
                 expiresAt: job.expiresAt,
-                retentionPolicy: job.retentionPolicy
+                retentionPolicy: job.retentionPolicy,
             )
         }
     }
@@ -236,7 +196,7 @@ struct GenerationJobStore {
     func markFailed(
         id jobID: String,
         error: WorkerError,
-        failedAt: Date
+        failedAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try updateGenerationJob(id: jobID) { job in
             SpeakSwiftly.GenerationJob(
@@ -255,20 +215,20 @@ struct GenerationJobStore {
                 completedAt: nil,
                 failedAt: failedAt,
                 expiresAt: job.expiresAt,
-                retentionPolicy: job.retentionPolicy
+                retentionPolicy: job.retentionPolicy,
             )
         }
     }
 
     func markExpired(
         id jobID: String,
-        expiredAt: Date
+        expiredAt: Date,
     ) throws -> SpeakSwiftly.GenerationJob {
         try updateGenerationJob(id: jobID) { job in
             guard job.state != .queued, job.state != .running else {
                 throw WorkerError(
                     code: .generationJobNotExpirable,
-                    message: "Generation job '\(jobID)' is still \(job.state.rawValue) and cannot be expired until it has either completed or failed."
+                    message: "Generation job '\(jobID)' is still \(job.state.rawValue) and cannot be expired until it has either completed or failed.",
                 )
             }
 
@@ -292,7 +252,7 @@ struct GenerationJobStore {
                 completedAt: job.completedAt,
                 failedAt: job.failedAt,
                 expiresAt: expiredAt,
-                retentionPolicy: job.retentionPolicy
+                retentionPolicy: job.retentionPolicy,
             )
         }
     }
@@ -305,9 +265,62 @@ struct GenerationJobStore {
         directoryURL.appendingPathComponent(Self.manifestFileName)
     }
 
+    private func createJob(
+        jobID: String,
+        jobKind: SpeakSwiftly.GenerationJobKind,
+        profileName: String,
+        textProfileName: String?,
+        speechBackend: SpeakSwiftly.SpeechBackend,
+        items: [SpeakSwiftly.GenerationJobItem],
+        createdAt: Date,
+    ) throws -> SpeakSwiftly.GenerationJob {
+        try ensureRootExists()
+
+        let directoryURL = generationJobDirectoryURL(for: jobID)
+        guard !fileManager.fileExists(atPath: directoryURL.path) else {
+            throw WorkerError(
+                code: .generationJobAlreadyExists,
+                message: "Generation job '\(jobID)' already exists in the SpeakSwiftly generation-job store and cannot be overwritten.",
+            )
+        }
+
+        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
+
+        let job = SpeakSwiftly.GenerationJob(
+            jobID: jobID,
+            jobKind: jobKind,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            profileName: profileName,
+            textProfileName: textProfileName,
+            speechBackend: speechBackend,
+            state: .queued,
+            items: items,
+            artifacts: [],
+            failure: nil,
+            startedAt: nil,
+            completedAt: nil,
+            failedAt: nil,
+            expiresAt: nil,
+            retentionPolicy: .manual,
+        )
+
+        do {
+            try write(job, to: directoryURL)
+        } catch {
+            try? fileManager.removeItem(at: directoryURL)
+            throw WorkerError(
+                code: .filesystemError,
+                message: "Generation job '\(jobID)' could not be written to disk. \(error.localizedDescription)",
+            )
+        }
+
+        return job
+    }
+
     private func updateGenerationJob(
         id jobID: String,
-        mutate: (SpeakSwiftly.GenerationJob) throws -> SpeakSwiftly.GenerationJob
+        mutate: (SpeakSwiftly.GenerationJob) throws -> SpeakSwiftly.GenerationJob,
     ) throws -> SpeakSwiftly.GenerationJob {
         let directoryURL = generationJobDirectoryURL(for: jobID)
         let job = try loadGenerationJob(id: jobID)
@@ -320,7 +333,7 @@ struct GenerationJobStore {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Generation job '\(jobID)' could not be updated on disk. \(error.localizedDescription)"
+                message: "Generation job '\(jobID)' could not be updated on disk. \(error.localizedDescription)",
             )
         }
 
@@ -334,18 +347,5 @@ struct GenerationJobStore {
 
     private func encodedDirectoryName(for jobID: String) -> String {
         jobID.utf8.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private static func makeEncoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }
-
-    private static func makeDecoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Voice Profile Generation Logic
 
 extension SpeakSwiftly.Runtime {
-    struct ResolvedCloneTranscript: Sendable, Equatable {
+    struct ResolvedCloneTranscript: Equatable {
         let text: String
         let provenance: TranscriptProvenance
     }
@@ -15,7 +15,7 @@ extension SpeakSwiftly.Runtime {
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
         outputPath: String?,
-        cwd: String?
+        cwd: String?,
     ) async throws -> StoredProfile {
         let op = WorkerRequest.createProfile(
             id: id,
@@ -24,8 +24,9 @@ extension SpeakSwiftly.Runtime {
             vibe: vibe,
             voiceDescription: voiceDescription,
             outputPath: outputPath,
-            cwd: cwd
-        ).opName
+            cwd: cwd,
+        )
+        .opName
         try profileStore.validateProfileName(profileName)
         await emitProgress(id: id, stage: .loadingProfileModel)
         let modelLoadStartedAt = dependencies.now()
@@ -38,7 +39,7 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "model_repo": .string(ModelFactory.profileModelRepo),
                 "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
@@ -50,7 +51,7 @@ extension SpeakSwiftly.Runtime {
             refAudio: nil,
             refText: nil,
             language: "English",
-            generationParameters: GenerationPolicy.profileParameters(for: text)
+            generationParameters: GenerationPolicy.profileParameters(for: text),
         )
         await logRequestEvent(
             "profile_audio_generated",
@@ -60,11 +61,12 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "duration_ms": .int(elapsedMS(since: generationStartedAt)),
                 "sample_count": .int(audio.count),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
-        let tempDirectory = dependencies.fileManager.temporaryDirectory
+        let tempDirectory = dependencies.fileManager
+            .temporaryDirectory
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -84,7 +86,7 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
-        let profileStore = self.profileStore
+        let profileStore = profileStore
         let storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,
@@ -93,7 +95,7 @@ extension SpeakSwiftly.Runtime {
                 voiceDescription: voiceDescription,
                 sourceText: text,
                 sampleRate: profileModel.sampleRate,
-                canonicalAudioData: canonicalAudioData
+                canonicalAudioData: canonicalAudioData,
             )
         }
         await logRequestEvent(
@@ -105,7 +107,7 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(storedProfile.directoryURL.path),
                 "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
@@ -118,7 +120,7 @@ extension SpeakSwiftly.Runtime {
                 cwd: cwd,
                 requestID: id,
                 fieldName: "output_path",
-                purpose: "profile export audio"
+                purpose: "profile export audio",
             )
             try await runBlockingFilesystemOperation {
                 try profileStore.exportCanonicalAudio(for: storedProfile, to: resolvedOutputURL)
@@ -132,7 +134,7 @@ extension SpeakSwiftly.Runtime {
                 details: [
                     "path": .string(resolvedOutputURL.path),
                     "duration_ms": .int(elapsedMS(since: exportStartedAt)),
-                ]
+                ],
             )
         }
 
@@ -145,7 +147,7 @@ extension SpeakSwiftly.Runtime {
         referenceAudioPath: String,
         vibe: SpeakSwiftly.Vibe,
         transcript: String?,
-        cwd: String?
+        cwd: String?,
     ) async throws -> StoredProfile {
         let op = WorkerRequest.createClone(
             id: id,
@@ -153,13 +155,14 @@ extension SpeakSwiftly.Runtime {
             referenceAudioPath: referenceAudioPath,
             vibe: vibe,
             transcript: transcript,
-            cwd: cwd
-        ).opName
+            cwd: cwd,
+        )
+        .opName
         try profileStore.validateProfileName(profileName)
         let referenceAudioURL = try resolveCloneReferenceAudioURL(
             referenceAudioPath,
             cwd: cwd,
-            requestID: id
+            requestID: id,
         )
 
         let sourceAudioLoadStartedAt = dependencies.now()
@@ -168,7 +171,7 @@ extension SpeakSwiftly.Runtime {
             sampleRate: ModelFactory.canonicalProfileSampleRate,
             requestID: id,
             pathLabel: "clone source audio",
-            op: op
+            op: op,
         )
         await logRequestEvent(
             "clone_source_audio_loaded",
@@ -179,7 +182,7 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(referenceAudioURL.path),
                 "sample_rate": .int(ModelFactory.canonicalProfileSampleRate),
                 "duration_ms": .int(elapsedMS(since: sourceAudioLoadStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
@@ -188,12 +191,13 @@ extension SpeakSwiftly.Runtime {
             op: op,
             profileName: profileName,
             referenceAudioURL: referenceAudioURL,
-            transcript: transcript
+            transcript: transcript,
         )
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
-        let tempDirectory = dependencies.fileManager.temporaryDirectory
+        let tempDirectory = dependencies.fileManager
+            .temporaryDirectory
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -212,7 +216,7 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         let profileWriteStartedAt = dependencies.now()
-        let profileStore = self.profileStore
+        let profileStore = profileStore
         let storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,
@@ -222,7 +226,7 @@ extension SpeakSwiftly.Runtime {
                 sourceText: resolvedTranscript.text,
                 transcriptProvenance: resolvedTranscript.provenance,
                 sampleRate: ModelFactory.canonicalProfileSampleRate,
-                canonicalAudioData: canonicalAudioData
+                canonicalAudioData: canonicalAudioData,
             )
         }
         await logRequestEvent(
@@ -234,7 +238,7 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(storedProfile.directoryURL.path),
                 "backend_materialization_count": .int(storedProfile.manifest.backendMaterializations.count),
                 "duration_ms": .int(elapsedMS(since: profileWriteStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
@@ -243,13 +247,14 @@ extension SpeakSwiftly.Runtime {
 
     func handleRerollProfile(
         id: String,
-        profileName: String
+        profileName: String,
     ) async throws -> StoredProfile {
         let op = WorkerRequest.rerollProfile(
             id: id,
-            profileName: profileName
-        ).opName
-        let profileStore = self.profileStore
+            profileName: profileName,
+        )
+        .opName
+        let profileStore = profileStore
 
         await emitProgress(id: id, stage: .loadingProfile)
         let loadStartedAt = dependencies.now()
@@ -265,31 +270,29 @@ extension SpeakSwiftly.Runtime {
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "path": .string(storedProfile.directoryURL.path),
                 "duration_ms": .int(elapsedMS(since: loadStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
         switch storedProfile.manifest.sourceKind {
-        case .generated:
-            let rerolled = try await rerollGeneratedProfile(
-                id: id,
-                op: op,
-                storedProfile: storedProfile
-            )
-            return rerolled
+            case .generated:
+                return try await rerollGeneratedProfile(
+                    id: id,
+                    op: op,
+                    storedProfile: storedProfile,
+                )
 
-        case .importedClone:
-            let rerolled = try await rerollImportedCloneProfile(
-                id: id,
-                op: op,
-                storedProfile: storedProfile
-            )
-            return rerolled
+            case .importedClone:
+                return try await rerollImportedCloneProfile(
+                    id: id,
+                    op: op,
+                    storedProfile: storedProfile,
+                )
         }
     }
 
     private func runBlockingFilesystemOperation<T: Sendable>(
-        _ operation: @escaping @Sendable () throws -> T
+        _ operation: @escaping @Sendable () throws -> T,
     ) async throws -> T {
         try await Task.detached(operation: operation).value
     }
@@ -297,7 +300,7 @@ extension SpeakSwiftly.Runtime {
     private func rerollGeneratedProfile(
         id: String,
         op: String,
-        storedProfile: StoredProfile
+        storedProfile: StoredProfile,
     ) async throws -> StoredProfile {
         await emitProgress(id: id, stage: .loadingProfileModel)
         let modelLoadStartedAt = dependencies.now()
@@ -310,7 +313,7 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "model_repo": .string(ModelFactory.profileModelRepo),
                 "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
@@ -322,7 +325,7 @@ extension SpeakSwiftly.Runtime {
             refAudio: nil,
             refText: nil,
             language: "English",
-            generationParameters: GenerationPolicy.profileParameters(for: storedProfile.manifest.sourceText)
+            generationParameters: GenerationPolicy.profileParameters(for: storedProfile.manifest.sourceText),
         )
         await logRequestEvent(
             "profile_audio_rerolled",
@@ -332,19 +335,19 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "duration_ms": .int(elapsedMS(since: generationStartedAt)),
                 "sample_count": .int(audio.count),
-            ]
+            ],
         )
         try Task.checkCancellation()
 
         let canonicalAudioData = try await canonicalAudioData(
             from: audio,
-            sampleRate: profileModel.sampleRate
+            sampleRate: profileModel.sampleRate,
         )
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let replaceStartedAt = dependencies.now()
-        let profileStore = self.profileStore
+        let profileStore = profileStore
         let rerolledProfile = try await runBlockingFilesystemOperation {
             try profileStore.replaceProfile(
                 named: storedProfile.manifest.profileName,
@@ -355,7 +358,7 @@ extension SpeakSwiftly.Runtime {
                 transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                 sampleRate: profileModel.sampleRate,
                 canonicalAudioData: canonicalAudioData,
-                createdAt: storedProfile.manifest.createdAt
+                createdAt: storedProfile.manifest.createdAt,
             )
         }
         await logRequestEvent(
@@ -367,7 +370,7 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(rerolledProfile.directoryURL.path),
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
-            ]
+            ],
         )
         return rerolledProfile
     }
@@ -375,7 +378,7 @@ extension SpeakSwiftly.Runtime {
     private func rerollImportedCloneProfile(
         id: String,
         op: String,
-        storedProfile: StoredProfile
+        storedProfile: StoredProfile,
     ) async throws -> StoredProfile {
         let canonicalAudioData = try await runBlockingFilesystemOperation {
             try Data(contentsOf: storedProfile.referenceAudioURL)
@@ -384,7 +387,7 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let replaceStartedAt = dependencies.now()
-        let profileStore = self.profileStore
+        let profileStore = profileStore
         let rerolledProfile = try await runBlockingFilesystemOperation {
             try profileStore.replaceProfile(
                 named: storedProfile.manifest.profileName,
@@ -395,7 +398,7 @@ extension SpeakSwiftly.Runtime {
                 transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                 sampleRate: storedProfile.manifest.sampleRate,
                 canonicalAudioData: canonicalAudioData,
-                createdAt: storedProfile.manifest.createdAt
+                createdAt: storedProfile.manifest.createdAt,
             )
         }
         await logRequestEvent(
@@ -407,16 +410,17 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(rerolledProfile.directoryURL.path),
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
-            ]
+            ],
         )
         return rerolledProfile
     }
 
     private func canonicalAudioData(
         from audio: [Float],
-        sampleRate: Int
+        sampleRate: Int,
     ) async throws -> Data {
-        let tempDirectory = dependencies.fileManager.temporaryDirectory
+        let tempDirectory = dependencies.fileManager
+            .temporaryDirectory
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
@@ -437,7 +441,7 @@ extension SpeakSwiftly.Runtime {
         op: String,
         profileName: String,
         referenceAudioURL: URL,
-        transcript: String?
+        transcript: String?,
     ) async throws -> ResolvedCloneTranscript {
         if let transcript = transcript?.trimmingCharacters(in: .whitespacesAndNewlines), !transcript.isEmpty {
             return ResolvedCloneTranscript(
@@ -445,8 +449,8 @@ extension SpeakSwiftly.Runtime {
                 provenance: TranscriptProvenance(
                     source: .provided,
                     createdAt: dependencies.now(),
-                    transcriptionModelRepo: nil
-                )
+                    transcriptionModelRepo: nil,
+                ),
             )
         }
 
@@ -461,7 +465,7 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "model_repo": .string(ModelFactory.cloneTranscriptionModelRepo),
                 "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
-            ]
+            ],
         )
         defer {
             cloneTranscriptionModel = nil
@@ -471,7 +475,7 @@ extension SpeakSwiftly.Runtime {
         guard let cloneTranscriptionModel else {
             throw WorkerError(
                 code: .internalError,
-                message: "Clone request '\(id)' lost its transcription model before transcription started. This indicates a SpeakSwiftly runtime bug."
+                message: "Clone request '\(id)' lost its transcription model before transcription started. This indicates a SpeakSwiftly runtime bug.",
             )
         }
 
@@ -481,7 +485,7 @@ extension SpeakSwiftly.Runtime {
             sampleRate: cloneTranscriptionModel.sampleRate,
             requestID: id,
             pathLabel: "clone transcription audio",
-            op: op
+            op: op,
         )
         await logRequestEvent(
             "clone_transcription_audio_loaded",
@@ -492,7 +496,7 @@ extension SpeakSwiftly.Runtime {
                 "path": .string(referenceAudioURL.path),
                 "sample_rate": .int(cloneTranscriptionModel.sampleRate),
                 "duration_ms": .int(elapsedMS(since: transcriptionAudioLoadStartedAt)),
-            ]
+            ],
         )
 
         await emitProgress(id: id, stage: .transcribingCloneAudio)
@@ -500,7 +504,7 @@ extension SpeakSwiftly.Runtime {
         let inferredTranscript = cloneTranscriptionModel
             .transcribe(
                 audio: transcriptionAudio,
-                generationParameters: GenerationPolicy.cloneTranscriptionParameters()
+                generationParameters: GenerationPolicy.cloneTranscriptionParameters(),
             )
             .trimmingCharacters(in: .whitespacesAndNewlines)
         await logRequestEvent(
@@ -511,13 +515,13 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "duration_ms": .int(elapsedMS(since: transcriptionStartedAt)),
                 "character_count": .int(inferredTranscript.count),
-            ]
+            ],
         )
 
         guard !inferredTranscript.isEmpty else {
             throw WorkerError(
                 code: .modelGenerationFailed,
-                message: "Clone request '\(id)' could not infer a transcript from '\(referenceAudioURL.path)'. Provide 'transcript' explicitly or retry with clearer speech audio."
+                message: "Clone request '\(id)' could not infer a transcript from '\(referenceAudioURL.path)'. Provide 'transcript' explicitly or retry with clearer speech audio.",
             )
         }
 
@@ -526,28 +530,28 @@ extension SpeakSwiftly.Runtime {
             provenance: TranscriptProvenance(
                 source: .inferred,
                 createdAt: dependencies.now(),
-                transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
-            )
+                transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo,
+            ),
         )
     }
 
     func resolveCloneReferenceAudioURL(
         _ referenceAudioPath: String,
         cwd: String?,
-        requestID: String
+        requestID: String,
     ) throws -> URL {
         let resolvedURL = try resolveFilesystemURL(
             referenceAudioPath,
             cwd: cwd,
             requestID: requestID,
             fieldName: "reference_audio_path",
-            purpose: "clone reference audio"
+            purpose: "clone reference audio",
         )
 
         guard dependencies.fileManager.fileExists(atPath: resolvedURL.path) else {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Clone request '\(requestID)' could not find reference audio at '\(resolvedURL.path)'."
+                message: "Clone request '\(requestID)' could not find reference audio at '\(resolvedURL.path)'.",
             )
         }
 
@@ -559,7 +563,7 @@ extension SpeakSwiftly.Runtime {
         cwd: String?,
         requestID: String,
         fieldName: String,
-        purpose: String
+        purpose: String,
     ) throws -> URL {
         if let explicitURL = URL(string: path), explicitURL.isFileURL {
             return explicitURL.standardizedFileURL
@@ -572,7 +576,7 @@ extension SpeakSwiftly.Runtime {
         guard let cwd, !cwd.isEmpty else {
             throw WorkerError(
                 code: .invalidRequest,
-                message: "Request '\(requestID)' used relative '\(fieldName)' path '\(path)' for \(purpose), but did not provide 'cwd'. Send an absolute path or include the caller working directory so SpeakSwiftly can resolve the relative path explicitly."
+                message: "Request '\(requestID)' used relative '\(fieldName)' path '\(path)' for \(purpose), but did not provide 'cwd'. Send an absolute path or include the caller working directory so SpeakSwiftly can resolve the relative path explicitly.",
             )
         }
 
@@ -584,7 +588,7 @@ extension SpeakSwiftly.Runtime {
         } else {
             throw WorkerError(
                 code: .invalidRequest,
-                message: "Request '\(requestID)' provided non-absolute 'cwd' value '\(cwd)' while resolving '\(fieldName)'. SpeakSwiftly requires 'cwd' to be an absolute filesystem path or file URL."
+                message: "Request '\(requestID)' provided non-absolute 'cwd' value '\(cwd)' while resolving '\(fieldName)'. SpeakSwiftly requires 'cwd' to be an absolute filesystem path or file URL.",
             )
         }
 
@@ -596,14 +600,14 @@ extension SpeakSwiftly.Runtime {
         sampleRate: Int,
         requestID: String,
         pathLabel: String,
-        op: String
+        op: String,
     ) throws -> [Float] {
         let audio = try dependencies.loadAudioFloats(url, sampleRate)
 
         guard !audio.isEmpty else {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Request '\(requestID)' could not load \(pathLabel) from '\(url.path)' at sample rate \(sampleRate) for operation '\(op)'. The file may be unreadable, unsupported, or empty."
+                message: "Request '\(requestID)' could not load \(pathLabel) from '\(url.path)' at sample rate \(sampleRate) for operation '\(op)'. The file may be unreadable, unsupported, or empty.",
             )
         }
 

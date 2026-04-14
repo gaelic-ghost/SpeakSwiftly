@@ -1,15 +1,17 @@
 import Foundation
 import MLXAudioTTS
 
-// MARK: - Voice & Clone Profile Models
+// MARK: - ProfileSourceKind
 
-enum ProfileSourceKind: String, Codable, Sendable, Equatable {
+enum ProfileSourceKind: String, Codable, Equatable {
     case generated
     case importedClone = "imported_clone"
 }
 
-struct TranscriptProvenance: Codable, Sendable, Equatable {
-    enum Source: String, Codable, Sendable, Equatable {
+// MARK: - TranscriptProvenance
+
+struct TranscriptProvenance: Codable, Equatable {
+    enum Source: String, Codable, Equatable {
         case provided
         case inferred
     }
@@ -19,7 +21,9 @@ struct TranscriptProvenance: Codable, Sendable, Equatable {
     let transcriptionModelRepo: String?
 }
 
-struct ProfileMaterializationManifest: Codable, Sendable, Equatable {
+// MARK: - ProfileMaterializationManifest
+
+struct ProfileMaterializationManifest: Codable, Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
     let createdAt: Date
@@ -28,20 +32,9 @@ struct ProfileMaterializationManifest: Codable, Sendable, Equatable {
     let sampleRate: Int
 }
 
-struct ProfileManifest: Codable, Sendable, Equatable {
-    let version: Int
-    let profileName: String
-    let vibe: SpeakSwiftly.Vibe
-    let createdAt: Date
-    let sourceKind: ProfileSourceKind
-    let modelRepo: String
-    let voiceDescription: String
-    let sourceText: String
-    let transcriptProvenance: TranscriptProvenance?
-    let sampleRate: Int
-    let backendMaterializations: [ProfileMaterializationManifest]
-    let qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
+// MARK: - ProfileManifest
 
+struct ProfileManifest: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case version
         case profileName
@@ -57,6 +50,19 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         case qwenConditioningArtifacts
     }
 
+    let version: Int
+    let profileName: String
+    let vibe: SpeakSwiftly.Vibe
+    let createdAt: Date
+    let sourceKind: ProfileSourceKind
+    let modelRepo: String
+    let voiceDescription: String
+    let sourceText: String
+    let transcriptProvenance: TranscriptProvenance?
+    let sampleRate: Int
+    let backendMaterializations: [ProfileMaterializationManifest]
+    let qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
+
     init(
         version: Int,
         profileName: String,
@@ -69,7 +75,7 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         transcriptProvenance: TranscriptProvenance?,
         sampleRate: Int,
         backendMaterializations: [ProfileMaterializationManifest],
-        qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
+        qwenConditioningArtifacts: [QwenConditioningArtifactManifest],
     ) {
         self.version = version
         self.profileName = profileName
@@ -97,18 +103,20 @@ struct ProfileManifest: Codable, Sendable, Equatable {
         sourceText = try container.decode(String.self, forKey: .sourceText)
         transcriptProvenance = try container.decodeIfPresent(
             TranscriptProvenance.self,
-            forKey: .transcriptProvenance
+            forKey: .transcriptProvenance,
         )
         sampleRate = try container.decode(Int.self, forKey: .sampleRate)
         backendMaterializations = try container.decode([ProfileMaterializationManifest].self, forKey: .backendMaterializations)
         qwenConditioningArtifacts = try container.decodeIfPresent(
             [QwenConditioningArtifactManifest].self,
-            forKey: .qwenConditioningArtifacts
+            forKey: .qwenConditioningArtifacts,
         ) ?? []
     }
 }
 
-private struct LegacyProfileManifest: Codable, Sendable, Equatable {
+// MARK: - LegacyProfileManifest
+
+private struct LegacyProfileManifest: Codable, Equatable {
     let version: Int
     let profileName: String
     let createdAt: Date
@@ -119,7 +127,9 @@ private struct LegacyProfileManifest: Codable, Sendable, Equatable {
     let sampleRate: Int
 }
 
-private struct LegacyMultiBackendProfileManifest: Codable, Sendable, Equatable {
+// MARK: - LegacyMultiBackendProfileManifest
+
+private struct LegacyMultiBackendProfileManifest: Codable, Equatable {
     let version: Int
     let profileName: String
     let createdAt: Date
@@ -131,21 +141,16 @@ private struct LegacyMultiBackendProfileManifest: Codable, Sendable, Equatable {
     let backendMaterializations: [ProfileMaterializationManifest]
 }
 
+// MARK: - SpeakSwiftly.ProfileSummary
+
 public extension SpeakSwiftly {
+    /// Summary metadata for one stored voice profile.
     struct ProfileSummary: Codable, Sendable, Equatable {
+        /// Describes how a clone transcript was obtained.
         public enum TranscriptSource: String, Codable, Sendable {
             case provided
             case inferred
         }
-
-        public let profileName: String
-        public let vibe: SpeakSwiftly.Vibe
-        public let createdAt: Date
-        public let voiceDescription: String
-        public let sourceText: String
-        public let transcriptSource: TranscriptSource?
-        public let transcriptResolvedAt: Date?
-        public let transcriptionModelRepo: String?
 
         enum CodingKeys: String, CodingKey {
             case profileName = "profile_name"
@@ -158,6 +163,15 @@ public extension SpeakSwiftly {
             case transcriptionModelRepo = "transcription_model_repo"
         }
 
+        public let profileName: String
+        public let vibe: SpeakSwiftly.Vibe
+        public let createdAt: Date
+        public let voiceDescription: String
+        public let sourceText: String
+        public let transcriptSource: TranscriptSource?
+        public let transcriptResolvedAt: Date?
+        public let transcriptionModelRepo: String?
+
         public init(
             profileName: String,
             vibe: SpeakSwiftly.Vibe,
@@ -166,7 +180,7 @@ public extension SpeakSwiftly {
             sourceText: String,
             transcriptSource: TranscriptSource? = nil,
             transcriptResolvedAt: Date? = nil,
-            transcriptionModelRepo: String? = nil
+            transcriptionModelRepo: String? = nil,
         ) {
             self.profileName = profileName
             self.vibe = vibe
@@ -180,7 +194,9 @@ public extension SpeakSwiftly {
     }
 }
 
-struct ProfileMaterializationDraft: Sendable, Equatable {
+// MARK: - ProfileMaterializationDraft
+
+struct ProfileMaterializationDraft: Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
     let referenceAudioFile: String
@@ -189,19 +205,25 @@ struct ProfileMaterializationDraft: Sendable, Equatable {
     let audioData: Data
 }
 
-struct StoredProfileMaterialization: Sendable, Equatable {
+// MARK: - StoredProfileMaterialization
+
+struct StoredProfileMaterialization: Equatable {
     let manifest: ProfileMaterializationManifest
     let referenceAudioURL: URL
 }
 
-struct StoredProfile: Sendable, Equatable {
+// MARK: - StoredProfile
+
+struct StoredProfile: Equatable {
     let manifest: ProfileManifest
     let directoryURL: URL
     let materializations: [StoredProfileMaterialization]
     let conditioningArtifacts: [StoredQwenConditioningArtifact]
 
     var referenceAudioURL: URL {
-        try! qwenMaterialization(for: .qwen3).referenceAudioURL
+        get throws {
+            try qwenMaterialization(for: .qwen3).referenceAudioURL
+        }
     }
 
     func qwenMaterialization(for backend: SpeakSwiftly.SpeechBackend) throws -> StoredProfileMaterialization {
@@ -215,7 +237,7 @@ struct StoredProfile: Sendable, Equatable {
 
         throw WorkerError(
             code: .profileNotFound,
-            message: "Profile '\(manifest.profileName)' does not contain a stored Qwen reference materialization for the '\(backend.rawValue)' backend. Recreate or reroll the profile to restore the canonical Qwen reference assets."
+            message: "Profile '\(manifest.profileName)' does not contain a stored Qwen reference materialization for the '\(backend.rawValue)' backend. Recreate or reroll the profile to restore the canonical Qwen reference assets.",
         )
     }
 
@@ -224,13 +246,13 @@ struct StoredProfile: Sendable, Equatable {
     }
 
     func qwenConditioningArtifact(
-        for backend: SpeakSwiftly.SpeechBackend
+        for backend: SpeakSwiftly.SpeechBackend,
     ) -> StoredQwenConditioningArtifact? {
         conditioningArtifacts.first(where: { $0.manifest.backend == backend })
     }
 }
 
-// MARK: - Profile Store
+// MARK: - ProfileStore
 
 struct ProfileStore: @unchecked Sendable {
     static let directoryName = "SpeakSwiftly"
@@ -241,6 +263,14 @@ struct ProfileStore: @unchecked Sendable {
     static let audioFileName = "reference.wav"
     static let manifestVersion = 5
 
+    private static var defaultDirectoryName: String {
+#if DEBUG
+        return "\(directoryName)-Debug"
+#else
+        return directoryName
+#endif
+    }
+
     let rootURL: URL
     let fileManager: FileManager
     let encoder: JSONEncoder
@@ -250,12 +280,65 @@ struct ProfileStore: @unchecked Sendable {
         rootURL: URL,
         fileManager: FileManager = .default,
         encoder: JSONEncoder = ProfileStore.makeEncoder(),
-        decoder: JSONDecoder = ProfileStore.makeDecoder()
+        decoder: JSONDecoder = ProfileStore.makeDecoder(),
     ) {
         self.rootURL = rootURL
         self.fileManager = fileManager
         self.encoder = encoder
         self.decoder = decoder
+    }
+
+    static func defaultRootURL(fileManager: FileManager = .default, overridePath: String? = nil) -> URL {
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: overridePath)
+            .appendingPathComponent(profilesDirectoryName, isDirectory: true)
+    }
+
+    static func defaultConfigurationURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil,
+    ) -> URL {
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+            .appendingPathComponent(configurationFileName, isDirectory: false)
+    }
+
+    static func defaultTextProfilesURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil,
+    ) -> URL {
+        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+            .appendingPathComponent(textProfilesFileName, isDirectory: false)
+    }
+
+    private static func defaultBaseURL(
+        fileManager: FileManager = .default,
+        profileRootOverride: String? = nil,
+    ) -> URL {
+        if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
+                .deletingLastPathComponent()
+        }
+
+        return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(defaultDirectoryName, isDirectory: true)
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    private static func qwenConditioningArtifactFileName(
+        for backend: SpeakSwiftly.SpeechBackend,
+    ) -> String {
+        "qwen-conditioning-\(backend.rawValue).json"
     }
 
     func ensureRootExists() throws {
@@ -269,7 +352,7 @@ struct ProfileStore: @unchecked Sendable {
         guard regex.firstMatch(in: profileName, options: [], range: range) != nil else {
             throw WorkerError(
                 code: .invalidProfileName,
-                message: "Profile name '\(profileName)' is invalid. Use 1 to 64 lowercase ASCII characters from a-z, 0-9, '.', '_' or '-'."
+                message: "Profile name '\(profileName)' is invalid. Use 1 to 64 lowercase ASCII characters from a-z, 0-9, '.', '_' or '-'.",
             )
         }
     }
@@ -282,7 +365,7 @@ struct ProfileStore: @unchecked Sendable {
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
-        canonicalAudioData: Data
+        canonicalAudioData: Data,
     ) throws -> StoredProfile {
         let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
         let materializations = [
@@ -292,7 +375,7 @@ struct ProfileStore: @unchecked Sendable {
                 referenceAudioFile: Self.audioFileName,
                 referenceText: sourceText,
                 sampleRate: sampleRate,
-                audioData: canonicalAudioData
+                audioData: canonicalAudioData,
             ),
         ]
 
@@ -305,7 +388,7 @@ struct ProfileStore: @unchecked Sendable {
             sourceText: sourceText,
             transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
-            materializations: materializations
+            materializations: materializations,
         )
     }
 
@@ -318,7 +401,7 @@ struct ProfileStore: @unchecked Sendable {
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
-        materializations: [ProfileMaterializationDraft]
+        materializations: [ProfileMaterializationDraft],
     ) throws -> StoredProfile {
         try ensureRootExists()
         try validateProfileName(profileName)
@@ -326,7 +409,7 @@ struct ProfileStore: @unchecked Sendable {
         guard !materializations.isEmpty else {
             throw WorkerError(
                 code: .internalError,
-                message: "Profile '\(profileName)' could not be created because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug."
+                message: "Profile '\(profileName)' could not be created because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
             )
         }
 
@@ -334,7 +417,7 @@ struct ProfileStore: @unchecked Sendable {
         guard !fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .profileAlreadyExists,
-                message: "Profile '\(profileName)' already exists in the SpeakSwiftly profile store and cannot be overwritten."
+                message: "Profile '\(profileName)' already exists in the SpeakSwiftly profile store and cannot be overwritten.",
             )
         }
 
@@ -359,10 +442,10 @@ struct ProfileStore: @unchecked Sendable {
                     createdAt: createdAt,
                     referenceAudioFile: $0.referenceAudioFile,
                     referenceText: $0.referenceText,
-                    sampleRate: $0.sampleRate
+                    sampleRate: $0.sampleRate,
                 )
             },
-            qwenConditioningArtifacts: []
+            qwenConditioningArtifacts: [],
         )
 
         do {
@@ -372,7 +455,7 @@ struct ProfileStore: @unchecked Sendable {
             try? fileManager.removeItem(at: directoryURL)
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)",
             )
         }
 
@@ -387,7 +470,7 @@ struct ProfileStore: @unchecked Sendable {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store."
+                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
             )
         }
 
@@ -396,27 +479,27 @@ struct ProfileStore: @unchecked Sendable {
             let materializations = manifest.backendMaterializations.map {
                 StoredProfileMaterialization(
                     manifest: $0,
-                    referenceAudioURL: referenceAudioURL(for: directoryURL, fileName: $0.referenceAudioFile)
+                    referenceAudioURL: referenceAudioURL(for: directoryURL, fileName: $0.referenceAudioFile),
                 )
             }
             let conditioningArtifacts = manifest.qwenConditioningArtifacts.map {
                 StoredQwenConditioningArtifact(
                     manifest: $0,
-                    artifactURL: qwenConditioningArtifactURL(for: directoryURL, fileName: $0.artifactFile)
+                    artifactURL: qwenConditioningArtifactURL(for: directoryURL, fileName: $0.artifactFile),
                 )
             }
             return StoredProfile(
                 manifest: manifest,
                 directoryURL: directoryURL,
                 materializations: materializations,
-                conditioningArtifacts: conditioningArtifacts
+                conditioningArtifacts: conditioningArtifacts,
             )
         } catch let workerError as WorkerError {
             throw workerError
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' exists, but its metadata could not be read. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' exists, but its metadata could not be read. \(error.localizedDescription)",
             )
         }
     }
@@ -427,7 +510,7 @@ struct ProfileStore: @unchecked Sendable {
         let urls = try fileManager.contentsOfDirectory(
             at: rootURL,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles],
         )
 
         let manifests = try urls
@@ -454,14 +537,14 @@ struct ProfileStore: @unchecked Sendable {
                 sourceText: $0.sourceText,
                 transcriptSource: $0.transcriptProvenance.map {
                     switch $0.source {
-                    case .provided:
-                        .provided
-                    case .inferred:
-                        .inferred
+                        case .provided:
+                            .provided
+                        case .inferred:
+                            .inferred
                     }
                 },
                 transcriptResolvedAt: $0.transcriptProvenance?.createdAt,
-                transcriptionModelRepo: $0.transcriptProvenance?.transcriptionModelRepo
+                transcriptionModelRepo: $0.transcriptProvenance?.transcriptionModelRepo,
             )
         }
     }
@@ -474,7 +557,7 @@ struct ProfileStore: @unchecked Sendable {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store."
+                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
             )
         }
 
@@ -483,14 +566,14 @@ struct ProfileStore: @unchecked Sendable {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' could not be removed from disk. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' could not be removed from disk. \(error.localizedDescription)",
             )
         }
     }
 
     func renameProfile(
         named profileName: String,
-        to newProfileName: String
+        to newProfileName: String,
     ) throws -> StoredProfile {
         try ensureRootExists()
         try validateProfileName(profileName)
@@ -499,7 +582,7 @@ struct ProfileStore: @unchecked Sendable {
         guard profileName != newProfileName else {
             throw WorkerError(
                 code: .invalidProfileName,
-                message: "Profile '\(profileName)' is already named '\(newProfileName)'. Choose a different target name before requesting a rename."
+                message: "Profile '\(profileName)' is already named '\(newProfileName)'. Choose a different target name before requesting a rename.",
             )
         }
 
@@ -507,7 +590,7 @@ struct ProfileStore: @unchecked Sendable {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store."
+                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
             )
         }
 
@@ -515,7 +598,7 @@ struct ProfileStore: @unchecked Sendable {
         guard !fileManager.fileExists(atPath: newDirectoryURL.path) else {
             throw WorkerError(
                 code: .profileAlreadyExists,
-                message: "Profile '\(newProfileName)' already exists in the SpeakSwiftly profile store and cannot be replaced by renaming '\(profileName)'."
+                message: "Profile '\(newProfileName)' already exists in the SpeakSwiftly profile store and cannot be replaced by renaming '\(profileName)'.",
             )
         }
 
@@ -532,7 +615,7 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: storedProfile.manifest.transcriptProvenance,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
-            qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts
+            qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts,
         )
 
         do {
@@ -545,7 +628,7 @@ struct ProfileStore: @unchecked Sendable {
                 } catch let rollbackError {
                     throw WorkerError(
                         code: .filesystemError,
-                        message: "Profile '\(profileName)' was moved to '\(newProfileName)', but SpeakSwiftly could not restore the original directory after the manifest rewrite failed. Manifest error: \(manifestWriteError.localizedDescription) Rollback error: \(rollbackError.localizedDescription)"
+                        message: "Profile '\(profileName)' was moved to '\(newProfileName)', but SpeakSwiftly could not restore the original directory after the manifest rewrite failed. Manifest error: \(manifestWriteError.localizedDescription) Rollback error: \(rollbackError.localizedDescription)",
                     )
                 }
 
@@ -556,7 +639,7 @@ struct ProfileStore: @unchecked Sendable {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' could not be renamed to '\(newProfileName)'. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' could not be renamed to '\(newProfileName)'. \(error.localizedDescription)",
             )
         }
 
@@ -572,7 +655,7 @@ struct ProfileStore: @unchecked Sendable {
         transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         canonicalAudioData: Data,
-        createdAt: Date
+        createdAt: Date,
     ) throws -> StoredProfile {
         let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
         let materializations = [
@@ -582,7 +665,7 @@ struct ProfileStore: @unchecked Sendable {
                 referenceAudioFile: Self.audioFileName,
                 referenceText: sourceText,
                 sampleRate: sampleRate,
-                audioData: canonicalAudioData
+                audioData: canonicalAudioData,
             ),
         ]
 
@@ -596,7 +679,7 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: transcriptProvenance,
             sampleRate: sampleRate,
             materializations: materializations,
-            createdAt: createdAt
+            createdAt: createdAt,
         )
     }
 
@@ -610,7 +693,7 @@ struct ProfileStore: @unchecked Sendable {
         transcriptProvenance: TranscriptProvenance? = nil,
         sampleRate: Int,
         materializations: [ProfileMaterializationDraft],
-        createdAt: Date
+        createdAt: Date,
     ) throws -> StoredProfile {
         try ensureRootExists()
         try validateProfileName(profileName)
@@ -618,7 +701,7 @@ struct ProfileStore: @unchecked Sendable {
         guard !materializations.isEmpty else {
             throw WorkerError(
                 code: .internalError,
-                message: "Profile '\(profileName)' could not be replaced because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug."
+                message: "Profile '\(profileName)' could not be replaced because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
             )
         }
 
@@ -626,7 +709,7 @@ struct ProfileStore: @unchecked Sendable {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store."
+                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
             )
         }
 
@@ -650,10 +733,10 @@ struct ProfileStore: @unchecked Sendable {
                     createdAt: createdAt,
                     referenceAudioFile: $0.referenceAudioFile,
                     referenceText: $0.referenceText,
-                    sampleRate: $0.sampleRate
+                    sampleRate: $0.sampleRate,
                 )
             },
-            qwenConditioningArtifacts: []
+            qwenConditioningArtifacts: [],
         )
 
         do {
@@ -668,7 +751,7 @@ struct ProfileStore: @unchecked Sendable {
                 try? fileManager.moveItem(at: backupDirectoryURL, to: directoryURL)
                 throw WorkerError(
                     code: .filesystemError,
-                    message: "Profile '\(profileName)' could not be replaced with the rerolled assets after staging succeeded. \(moveInError.localizedDescription)"
+                    message: "Profile '\(profileName)' could not be replaced with the rerolled assets after staging succeeded. \(moveInError.localizedDescription)",
                 )
             }
 
@@ -680,7 +763,7 @@ struct ProfileStore: @unchecked Sendable {
             try? fileManager.removeItem(at: stagedDirectoryURL)
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' could not be replaced in place. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' could not be replaced in place. \(error.localizedDescription)",
             )
         }
 
@@ -691,7 +774,7 @@ struct ProfileStore: @unchecked Sendable {
         guard !fileManager.fileExists(atPath: outputURL.path) else {
             throw WorkerError(
                 code: .filesystemError,
-                message: "The export path '\(outputURL.path)' already exists. SpeakSwiftly does not overwrite existing files."
+                message: "The export path '\(outputURL.path)' already exists. SpeakSwiftly does not overwrite existing files.",
             )
         }
 
@@ -701,7 +784,7 @@ struct ProfileStore: @unchecked Sendable {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profile.manifest.profileName)' could not be exported to '\(outputURL.path)'. \(error.localizedDescription)"
+                message: "Profile '\(profile.manifest.profileName)' could not be exported to '\(outputURL.path)'. \(error.localizedDescription)",
             )
         }
     }
@@ -711,7 +794,7 @@ struct ProfileStore: @unchecked Sendable {
         backend: SpeakSwiftly.SpeechBackend,
         modelRepo: String,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
     ) throws -> StoredProfile {
         let storedProfile = try loadProfile(named: profileName)
         let artifactFile = Self.qwenConditioningArtifactFileName(for: backend)
@@ -721,10 +804,10 @@ struct ProfileStore: @unchecked Sendable {
             modelRepo: modelRepo,
             createdAt: createdAt,
             artifactVersion: PersistedQwenConditioningArtifact.currentVersion,
-            artifactFile: artifactFile
+            artifactFile: artifactFile,
         )
         let updatedArtifacts = (
-            storedProfile.manifest.qwenConditioningArtifacts.filter { $0.backend != backend } + [updatedArtifactManifest]
+            storedProfile.manifest.qwenConditioningArtifacts.filter { $0.backend != backend } + [updatedArtifactManifest],
         )
         .sorted { $0.backend.rawValue < $1.backend.rawValue }
         let updatedManifest = ProfileManifest(
@@ -739,20 +822,20 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: storedProfile.manifest.transcriptProvenance,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
-            qwenConditioningArtifacts: updatedArtifacts
+            qwenConditioningArtifacts: updatedArtifacts,
         )
 
         do {
             try writeQwenConditioningArtifact(
                 persistedArtifact,
                 to: storedProfile.directoryURL,
-                fileName: artifactFile
+                fileName: artifactFile,
             )
             try writeManifest(updatedManifest, to: storedProfile.directoryURL)
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profileName)' could not persist the prepared Qwen conditioning artifact for the '\(backend.rawValue)' backend. \(error.localizedDescription)"
+                message: "Profile '\(profileName)' could not persist the prepared Qwen conditioning artifact for the '\(backend.rawValue)' backend. \(error.localizedDescription)",
             )
         }
 
@@ -760,7 +843,7 @@ struct ProfileStore: @unchecked Sendable {
     }
 
     func loadQwenConditioningArtifact(
-        _ storedArtifact: StoredQwenConditioningArtifact
+        _ storedArtifact: StoredQwenConditioningArtifact,
     ) throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
         do {
             let data = try Data(contentsOf: storedArtifact.artifactURL)
@@ -768,16 +851,17 @@ struct ProfileStore: @unchecked Sendable {
             guard artifact.version == PersistedQwenConditioningArtifact.currentVersion else {
                 throw WorkerError(
                     code: .filesystemError,
-                    message: "SpeakSwiftly found a prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)', but the artifact version '\(artifact.version)' is not supported by this runtime. Recreate or reroll the profile to rebuild the artifact."
+                    message: "SpeakSwiftly found a prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)', but the artifact version '\(artifact.version)' is not supported by this runtime. Recreate or reroll the profile to rebuild the artifact.",
                 )
             }
+
             return artifact.makeConditioning()
         } catch let workerError as WorkerError {
             throw workerError
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "SpeakSwiftly could not load the prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)' for the '\(storedArtifact.manifest.backend.rawValue)' backend. \(error.localizedDescription)"
+                message: "SpeakSwiftly could not load the prepared Qwen conditioning artifact at '\(storedArtifact.artifactURL.path)' for the '\(storedArtifact.manifest.backend.rawValue)' backend. \(error.localizedDescription)",
             )
         }
     }
@@ -796,51 +880,9 @@ struct ProfileStore: @unchecked Sendable {
 
     func qwenConditioningArtifactURL(
         for directoryURL: URL,
-        fileName: String
+        fileName: String,
     ) -> URL {
         directoryURL.appendingPathComponent(fileName)
-    }
-
-    static func defaultRootURL(fileManager: FileManager = .default, overridePath: String? = nil) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: overridePath)
-            .appendingPathComponent(profilesDirectoryName, isDirectory: true)
-    }
-
-    static func defaultConfigurationURL(
-        fileManager: FileManager = .default,
-        profileRootOverride: String? = nil
-    ) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
-            .appendingPathComponent(configurationFileName, isDirectory: false)
-    }
-
-    static func defaultTextProfilesURL(
-        fileManager: FileManager = .default,
-        profileRootOverride: String? = nil
-    ) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
-            .appendingPathComponent(textProfilesFileName, isDirectory: false)
-    }
-
-    private static func defaultBaseURL(
-        fileManager: FileManager = .default,
-        profileRootOverride: String? = nil
-    ) -> URL {
-        if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
-                .deletingLastPathComponent()
-        }
-
-        return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(defaultDirectoryName, isDirectory: true)
-    }
-
-    private static var defaultDirectoryName: String {
-        #if DEBUG
-            return "\(directoryName)-Debug"
-        #else
-            return directoryName
-        #endif
     }
 
     private func loadManifest(from directoryURL: URL) throws -> ProfileManifest {
@@ -869,7 +911,7 @@ struct ProfileStore: @unchecked Sendable {
 
         throw WorkerError(
             code: .filesystemError,
-            message: "SpeakSwiftly could not read the profile manifest at '\(manifestPath.path)' because the file is unreadable or corrupt."
+            message: "SpeakSwiftly could not read the profile manifest at '\(manifestPath.path)' because the file is unreadable or corrupt.",
         )
     }
 
@@ -882,7 +924,7 @@ struct ProfileStore: @unchecked Sendable {
                 createdAt: legacyManifest.createdAt,
                 referenceAudioFile: legacyManifest.referenceAudioFile,
                 referenceText: legacyManifest.sourceText,
-                sampleRate: legacyManifest.sampleRate
+                sampleRate: legacyManifest.sampleRate,
             ),
         ]
 
@@ -891,7 +933,7 @@ struct ProfileStore: @unchecked Sendable {
             profileName: legacyManifest.profileName,
             vibe: inferredLegacyVibe(
                 profileName: legacyManifest.profileName,
-                voiceDescription: legacyManifest.voiceDescription
+                voiceDescription: legacyManifest.voiceDescription,
             ),
             createdAt: legacyManifest.createdAt,
             sourceKind: sourceKind,
@@ -901,7 +943,7 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: nil,
             sampleRate: legacyManifest.sampleRate,
             backendMaterializations: materializations,
-            qwenConditioningArtifacts: []
+            qwenConditioningArtifacts: [],
         )
     }
 
@@ -915,7 +957,7 @@ struct ProfileStore: @unchecked Sendable {
                     createdAt: legacyManifest.createdAt,
                     referenceAudioFile: Self.audioFileName,
                     referenceText: legacyManifest.sourceText,
-                    sampleRate: legacyManifest.sampleRate
+                    sampleRate: legacyManifest.sampleRate,
                 ),
             ]
         } else {
@@ -927,7 +969,7 @@ struct ProfileStore: @unchecked Sendable {
             profileName: legacyManifest.profileName,
             vibe: inferredLegacyVibe(
                 profileName: legacyManifest.profileName,
-                voiceDescription: legacyManifest.voiceDescription
+                voiceDescription: legacyManifest.voiceDescription,
             ),
             createdAt: legacyManifest.createdAt,
             sourceKind: legacyManifest.sourceKind,
@@ -937,7 +979,7 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: nil,
             sampleRate: legacyManifest.sampleRate,
             backendMaterializations: materializations,
-            qwenConditioningArtifacts: []
+            qwenConditioningArtifacts: [],
         )
     }
 
@@ -958,13 +1000,13 @@ struct ProfileStore: @unchecked Sendable {
             transcriptProvenance: manifest.transcriptProvenance,
             sampleRate: manifest.sampleRate,
             backendMaterializations: manifest.backendMaterializations,
-            qwenConditioningArtifacts: manifest.qwenConditioningArtifacts
+            qwenConditioningArtifacts: manifest.qwenConditioningArtifacts,
         )
     }
 
     private func inferredLegacyVibe(
         profileName: String,
-        voiceDescription: String
+        voiceDescription: String,
     ) -> SpeakSwiftly.Vibe {
         let signal = "\(profileName) \(voiceDescription)".lowercased()
 
@@ -972,8 +1014,7 @@ struct ProfileStore: @unchecked Sendable {
             || signal.contains("female")
             || signal.contains("feminine")
             || signal.contains("woman")
-            || signal.contains("girl")
-        {
+            || signal.contains("girl") {
             return .femme
         }
 
@@ -981,8 +1022,7 @@ struct ProfileStore: @unchecked Sendable {
             || signal.contains("male")
             || signal.contains("masculine")
             || signal.contains("man")
-            || signal.contains("boy")
-        {
+            || signal.contains("boy") {
             return .masc
         }
 
@@ -991,7 +1031,7 @@ struct ProfileStore: @unchecked Sendable {
 
     private func writeMaterializationFiles(
         _ materializations: [ProfileMaterializationDraft],
-        to directoryURL: URL
+        to directoryURL: URL,
     ) throws {
         var writtenFiles = Set<String>()
 
@@ -1002,7 +1042,7 @@ struct ProfileStore: @unchecked Sendable {
 
             try materialization.audioData.write(
                 to: referenceAudioURL(for: directoryURL, fileName: materialization.referenceAudioFile),
-                options: .atomic
+                options: .atomic,
             )
             writtenFiles.insert(materialization.referenceAudioFile)
         }
@@ -1011,12 +1051,12 @@ struct ProfileStore: @unchecked Sendable {
     private func writeQwenConditioningArtifact(
         _ artifact: PersistedQwenConditioningArtifact,
         to directoryURL: URL,
-        fileName: String
+        fileName: String,
     ) throws {
         let data = try encoder.encode(artifact)
         try data.write(
             to: qwenConditioningArtifactURL(for: directoryURL, fileName: fileName),
-            options: .atomic
+            options: .atomic,
         )
     }
 
@@ -1028,24 +1068,5 @@ struct ProfileStore: @unchecked Sendable {
     private func isDirectory(_ url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.isDirectoryKey])
         return values.isDirectory == true
-    }
-
-    private static func makeEncoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }
-
-    private static func makeDecoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }
-
-    private static func qwenConditioningArtifactFileName(
-        for backend: SpeakSwiftly.SpeechBackend
-    ) -> String {
-        "qwen-conditioning-\(backend.rawValue).json"
     }
 }

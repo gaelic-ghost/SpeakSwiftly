@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Generated File Models
+// MARK: - GeneratedFileManifest
 
-struct GeneratedFileManifest: Codable, Sendable, Equatable {
+struct GeneratedFileManifest: Codable, Equatable {
     let version: Int
     let artifactID: String
     let createdAt: Date
@@ -12,7 +12,10 @@ struct GeneratedFileManifest: Codable, Sendable, Equatable {
     let audioFile: String
 }
 
+// MARK: - SpeakSwiftly.GeneratedFile
+
 public extension SpeakSwiftly {
+    /// Metadata for one retained generated audio file.
     struct GeneratedFile: Codable, Sendable, Equatable {
         public let artifactID: String
         public let createdAt: Date
@@ -36,7 +39,7 @@ public extension SpeakSwiftly {
             profileName: String,
             textProfileName: String?,
             sampleRate: Int,
-            filePath: String
+            filePath: String,
         ) {
             self.artifactID = artifactID
             self.createdAt = createdAt
@@ -48,7 +51,9 @@ public extension SpeakSwiftly {
     }
 }
 
-struct StoredGeneratedFile: Sendable, Equatable {
+// MARK: - StoredGeneratedFile
+
+struct StoredGeneratedFile: Equatable {
     let manifest: GeneratedFileManifest
     let directoryURL: URL
     let audioURL: URL
@@ -60,12 +65,12 @@ struct StoredGeneratedFile: Sendable, Equatable {
             profileName: manifest.profileName,
             textProfileName: manifest.textProfileName,
             sampleRate: manifest.sampleRate,
-            filePath: audioURL.standardizedFileURL.path
+            filePath: audioURL.standardizedFileURL.path,
         )
     }
 }
 
-// MARK: - Generated File Store
+// MARK: - GeneratedFileStore
 
 struct GeneratedFileStore {
     static let directoryName = "generated-files"
@@ -81,12 +86,25 @@ struct GeneratedFileStore {
         rootURL: URL,
         fileManager: FileManager = .default,
         encoder: JSONEncoder = GeneratedFileStore.makeEncoder(),
-        decoder: JSONDecoder = GeneratedFileStore.makeDecoder()
+        decoder: JSONDecoder = GeneratedFileStore.makeDecoder(),
     ) {
         self.rootURL = rootURL
         self.fileManager = fileManager
         self.encoder = encoder
         self.decoder = decoder
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 
     func ensureRootExists() throws {
@@ -98,7 +116,7 @@ struct GeneratedFileStore {
         profileName: String,
         textProfileName: String?,
         sampleRate: Int,
-        audioData: Data
+        audioData: Data,
     ) throws -> StoredGeneratedFile {
         try ensureRootExists()
 
@@ -106,7 +124,7 @@ struct GeneratedFileStore {
         guard !fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .generatedFileAlreadyExists,
-                message: "Generated file '\(artifactID)' already exists in the SpeakSwiftly generated-file store and cannot be overwritten."
+                message: "Generated file '\(artifactID)' already exists in the SpeakSwiftly generated-file store and cannot be overwritten.",
             )
         }
 
@@ -119,7 +137,7 @@ struct GeneratedFileStore {
             profileName: profileName,
             textProfileName: textProfileName,
             sampleRate: sampleRate,
-            audioFile: Self.audioFileName
+            audioFile: Self.audioFileName,
         )
 
         do {
@@ -130,14 +148,14 @@ struct GeneratedFileStore {
             try? fileManager.removeItem(at: directoryURL)
             throw WorkerError(
                 code: .filesystemError,
-                message: "Generated file '\(artifactID)' could not be written to disk. \(error.localizedDescription)"
+                message: "Generated file '\(artifactID)' could not be written to disk. \(error.localizedDescription)",
             )
         }
 
         return StoredGeneratedFile(
             manifest: manifest,
             directoryURL: directoryURL,
-            audioURL: audioURL(for: directoryURL)
+            audioURL: audioURL(for: directoryURL),
         )
     }
 
@@ -148,7 +166,7 @@ struct GeneratedFileStore {
         guard fileManager.fileExists(atPath: directoryURL.path) else {
             throw WorkerError(
                 code: .generatedFileNotFound,
-                message: "Generated file '\(artifactID)' was not found in the SpeakSwiftly generated-file store."
+                message: "Generated file '\(artifactID)' was not found in the SpeakSwiftly generated-file store.",
             )
         }
 
@@ -158,14 +176,14 @@ struct GeneratedFileStore {
             return StoredGeneratedFile(
                 manifest: manifest,
                 directoryURL: directoryURL,
-                audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile)
+                audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile),
             )
         } catch let workerError as WorkerError {
             throw workerError
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Generated file '\(artifactID)' exists, but its metadata could not be read. \(error.localizedDescription)"
+                message: "Generated file '\(artifactID)' exists, but its metadata could not be read. \(error.localizedDescription)",
             )
         }
     }
@@ -176,10 +194,10 @@ struct GeneratedFileStore {
         let urls = try fileManager.contentsOfDirectory(
             at: rootURL,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles],
         )
 
-        let generatedFiles = try urls
+        return try urls
             .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
             .map { directoryURL in
                 do {
@@ -188,17 +206,15 @@ struct GeneratedFileStore {
                     return StoredGeneratedFile(
                         manifest: manifest,
                         directoryURL: directoryURL,
-                        audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile)
+                        audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile),
                     ).summary
                 } catch {
                     throw WorkerError(
                         code: .filesystemError,
-                        message: "SpeakSwiftly could not list generated files because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)"
+                        message: "SpeakSwiftly could not list generated files because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)",
                     )
                 }
             }
-
-        return generatedFiles
     }
 
     @discardableResult
@@ -217,7 +233,7 @@ struct GeneratedFileStore {
         } catch {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Generated file '\(artifactID)' was found, but SpeakSwiftly could not remove its stored artifact directory at '\(directoryURL.path)'. \(error.localizedDescription)"
+                message: "Generated file '\(artifactID)' was found, but SpeakSwiftly could not remove its stored artifact directory at '\(directoryURL.path)'. \(error.localizedDescription)",
             )
         }
 
@@ -238,18 +254,5 @@ struct GeneratedFileStore {
 
     private func encodedDirectoryName(for artifactID: String) -> String {
         artifactID.utf8.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private static func makeEncoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }
-
-    private static func makeDecoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
     }
 }

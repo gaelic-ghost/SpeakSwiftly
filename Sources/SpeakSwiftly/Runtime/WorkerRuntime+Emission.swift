@@ -7,52 +7,52 @@ extension SpeakSwiftly.Runtime {
     func completeRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
         lastQueuedGenerationParkReason.removeValue(forKey: request.id)
         switch result {
-        case .success(let payload):
-            await logRequestEvent(
-                "request_succeeded",
-                requestID: payload.id,
-                op: nil,
-                profileName: payload.profileName
-            )
-            let success = WorkerSuccessResponse(
-                id: payload.id,
-                generatedFile: payload.generatedFile,
-                generatedFiles: payload.generatedFiles,
-                generatedBatch: payload.generatedBatch,
-                generatedBatches: payload.generatedBatches,
-                generationJob: payload.generationJob,
-                generationJobs: payload.generationJobs,
-                profileName: payload.profileName,
-                profilePath: payload.profilePath,
-                profiles: payload.profiles,
-                textProfile: payload.textProfile,
-                textProfiles: payload.textProfiles,
-                replacements: payload.replacements,
-                textProfileStyle: payload.textProfileStyle,
-                textProfilePath: payload.textProfilePath,
-                activeRequest: payload.activeRequest,
-                activeRequests: payload.activeRequests,
-                queue: payload.queue,
-                playbackState: payload.playbackState,
-                runtimeOverview: payload.runtimeOverview,
-                status: payload.status,
-                speechBackend: payload.speechBackend,
-                clearedCount: payload.clearedCount,
-                cancelledRequestID: payload.cancelledRequestID
-            )
-            yieldRequestEvent(.completed(success), for: request.id)
-            if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
-                await emit(success)
-            }
+            case let .success(payload):
+                await logRequestEvent(
+                    "request_succeeded",
+                    requestID: payload.id,
+                    op: nil,
+                    profileName: payload.profileName,
+                )
+                let success = WorkerSuccessResponse(
+                    id: payload.id,
+                    generatedFile: payload.generatedFile,
+                    generatedFiles: payload.generatedFiles,
+                    generatedBatch: payload.generatedBatch,
+                    generatedBatches: payload.generatedBatches,
+                    generationJob: payload.generationJob,
+                    generationJobs: payload.generationJobs,
+                    profileName: payload.profileName,
+                    profilePath: payload.profilePath,
+                    profiles: payload.profiles,
+                    textProfile: payload.textProfile,
+                    textProfiles: payload.textProfiles,
+                    replacements: payload.replacements,
+                    textProfileStyle: payload.textProfileStyle,
+                    textProfilePath: payload.textProfilePath,
+                    activeRequest: payload.activeRequest,
+                    activeRequests: payload.activeRequests,
+                    queue: payload.queue,
+                    playbackState: payload.playbackState,
+                    runtimeOverview: payload.runtimeOverview,
+                    status: payload.status,
+                    speechBackend: payload.speechBackend,
+                    clearedCount: payload.clearedCount,
+                    cancelledRequestID: payload.cancelledRequestID,
+                )
+                yieldRequestEvent(.completed(success), for: request.id)
+                if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
+                    await emit(success)
+                }
 
-        case .failure(let error):
-            failRequestStream(for: request.id, error: error)
-            await logError(
-                error.message,
-                requestID: request.id,
-                details: ["failure_code": .string(error.code.rawValue)]
-            )
-            await emitFailure(id: request.id, error: error)
+            case let .failure(error):
+                failRequestStream(for: request.id, error: error)
+                await logError(
+                    error.message,
+                    requestID: request.id,
+                    details: ["failure_code": .string(error.code.rawValue)],
+                )
+                await emitFailure(id: request.id, error: error)
         }
     }
 
@@ -60,13 +60,13 @@ extension SpeakSwiftly.Runtime {
         if isShuttingDown {
             return WorkerError(
                 code: .requestCancelled,
-                message: "Request '\(id)' was cancelled because the SpeakSwiftly worker is shutting down."
+                message: "Request '\(id)' was cancelled because the SpeakSwiftly worker is shutting down.",
             )
         }
 
         return WorkerError(
             code: .requestCancelled,
-            message: "Request '\(id)' was cancelled before it could complete."
+            message: "Request '\(id)' was cancelled before it could complete.",
         )
     }
 
@@ -77,7 +77,7 @@ extension SpeakSwiftly.Runtime {
         let decision = try? evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
-            playbackSnapshot: playbackSnapshot
+            playbackSnapshot: playbackSnapshot,
         )
         guard let reason = decision?.parkReasons[job.token] else {
             return nil
@@ -85,18 +85,18 @@ extension SpeakSwiftly.Runtime {
 
         let queuePosition = await generationController.waitingPosition(
             for: job.token,
-            residentReady: isResidentReady
+            residentReady: isResidentReady,
         ) ?? 1
         return WorkerQueuedEvent(
             id: job.request.id,
             reason: queuedReason(for: reason),
-            queuePosition: queuePosition
+            queuePosition: queuePosition,
         )
     }
 
     func syncQueuedGenerationParkReasons(
         queuedJobs: [GenerationController.Job],
-        parkReasons: [UUID: GenerationParkReason]
+        parkReasons: [UUID: GenerationParkReason],
     ) async {
         var queuedRequestIDs = Set<String>()
 
@@ -112,12 +112,12 @@ extension SpeakSwiftly.Runtime {
 
             let queuePosition = await generationController.waitingPosition(
                 for: job.token,
-                residentReady: isResidentReady
+                residentReady: isResidentReady,
             ) ?? 1
             let queuedEvent = WorkerQueuedEvent(
                 id: job.request.id,
                 reason: queuedReason(for: reason),
-                queuePosition: queuePosition
+                queuePosition: queuePosition,
             )
             await emit(queuedEvent)
             yieldRequestEvent(.queued(queuedEvent), for: job.request.id)
@@ -145,82 +145,82 @@ extension SpeakSwiftly.Runtime {
                 ActiveWorkerRequestSummary(
                     id: $0.id,
                     op: $0.opName,
-                    profileName: $0.profileName
+                    profileName: $0.profileName,
                 )
             }
     }
 
     func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
         switch queueType {
-        case .generation:
-            let jobs = await generationController.queuedJobsOrdered()
-            return jobs.enumerated().map { offset, job in
-                QueuedWorkerRequestSummary(
-                    id: job.request.id,
-                    op: job.request.opName,
-                    profileName: job.request.profileName,
-                    queuePosition: offset + 1
-                )
-            }
-        case .playback:
-            return await playbackController.queuedRequestSummaries()
+            case .generation:
+                let jobs = await generationController.queuedJobsOrdered()
+                return jobs.enumerated().map { offset, job in
+                    QueuedWorkerRequestSummary(
+                        id: job.request.id,
+                        op: job.request.opName,
+                        profileName: job.request.profileName,
+                        queuePosition: offset + 1,
+                    )
+                }
+            case .playback:
+                return await playbackController.queuedRequestSummaries()
         }
     }
 
     func queueSnapshot(for queueType: WorkerQueueType) async -> SpeakSwiftly.QueueSnapshot {
-        SpeakSwiftly.QueueSnapshot(
+        await SpeakSwiftly.QueueSnapshot(
             queueType: queueType.rawValue,
-            activeRequest: await queueSummaryActiveRequest(for: queueType),
-            activeRequests: await queueSummaryActiveRequests(for: queueType),
-            queue: await queuedRequestSummaries(for: queueType)
+            activeRequest: queueSummaryActiveRequest(for: queueType),
+            activeRequests: queueSummaryActiveRequests(for: queueType),
+            queue: queuedRequestSummaries(for: queueType),
         )
     }
 
     func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
         switch queueType {
-        case .generation:
-            return generationActiveRequestSummaries().first
-        case .playback:
-            return await playbackController.activeRequestSummary()
+            case .generation:
+                generationActiveRequestSummaries().first
+            case .playback:
+                await playbackController.activeRequestSummary()
         }
     }
 
     func queueSummaryActiveRequests(for queueType: WorkerQueueType) async -> [ActiveWorkerRequestSummary]? {
         switch queueType {
-        case .generation:
-            let activeRequests = generationActiveRequestSummaries()
-            return activeRequests.isEmpty ? nil : activeRequests
-        case .playback:
-            return nil
+            case .generation:
+                let activeRequests = generationActiveRequestSummaries()
+                return activeRequests.isEmpty ? nil : activeRequests
+            case .playback:
+                return nil
         }
     }
 
     func runtimeOverviewSnapshot() async -> SpeakSwiftly.RuntimeOverview {
-        SpeakSwiftly.RuntimeOverview(
+        await SpeakSwiftly.RuntimeOverview(
             status: currentStatusSnapshot(),
             speechBackend: speechBackend,
-            generationQueue: await queueSnapshot(for: .generation),
-            playbackQueue: await queueSnapshot(for: .playback),
-            playbackState: await playbackController.stateSnapshot()
+            generationQueue: queueSnapshot(for: .generation),
+            playbackQueue: queueSnapshot(for: .playback),
+            playbackState: playbackController.stateSnapshot(),
         )
     }
 
     func generationQueueDepth() async -> Int {
-        (await generationController.queuedJobsOrdered()).count
+        await (generationController.queuedJobsOrdered()).count
     }
 
     private func queuedReason(for parkReason: SpeakSwiftly.Runtime.GenerationParkReason) -> WorkerQueuedReason {
         switch parkReason {
-        case .waitingForResidentModel:
-            .waitingForResidentModel
-        case .waitingForResidentModels:
-            .waitingForResidentModels
-        case .waitingForActiveRequest:
-            .waitingForActiveRequest
-        case .waitingForPlaybackStability:
-            .waitingForPlaybackStability
-        case .waitingForMarvisGenerationLane:
-            .waitingForMarvisGenerationLane
+            case .waitingForResidentModel:
+                .waitingForResidentModel
+            case .waitingForResidentModels:
+                .waitingForResidentModels
+            case .waitingForActiveRequest:
+                .waitingForActiveRequest
+            case .waitingForPlaybackStability:
+                .waitingForPlaybackStability
+            case .waitingForMarvisGenerationLane:
+                .waitingForMarvisGenerationLane
         }
     }
 
@@ -238,7 +238,7 @@ extension SpeakSwiftly.Runtime {
         let status = WorkerStatusEvent(
             stage: stage,
             residentState: residentStateSummary,
-            speechBackend: speechBackend
+            speechBackend: speechBackend,
         )
         await emit(status)
         broadcastStatus(status)
@@ -248,7 +248,7 @@ extension SpeakSwiftly.Runtime {
         await emit(WorkerFailureResponse(id: id, code: error.code, message: error.message))
     }
 
-    func emit<T: Encodable>(_ value: T) async {
+    func emit(_ value: some Encodable) async {
         do {
             let data = try encoder.encode(value) + Data("\n".utf8)
             try dependencies.writeStdout(data)
@@ -284,7 +284,7 @@ extension SpeakSwiftly.Runtime {
         outputPath: String? = nil,
         cwd: String? = nil,
         referenceAudioPath: String? = nil,
-        transcript: String? = nil
+        transcript: String? = nil,
     ) async {
         let request = OutgoingWorkerRequest(
             id: id,
@@ -315,7 +315,7 @@ extension SpeakSwiftly.Runtime {
             voiceDescription: voiceDescription,
             outputPath: outputPath,
             referenceAudioPath: referenceAudioPath,
-            transcript: transcript
+            transcript: transcript,
         )
 
         do {
@@ -327,187 +327,187 @@ extension SpeakSwiftly.Runtime {
                 id: id,
                 error: WorkerError(
                     code: .internalError,
-                    message: "SpeakSwiftly could not encode the outgoing '\(op)' request before queueing it. \(error.localizedDescription)"
-                )
+                    message: "SpeakSwiftly could not encode the outgoing '\(op)' request before queueing it. \(error.localizedDescription)",
+                ),
             )
         }
     }
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-        case .queueSpeech(let id, let text, let profileName, let textProfileName, _, let textContext, let sourceFormat):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                text: text,
-                profileName: profileName,
-                textProfileName: textProfileName,
-                textContext: textContext,
-                sourceFormat: sourceFormat
-            )
-        case .queueBatch(let id, let profileName, let items):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                items: items,
-                profileName: profileName
-            )
-        case .generatedFile(let id, let artifactID):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                artifactID: artifactID
-            )
-        case .generatedFiles(let id):
-            await submitRequest(
-                id: id,
-                op: request.opName
-            )
-        case .overview(let id):
-            await submitRequest(
-                id: id,
-                op: request.opName
-            )
-        case .generatedBatch(let id, let batchID):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                batchID: batchID
-            )
-        case .generatedBatches(let id):
-            await submitRequest(
-                id: id,
-                op: request.opName
-            )
-        case .expireGenerationJob(let id, let jobID):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                jobID: jobID
-            )
-        case .generationJob(let id, let jobID):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                jobID: jobID
-            )
-        case .generationJobs(let id):
-            await submitRequest(
-                id: id,
-                op: request.opName
-            )
-        case .createProfile(let id, let profileName, let text, let vibe, let voiceDescription, let outputPath, let cwd):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                text: text,
-                profileName: profileName,
-                vibe: vibe,
-                voiceDescription: voiceDescription,
-                outputPath: outputPath,
-                cwd: cwd
-            )
-        case .createClone(let id, let profileName, let referenceAudioPath, let vibe, let transcript, let cwd):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                profileName: profileName,
-                vibe: vibe,
-                cwd: cwd,
-                referenceAudioPath: referenceAudioPath,
-                transcript: transcript
-            )
-        case .listProfiles(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .renameProfile(let id, let profileName, let newProfileName):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                profileName: profileName,
-                newProfileName: newProfileName
-            )
-        case .rerollProfile(let id, let profileName):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                profileName: profileName
-            )
-        case .removeProfile(let id, let profileName):
-            await submitRequest(id: id, op: request.opName, profileName: profileName)
-        case .textProfileActive(let id),
-             .textProfiles(let id),
-             .textProfileStyle(let id),
-             .textProfilePersistence(let id),
-             .loadTextProfiles(let id),
-             .saveTextProfiles(let id),
-             .resetTextProfile(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .textProfile(let id, let name),
-             .removeTextProfile(let id, let name):
-            await submitRequest(id: id, op: request.opName, textProfileName: name)
-        case .textProfileEffective(let id, let name),
-             .textReplacements(let id, let name),
-             .clearTextReplacements(let id, let name):
-            await submitRequest(id: id, op: request.opName, textProfileName: name)
-        case .setTextProfileStyle(let id, let style):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                textProfileStyle: style
-            )
-        case .createTextProfile(let id, let profileID, let profileName, let replacements):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                textProfileID: profileID,
-                textProfileDisplayName: profileName,
-                replacements: replacements
-            )
-        case .storeTextProfile(let id, let profile),
-             .useTextProfile(let id, let profile):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                textProfile: profile
-            )
-        case .addTextReplacement(let id, let replacement, let profileName),
-             .replaceTextReplacement(let id, let replacement, let profileName):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                textProfileName: profileName,
-                replacement: replacement
-            )
-        case .removeTextReplacement(let id, let replacementID, let profileName):
-            await submitRequest(
-                id: id,
-                op: request.opName,
-                textProfileName: profileName,
-                replacementID: replacementID
-            )
-        case .listQueue(let id, _):
-            await submitRequest(id: id, op: request.opName)
-        case .status(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .switchSpeechBackend(let id, let speechBackend):
-            await submitRequest(id: id, op: request.opName, speechBackend: speechBackend)
-        case .reloadModels(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .unloadModels(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .playback(let id, _):
-            await submitRequest(id: id, op: request.opName)
-        case .clearQueue(let id):
-            await submitRequest(id: id, op: request.opName)
-        case .cancelRequest(let id, let requestID):
-            await submitRequest(id: id, op: request.opName, requestID: requestID)
+            case let .queueSpeech(id, text, profileName, textProfileName, _, textContext, sourceFormat):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    text: text,
+                    profileName: profileName,
+                    textProfileName: textProfileName,
+                    textContext: textContext,
+                    sourceFormat: sourceFormat,
+                )
+            case let .queueBatch(id, profileName, items):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    items: items,
+                    profileName: profileName,
+                )
+            case let .generatedFile(id, artifactID):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    artifactID: artifactID,
+                )
+            case let .generatedFiles(id):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                )
+            case let .overview(id):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                )
+            case let .generatedBatch(id, batchID):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    batchID: batchID,
+                )
+            case let .generatedBatches(id):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                )
+            case let .expireGenerationJob(id, jobID):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    jobID: jobID,
+                )
+            case let .generationJob(id, jobID):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    jobID: jobID,
+                )
+            case let .generationJobs(id):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                )
+            case let .createProfile(id, profileName, text, vibe, voiceDescription, outputPath, cwd):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    text: text,
+                    profileName: profileName,
+                    vibe: vibe,
+                    voiceDescription: voiceDescription,
+                    outputPath: outputPath,
+                    cwd: cwd,
+                )
+            case let .createClone(id, profileName, referenceAudioPath, vibe, transcript, cwd):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    profileName: profileName,
+                    vibe: vibe,
+                    cwd: cwd,
+                    referenceAudioPath: referenceAudioPath,
+                    transcript: transcript,
+                )
+            case let .listProfiles(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .renameProfile(id, profileName, newProfileName):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    profileName: profileName,
+                    newProfileName: newProfileName,
+                )
+            case let .rerollProfile(id, profileName):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    profileName: profileName,
+                )
+            case let .removeProfile(id, profileName):
+                await submitRequest(id: id, op: request.opName, profileName: profileName)
+            case let .textProfileActive(id),
+                 let .textProfiles(id),
+                 let .textProfileStyle(id),
+                 let .textProfilePersistence(id),
+                 let .loadTextProfiles(id),
+                 let .saveTextProfiles(id),
+                 let .resetTextProfile(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .textProfile(id, name),
+                 let .removeTextProfile(id, name):
+                await submitRequest(id: id, op: request.opName, textProfileName: name)
+            case let .textProfileEffective(id, name),
+                 let .textReplacements(id, name),
+                 let .clearTextReplacements(id, name):
+                await submitRequest(id: id, op: request.opName, textProfileName: name)
+            case let .setTextProfileStyle(id, style):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    textProfileStyle: style,
+                )
+            case let .createTextProfile(id, profileID, profileName, replacements):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    textProfileID: profileID,
+                    textProfileDisplayName: profileName,
+                    replacements: replacements,
+                )
+            case let .storeTextProfile(id, profile),
+                 let .useTextProfile(id, profile):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    textProfile: profile,
+                )
+            case let .addTextReplacement(id, replacement, profileName),
+                 let .replaceTextReplacement(id, replacement, profileName):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    textProfileName: profileName,
+                    replacement: replacement,
+                )
+            case let .removeTextReplacement(id, replacementID, profileName):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    textProfileName: profileName,
+                    replacementID: replacementID,
+                )
+            case let .listQueue(id, _):
+                await submitRequest(id: id, op: request.opName)
+            case let .status(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .switchSpeechBackend(id, speechBackend):
+                await submitRequest(id: id, op: request.opName, speechBackend: speechBackend)
+            case let .reloadModels(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .unloadModels(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .playback(id, _):
+                await submitRequest(id: id, op: request.opName)
+            case let .clearQueue(id):
+                await submitRequest(id: id, op: request.opName)
+            case let .cancelRequest(id, requestID):
+                await submitRequest(id: id, op: request.opName, requestID: requestID)
         }
     }
 
     func logPlaybackFinished(
         for speechJob: PlaybackJob,
         playbackSummary: PlaybackSummary,
-        sampleRate: Double
+        sampleRate: Double,
     ) async {
         let id = speechJob.requestID
         let op = speechJob.op
@@ -583,14 +583,14 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profileName: profileName,
-            details: details
+            details: details,
         )
 
-        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1_000).rounded())
+        let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1000).rounded())
         let sectionWindows = SpeakSwiftly.DeepTrace.sectionWindows(
             originalText: speechJob.text,
             totalDurationMS: totalDurationMS,
-            totalChunkCount: playbackSummary.chunkCount
+            totalChunkCount: playbackSummary.chunkCount,
         )
         for window in sectionWindows {
             await logRequestEvent(
@@ -598,18 +598,18 @@ extension SpeakSwiftly.Runtime {
                 requestID: id,
                 op: op,
                 profileName: profileName,
-                details: textSectionWindowDetails(window)
+                details: textSectionWindowDetails(window),
             )
         }
     }
 
     func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
-        return WorkerRequestHandle(
+        WorkerRequestHandle(
             id: request.id,
             operation: request.opName,
             profileName: request.profileName,
             events: makeLegacyRequestEventStream(for: request.id),
-            generationEvents: makeGenerationEventStream(for: request.id)
+            generationEvents: makeGenerationEventStream(for: request.id),
         )
     }
 
@@ -626,7 +626,7 @@ extension SpeakSwiftly.Runtime {
             operation: request.opName,
             profileName: request.profileName,
             acceptedAt: acceptedAt,
-            lastUpdatedAt: acceptedAt
+            lastUpdatedAt: acceptedAt,
         )
     }
 
@@ -636,7 +636,7 @@ extension SpeakSwiftly.Runtime {
 
     func makeRequestUpdateStream(
         for requestID: String,
-        replayBuffered: Bool = true
+        replayBuffered: Bool = true,
     ) -> AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error> {
         guard let broker = requestBrokers[requestID] else {
             return AsyncThrowingStream { continuation in
@@ -667,7 +667,7 @@ extension SpeakSwiftly.Runtime {
 
     func makeGenerationEventStream(
         for requestID: String,
-        replayBuffered: Bool = true
+        replayBuffered: Bool = true,
     ) -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> {
         guard let broker = requestBrokers[requestID] else {
             return AsyncThrowingStream { continuation in
@@ -697,7 +697,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func makeLegacyRequestEventStream(
-        for requestID: String
+        for requestID: String,
     ) -> AsyncThrowingStream<WorkerRequestStreamEvent, any Swift.Error> {
         let updates = makeRequestUpdateStream(for: requestID, replayBuffered: false)
         return AsyncThrowingStream { continuation in
@@ -705,21 +705,21 @@ extension SpeakSwiftly.Runtime {
                 do {
                     for try await update in updates {
                         switch update.state {
-                        case .queued(let event):
-                            continuation.yield(.queued(event))
-                        case .acknowledged(let success):
-                            continuation.yield(.acknowledged(success))
-                        case .started(let event):
-                            continuation.yield(.started(event))
-                        case .progress(let event):
-                            continuation.yield(.progress(event))
-                        case .completed(let success):
-                            continuation.yield(.completed(success))
-                        case .failed(let failure), .cancelled(let failure):
-                            continuation.finish(
-                                throwing: WorkerError(code: failure.code, message: failure.message)
-                            )
-                            return
+                            case let .queued(event):
+                                continuation.yield(.queued(event))
+                            case let .acknowledged(success):
+                                continuation.yield(.acknowledged(success))
+                            case let .started(event):
+                                continuation.yield(.started(event))
+                            case let .progress(event):
+                                continuation.yield(.progress(event))
+                            case let .completed(success):
+                                continuation.yield(.completed(success))
+                            case let .failed(failure), let .cancelled(failure):
+                                continuation.finish(
+                                    throwing: WorkerError(code: failure.code, message: failure.message),
+                                )
+                                return
                         }
                     }
                     continuation.finish()
@@ -735,18 +735,17 @@ extension SpeakSwiftly.Runtime {
     }
 
     func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {
-        let state: SpeakSwiftly.RequestState
-        switch event {
-        case .queued(let queuedEvent):
-            state = .queued(queuedEvent)
-        case .acknowledged(let success):
-            state = .acknowledged(success)
-        case .started(let startedEvent):
-            state = .started(startedEvent)
-        case .progress(let progressEvent):
-            state = .progress(progressEvent)
-        case .completed(let success):
-            state = .completed(success)
+        let state: SpeakSwiftly.RequestState = switch event {
+            case let .queued(queuedEvent):
+                .queued(queuedEvent)
+            case let .acknowledged(success):
+                .acknowledged(success)
+            case let .started(startedEvent):
+                .started(startedEvent)
+            case let .progress(progressEvent):
+                .progress(progressEvent)
+            case let .completed(success):
+                .completed(success)
         }
 
         recordRequestState(
@@ -755,20 +754,20 @@ extension SpeakSwiftly.Runtime {
             terminal: {
                 if case .completed = state { return true }
                 return false
-            }()
+            }(),
         )
     }
 
     func recordGenerationEvent(
         _ event: SpeakSwiftly.GenerationEvent,
-        for requestID: String
+        for requestID: String,
     ) {
         guard var broker = requestBrokers[requestID] else { return }
 
         let update = broker.recordGenerationEvent(
             event,
             date: dependencies.now(),
-            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates
+            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates,
         )
         let continuations = Array(broker.generationContinuations.values)
         requestBrokers[requestID] = broker
@@ -782,7 +781,7 @@ extension SpeakSwiftly.Runtime {
         let failure = WorkerFailureResponse(
             id: requestID,
             code: error.code,
-            message: error.message
+            message: error.message,
         )
         let state: SpeakSwiftly.RequestState =
             error.code == .requestCancelled ? .cancelled(failure) : .failed(failure)
@@ -792,14 +791,14 @@ extension SpeakSwiftly.Runtime {
     func recordRequestState(
         _ state: SpeakSwiftly.RequestState,
         for requestID: String,
-        terminal: Bool
+        terminal: Bool,
     ) {
         guard var broker = requestBrokers[requestID] else { return }
 
         let update = broker.recordState(
             state: state,
             date: dependencies.now(),
-            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates
+            maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates,
         )
         let continuations = Array(broker.subscriberContinuations.values)
         let generationContinuations = Array(broker.generationContinuations.values)
@@ -832,6 +831,7 @@ extension SpeakSwiftly.Runtime {
 
     func retainTerminalRequestBrokerIfNeeded(for requestID: String) {
         guard requestBrokers[requestID]?.isTerminal == true else { return }
+
         terminalRequestBrokerOrder.removeAll { $0 == requestID }
         terminalRequestBrokerOrder.append(requestID)
 
@@ -857,44 +857,45 @@ extension SpeakSwiftly.Runtime {
 
     func currentStatusSnapshot() -> WorkerStatusEvent? {
         switch residentState {
-        case .warming:
-            guard preloadTask != nil else { return nil }
-            return WorkerStatusEvent(
-                stage: .warmingResidentModel,
-                residentState: residentStateSummary,
-                speechBackend: speechBackend
-            )
-        case .ready:
-            return WorkerStatusEvent(
-                stage: .residentModelReady,
-                residentState: residentStateSummary,
-                speechBackend: speechBackend
-            )
-        case .unloaded:
-            return WorkerStatusEvent(
-                stage: .residentModelsUnloaded,
-                residentState: residentStateSummary,
-                speechBackend: speechBackend
-            )
-        case .failed:
-            return WorkerStatusEvent(
-                stage: .residentModelFailed,
-                residentState: residentStateSummary,
-                speechBackend: speechBackend
-            )
+            case .warming:
+                guard preloadTask != nil else { return nil }
+
+                return WorkerStatusEvent(
+                    stage: .warmingResidentModel,
+                    residentState: residentStateSummary,
+                    speechBackend: speechBackend,
+                )
+            case .ready:
+                return WorkerStatusEvent(
+                    stage: .residentModelReady,
+                    residentState: residentStateSummary,
+                    speechBackend: speechBackend,
+                )
+            case .unloaded:
+                return WorkerStatusEvent(
+                    stage: .residentModelsUnloaded,
+                    residentState: residentStateSummary,
+                    speechBackend: speechBackend,
+                )
+            case .failed:
+                return WorkerStatusEvent(
+                    stage: .residentModelFailed,
+                    residentState: residentStateSummary,
+                    speechBackend: speechBackend,
+                )
         }
     }
 
     var residentStateSummary: SpeakSwiftly.ResidentModelState {
         switch residentState {
-        case .warming:
-            .warming
-        case .ready:
-            .ready
-        case .unloaded:
-            .unloaded
-        case .failed:
-            .failed
+            case .warming:
+                .warming
+            case .ready:
+                .ready
+            case .unloaded:
+                .unloaded
+            case .failed:
+                .failed
         }
     }
 
@@ -907,7 +908,7 @@ extension SpeakSwiftly.Runtime {
         requestID: String? = nil,
         op: String? = nil,
         profileName: String? = nil,
-        details: [String: LogValue]? = nil
+        details: [String: LogValue]? = nil,
     ) async {
         var mergedDetails = details ?? [:]
         mergedDetails["message"] = .string(message)
@@ -918,7 +919,7 @@ extension SpeakSwiftly.Runtime {
             op: op,
             profileName: profileName,
             elapsedMS: requestID.flatMap(elapsedMS(for:)),
-            details: mergedDetails
+            details: mergedDetails,
         )
     }
 
@@ -928,7 +929,7 @@ extension SpeakSwiftly.Runtime {
         op: String?,
         profileName: String? = nil,
         queueDepth: Int? = nil,
-        details: [String: LogValue]? = nil
+        details: [String: LogValue]? = nil,
     ) async {
         await logEvent(
             event,
@@ -937,7 +938,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             queueDepth: queueDepth,
             elapsedMS: elapsedMS(for: requestID),
-            details: details
+            details: details,
         )
     }
 
@@ -985,7 +986,7 @@ extension SpeakSwiftly.Runtime {
         profileName: String? = nil,
         queueDepth: Int? = nil,
         elapsedMS: Int? = nil,
-        details: [String: LogValue]? = nil
+        details: [String: LogValue]? = nil,
     ) async {
         let logEvent = LogEvent(
             event: event,
@@ -996,26 +997,27 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             queueDepth: queueDepth,
             elapsedMS: elapsedMS,
-            details: details
+            details: details,
         )
 
         do {
-            dependencies.writeStderr(try WorkerStructuredLogSupport.encode(logEvent))
+            try dependencies.writeStderr(WorkerStructuredLogSupport.encode(logEvent))
         } catch {
             dependencies.writeStderr(WorkerStructuredLogSupport.encodingFailureLine(
                 timestamp: logTimestampFormatter.string(from: dependencies.now()),
-                errorDescription: error.localizedDescription
+                errorDescription: error.localizedDescription,
             ))
         }
     }
 
     func elapsedMS(for requestID: String) -> Int? {
         guard let startedAt = requestBrokers[requestID]?.acceptedAt else { return nil }
+
         return elapsedMS(since: startedAt)
     }
 
     func elapsedMS(since startedAt: Date) -> Int {
-        Int((dependencies.now().timeIntervalSince(startedAt) * 1_000).rounded())
+        Int((dependencies.now().timeIntervalSince(startedAt) * 1000).rounded())
     }
 
     func bestEffortID(from line: String) -> String {

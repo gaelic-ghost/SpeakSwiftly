@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Deep Trace API
+// MARK: - SpeakSwiftly.DeepTrace
 
 public extension SpeakSwiftly {
     enum DeepTrace {}
@@ -52,11 +52,11 @@ public extension SpeakSwiftly.DeepTrace {
 
     static func features(
         originalText: String,
-        normalizedText: String
+        normalizedText: String,
     ) -> Features {
         DeepTraceAnalysis.features(
             originalText: originalText,
-            normalizedText: normalizedText
+            normalizedText: normalizedText,
         )
     }
 
@@ -67,12 +67,12 @@ public extension SpeakSwiftly.DeepTrace {
     static func sectionWindows(
         originalText: String,
         totalDurationMS: Int,
-        totalChunkCount: Int
+        totalChunkCount: Int,
     ) -> [SectionWindow] {
         DeepTraceAnalysis.sectionWindows(
             originalText: originalText,
             totalDurationMS: totalDurationMS,
-            totalChunkCount: totalChunkCount
+            totalChunkCount: totalChunkCount,
         )
     }
 

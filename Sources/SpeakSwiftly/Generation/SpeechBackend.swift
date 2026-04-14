@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Speech Backend
+// MARK: - SpeakSwiftly.SpeechBackend
 
 public extension SpeakSwiftly {
     // MARK: Backend Enumeration
@@ -12,12 +12,12 @@ public extension SpeakSwiftly {
     }
 }
 
-extension SpeakSwiftly.SpeechBackend {
+public extension SpeakSwiftly.SpeechBackend {
     // MARK: Environment
 
-    public static let environmentVariable = "SPEAKSWIFTLY_SPEECH_BACKEND"
+    static let environmentVariable = "SPEAKSWIFTLY_SPEECH_BACKEND"
 
-    public static func configured(in environment: [String: String]) -> Self? {
+    static func configured(in environment: [String: String]) -> Self? {
         guard let rawValue = environment[environmentVariable]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
@@ -30,27 +30,27 @@ extension SpeakSwiftly.SpeechBackend {
         return backend
     }
 
-    public static func fromEnvironment(_ environment: [String: String]) -> Self {
+    static func fromEnvironment(_ environment: [String: String]) -> Self {
         configured(in: environment) ?? .qwen3
     }
 
-    var residentModelRepo: String {
+    internal var residentModelRepo: String {
         switch self {
-        case .qwen3:
-            ModelFactory.qwenResidentModelRepo
-        case .qwen3CustomVoice:
-            ModelFactory.qwenCustomVoiceResidentModelRepo
-        case .marvis:
-            ModelFactory.marvisResidentModelRepo
+            case .qwen3:
+                ModelFactory.qwenResidentModelRepo
+            case .qwen3CustomVoice:
+                ModelFactory.qwenCustomVoiceResidentModelRepo
+            case .marvis:
+                ModelFactory.marvisResidentModelRepo
         }
     }
 
-    var isQwenFamily: Bool {
+    internal var isQwenFamily: Bool {
         switch self {
-        case .qwen3, .qwen3CustomVoice:
-            true
-        case .marvis:
-            false
+            case .qwen3, .qwen3CustomVoice:
+                true
+            case .marvis:
+                false
         }
     }
 }

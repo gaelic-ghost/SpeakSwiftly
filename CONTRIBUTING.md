@@ -16,6 +16,22 @@ Keep the doc split clean:
 - [README.md](README.md) should stay focused on setup, usage, public API names, and baseline verification
 - this document should hold architecture notes, repository workflow, operator behavior, full wire examples, and extended verification paths
 
+## Formatting
+
+SpeakSwiftly uses the checked-in [.swiftformat](.swiftformat) file as the repository source of truth for Swift formatting and the checked-in [.swiftlint.yml](.swiftlint.yml) file for a small set of non-formatting policy checks.
+
+Use these commands from the package root:
+
+```bash
+swiftformat --lint --config .swiftformat .
+swiftformat --config .swiftformat .
+swiftlint lint --config .swiftlint.yml
+```
+
+Use the first command when you want to see formatting drift without rewriting files. Use the second command when you intentionally want to apply formatting changes. Use the SwiftLint command for the smaller safety and maintainability checks that are intentionally left outside SwiftFormat.
+
+Treat SwiftFormat as the primary style tool in this repository. Keep SwiftLint focused on non-formatting policy checks instead of duplicating formatter behavior.
+
 ## Runtime Shape
 
 The current intended runtime shape is:

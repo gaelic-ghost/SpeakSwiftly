@@ -262,6 +262,8 @@ For package-focused development, prefer:
 ```bash
 swift build
 swift test
+swiftformat --lint --config .swiftformat .
+swiftlint lint --config .swiftlint.yml
 ```
 
 For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](CONTRIBUTING.md).

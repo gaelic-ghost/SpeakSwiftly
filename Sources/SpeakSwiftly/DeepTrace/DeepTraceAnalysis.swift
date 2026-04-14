@@ -1,7 +1,7 @@
 import Foundation
 import NaturalLanguage
 
-// MARK: - Deep Trace Analysis
+// MARK: - DeepTraceAnalysis
 
 enum DeepTraceAnalysis {
     struct SectionCandidate {
@@ -18,7 +18,7 @@ enum DeepTraceAnalysis {
 
     static func features(
         originalText: String,
-        normalizedText: String
+        normalizedText: String,
     ) -> SpeakSwiftly.DeepTrace.Features {
         let tokens = candidateTokens(in: originalText)
 
@@ -39,7 +39,7 @@ enum DeepTraceAnalysis {
             camelCaseTokenCount: tokens.count(where: isLikelyCamelCaseIdentifier),
             snakeCaseTokenCount: tokens.count(where: isLikelySnakeCaseIdentifier),
             objcSymbolCount: tokens.count(where: isLikelyObjectiveCSymbol),
-            repeatedLetterRunCount: tokens.count(where: containsRepeatedLetterRun)
+            repeatedLetterRunCount: tokens.count(where: containsRepeatedLetterRun),
         )
     }
 
@@ -55,7 +55,7 @@ enum DeepTraceAnalysis {
                 kind: section.kind,
                 originalCharacterCount: section.text.count,
                 normalizedCharacterCount: weightedCounts[index],
-                normalizedCharacterShare: Double(weightedCounts[index]) / Double(totalWeightedCount)
+                normalizedCharacterShare: Double(weightedCounts[index]) / Double(totalWeightedCount),
             )
         }
     }
@@ -63,7 +63,7 @@ enum DeepTraceAnalysis {
     static func sectionWindows(
         originalText: String,
         totalDurationMS: Int,
-        totalChunkCount: Int
+        totalChunkCount: Int,
     ) -> [SpeakSwiftly.DeepTrace.SectionWindow] {
         let sections = sections(originalText: originalText)
         guard !sections.isEmpty else { return [] }
@@ -79,13 +79,13 @@ enum DeepTraceAnalysis {
                 ? remainingDurationMS
                 : min(
                     remainingDurationMS,
-                    max(Int((Double(totalDurationMS) * section.normalizedCharacterShare).rounded()), 0)
+                    max(Int((Double(totalDurationMS) * section.normalizedCharacterShare).rounded()), 0),
                 )
             let chunkCount = isLastSection
                 ? remainingChunkCount
                 : min(
                     remainingChunkCount,
-                    max(Int((Double(totalChunkCount) * section.normalizedCharacterShare).rounded()), 0)
+                    max(Int((Double(totalChunkCount) * section.normalizedCharacterShare).rounded()), 0),
                 )
 
             let window = SpeakSwiftly.DeepTrace.SectionWindow(
@@ -94,7 +94,7 @@ enum DeepTraceAnalysis {
                 estimatedEndMS: elapsedMS + durationMS,
                 estimatedDurationMS: durationMS,
                 estimatedStartChunk: elapsedChunks,
-                estimatedEndChunk: elapsedChunks + chunkCount
+                estimatedEndChunk: elapsedChunks + chunkCount,
             )
 
             elapsedMS += durationMS
@@ -108,8 +108,6 @@ enum DeepTraceAnalysis {
         tokenizer.string = text
         return tokenizer.tokens(for: text.startIndex..<text.endIndex).map { String(text[$0]) }
     }
-
-    // MARK: Sections
 
     static func splitSections(in text: String) -> [SectionCandidate] {
         let headerSections = splitMarkdownHeaderSections(in: text)
@@ -129,8 +127,8 @@ enum DeepTraceAnalysis {
             SectionCandidate(
                 title: "Full Request",
                 kind: .fullRequest,
-                text: trimmed
-            )
+                text: trimmed,
+            ),
         ]
     }
 
@@ -142,15 +140,17 @@ enum DeepTraceAnalysis {
 
         func flushCurrentSection() {
             guard let currentTitle else { return }
+
             let sectionText = currentLines.joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !sectionText.isEmpty else { return }
+
             sections.append(
                 SectionCandidate(
                     title: currentTitle,
                     kind: .markdownHeader,
-                    text: sectionText
-                )
+                    text: sectionText,
+                ),
             )
         }
 
@@ -181,7 +181,7 @@ enum DeepTraceAnalysis {
                 SectionCandidate(
                     title: "Paragraph \(index + 1)",
                     kind: .paragraph,
-                    text: paragraph
+                    text: paragraph,
                 )
             }
     }
@@ -269,8 +269,8 @@ enum DeepTraceAnalysis {
                 MarkdownLinkMatch(
                     fullRange: fullRange,
                     label: String(text[text.index(after: labelStart)..<labelEnd]),
-                    destination: String(text[destinationStart..<destinationEnd])
-                )
+                    destination: String(text[destinationStart..<destinationEnd]),
+                ),
             )
             cursor = fullRange.upperBound
         }
@@ -340,8 +340,7 @@ enum DeepTraceAnalysis {
         var end = token.endIndex
 
         while start < end,
-            token[start].unicodeScalars.allSatisfy({ punctuation.contains($0) })
-        {
+              token[start].unicodeScalars.allSatisfy({ punctuation.contains($0) }) {
             start = token.index(after: start)
         }
 
@@ -350,6 +349,7 @@ enum DeepTraceAnalysis {
             guard token[beforeEnd].unicodeScalars.allSatisfy({ punctuation.contains($0) }) else {
                 break
             }
+
             end = beforeEnd
         }
 
@@ -370,8 +370,10 @@ enum DeepTraceAnalysis {
 
     static func isLikelyURL(_ token: String) -> Bool {
         guard let schemeSeparator = token.range(of: "://") else { return false }
+
         let scheme = token[..<schemeSeparator.lowerBound]
         guard !scheme.isEmpty else { return false }
+
         return scheme.allSatisfy { $0.isLetter }
     }
 
@@ -382,13 +384,16 @@ enum DeepTraceAnalysis {
 
         let parts = token.split(separator: ".").map(String.init)
         guard parts.count >= 2 else { return false }
+
         return parts.allSatisfy(isIdentifierLike)
     }
 
     static func isLikelySnakeCaseIdentifier(_ token: String) -> Bool {
         guard token.contains("_") else { return false }
+
         let parts = token.split(separator: "_").map(String.init)
         guard parts.count >= 2 else { return false }
+
         return parts.allSatisfy { !$0.isEmpty && $0.allSatisfy(\.isAlphaNumeric) }
     }
 
@@ -410,6 +415,7 @@ enum DeepTraceAnalysis {
         }
 
         guard token.contains(":") else { return false }
+
         return token.split(separator: ":").allSatisfy { part in
             !part.isEmpty && part.allSatisfy(\.isAlphaNumeric)
         }
@@ -425,6 +431,7 @@ enum DeepTraceAnalysis {
         for character in text {
             defer { previous = character }
             guard let previous else { continue }
+
             if previous.isLowercase, character.isUppercase {
                 return true
             }

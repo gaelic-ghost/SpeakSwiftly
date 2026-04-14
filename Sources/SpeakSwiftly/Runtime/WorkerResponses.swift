@@ -90,7 +90,7 @@ public extension SpeakSwiftly {
             queueType: String,
             activeRequest: ActiveRequest? = nil,
             activeRequests: [ActiveRequest]? = nil,
-            queue: [QueuedRequest]
+            queue: [QueuedRequest],
         ) {
             self.queueType = queueType
             self.activeRequest = activeRequest
@@ -142,32 +142,6 @@ public extension SpeakSwiftly {
     }
 
     struct Success: Encodable, Sendable, Equatable {
-        public let id: String
-        public let ok = true
-        public let generatedFile: GeneratedFile?
-        public let generatedFiles: [GeneratedFile]?
-        public let generatedBatch: GeneratedBatch?
-        public let generatedBatches: [GeneratedBatch]?
-        public let generationJob: GenerationJob?
-        public let generationJobs: [GenerationJob]?
-        public let profileName: String?
-        public let profilePath: String?
-        public let profiles: [ProfileSummary]?
-        public let textProfile: TextForSpeech.Profile?
-        public let textProfiles: [TextForSpeech.Profile]?
-        public let replacements: [TextForSpeech.Replacement]?
-        public let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-        public let textProfilePath: String?
-        public let activeRequest: ActiveRequest?
-        public let activeRequests: [ActiveRequest]?
-        public let queue: [QueuedRequest]?
-        public let playbackState: PlaybackStateSnapshot?
-        public let runtimeOverview: RuntimeOverview?
-        public let status: StatusEvent?
-        public let speechBackend: SpeechBackend?
-        public let clearedCount: Int?
-        public let cancelledRequestID: String?
-
         enum CodingKeys: String, CodingKey {
             case id
             case ok
@@ -196,6 +170,32 @@ public extension SpeakSwiftly {
             case cancelledRequestID = "cancelled_request_id"
         }
 
+        public let id: String
+        public let ok = true
+        public let generatedFile: GeneratedFile?
+        public let generatedFiles: [GeneratedFile]?
+        public let generatedBatch: GeneratedBatch?
+        public let generatedBatches: [GeneratedBatch]?
+        public let generationJob: GenerationJob?
+        public let generationJobs: [GenerationJob]?
+        public let profileName: String?
+        public let profilePath: String?
+        public let profiles: [ProfileSummary]?
+        public let textProfile: TextForSpeech.Profile?
+        public let textProfiles: [TextForSpeech.Profile]?
+        public let replacements: [TextForSpeech.Replacement]?
+        public let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+        public let textProfilePath: String?
+        public let activeRequest: ActiveRequest?
+        public let activeRequests: [ActiveRequest]?
+        public let queue: [QueuedRequest]?
+        public let playbackState: PlaybackStateSnapshot?
+        public let runtimeOverview: RuntimeOverview?
+        public let status: StatusEvent?
+        public let speechBackend: SpeechBackend?
+        public let clearedCount: Int?
+        public let cancelledRequestID: String?
+
         public init(
             id: String,
             generatedFile: GeneratedFile? = nil,
@@ -220,7 +220,7 @@ public extension SpeakSwiftly {
             status: StatusEvent? = nil,
             speechBackend: SpeechBackend? = nil,
             clearedCount: Int? = nil,
-            cancelledRequestID: String? = nil
+            cancelledRequestID: String? = nil,
         ) {
             self.id = id
             self.generatedFile = generatedFile
@@ -274,7 +274,7 @@ public extension SpeakSwiftly {
             isStableForConcurrentGeneration: Bool = false,
             isRebuffering: Bool = false,
             stableBufferedAudioMS: Int? = nil,
-            stableBufferTargetMS: Int? = nil
+            stableBufferTargetMS: Int? = nil,
         ) {
             self.state = state
             self.activeRequest = activeRequest
@@ -305,7 +305,7 @@ public extension SpeakSwiftly {
             speechBackend: SpeechBackend,
             generationQueue: QueueSnapshot,
             playbackQueue: QueueSnapshot,
-            playbackState: PlaybackStateSnapshot
+            playbackState: PlaybackStateSnapshot,
         ) {
             self.status = status
             self.speechBackend = speechBackend

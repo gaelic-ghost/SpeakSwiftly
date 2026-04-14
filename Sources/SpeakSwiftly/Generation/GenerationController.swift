@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Generation Queue
 
 actor GenerationController {
-    struct Job: Sendable, Equatable {
+    struct Job: Equatable {
         let token: UUID
         let request: WorkerRequest
 
@@ -13,7 +13,7 @@ actor GenerationController {
         }
     }
 
-    enum CancellationTarget: Sendable, Equatable {
+    enum CancellationTarget: Equatable {
         case active(Job)
         case queued(Job)
     }
@@ -73,6 +73,7 @@ actor GenerationController {
         guard let index = orderedWaitingQueue().firstIndex(where: { $0.token == token }) else {
             return nil
         }
+
         return index + 1
     }
 

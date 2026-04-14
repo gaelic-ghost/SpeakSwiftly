@@ -36,6 +36,7 @@
 - [ ] Milestone 18: Package docs and distribution polish
 - [x] Milestone 19: Persisted async generation jobs and batch artifacts
 - [ ] Milestone 20: Per-request event stream observability
+- [ ] Milestone 21: Unified Logging with `Logger`
 
 ## Milestone 0: Bootstrap
 
@@ -252,11 +253,11 @@ Scope:
 
 Tickets:
 
-- [ ] Add a first DocC catalog for `SpeakSwiftly` with entry points for runtime ownership, top-level normalizer ownership, and the JSONL worker contract.
-- [ ] Add baseline DocC coverage for text-profile management, live playback requests, and voice-profile creation operations.
-- [ ] Add SwiftFormat to the repository with checked-in configuration and a documented formatting command.
-- [ ] Decide whether SwiftLint belongs in the same pass or should remain a separate follow-up once SwiftFormat is in place.
-- [ ] Add a minimal `.spi.yml` that reflects the package's DocC and Swift Package Index needs once the docs surface exists.
+- [x] Add a first DocC catalog for `SpeakSwiftly` with entry points for runtime ownership, top-level normalizer ownership, and the JSONL worker contract.
+- [x] Add baseline DocC coverage for text-profile management, live playback requests, and voice-profile creation operations.
+- [x] Add SwiftFormat to the repository with checked-in configuration and a documented formatting command.
+- [x] Decide whether SwiftLint belongs in the same pass or should remain a separate follow-up once SwiftFormat is in place.
+- [x] Add a minimal `.spi.yml` that reflects the package's DocC and Swift Package Index needs once the docs surface exists.
 - [ ] Document when `.spi.yml` needs changes and keep it intentionally small.
 
 ## Milestone 20: Per-request event stream observability
@@ -310,6 +311,41 @@ Exit criteria:
 - [x] A live-service latency complaint can be broken down into warmup, queueing, generation, playback, and filesystem phases from existing logs.
 - [x] Operator-facing diagnostics contain enough context to identify the request, profile, path, and likely failure point without attaching a debugger.
 - [x] The JSONL contract remains clean while stderr becomes a trustworthy operational signal.
+
+## Milestone 21: Unified Logging with `Logger`
+
+Scope:
+
+- [ ] Move package-owned operator diagnostics from ad-hoc stderr writes toward Apple's Unified Logging surface built around `Logger`.
+- [ ] Preserve the current human-friendly, concrete diagnostic wording while making runtime logs easier to filter in Console, Instruments, and later log-store tooling.
+- [ ] Keep the logging shape direct and local to the runtime instead of adding a wrapper-heavy logging abstraction.
+- [ ] Make the relationship between structured package logs and the JSONL worker contract explicit, so logs stay operational and stdout stays protocol-only.
+
+Tickets:
+
+- [ ] Inventory the current stderr logging surface and group it by subsystem, category, and intended audience before changing call sites.
+- [ ] Define a small package logging layout using `Logger` with clear subsystem and category names for runtime lifecycle, playback, generation, profiles, persistence, and request observation.
+- [ ] Add a package-owned logger access pattern that keeps dependency flow simple and does not introduce a second diagnostics coordinator.
+- [ ] Replace direct runtime stderr writes with `Logger` call sites where Apple Unified Logging is the right surface, while preserving stdout for JSONL protocol traffic.
+- [ ] Decide which diagnostics should remain mirrored to stderr for parent-process operability during local worker runs, and make that mirroring policy explicit instead of accidental.
+- [ ] Audit current message strings so migrated log lines still explain what failed, where it failed, and the most likely cause in concrete language.
+- [ ] Use appropriate log levels such as debug, info, notice, error, and fault intentionally instead of flattening everything to one severity.
+- [ ] Add or tighten tests around the logging seam where practical, especially where the runtime currently depends on injected stderr writers for diagnostics assertions.
+- [ ] Document how package logs are intended to be consumed locally with Console or other Unified Logging readers, and clarify which information remains on the JSONL contract versus the logging channel.
+- [ ] Decide whether any later `OSLogStore`-based inspection or export story belongs in this package or should remain a separate follow-up once `Logger` adoption is stable.
+
+Implementation notes:
+
+- Apple documents the unified logging direction under `OSLog` and `Logging`, with `Logger` as the structured Swift API surface for emitting logs.
+- Prefer a durable building-block change here: one clear package logging story that future observability work can reuse, not a temporary stderr-to-logger bridge that leaves both paths half-owned.
+- If a helper type is needed, keep it narrow and local to package logging setup rather than introducing a general-purpose service layer.
+
+Exit criteria:
+
+- [ ] Package-owned operational diagnostics primarily flow through `Logger` with clear subsystem and category names.
+- [ ] The JSONL worker contract remains stdout-only and easy to reason about, with logging clearly separated from protocol traffic.
+- [ ] Operator-facing log messages remain specific, readable, and useful in Console as well as local debugging flows.
+- [ ] The repo documents when to use Unified Logging, when stderr mirroring still exists, and what future log-inspection work is intentionally out of scope for this milestone.
 
 ## Milestone 9: Live-service operability review
 
