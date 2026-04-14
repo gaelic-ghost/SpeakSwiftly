@@ -8,28 +8,6 @@ import TextForSpeech
 
 @MainActor
 final class AudioPlaybackDriver {
-    enum PlaybackConfiguration {
-        static let minimumDrainTimeout: Duration = .seconds(5)
-        static let drainTimeoutPaddingMS = 3000
-        static let drainProgressCheckIntervalMS = 500
-        static let drainProgressStallTimeoutMS = 8000
-        static let environmentInstabilityWindowMS = 8000
-        static let recoveryStabilizationDelayMS = 900
-        static let recoveryMaximumAttempts = 3
-        static let lowQueueThresholdMS = 100
-        static let channels: AVAudioChannelCount = 1
-        static let interJobBoopDurationMS = 90
-        static let interJobBoopFrequencyHz = 1176.0
-        static let interJobBoopAmplitude: Float = 0.14
-        static let interJobBoopFadeMS = 10
-        static let interJobBoopTimeout: Duration = .seconds(2)
-
-        static func drainTimeout(forQueuedAudioMS queuedAudioMS: Int) -> Duration {
-            let paddedQueuedAudioMS = queuedAudioMS + drainTimeoutPaddingMS
-            return max(minimumDrainTimeout, .milliseconds(paddedQueuedAudioMS))
-        }
-    }
-
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var streamingFormat: AVAudioFormat?
@@ -72,12 +50,12 @@ final class AudioPlaybackDriver {
         guard let lastEnvironmentInstabilityAt else { return false }
 
         return Date().timeIntervalSince(lastEnvironmentInstabilityAt) * 1000
-            <= Double(PlaybackConfiguration.environmentInstabilityWindowMS)
+            <= Double(AudioPlaybackConfiguration.environmentInstabilityWindowMS)
     }
 
     init(traceEnabled: Bool = false) {
         self.traceEnabled = traceEnabled
-        lastObservedOutputDeviceDescription = currentDefaultOutputDeviceDescription()
+        lastObservedOutputDeviceDescription = currentDefaultAudioPlaybackDeviceDescription()
         installEngineConfigurationObserver()
         installWorkspaceObservers()
         installDefaultOutputDeviceObserver()
@@ -302,11 +280,11 @@ final class AudioPlaybackDriver {
                     }
 
                     if !state.generationFinished,
-                       currentQueuedAudioMS <= PlaybackConfiguration.lowQueueThresholdMS,
+                       currentQueuedAudioMS <= AudioPlaybackConfiguration.lowQueueThresholdMS,
                        !state.emittedLowQueueWarning {
                         state.emittedLowQueueWarning = true
                         await onEvent(.queueDepthLow(queuedAudioMS: currentQueuedAudioMS))
-                    } else if currentQueuedAudioMS > PlaybackConfiguration.lowQueueThresholdMS {
+                    } else if currentQueuedAudioMS > AudioPlaybackConfiguration.lowQueueThresholdMS {
                         state.emittedLowQueueWarning = false
                     }
 
@@ -613,7 +591,7 @@ final class AudioPlaybackDriver {
         if currentQueuedAudioMS == 0 {
             return
         }
-        let drainTimeout = PlaybackConfiguration.drainTimeout(forQueuedAudioMS: currentQueuedAudioMS)
+        let drainTimeout = AudioPlaybackConfiguration.drainTimeout(forQueuedAudioMS: currentQueuedAudioMS)
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -641,7 +619,7 @@ final class AudioPlaybackDriver {
                 var lastProgressAt = Date()
 
                 while true {
-                    try await Task.sleep(for: .milliseconds(PlaybackConfiguration.drainProgressCheckIntervalMS))
+                    try await Task.sleep(for: .milliseconds(AudioPlaybackConfiguration.drainProgressCheckIntervalMS))
                     let snapshot = await MainActor.run {
                         (
                             playedBackCallbackCount: state.playedBackCallbackCount,
@@ -668,10 +646,10 @@ final class AudioPlaybackDriver {
                     }
 
                     let stalledForMS = Int((Date().timeIntervalSince(lastProgressAt) * 1000).rounded())
-                    if stalledForMS >= PlaybackConfiguration.drainProgressStallTimeoutMS {
+                    if stalledForMS >= AudioPlaybackConfiguration.drainProgressStallTimeoutMS {
                         throw WorkerError(
                             code: .audioPlaybackTimeout,
-                            message: "Live playback stalled after generated audio finished because the local audio player stopped reporting drain progress for \(PlaybackConfiguration.drainProgressStallTimeoutMS / 1000) seconds while \(snapshot.queuedAudioMS) ms of audio remained queued.",
+                            message: "Live playback stalled after generated audio finished because the local audio player stopped reporting drain progress for \(AudioPlaybackConfiguration.drainProgressStallTimeoutMS / 1000) seconds while \(snapshot.queuedAudioMS) ms of audio remained queued.",
                         )
                     }
                 }
@@ -692,7 +670,7 @@ final class AudioPlaybackDriver {
         let node = AVAudioPlayerNode()
         let format = AVAudioFormat(
             standardFormatWithSampleRate: sampleRate,
-            channels: PlaybackConfiguration.channels,
+            channels: AudioPlaybackConfiguration.channels,
         )
 
         guard let format else {
@@ -861,7 +839,7 @@ final class AudioPlaybackDriver {
 
     private func handleDefaultOutputDeviceChange() {
         let previousDevice = lastObservedOutputDeviceDescription
-        let currentDevice = currentDefaultOutputDeviceDescription()
+        let currentDevice = currentDefaultAudioPlaybackDeviceDescription()
         guard previousDevice != currentDevice else { return }
 
         lastObservedOutputDeviceDescription = currentDevice
@@ -966,7 +944,7 @@ final class AudioPlaybackDriver {
             return
         }
 
-        while playbackRecoveryAttempt < PlaybackConfiguration.recoveryMaximumAttempts {
+        while playbackRecoveryAttempt < AudioPlaybackConfiguration.recoveryMaximumAttempts {
             playbackRecoveryAttempt += 1
             let attempt = playbackRecoveryAttempt
             emitEnvironmentEvent(
@@ -979,7 +957,7 @@ final class AudioPlaybackDriver {
             )
 
             do {
-                try await Task.sleep(for: .milliseconds(PlaybackConfiguration.recoveryStabilizationDelayMS))
+                try await Task.sleep(for: .milliseconds(AudioPlaybackConfiguration.recoveryStabilizationDelayMS))
                 try Task.checkCancellation()
                 try await rebuildEngine(sampleRate: sampleRate)
                 activeRequestState.markQueuedBuffersForReschedule()
@@ -1018,7 +996,7 @@ final class AudioPlaybackDriver {
         interruptActivePlayback(
             with: WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(PlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request.",
+                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(AudioPlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request.",
             ),
         )
     }
@@ -1073,55 +1051,6 @@ final class AudioPlaybackDriver {
 
     // MARK: - Device Inspection
 
-    private func currentDefaultOutputDeviceDescription() -> String? {
-        var deviceID = AudioObjectID(kAudioObjectUnknown)
-        var dataSize = UInt32(MemoryLayout<AudioObjectID>.size)
-        var deviceAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain,
-        )
-        let deviceStatus = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &deviceAddress,
-            0,
-            nil,
-            &dataSize,
-            &deviceID,
-        )
-
-        guard deviceStatus == noErr, deviceID != AudioObjectID(kAudioObjectUnknown) else {
-            return nil
-        }
-
-        var deviceName: CFString = "" as CFString
-        var nameSize = UInt32(MemoryLayout<CFString>.stride)
-        var nameAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceNameCFString,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain,
-        )
-        let nameStatus = withUnsafeMutablePointer(to: &deviceName) { pointer in
-            AudioObjectGetPropertyData(
-                deviceID,
-                &nameAddress,
-                0,
-                nil,
-                &nameSize,
-                UnsafeMutableRawPointer(pointer),
-            )
-        }
-
-        if nameStatus == noErr {
-            let name = "\(deviceName)"
-            if !name.isEmpty {
-                return "\(name) [\(deviceID)]"
-            }
-        }
-
-        return "AudioObjectID \(deviceID)"
-    }
-
     // MARK: - Buffer Preparation
 
     private func makePCMBuffer(
@@ -1132,7 +1061,7 @@ final class AudioPlaybackDriver {
     ) -> (buffer: AVAudioPCMBuffer, frameCount: Int, firstSample: Float, lastSample: Float, fadeInApplied: Bool)? {
         guard let format = streamingFormat ?? AVAudioFormat(
             standardFormatWithSampleRate: sampleRate,
-            channels: PlaybackConfiguration.channels,
+            channels: AudioPlaybackConfiguration.channels,
         ) else {
             return nil
         }
@@ -1222,7 +1151,7 @@ final class AudioPlaybackDriver {
         defer { playbackTask.cancel() }
 
         let timeoutTask = Task {
-            try await Task.sleep(for: PlaybackConfiguration.interJobBoopTimeout)
+            try await Task.sleep(for: AudioPlaybackConfiguration.interJobBoopTimeout)
             throw WorkerError(
                 code: .audioPlaybackTimeout,
                 message: "SpeakSwiftly timed out while trying to play the short inter-job playback boop before the next live request could begin.",
@@ -1241,8 +1170,8 @@ final class AudioPlaybackDriver {
         if let environmentEventSink {
             await environmentEventSink(
                 .interJobBoopPlayed(
-                    durationMS: PlaybackConfiguration.interJobBoopDurationMS,
-                    frequencyHz: PlaybackConfiguration.interJobBoopFrequencyHz,
+                    durationMS: AudioPlaybackConfiguration.interJobBoopDurationMS,
+                    frequencyHz: AudioPlaybackConfiguration.interJobBoopFrequencyHz,
                     sampleRate: sampleRate,
                 ),
             )

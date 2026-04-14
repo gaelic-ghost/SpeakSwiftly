@@ -689,6 +689,7 @@ Tickets:
 
 - [ ] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
 - [ ] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before and after capture for each tuning change.
+- [ ] Investigate whether resident preload is too eager about preparing local playback hardware, especially the `startResidentPreload()` -> `playbackController.prepare(...)` -> `AudioPlaybackDriver.rebuildEngine(sampleRate:)` path that currently tears down hardware, begins routing arbitration, starts a fresh `AVAudioEngine`, and immediately calls `play()` before an active live request exists.
 - [ ] Revisit warmup startup, low-water, and resume thresholds specifically for the first active Marvis playback request.
 - [ ] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
 - [ ] Keep the `marvis_generation_scheduler_snapshot` and lane-reservation logs aligned with any playback-tuning changes so queue truth stays obvious.

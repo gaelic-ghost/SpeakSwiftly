@@ -5,16 +5,16 @@ import Foundation
 func makeInterJobBoopSamples(sampleRate: Double) -> [Float] {
     let sampleCount = max(
         1,
-        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopDurationMS)) / 1000.0),
+        Int((sampleRate * Double(AudioPlaybackConfiguration.interJobBoopDurationMS)) / 1000.0),
     )
     let fadeSampleCount = max(
         1,
-        Int((sampleRate * Double(AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFadeMS)) / 1000.0),
+        Int((sampleRate * Double(AudioPlaybackConfiguration.interJobBoopFadeMS)) / 1000.0),
     )
 
     return (0..<sampleCount).map { index in
         let time = Double(index) / sampleRate
-        let phase = 2.0 * Double.pi * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopFrequencyHz * time
+        let phase = 2.0 * Double.pi * AudioPlaybackConfiguration.interJobBoopFrequencyHz * time
         let fadeEnvelope: Double = if index < fadeSampleCount {
             Double(index) / Double(fadeSampleCount)
         } else if index >= sampleCount - fadeSampleCount {
@@ -23,7 +23,7 @@ func makeInterJobBoopSamples(sampleRate: Double) -> [Float] {
             1
         }
 
-        return Float(sin(phase) * fadeEnvelope) * AudioPlaybackDriver.PlaybackConfiguration.interJobBoopAmplitude
+        return Float(sin(phase) * fadeEnvelope) * AudioPlaybackConfiguration.interJobBoopAmplitude
     }
 }
 
