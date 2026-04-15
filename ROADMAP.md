@@ -271,8 +271,8 @@ Scope:
 
 Tickets:
 
-- [ ] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
-- [ ] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before-and-after capture for each tuning change.
+- [x] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
+- [x] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before-and-after capture for each tuning change.
 - [ ] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
 - [ ] Preserve queued-live Marvis overlap in principle, but allow the second lane to start a little later if that materially reduces first-request rebuffering.
 - [ ] Take Milestone 22 one stage at a time: ship one bounded tuning pass, benchmark it, record what changed, then decide whether another pass should widen into resident warmup behavior.
@@ -281,6 +281,22 @@ Tickets:
 - [ ] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
 - [ ] Keep the scheduler snapshot and lane-reservation logs aligned with any playback-tuning changes so queue truth stays obvious.
 - [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful tuning pass.
+
+Stage notes:
+
+- Stage 1 landed on `2026-04-15` as a bounded first-request warmup-floor pass. The first drained live Marvis request now seeds higher warmup floors before playback begins:
+  - compact: `startup 1440`, `low-water 640`, `resume 1700`
+  - balanced: `startup 2320`, `low-water 1040`, `resume 2700`
+- Baseline artifact: `.local/e2e-runs/2026-04-15T03-14-57Z-166e3f0f-284e-45f9-ab95-618a3ea71e5a-prequeued-jobs-drain-in-order`
+- Stage 1 artifact: `.local/e2e-runs/2026-04-15T17-27-27Z-e8a7db8f-cc3e-44ee-8f35-65266fb949f4-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured before-and-after stderr metrics changed like this:
+  - `time_to_preroll_ready_ms`: `2320` -> `3746`
+  - `startup_buffered_audio_ms`: `1440` -> `2400`
+  - `startup_buffer_target_ms` at playback start: `1381` -> `2320`
+  - `rebuffer_event_count`: `5` -> `4`
+  - `rebuffer_total_duration_ms`: `24279` -> `25188`
+- The restored dual-lane queued-live overlap model stayed intact. The second Marvis lane remained parked on `waiting_for_playback_stability` until the first request reached the stronger preroll target, then resumed and paired cleanly with the first lane.
+- Stage 1 improved the initial reserve and delayed second-lane admission as intended, but it did not make the first drained-queue playback materially steady enough yet. Milestone 22 stays open, and the next pass should bias toward earlier threshold hardening or resident cadence follow-up rather than rolling overlap back into blanket serialization.
 
 Exit criteria:
 

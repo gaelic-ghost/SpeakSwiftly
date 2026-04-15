@@ -196,9 +196,9 @@ final class PlaybackSpy: @unchecked Sendable {
                 lock.withLock { prepareCount += 1 }
                 return prepareCount == 1
             },
-            play: { [self] _, text, stream, onEvent in
+            play: { [self] _, text, tuningProfile, stream, onEvent in
                 lock.withLock { playCount += 1 }
-                let thresholds = PlaybackThresholdController(text: text).thresholds
+                let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
 
                 var emittedFirstChunk = false
                 var emittedPrerollReady = false

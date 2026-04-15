@@ -91,6 +91,7 @@ final class AudioPlaybackDriver {
     func play(
         sampleRate: Double,
         text: String,
+        tuningProfile: PlaybackTuningProfile,
         stream: AsyncThrowingStream<[Float], Error>,
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary {
@@ -100,7 +101,7 @@ final class AudioPlaybackDriver {
         let startedAt = Date()
         let requestID = nextRequestID
         nextRequestID += 1
-        let state = AudioPlaybackRequestState(requestID: requestID, text: text)
+        let state = AudioPlaybackRequestState(requestID: requestID, text: text, tuningProfile: tuningProfile)
         activeRequestState = state
         activeEventSink = onEvent
         activeRuntimeFailure = nil

@@ -200,11 +200,18 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
+        let playbackTuningProfile: PlaybackTuningProfile =
+            if speechBackend == .marvis, await playbackController.jobCount() == 0 {
+                .firstDrainedLiveMarvis
+            } else {
+                .standard
+            }
         return LiveSpeechRequestState(
             request: request,
             normalizedText: normalizedText,
             textFeatures: textFeatures,
             textSections: textSections,
+            playbackTuningProfile: playbackTuningProfile,
         )
     }
 

@@ -11,12 +11,14 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let normalizedText: String
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
+    let playbackTuningProfile: PlaybackTuningProfile
 
     init(
         request: WorkerRequest,
         normalizedText: String,
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
+        playbackTuningProfile: PlaybackTuningProfile,
     ) {
         guard case let .queueSpeech(
             id: _,
@@ -41,6 +43,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.normalizedText = normalizedText
         self.textFeatures = textFeatures
         self.textSections = textSections
+        self.playbackTuningProfile = playbackTuningProfile
     }
 
     var id: String {

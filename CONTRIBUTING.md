@@ -422,6 +422,14 @@ The current Milestone 22 operating decisions are:
 2. The queued-live dual-lane Marvis overlap model should stay intact in principle, but the second lane is allowed to start a little later if that protects the first active playback from obvious instability.
 3. Tuning work should land one bounded stage at a time, with before-and-after metrics captured after each pass, so later widening into resident warmup behavior happens only if the narrower pass is not enough.
 
+The first bounded Milestone 22 pass landed on `2026-04-15` as a warmup-floor-only change for the first drained live Marvis request.
+
+- That pass raised the first-request warmup floors to `1440 / 640 / 1700` for compact text and `2320 / 1040 / 2700` for balanced text before ordinary adaptive playback thresholds take over.
+- The benchmark path compared `.local/e2e-runs/2026-04-15T03-14-57Z-166e3f0f-284e-45f9-ab95-618a3ea71e5a-prequeued-jobs-drain-in-order` against `.local/e2e-runs/2026-04-15T17-27-27Z-e8a7db8f-cc3e-44ee-8f35-65266fb949f4-prequeued-jobs-drain-in-order`.
+- For the first queued femme request, that moved `time_to_preroll_ready_ms` from `2320` to `3746`, raised `startup_buffered_audio_ms` from `1440` to `2400`, reduced `rebuffer_event_count` from `5` to `4`, and left `rebuffer_total_duration_ms` effectively unchanged at `24279` versus `25188`.
+- The important architectural outcome is that overlap stayed intact: the second Marvis lane still waited for playback stability, then resumed cleanly instead of collapsing the system back into one-at-a-time generation.
+- The important tuning outcome is that stronger first-request preroll alone is not sufficient. The next pass should stay policy-driven and likely target earlier threshold hardening during the first active rebuffer window, or widen into resident cadence and warmup behavior only if that smaller follow-up still does not materially improve the first audible playback.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
@@ -533,6 +541,16 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftl
 ```
 
 Without `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, the trace-capture suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
+
+For the targeted first-request Marvis tuning lane, the current reliable rerun path is the Xcode-backed runtime:
+
+- direct `swift test` is still blocked by the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`
+- direct `xcodebuild test` does not currently carry `SPEAKSWIFTLY_E2E=1` through the Swift Testing suite gate on its own
+- the working path is `xcodebuild build-for-testing`, then an `.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building` against this exact test identifier:
+
+```text
+SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
+```
 
 Long deep-trace playback probe:
 

@@ -51,6 +51,34 @@ import TextForSpeech
     #expect(extended.resumeBufferTargetMS == 16480)
 }
 
+@Test func `first drained live marvis tuning raises compact and balanced warmup floors`() {
+    let compact = PlaybackThresholdController(
+        text: "Hello there.",
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+    let balanced = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+    let extended = PlaybackThresholdController(
+        text: String(
+            repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
+            count: 9,
+        ),
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+
+    #expect(compact.startupBufferTargetMS == 1440)
+    #expect(compact.lowWaterTargetMS == 640)
+    #expect(compact.resumeBufferTargetMS == 1700)
+    #expect(balanced.startupBufferTargetMS == 2320)
+    #expect(balanced.lowWaterTargetMS == 1040)
+    #expect(balanced.resumeBufferTargetMS == 2700)
+    #expect(extended.startupBufferTargetMS == 13120)
+    #expect(extended.lowWaterTargetMS == 5000)
+    #expect(extended.resumeBufferTargetMS == 16480)
+}
+
 @Test func `adaptive playback thresholds ignore content shape when lengths match`() {
     let plainText = String(repeating: "Please explain this clearly. ", count: 8)
     let codeishSeed = """

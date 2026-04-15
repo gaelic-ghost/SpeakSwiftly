@@ -7,6 +7,7 @@ final class AnyPlaybackController: @unchecked Sendable {
     private let playImpl: @Sendable (
         _ sampleRate: Double,
         _ text: String,
+        _ tuningProfile: PlaybackTuningProfile,
         _ stream: AsyncThrowingStream<[Float], Error>,
         _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary
@@ -23,6 +24,7 @@ final class AnyPlaybackController: @unchecked Sendable {
         play: @escaping @Sendable (
             _ sampleRate: Double,
             _ text: String,
+            _ tuningProfile: PlaybackTuningProfile,
             _ stream: AsyncThrowingStream<[Float], Error>,
             _ onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
         ) async throws -> PlaybackSummary,
@@ -48,10 +50,11 @@ final class AnyPlaybackController: @unchecked Sendable {
             prepare: { sampleRate in
                 try await controller.prepare(sampleRate: sampleRate)
             },
-            play: { sampleRate, text, stream, onEvent in
+            play: { sampleRate, text, tuningProfile, stream, onEvent in
                 try await controller.play(
                     sampleRate: sampleRate,
                     text: text,
+                    tuningProfile: tuningProfile,
                     stream: stream,
                     onEvent: onEvent,
                 )
@@ -77,9 +80,9 @@ final class AnyPlaybackController: @unchecked Sendable {
     static func silent(traceEnabled: Bool = false) -> AnyPlaybackController {
         AnyPlaybackController(
             prepare: { _ in true },
-            play: { sampleRate, text, stream, onEvent in
+            play: { sampleRate, text, tuningProfile, stream, onEvent in
                 let startedAt = Date()
-                let thresholds = PlaybackThresholdController(text: text).thresholds
+                let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
                 var emittedFirstChunk = false
                 var emittedPrerollReady = false
                 var chunkCount = 0
@@ -255,10 +258,11 @@ final class AnyPlaybackController: @unchecked Sendable {
     func play(
         sampleRate: Double,
         text: String,
+        tuningProfile: PlaybackTuningProfile,
         stream: AsyncThrowingStream<[Float], Error>,
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary {
-        try await playImpl(sampleRate, text, stream, onEvent)
+        try await playImpl(sampleRate, text, tuningProfile, stream, onEvent)
     }
 
     func stop() async {

@@ -254,6 +254,7 @@ actor PlaybackController {
             let playbackSummary = try await driver.play(
                 sampleRate: sampleRate,
                 text: playbackState.request.normalizedText,
+                tuningProfile: playbackState.request.playbackTuningProfile,
                 stream: playbackState.execution.stream,
             ) { event in
                 await self.recordConcurrencyEvent(event, for: playbackState.id)
