@@ -275,6 +275,136 @@ Current generated-file behavior:
 - expired batch reads stay inspectable through `get_generated_batch` and `list_generated_batches`, but return an empty `artifacts` list because the saved files are intentionally gone
 - expired file and batch jobs keep artifact references inside `get_generation_job` and `list_generation_jobs` so operators can still see what existed before cleanup
 
+## Playback Architecture
+
+Playback is not only the audio-output layer. In the current runtime shape, playback is also one of the scheduler inputs that decides when later live generation work may proceed. That means maintainers should read the playback path as:
+
+1. public request entry
+2. runtime request acceptance and queueing
+3. live generation handoff
+4. playback execution
+5. terminal request completion after playback drains
+
+The public semantic entry point for audible playback is the Swift call `runtime.generate.speech(...)` or the wire op `generate_speech`. `runtime.player` is the control and inspection surface, not the request-creation surface.
+
+The main code anchors are:
+
+- [`Sources/SpeakSwiftly/API/Generation.swift`](Sources/SpeakSwiftly/API/Generation.swift)
+- [`Sources/SpeakSwiftly/API/Playback.swift`](Sources/SpeakSwiftly/API/Playback.swift)
+- [`Sources/SpeakSwiftly/Runtime/WorkerRuntimeLifecycle.swift`](Sources/SpeakSwiftly/Runtime/WorkerRuntimeLifecycle.swift)
+- [`Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing.swift`](Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing.swift)
+- [`Sources/SpeakSwiftly/Playback/PlaybackController.swift`](Sources/SpeakSwiftly/Playback/PlaybackController.swift)
+- [`Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift`](Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift)
+
+### Entry points
+
+The main entry points into the playback layer are:
+
+- typed Swift submission through `Generate.speech(...)`
+- JSONL submission through `generate_speech`
+- playback control reads and writes through `runtime.player` and the wire control ops such as `playback_pause`, `playback_resume`, `get_playback_state`, `list_playback_queue`, `clear_queue`, and `cancel_request`
+
+The runtime accepts a live speech request as a generation request first. It then creates the playback-side job state that will receive streamed audio and complete only after playback finishes.
+
+### Execution path
+
+The current live path is:
+
+1. `Generate.speech(...)` or `generate_speech` becomes `WorkerRequest.queueSpeech(..., jobType: .live)`.
+2. `WorkerRuntime.accept(line:)` validates and accepts the request.
+3. The runtime creates live playback job state and registers it with `PlaybackController`.
+4. `handleQueueSpeechLiveGeneration(...)` runs resident generation and pushes streamed audio chunks into the playback-side continuation.
+5. `PlaybackController` waits for enough playback-ready state, then hands audio to the type-erased playback driver.
+6. `AudioPlaybackDriver` owns AVFoundation scheduling, buffering, route and engine recovery, and final playback drain.
+7. Terminal request success is emitted only after local playback drain finishes, not when generation finishes producing samples.
+
+That split is intentional. Generated audio completion and local playback completion are not the same event.
+
+### Exit points
+
+Playback currently exits through four surfaces:
+
+- audible audio through `AVAudioEngine` and `AVAudioPlayerNode`
+- typed request events and snapshots for Swift callers
+- JSONL success, failure, and progress events on `stdout`
+- operator-facing diagnostics and playback trace output on `stderr`
+
+The key design point is that playback completion is a runtime event as well as an audio event. The worker does not treat "last chunk generated" as "request complete."
+
+### Apple behavior we rely on
+
+The playback implementation depends on documented Apple audio behavior and should stay aligned with it.
+
+Primary references:
+
+- [`AVAudioPlayerNode`](https://developer.apple.com/documentation/avfaudio/avaudioplayernode)
+- [`.dataPlayedBack`](https://developer.apple.com/documentation/avfaudio/avaudioplayernodecompletioncallbacktype/dataplayedback)
+- [`AVAudioPlayerNode.stop()`](https://developer.apple.com/documentation/avfaudio/avaudioplayernode/stop())
+
+Important documented constraints:
+
+- `.dataPlayedBack` is the completion callback type that reflects actual downstream playback completion rather than only buffer consumption by the player node.
+- `AVAudioPlayerNode.stop()` clears scheduled buffers and resets the player timeline.
+- Apple warns against stopping the player from a completion callback because that can deadlock.
+
+Those constraints are why the runtime keeps explicit drain and shutdown logic outside the raw callback body and why playback completion is tracked as a separate runtime concern.
+
+### Current strengths
+
+The playback architecture is strongest at the edges:
+
+- the public surface is clear: generation submits playback work, `Player` controls and inspects it
+- dependency injection is real: the runtime can swap playback implementations through `WorkerDependencies`
+- platform audio details are mostly boxed into `AudioPlaybackDriver`
+- tests can exercise runtime playback behavior without needing real hardware in every case
+
+This is the separation of concerns to preserve:
+
+- `API/` owns public typed surfaces
+- `Runtime/` owns request acceptance, queueing, lifecycle, and terminal semantics
+- `PlaybackController` owns playback job coordination and playback-facing state
+- `AudioPlaybackDriver` owns AVFoundation, engine state, route changes, and drain mechanics
+
+### Current pressure points
+
+The weakest part of the current architecture is the middle, where one live request spans generation, playback, scheduling, and terminal completion at the same time.
+
+The main maintainership pain points today are:
+
+- live requests are represented in both generation and playback bookkeeping
+- `PlaybackJob` carries too many responsibilities and reads more like a live-request bundle than a playback-local type
+- runtime bridge code is spread across both `Runtime/` and `Playback/`, which makes ownership harder to scan
+- the scheduler currently depends on playback heuristics such as stable-buffer state and rebuffer flags instead of a narrower policy decision
+- the public playback state is intentionally thin, but the real playback lifecycle is richer, which creates pressure to infer too much from progress events and snapshots
+
+None of that means the design is bad. It means the existing public shape has held up well enough that the next cleanup should focus on flattening the internal coordination path instead of adding more layers.
+
+### Refactor map
+
+The current playback refactor sequence is intentionally staged so we improve clarity without breaking the public surface.
+
+1. Flatten live request coordination.
+   Move toward one runtime-owned live-speech coordination model that survives from request acceptance through playback completion, instead of reconstructing one request across separate generation and playback bookkeeping paths.
+
+2. Split playback execution ownership.
+   Narrow today's `PlaybackJob` responsibilities so playback-local execution state is separate from runtime-local request metadata, normalization context, and deep-trace metadata.
+
+3. Rehome runtime bridge code.
+   Keep playback implementation files focused on playback behavior. Runtime lifecycle or bridge code should live with runtime ownership even when it talks to playback.
+
+4. Narrow the playback-to-scheduler boundary.
+   The scheduler should depend on explicit playback policy or backpressure decisions rather than on raw playback heuristics like threshold snapshots and rebuffer booleans.
+
+5. Revisit public playback-state semantics after the internal ownership model is cleaner.
+   We should not widen the public state enum first and hope the rest becomes clearer later. Fix ownership and policy first, then decide whether the public state should stay thin or gain explicit buffering and draining phases.
+
+The active roadmap milestones for this work are:
+
+- `Milestone 22`: first-request Marvis playback tuning
+- `Milestone 23`: playback request coordination flattening
+- `Milestone 24`: playback execution ownership split
+- `Milestone 25`: playback scheduling boundary and public state review
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
