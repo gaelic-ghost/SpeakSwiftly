@@ -355,6 +355,19 @@ Stage notes:
   - `longest_rebuffer_duration_ms`: `4385` -> `4395`
   - `time_from_preroll_ready_to_drain_ms`: `34617` -> `37107`
 - The important stage-six outcome is correctness, not another performance win. The old bogus state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
+- Stage 7 landed on `2026-04-15` as the next bounded cadence follow-up pass. The truthful overlap gate from stage six stayed in place, and the first drained live Marvis request now asks the resident model for a slightly tighter first-request streaming cadence again.
+- Stage 7 artifact: `.local/e2e-runs/2026-04-15T18-46-12Z-ce51be64-6dd0-4e21-a125-3d1067397266-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-six to stage-seven stderr metrics changed like this:
+  - `streaming_interval`: `0.12` -> `0.10`
+  - `time_to_first_chunk_ms`: `324` -> `324`
+  - `time_to_preroll_ready_ms`: `3833` -> `3951`
+  - `startup_buffered_audio_ms`: `2320` -> `2320`
+  - `rebuffer_event_count`: `5` -> `4`
+  - `rebuffer_total_duration_ms`: `20055` -> `17284`
+  - `longest_rebuffer_duration_ms`: `4395` -> `4897`
+  - `avg_inter_chunk_gap_ms`: `183` -> `180`
+  - `avg_schedule_gap_ms`: `166` -> `162`
+- The important stage-seven outcome is that the smoother first-request result came back without reintroducing the false overlap signal from stage five. The second Marvis lane still stayed parked on `waiting_for_playback_stability`, and every overlap reopen in the fresh trace happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
 - Milestone 22 is still open, but the current evidence now points more clearly at two facts: faster first-request cadence helps, and cadence changes need admission-gate changes alongside them or the first request gives the gains back as soon as overlap resumes.
 
 Exit criteria:

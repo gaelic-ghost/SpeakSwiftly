@@ -275,7 +275,7 @@ import TextForSpeech
     )
 
     #expect(standardInterval == 0.18)
-    #expect(firstRequestInterval == 0.12)
+    #expect(firstRequestInterval == 0.10)
     #expect(firstRequestInterval < standardInterval)
 }
 

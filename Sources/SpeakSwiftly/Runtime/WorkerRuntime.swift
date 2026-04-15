@@ -28,7 +28,7 @@ public extension SpeakSwiftly {
             /// bootstrap audible reserve from nothing. Give it a tighter resident
             /// streaming cadence so playback can accumulate preroll before overlap
             /// opens the second generation lane.
-            static let firstDrainedLiveMarvisStreamingInterval = 0.12
+            static let firstDrainedLiveMarvisStreamingInterval = 0.10
 
             static func residentStreamingInterval(
                 for tuningProfile: PlaybackTuningProfile,

@@ -472,6 +472,12 @@ The sixth Milestone 22 pass also landed on `2026-04-15` as the review-and-correc
 - The benchmark comparison against `.local/e2e-runs/2026-04-15T18-32-16Z-69de7141-3485-4788-8ea5-b30a49e87cbc-prequeued-jobs-drain-in-order` shows the right tradeoff for this stage: this was primarily a correctness repair rather than another tuning win. For the first queued femme request, `time_to_first_chunk_ms` stayed effectively flat at `324`, `time_to_preroll_ready_ms` stayed effectively flat at `3833`, `rebuffer_event_count` stayed at `5`, and `rebuffer_total_duration_ms` rose back to `20055`.
 - The important architecture result is that the overlap gate now tells the truth. The old bogus stage-five state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
 
+The seventh Milestone 22 pass also landed on `2026-04-15` as the next bounded cadence follow-up.
+
+- That pass kept the truthful overlap gate from stage six and tightened only the first drained live Marvis resident streaming cadence again, from `0.12` to `0.10`.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-46-12Z-ce51be64-6dd0-4e21-a125-3d1067397266-prequeued-jobs-drain-in-order` shows why this pass is worth keeping: for the first queued femme request, `time_to_first_chunk_ms` stayed flat at `324`, `time_to_preroll_ready_ms` drifted up to `3951`, `rebuffer_event_count` fell from `5` to `4`, and `rebuffer_total_duration_ms` dropped from `20055` to `17284`.
+- The important architecture result is that the overlap gate stayed honest while the first-request result improved. In the fresh stage-seven trace, the second Marvis lane still remained parked on `waiting_for_playback_stability`, and every later overlap reopen happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
