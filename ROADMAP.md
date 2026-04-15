@@ -297,6 +297,16 @@ Stage notes:
   - `rebuffer_total_duration_ms`: `24279` -> `25188`
 - The restored dual-lane queued-live overlap model stayed intact. The second Marvis lane remained parked on `waiting_for_playback_stability` until the first request reached the stronger preroll target, then resumed and paired cleanly with the first lane.
 - Stage 1 improved the initial reserve and delayed second-lane admission as intended, but it did not make the first drained-queue playback materially steady enough yet. Milestone 22 stays open, and the next pass should bias toward earlier threshold hardening or resident cadence follow-up rather than rolling overlap back into blanket serialization.
+- Stage 2 landed on `2026-04-15` as a bounded first-rebuffer hardening pass. The first drained live Marvis request now keeps its tuning profile active in adaptive recovery and no longer waits for rebuffer number two before applying rebuffer penalties.
+- Stage 2 artifact: `.local/e2e-runs/2026-04-15T17-52-36Z-e575274b-31ec-486f-9ef7-50f080660f33-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-one to stage-two stderr metrics changed like this:
+  - `time_to_preroll_ready_ms`: `3746` -> `3810`
+  - `startup_buffered_audio_ms`: `2400` -> `2400`
+  - `rebuffer_event_count`: `4` -> `4`
+  - `rebuffer_total_duration_ms`: `25188` -> `23991`
+  - `longest_rebuffer_duration_ms`: `7041` -> `9399`
+- The stage-two logs show the intended policy change actually taking effect. On the first active rebuffer, the resumed target rose from the stage-one `3282` range into the `3403` range, and the later repeated-rebuffer recovery ceiling stayed strong at `4980` instead of falling back toward the standard profile.
+- Stage 2 is a real improvement, but still not a full fix. Total rebuffer time dropped by about `1.2s`, yet the first request still suffered four rebuffers and one longer recovery window. The next bounded pass should probably stay in the policy lane and target earlier distress reaction before the first rebuffer finishes growing, or widen into resident Marvis cadence only if that narrower pass still stalls out.
 
 Exit criteria:
 

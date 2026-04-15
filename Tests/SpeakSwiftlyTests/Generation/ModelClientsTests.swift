@@ -148,6 +148,25 @@ import TextForSpeech
     #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
 }
 
+@Test func `first drained live marvis tuning escalates on the first rebuffer`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordRebuffer()
+    let afterFirstRebuffer = controller.thresholds
+
+    #expect(afterFirstRebuffer.startupBufferTargetMS > adapted.startupBufferTargetMS)
+    #expect(afterFirstRebuffer.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(afterFirstRebuffer.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+}
+
 @Test func `adaptive playback thresholds keep escalated rebuffer targets across later chunks`() {
     var controller = PlaybackThresholdController(
         text: """
@@ -176,6 +195,34 @@ import TextForSpeech
     #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
     #expect(afterMoreChunks.chunkGapWarningMS >= escalated.chunkGapWarningMS)
     #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
+}
+
+@Test func `first drained live marvis tuning keeps stronger recovery floors during later chunks`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    controller.recordRebuffer()
+    let escalated = controller.thresholds
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 190)
+    }
+
+    let afterMoreChunks = controller.thresholds
+
+    #expect(controller.phase == .recovery || controller.phase == .steady)
+    #expect(afterMoreChunks.startupBufferTargetMS >= 1660)
+    #expect(afterMoreChunks.lowWaterTargetMS >= 760)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= 2000)
+    #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
+    #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
 }
 
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {

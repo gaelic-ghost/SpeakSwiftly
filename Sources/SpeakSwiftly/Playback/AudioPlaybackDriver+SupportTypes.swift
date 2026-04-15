@@ -183,6 +183,7 @@ struct PlaybackThresholdController {
 
     private(set) var thresholds: PlaybackAdaptiveThresholds
     private(set) var phase: PlaybackPhase = .warmup
+    private let tuningProfile: PlaybackTuningProfile
 
     private var chunkDurationsMS = [Int]()
     private var interChunkGapsMS = [Int]()
@@ -196,6 +197,7 @@ struct PlaybackThresholdController {
     private var scheduleGapWarningFloorMS: Int
 
     init(text: String, tuningProfile: PlaybackTuningProfile = .standard) {
+        self.tuningProfile = tuningProfile
         thresholds = Self.seedThresholds(for: text, phase: .warmup, tuningProfile: tuningProfile)
         startupBufferFloorMS = thresholds.startupBufferTargetMS
         lowWaterFloorMS = thresholds.lowWaterTargetMS
@@ -310,16 +312,20 @@ struct PlaybackThresholdController {
         chunkGapWarningMS: Int,
         scheduleGapWarningMS: Int,
     ) {
-        guard tuningProfile == .firstDrainedLiveMarvis, phase == .warmup else {
+        guard tuningProfile == .firstDrainedLiveMarvis else {
             return (0, 0, 0, 0, 0)
         }
 
-        return switch complexityClass {
-            case .compact:
+        return switch (complexityClass, phase) {
+            case (.compact, .warmup):
                 (960, 420, 1160, 0, 0)
-            case .balanced:
+            case (.balanced, .warmup):
                 (1600, 700, 1900, 0, 0)
-            case .extended:
+            case (.compact, .recovery):
+                (600, 240, 760, 0, 0)
+            case (.balanced, .recovery):
+                (1000, 420, 1260, 0, 0)
+            case (_, .steady), (.extended, _):
                 (0, 0, 0, 0, 0)
         }
     }
@@ -367,7 +373,11 @@ struct PlaybackThresholdController {
             cadenceDeficitMS: cadenceDeficitMS,
         )
 
-        let seeded = Self.seededThresholds(for: thresholds.complexityClass, phase: phase, tuningProfile: .standard)
+        let seeded = Self.seededThresholds(
+            for: thresholds.complexityClass,
+            phase: phase,
+            tuningProfile: tuningProfile,
+        )
         let phaseMargins = phaseAdaptiveMargins(
             for: phase,
             avgChunkDurationMS: avgChunkDurationMS,
@@ -478,14 +488,16 @@ struct PlaybackThresholdController {
         }
         stableChunkStreak = 0
 
-        guard rebufferCount >= 2 else { return }
-
         let avgChunkDurationMS = average(chunkDurationsMS) ?? Self.defaultChunkDurationMS
         let avgInterChunkGapMS = average(interChunkGapsMS) ?? max(avgChunkDurationMS, Self.defaultChunkDurationMS)
         let maxInterChunkGapMS = interChunkGapsMS.max() ?? avgInterChunkGapMS
         let jitterMS = max(maxInterChunkGapMS - avgInterChunkGapMS, 0)
         let cadenceDeficitMS = max(avgInterChunkGapMS - avgChunkDurationMS, 0)
-        let rebufferPenaltyMS = max(avgChunkDurationMS / 2, 40) * (rebufferCount - 1)
+        let immediateRecoveryPenalty = tuningProfile == .firstDrainedLiveMarvis ? 1 : 0
+        let effectiveRebufferCount = max(rebufferCount - 1, immediateRecoveryPenalty)
+        guard effectiveRebufferCount > 0 else { return }
+
+        let rebufferPenaltyMS = max(avgChunkDurationMS / 2, 40) * effectiveRebufferCount
         let repeatedRebufferMargins = (
             startupBufferMS: max(rebufferPenaltyMS * 8, avgChunkDurationMS),
             lowWaterMS: max(rebufferPenaltyMS * 3, avgChunkDurationMS / 2),

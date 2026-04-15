@@ -427,8 +427,14 @@ The first bounded Milestone 22 pass landed on `2026-04-15` as a warmup-floor-onl
 - That pass raised the first-request warmup floors to `1440 / 640 / 1700` for compact text and `2320 / 1040 / 2700` for balanced text before ordinary adaptive playback thresholds take over.
 - The benchmark path compared `.local/e2e-runs/2026-04-15T03-14-57Z-166e3f0f-284e-45f9-ab95-618a3ea71e5a-prequeued-jobs-drain-in-order` against `.local/e2e-runs/2026-04-15T17-27-27Z-e8a7db8f-cc3e-44ee-8f35-65266fb949f4-prequeued-jobs-drain-in-order`.
 - For the first queued femme request, that moved `time_to_preroll_ready_ms` from `2320` to `3746`, raised `startup_buffered_audio_ms` from `1440` to `2400`, reduced `rebuffer_event_count` from `5` to `4`, and left `rebuffer_total_duration_ms` effectively unchanged at `24279` versus `25188`.
-- The important architectural outcome is that overlap stayed intact: the second Marvis lane still waited for playback stability, then resumed cleanly instead of collapsing the system back into one-at-a-time generation.
-- The important tuning outcome is that stronger first-request preroll alone is not sufficient. The next pass should stay policy-driven and likely target earlier threshold hardening during the first active rebuffer window, or widen into resident cadence and warmup behavior only if that smaller follow-up still does not materially improve the first audible playback.
+
+The second bounded Milestone 22 pass also landed on `2026-04-15` as a first-rebuffer hardening change for that same first drained live Marvis request.
+
+- That follow-up pass kept the first drained live Marvis tuning profile active while adaptive playback thresholds move into recovery, and it let the first active rebuffer apply penalties immediately instead of waiting for rebuffer number two.
+- The next benchmark comparison against `.local/e2e-runs/2026-04-15T17-52-36Z-e575274b-31ec-486f-9ef7-50f080660f33-prequeued-jobs-drain-in-order` showed a narrower but real improvement: `time_to_preroll_ready_ms` rose slightly again to `3810`, `startup_buffered_audio_ms` stayed at `2400`, `rebuffer_event_count` stayed at `4`, and `rebuffer_total_duration_ms` fell to `23991`.
+- The important implementation detail is that stage two improved recovery posture rather than startup reserve. The first active rebuffer now resumes against a stronger `3403 ms` target instead of the stage-one `3282 ms` range, and later repeated-rebuffer recovery still climbs to `4980 ms` without dropping back to the standard profile.
+- The important architectural outcome is that overlap stayed intact across both stages: the second Marvis lane still waited for playback stability, then resumed cleanly instead of collapsing the system back into one-at-a-time generation.
+- The important tuning outcome is that stronger first-request preroll plus earlier rebuffer hardening is helping, but it still is not enough to make the first drained-queue playback clean. The next pass should stay policy-driven if possible and likely target earlier distress reaction before the first rebuffer becomes prolonged, or widen into resident cadence and warmup behavior only if that smaller follow-up still does not materially improve the first audible playback.
 
 ## Repository Layout
 
