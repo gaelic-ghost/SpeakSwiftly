@@ -3,6 +3,11 @@ import TextForSpeech
 
 final class LiveSpeechRequestState: @unchecked Sendable {
     let request: WorkerRequest
+    let text: String
+    let profileName: String
+    let textProfileName: String?
+    let textContext: TextForSpeech.Context?
+    let sourceFormat: TextForSpeech.SourceFormat?
     let normalizedText: String
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
@@ -13,7 +18,26 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
     ) {
+        guard case let .queueSpeech(
+            id: _,
+            text: text,
+            profileName: profileName,
+            textProfileName: textProfileName,
+            jobType: .live,
+            textContext: textContext,
+            sourceFormat: sourceFormat,
+        ) = request else {
+            fatalError(
+                "SpeakSwiftly attempted to create live speech request state for request '\(request.id)' (\(request.opName)), but that request does not require live playback. This indicates a runtime queueing bug.",
+            )
+        }
+
         self.request = request
+        self.text = text
+        self.profileName = profileName
+        self.textProfileName = textProfileName
+        self.textContext = textContext
+        self.sourceFormat = sourceFormat
         self.normalizedText = normalizedText
         self.textFeatures = textFeatures
         self.textSections = textSections
@@ -25,30 +49,5 @@ final class LiveSpeechRequestState: @unchecked Sendable {
 
     var op: String {
         request.opName
-    }
-
-    var text: String {
-        switch request {
-            case .queueSpeech(id: _, text: let text, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
-                text
-            default:
-                ""
-        }
-    }
-
-    var profileName: String {
-        request.profileName ?? "unknown-profile"
-    }
-
-    var textProfileName: String? {
-        request.textProfileName
-    }
-
-    var textContext: TextForSpeech.Context? {
-        request.textContext
-    }
-
-    var sourceFormat: TextForSpeech.SourceFormat? {
-        request.sourceFormat
     }
 }

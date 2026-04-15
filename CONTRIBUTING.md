@@ -365,6 +365,20 @@ This is the separation of concerns to preserve:
 - `PlaybackController` owns playback job coordination and playback-facing state
 - `AudioPlaybackDriver` owns AVFoundation, engine state, route changes, and drain mechanics
 
+### Recently landed cleanup
+
+The first playback-architecture cleanup pass landed on `2026-04-15` in three steps:
+
+- live playback now keeps one runtime-owned `LiveSpeechRequestState` from request acceptance through terminal playback completion instead of reconstructing request identity late
+- playback execution mechanics now live in `PlaybackExecutionState` and `LiveSpeechPlaybackState`, which keeps streamed audio, continuations, sample rate, and task ownership playback-local
+- generation scheduling now depends on a narrow playback admission signal for concurrent-generation gating, while richer playback telemetry remains part of runtime overview and diagnostics for operators
+
+That means the current model is flatter than the earlier `PlaybackJob` design:
+
+- runtime owns request identity, normalization context, and deep-trace metadata
+- playback owns execution state and hardware-facing playback coordination
+- scheduling consumes an explicit admission decision instead of reaching directly into the full playback telemetry surface for lane gating
+
 ### Current pressure points
 
 The weakest part of the current architecture is the middle, where one live request spans generation, playback, scheduling, and terminal completion at the same time.
@@ -372,38 +386,35 @@ The weakest part of the current architecture is the middle, where one live reque
 The main maintainership pain points today are:
 
 - live requests are represented in both generation and playback bookkeeping
-- `PlaybackJob` carries too many responsibilities and reads more like a live-request bundle than a playback-local type
-- runtime bridge code is spread across both `Runtime/` and `Playback/`, which makes ownership harder to scan
-- the scheduler currently depends on playback heuristics such as stable-buffer state and rebuffer flags instead of a narrower policy decision
-- the public playback state is intentionally thin, but the real playback lifecycle is richer, which creates pressure to infer too much from progress events and snapshots
+- runtime bridge code is still spread across both `Runtime/` and `Playback/`, which makes ownership harder to scan than it should be
+- live requests still span both generation and playback bookkeeping, even though the coordination path is now much easier to follow than before milestones 23 through 25 landed
+- the public playback state is intentionally thin, while runtime overview still exposes richer buffering telemetry, so maintainers need to stay clear about which surface is operator telemetry and which surface is scheduling policy
+- backend-specific playback tuning work, especially around first-request Marvis behavior, still needs to stay visibly policy-driven instead of slowly becoming hidden controller coupling again
 
 None of that means the design is bad. It means the existing public shape has held up well enough that the next cleanup should focus on flattening the internal coordination path instead of adding more layers.
 
 ### Refactor map
 
-The current playback refactor sequence is intentionally staged so we improve clarity without breaking the public surface.
+The first staged playback refactor sequence has now landed:
 
 1. Flatten live request coordination.
-   Move toward one runtime-owned live-speech coordination model that survives from request acceptance through playback completion, instead of reconstructing one request across separate generation and playback bookkeeping paths.
+   Landed. One runtime-owned `LiveSpeechRequestState` now survives from request acceptance through playback completion.
 
 2. Split playback execution ownership.
-   Narrow today's `PlaybackJob` responsibilities so playback-local execution state is separate from runtime-local request metadata, normalization context, and deep-trace metadata.
+   Landed. Playback-local execution state now lives in `PlaybackExecutionState` and `LiveSpeechPlaybackState` instead of staying mixed into the runtime-owned request record.
 
-3. Rehome runtime bridge code.
-   Keep playback implementation files focused on playback behavior. Runtime lifecycle or bridge code should live with runtime ownership even when it talks to playback.
+3. Narrow the playback-to-scheduler boundary.
+   Landed. Generation scheduling now consumes a smaller playback admission signal, while richer playback telemetry stays available for operator-facing diagnostics and runtime overview.
 
-4. Narrow the playback-to-scheduler boundary.
-   The scheduler should depend on explicit playback policy or backpressure decisions rather than on raw playback heuristics like threshold snapshots and rebuffer booleans.
+4. Rehome runtime bridge code.
+   Still open. Playback implementation files are cleaner than before, but some runtime-owned bridge logic still lives under `Playback/` and should move only if doing so makes ownership easier to scan rather than just reshuffling files.
 
-5. Revisit public playback-state semantics after the internal ownership model is cleaner.
-   We should not widen the public state enum first and hope the rest becomes clearer later. Fix ownership and policy first, then decide whether the public state should stay thin or gain explicit buffering and draining phases.
+5. Keep the public playback state intentionally thin unless a real user-facing need appears.
+   Reviewed. The current outcome is to keep `PlaybackState` thin and keep richer buffering and rebuffer telemetry in runtime overview instead of widening the enum prematurely.
 
 The active roadmap milestones for this work are:
 
 - `Milestone 22`: first-request Marvis playback tuning
-- `Milestone 23`: playback request coordination flattening
-- `Milestone 24`: playback execution ownership split
-- `Milestone 25`: playback scheduling boundary and public state review
 
 ## Repository Layout
 

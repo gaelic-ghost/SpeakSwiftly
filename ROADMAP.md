@@ -37,9 +37,9 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [ ] Milestone 20: Per-request event stream observability
 - [ ] Milestone 21: Unified Logging with `Logger`
 - [ ] Milestone 22: First-request Marvis playback tuning
-- [ ] Milestone 23: Playback request coordination flattening
-- [ ] Milestone 24: Playback execution ownership split
-- [ ] Milestone 25: Playback scheduling boundary and public state review
+- [x] Milestone 23: Playback request coordination flattening
+- [x] Milestone 24: Playback execution ownership split
+- [x] Milestone 25: Playback scheduling boundary and public state review
 - [ ] Milestone 26: Pre-v1 release hardening
 
 ## Active Milestones
@@ -285,74 +285,6 @@ Exit criteria:
 - [ ] The restored dual-lane queued-live Marvis overlap model remains intact and verified.
 - [ ] The repository has a documented before-and-after record for the tuning work that makes later regressions obvious.
 
-## Milestone 23: Playback Request Coordination Flattening
-
-Scope:
-
-- [ ] Flatten the current live-speech coordination path so one request no longer has to be mentally reconstructed across generation bookkeeping, playback bookkeeping, and terminal completion machinery.
-- [ ] Preserve the current public surface while reducing the amount of cross-feature runtime glue hidden in internal request handling.
-- [ ] Treat this as a durable building-block change, not as a temporary compatibility wrapper.
-
-Tickets:
-
-- [ ] Introduce one explicit runtime-owned live-speech coordination model that survives from request acceptance through terminal playback completion.
-- [ ] Stop treating live playback as ad-hoc dual ownership across both generation and playback queues when one request-shaped coordination object would do.
-- [ ] Move cancellation, clear-queue, shutdown, and terminal completion decisions onto that one live-speech coordination path instead of scattering them across runtime lifecycle and playback bridge code.
-- [ ] Keep saved-file generation on the simpler generation-job path so live playback is the only lane that carries the extra coordination shape.
-- [ ] Audit queue snapshots, cancellation semantics, and terminal response timing so the new coordination path does not regress observable behavior.
-- [ ] Add focused tests around cancellation, shutdown, queue clearing, and terminal success timing for live requests.
-
-Exit criteria:
-
-- [ ] A maintainer can follow one live request through the code without reconstructing dual bookkeeping by hand.
-- [ ] Cancellation and shutdown semantics for live playback are simpler, more local, and better covered by tests.
-- [ ] Public APIs and wire naming stay stable while the internal coordination path becomes flatter.
-
-## Milestone 24: Playback Execution Ownership Split
-
-Scope:
-
-- [ ] Split playback-execution ownership cleanly enough that playback-local state, runtime-local state, and transport-local state no longer accumulate inside one fat request bundle.
-- [ ] Preserve the strong hardware boundary around `AudioPlaybackDriver` while making higher-level playback state easier to reason about.
-- [ ] Avoid inventing a new playback manager layer just to move code around.
-
-Tickets:
-
-- [ ] Split today's `PlaybackJob` responsibilities into narrower playback-local and runtime-local pieces.
-- [ ] Keep playback-local types focused on streamed audio, buffering, drain, and playback completion ownership.
-- [ ] Keep runtime-local request metadata, normalization choices, and deep-trace metadata out of playback-local execution types unless playback itself needs them.
-- [ ] Rehome bridge code that is runtime coordination rather than playback implementation so `Playback/` contains playback logic instead of generic runtime glue.
-- [ ] Move `Runtime.shutdown()` and other runtime-lifecycle behaviors out of API files that currently mix public surface and worker-internal ownership.
-- [ ] Add or tighten tests around playback-state consistency during preroll, rebuffer, drain, and terminal completion.
-
-Exit criteria:
-
-- [ ] Playback-local types look like playback types instead of generic live-request bundles.
-- [ ] Runtime bridge code is easier to find because it lives with runtime ownership, not inside playback implementation files by accident.
-- [ ] Playback state and terminal request state remain consistent through preroll, rebuffer, drain, and shutdown.
-
-## Milestone 25: Playback Scheduling Boundary And Public State Review
-
-Scope:
-
-- [ ] Narrow the contract between playback and generation scheduling so the scheduler depends on policy, not on playback heuristics leaking through raw internal state.
-- [ ] Revisit whether the public playback state is still too thin for the real playback lifecycle now that the runtime exposes richer buffering and rebuffer signals.
-- [ ] Keep the policy boundary small, explicit, and testable.
-
-Tickets:
-
-- [ ] Replace direct scheduler dependence on playback-internal heuristics such as stable-buffer thresholds and rebuffer flags with a narrower playback backpressure or lane-allocation decision surface.
-- [ ] Decide whether the public playback state should remain `idle` / `playing` / `paused` or grow explicit buffering and draining phases.
-- [ ] Make the relationship between playback snapshots, active request ids, progress events, and scheduler gating explicit in code and docs.
-- [ ] Keep backend-specific scheduling differences, if any, visible as deliberate policy instead of incidental branching spread across runtime code.
-- [ ] Add focused tests for scheduler behavior when playback is healthy, rebuffering, draining, or paused.
-
-Exit criteria:
-
-- [ ] The generation scheduler no longer needs to know playback-internal threshold details directly.
-- [ ] Playback snapshots and public playback-state semantics are easy to explain without caveats.
-- [ ] Playback backpressure policy is explicit enough that later backend tuning does not silently reshape runtime architecture.
-
 ## Milestone 26: Pre-v1 Release Hardening
 
 Scope:
@@ -379,6 +311,14 @@ Exit criteria:
 
 ## History
 
+### 2026-04-15 playback architecture cleanup
+
+- `Milestone 23` landed by flattening live playback request ownership around one runtime-owned `LiveSpeechRequestState` that survives from acceptance through terminal playback completion.
+- `Milestone 24` landed by splitting playback execution mechanics into `PlaybackExecutionState` and `LiveSpeechPlaybackState`, keeping streamed audio and task ownership playback-local instead of request-local.
+- `Milestone 25` landed by narrowing generation scheduling to a playback admission signal while keeping richer playback telemetry in runtime overview and diagnostics.
+- Review outcome: keep the public `PlaybackState` surface thin for now, and treat buffering and rebuffer details as operator-facing playback telemetry rather than as a widened public state enum.
+- Review hardening: `LiveSpeechRequestState` now fails immediately with a descriptive runtime-bug message if anything other than a live playback request tries to construct it.
+
 ### 2026-04-15 roadmap consolidation
 
 These notes were archived and removed as standalone maintainer docs because they were either completed plans, superseded investigations, or low-level tuning logs whose durable outcomes now live in this roadmap and `CONTRIBUTING.md`.
@@ -394,9 +334,9 @@ These notes were archived and removed as standalone maintainer docs because they
 - `docs/maintainers/audio-route-and-live-playback-investigation-2026-04-03.md`
   Result: route-change and engine-reconfiguration observations have been folded into the active playback-operability and playback-control milestones.
 - `docs/maintainers/playback-metrics-review-2026-04-08.md`
-  Result: the main lesson was to treat playback truth as controller-owned and to keep tuning grounded in trace metrics, now tracked in milestones 22 through 25.
+  Result: the main lesson was to treat playback truth as controller-owned and to keep tuning grounded in trace metrics, now tracked in milestone 22 plus the completed playback-architecture cleanup history below.
 - `docs/maintainers/queued-marvis-playback-state-review-2026-04-08.md`
-  Result: the immediate controller-owned playback-state fix landed, and the remaining follow-up is now the active Marvis tuning and playback-architecture cleanup work.
+  Result: the immediate controller-owned playback-state fix landed, the architecture cleanup landed, and the remaining follow-up is now first-request Marvis tuning.
 - `docs/maintainers/playback-forensics-2026-04-02.md`
   Result: early playback-threshold and adaptive-buffer tuning logs are now historical context rather than active guidance.
 
