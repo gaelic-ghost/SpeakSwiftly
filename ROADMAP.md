@@ -391,6 +391,19 @@ Stage notes:
   - `rebuffer_total_duration_ms`: `20089` -> `20769`
   - `longest_rebuffer_duration_ms`: `4469` -> `4566`
 - The useful outcome is architectural rather than audible. The package now has an explicit follower-cadence role, but the follower interval itself is back on the ordinary `0.18` baseline until a better overlap-pressure experiment earns a real tuning change.
+- A clean rerun of the same stage-eleven follower experiment under lighter machine load landed at `.local/e2e-runs/2026-04-15T22-10-00Z-7ccd26f6-62b6-4117-a4c5-3027d81ebacf-prequeued-jobs-drain-in-order`.
+- That rerun showed the original noisy result was overstating the regression. The same `0.20` follower cadence kept overlap alive and improved modestly over the stage-eight probe:
+  - `time_to_first_chunk_ms`: `340` -> `340`
+  - `time_to_preroll_ready_ms`: `3926` -> `3833`
+  - `rebuffer_event_count`: `5` -> `5`
+  - `rebuffer_total_duration_ms`: `20089` -> `19115`
+  - `longest_rebuffer_duration_ms`: `4469` -> `4490`
+- Even with the cleaner rerun, the first audible request was still subjectively too rough to justify keeping fixed follower slowdown as the main strategy. The working read is now that simultaneous second-lane startup is the unstable part on Gale's machine, so the next pass should move away from fixed follower cadence and into a dynamic fragile-overlap policy.
+- The smallest next dynamic pass should keep the truthful overlap gate, preserve the explicit follower-cadence role, and add one short-lived `fragile first playback` state for the first drained live Marvis request:
+  - lane two stays parked or in a lighter mode until the first request has crossed a stronger reserve target and held it briefly
+  - once the first request has held reserve long enough, lane two can enter overlap
+  - if reserve drops back toward the floor, lane two backs off again instead of staying fully active
+- That gives Milestone 22 a more promising next lever than another fixed `0.19` versus `0.20` follower comparison, because it targets the unstable transition into overlap rather than applying one constant pressure level for the whole follower request.
 
 Exit criteria:
 

@@ -40,8 +40,8 @@ public extension SpeakSwiftly {
             /// own cadence role so overlap experiments can tune it without
             /// overloading the first-request playback profile. The current baseline
             /// keeps it on the ordinary resident cadence because the first `0.20`
-            /// follower experiment preserved overlap but made the first playback
-            /// worse overall.
+            /// follower experiment only helped modestly under clean conditions and
+            /// still left startup sounding too fragile to keep as the fixed policy.
             static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.18
 
             static func residentStreamingCadenceProfile(
