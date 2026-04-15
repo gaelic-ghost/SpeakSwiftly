@@ -330,13 +330,19 @@ actor PlaybackController {
                 activePlaybackConcurrentGenerationTargetMS = admissionThresholds.concurrentGenerationTargetMS
                 activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
                 activePlaybackStableBufferTargetMS = admissionThresholds.concurrentGenerationTargetMS
-                activePlaybackIsStableForConcurrentGeneration = startupBufferedAudioMS >= admissionThresholds.concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: startupBufferedAudioMS,
+                    targetMS: admissionThresholds.concurrentGenerationTargetMS,
+                )
                 activePlaybackIsRebuffering = false
             case .rebufferStarted:
                 activePlaybackIsStableForConcurrentGeneration = false
                 activePlaybackIsRebuffering = true
             case let .rebufferResumed(bufferedAudioMS, thresholds):
-                activePlaybackIsStableForConcurrentGeneration = true
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: bufferedAudioMS,
+                    targetMS: thresholds.resumeBufferTargetMS,
+                )
                 activePlaybackStableBufferedAudioMS = bufferedAudioMS
                 activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
                 activePlaybackConcurrentGenerationTargetMS = thresholds.resumeBufferTargetMS
@@ -357,7 +363,10 @@ actor PlaybackController {
 
                 activePlaybackStableBufferedAudioMS = queuedAudioAfterMS
                 activePlaybackStableBufferTargetMS = concurrentGenerationTargetMS
-                activePlaybackIsStableForConcurrentGeneration = queuedAudioAfterMS >= concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: queuedAudioAfterMS,
+                    targetMS: concurrentGenerationTargetMS,
+                )
             case .firstChunk,
                  .queueDepthLow,
                  .chunkGapWarning,
@@ -387,5 +396,12 @@ actor PlaybackController {
             startupBufferTargetMS: startupBufferTargetMS,
             concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
         )
+    }
+
+    static func allowsConcurrentGeneration(
+        bufferedAudioMS: Int,
+        targetMS: Int,
+    ) -> Bool {
+        bufferedAudioMS >= targetMS
     }
 }

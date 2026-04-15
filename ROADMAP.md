@@ -343,6 +343,18 @@ Stage notes:
   - `avg_inter_chunk_gap_ms`: `202` -> `183`
   - `avg_schedule_gap_ms`: `184` -> `165`
 - The important stage-five architecture outcome is that overlap stayed intact while moving later in the flow. The second Marvis lane no longer reopened at the first request's bare preroll reserve; it stayed parked on `waiting_for_playback_stability` until the first playback had already recovered into a healthier reserve window, then resumed and kept the dual-lane model alive.
+- Stage 6 landed on `2026-04-15` as the review-and-correctness follow-up pass. The widened stage-five trace exposed one real bug in the overlap gate: after a later rebuffer resume, playback could report `playback_is_stable_for_concurrency = true` even when `playback_stable_buffered_audio_ms` was still below `playback_stable_buffer_target_ms`.
+- Stage 6 artifact: `.local/e2e-runs/2026-04-15T18-32-16Z-69de7141-3485-4788-8ea5-b30a49e87cbc-prequeued-jobs-drain-in-order`
+- The fix kept the admission boundary narrow but made the overlap gate consistent: `PlaybackController` now reuses the same buffered-audio-versus-target check for preroll, rebuffer resume, and buffer-scheduled updates instead of reopening overlap unconditionally on `rebuffer_resumed`.
+- For the first queued femme request, the measured stage-five to stage-six stderr metrics changed like this:
+  - `time_to_first_chunk_ms`: `325` -> `324`
+  - `time_to_preroll_ready_ms`: `3828` -> `3833`
+  - `startup_buffered_audio_ms`: `2320` -> `2320`
+  - `rebuffer_event_count`: `5` -> `5`
+  - `rebuffer_total_duration_ms`: `18775` -> `20055`
+  - `longest_rebuffer_duration_ms`: `4385` -> `4395`
+  - `time_from_preroll_ready_to_drain_ms`: `34617` -> `37107`
+- The important stage-six outcome is correctness, not another performance win. The old bogus state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
 - Milestone 22 is still open, but the current evidence now points more clearly at two facts: faster first-request cadence helps, and cadence changes need admission-gate changes alongside them or the first request gives the gains back as soon as overlap resumes.
 
 Exit criteria:

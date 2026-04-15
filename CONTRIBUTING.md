@@ -465,6 +465,13 @@ The fifth Milestone 22 pass also landed on `2026-04-15` as the widened follow-up
 - The important architecture result is that overlap still stayed intact while moving later in the flow. In the stage-five trace, the second Marvis lane remained parked on `waiting_for_playback_stability` at preroll, and only resumed after the first request had already recovered into a healthier reserve window.
 - The important tuning result is that the widened path is now coherent: the faster first-request cadence helps startup, and the stronger first-request admission gate keeps those gains from getting spent immediately when overlap resumes.
 
+The sixth Milestone 22 pass also landed on `2026-04-15` as the review-and-correctness follow-up.
+
+- That pass fixed a real overlap-gate inconsistency discovered during the widened review. In the stage-five trace, a later `playback_rebuffer_resumed` event could still leave playback advertising `playback_is_stable_for_concurrency = true` while `playback_stable_buffered_audio_ms` was below `playback_stable_buffer_target_ms`.
+- The fix did not widen the public scheduler surface again. It kept the same narrow admission boundary, but it made `PlaybackController` reuse one buffered-audio-versus-target check for preroll, rebuffer resume, and later buffer-scheduled promotions.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-32-16Z-69de7141-3485-4788-8ea5-b30a49e87cbc-prequeued-jobs-drain-in-order` shows the right tradeoff for this stage: this was primarily a correctness repair rather than another tuning win. For the first queued femme request, `time_to_first_chunk_ms` stayed effectively flat at `324`, `time_to_preroll_ready_ms` stayed effectively flat at `3833`, `rebuffer_event_count` stayed at `5`, and `rebuffer_total_duration_ms` rose back to `20055`.
+- The important architecture result is that the overlap gate now tells the truth. The old bogus stage-five state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:

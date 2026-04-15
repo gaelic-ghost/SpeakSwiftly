@@ -296,6 +296,21 @@ import TextForSpeech
     #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
 }
 
+@Test func `concurrent generation stays closed below the claimed reserve target`() {
+    #expect(
+        PlaybackController.allowsConcurrentGeneration(
+            bufferedAudioMS: 2160,
+            targetMS: 2700,
+        ) == false
+    )
+    #expect(
+        PlaybackController.allowsConcurrentGeneration(
+            bufferedAudioMS: 2720,
+            targetMS: 2700,
+        ) == true
+    )
+}
+
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {
     var controller = PlaybackThresholdController(
         text: """
