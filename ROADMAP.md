@@ -48,7 +48,7 @@ Scope:
 
 Tickets:
 
-- [x] Bootstrap the package in `/Users/galew/Workspace/SpeakSwiftly`.
+- [x] Bootstrap the package in a standalone local repository checkout.
 - [x] Replace the generated XCTest stub with Swift Testing.
 - [x] Document the intended resident `0.6B` and on-demand `1.7B` split.
 
@@ -704,7 +704,7 @@ Exit criteria:
 
 ## Pre-v1 Release Hardening
 
-Before the first full `v1.0.0` release, finish the release-hardening pass in [pre-v1-release-hardening-2026-04-07.md](/Users/galew/Workspace/SpeakSwiftly/docs/maintainers/pre-v1-release-hardening-2026-04-07.md).
+Before the first full `v1.0.0` release, finish the release-hardening pass in [pre-v1-release-hardening-2026-04-07.md](docs/maintainers/pre-v1-release-hardening-2026-04-07.md).
 
 - [x] Persist real e2e worker stdout and stderr artifacts plus compact per-run summaries so memory and later CPU telemetry can be inspected after a run finishes.
 - [x] Add CPU accounting to the retained real e2e run summaries through the same unprivileged process-accounting path used for current memory snapshots.

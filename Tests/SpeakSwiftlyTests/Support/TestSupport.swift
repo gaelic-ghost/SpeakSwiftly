@@ -12,6 +12,10 @@ func mlxConditioningPersistenceTestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS"] == "1"
 }
 
+func speakSwiftlyE2ETestsEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_E2E"] == "1"
+}
+
 // MARK: - Locking Helpers
 
 private extension NSLock {

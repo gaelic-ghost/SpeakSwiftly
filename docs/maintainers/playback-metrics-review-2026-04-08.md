@@ -16,7 +16,7 @@ This review intentionally uses shipped `stderr.jsonl` artifacts instead of synth
 
 Clean sequential audible Marvis run:
 
-- artifact: [`.local/e2e-runs/2026-04-08T00-48-11Z-91ec1fbd-f3dc-40f4-97f4-a6bffdfd5d2b-marvisvoicedesignprofilesrunaudibleliveplaybackacrossallvibes/stderr.jsonl`](/Users/galew/Workspace/SpeakSwiftly/.local/e2e-runs/2026-04-08T00-48-11Z-91ec1fbd-f3dc-40f4-97f4-a6bffdfd5d2b-marvisvoicedesignprofilesrunaudibleliveplaybackacrossallvibes/stderr.jsonl)
+- artifact: [`.local/e2e-runs/2026-04-08T00-48-11Z-91ec1fbd-f3dc-40f4-97f4-a6bffdfd5d2b-marvisvoicedesignprofilesrunaudibleliveplaybackacrossallvibes/stderr.jsonl`](../../.local/e2e-runs/2026-04-08T00-48-11Z-91ec1fbd-f3dc-40f4-97f4-a6bffdfd5d2b-marvisvoicedesignprofilesrunaudibleliveplaybackacrossallvibes/stderr.jsonl)
 - all three `playback_finished` events reported:
   - `rebuffer_event_count: 0`
   - `starvation_event_count: 0`
@@ -26,7 +26,7 @@ Clean sequential audible Marvis run:
 
 Queued audible Marvis run:
 
-- artifact: [`.local/e2e-runs/2026-04-08T00-35-03Z-1156ff8a-b3d8-4485-a3b7-55c1b2d978e7-marvisaudibleliveplaybackprequeuesthreejobsanddrainsinorder/stderr.jsonl`](/Users/galew/Workspace/SpeakSwiftly/.local/e2e-runs/2026-04-08T00-35-03Z-1156ff8a-b3d8-4485-a3b7-55c1b2d978e7-marvisaudibleliveplaybackprequeuesthreejobsanddrainsinorder/stderr.jsonl)
+- artifact: [`.local/e2e-runs/2026-04-08T00-35-03Z-1156ff8a-b3d8-4485-a3b7-55c1b2d978e7-marvisaudibleliveplaybackprequeuesthreejobsanddrainsinorder/stderr.jsonl`](../../.local/e2e-runs/2026-04-08T00-35-03Z-1156ff8a-b3d8-4485-a3b7-55c1b2d978e7-marvisaudibleliveplaybackprequeuesthreejobsanddrainsinorder/stderr.jsonl)
 - first queued live request (`req-live-marvis-queued-femme`) reported:
   - repeated `playback_rebuffer_started`
   - one `playback_schedule_gap_warning`

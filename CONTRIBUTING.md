@@ -201,7 +201,7 @@ Representative request shapes:
 
 ```json
 {"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}
+{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"./","repo_root":"./","text_format":"cli_output"}
 {"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
 {"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
 {"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
@@ -365,7 +365,7 @@ Prepared-conditioning qwen verification. This boots the worker in `prepared_cond
 SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/preparedConditioningPersistsAndReloadsAcrossWorkerRestart
 ```
 
-Opt-in MLX-backed persistence unit coverage. The plain SwiftPM runner does not ship the Metal bundle needed for direct MLX tensor persistence round-trips, so these tests stay out of the default `swift test` pass and should be run only when you explicitly want that narrow coverage:
+Opt-in MLX-backed persistence unit coverage. These tests are marked with a Swift Testing conditional-execution trait, so the default `swift test` lane skips them unless you explicitly enable `SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1` for the narrow MLX persistence round-trip coverage:
 
 ```bash
 SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter preparedQwenConditioning

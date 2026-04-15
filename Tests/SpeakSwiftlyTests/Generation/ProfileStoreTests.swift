@@ -387,9 +387,12 @@ import Testing
     #expect(upgradedLegacyClone.manifest.transcriptProvenance == nil)
 }
 
-@Test func `stores and loads prepared qwen conditioning artifacts`() throws {
-    #expect(mlxConditioningPersistenceTestsEnabled())
-
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `stores and loads prepared qwen conditioning artifacts`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }

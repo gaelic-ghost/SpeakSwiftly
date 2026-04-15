@@ -732,9 +732,12 @@ import TextForSpeech
     #expect(residentRecorder.audioLoadCallCount == 1)
 }
 
-@Test func `speak live prepared qwen conditioning persists and reloads across runtime restarts`() async throws {
-    #expect(mlxConditioningPersistenceTestsEnabled())
-
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `speak live prepared qwen conditioning persists and reloads across runtime restarts`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -819,9 +822,12 @@ import TextForSpeech
     #expect(secondRecorder.audioLoadCallCount == 0)
 }
 
-@Test func `speak live legacy raw strategy ignores prepared qwen conditioning artifacts`() async throws {
-    #expect(mlxConditioningPersistenceTestsEnabled())
-
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `speak live legacy raw strategy ignores prepared qwen conditioning artifacts`() async throws {
     let output = OutputRecorder()
     let residentRecorder = ResidentModelRecorder()
     let storeRoot = makeTempDirectoryURL()
