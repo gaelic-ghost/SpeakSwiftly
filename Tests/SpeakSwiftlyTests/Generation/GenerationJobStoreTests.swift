@@ -1,15 +1,15 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 // MARK: - Generation Job Store
 
-@Test func generationJobStoreWritesLoadsListsAndTransitionsFileJobs() throws {
+@Test func `generation job store writes loads lists and transitions file jobs`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
     let store = try makeGenerationJobStore(rootURL: rootURL)
-    let createdAt = Date(timeIntervalSince1970: 1_234)
+    let createdAt = Date(timeIntervalSince1970: 1234)
     let queued = try store.createFileJob(
         jobID: "job-file-1",
         profileName: "default-femme",
@@ -20,9 +20,9 @@ import Testing
             text: "Hello from a file job.",
             textProfileName: "logs",
             textContext: nil,
-            sourceFormat: nil
+            sourceFormat: nil,
         ),
-        createdAt: createdAt
+        createdAt: createdAt,
     )
 
     #expect(queued.jobID == "job-file-1")
@@ -34,9 +34,9 @@ import Testing
     #expect(queued.items.count == 1)
     #expect(queued.items[0].artifactID == "artifact-1")
 
-    let running = try store.markRunning(id: "job-file-1", startedAt: Date(timeIntervalSince1970: 1_235))
+    let running = try store.markRunning(id: "job-file-1", startedAt: Date(timeIntervalSince1970: 1235))
     #expect(running.state == .running)
-    #expect(running.startedAt == Date(timeIntervalSince1970: 1_235))
+    #expect(running.startedAt == Date(timeIntervalSince1970: 1235))
 
     let completed = try store.markCompleted(
         id: "job-file-1",
@@ -44,14 +44,14 @@ import Testing
             SpeakSwiftly.GenerationArtifact(
                 artifactID: "artifact-1",
                 kind: .audioWAV,
-                createdAt: Date(timeIntervalSince1970: 1_236),
+                createdAt: Date(timeIntervalSince1970: 1236),
                 filePath: "/tmp/generated.wav",
-                sampleRate: 24_000,
+                sampleRate: 24000,
                 profileName: "default-femme",
-                textProfileName: "logs"
-            )
+                textProfileName: "logs",
+            ),
         ],
-        completedAt: Date(timeIntervalSince1970: 1_237)
+        completedAt: Date(timeIntervalSince1970: 1237),
     )
     #expect(completed.state == .completed)
     #expect(completed.artifacts.count == 1)
@@ -64,7 +64,7 @@ import Testing
     #expect(listed == [completed])
 }
 
-@Test func generationJobStoreRejectsMissingJobs() throws {
+@Test func `generation job store rejects missing jobs`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -75,7 +75,7 @@ import Testing
     }
 }
 
-@Test func generationJobStoreWritesAndListsBatchJobs() throws {
+@Test func `generation job store writes and lists batch jobs`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -91,17 +91,17 @@ import Testing
                 text: "First file",
                 textProfileName: nil,
                 textContext: nil,
-                sourceFormat: nil
+                sourceFormat: nil,
             ),
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-batch-1-artifact-2",
                 text: "Second file",
                 textProfileName: "logs",
                 textContext: nil,
-                sourceFormat: .swift
+                sourceFormat: .swift,
             ),
         ],
-        createdAt: Date(timeIntervalSince1970: 2_000)
+        createdAt: Date(timeIntervalSince1970: 2000),
     )
 
     #expect(queued.jobKind == .batch)
@@ -113,7 +113,7 @@ import Testing
     #expect(loaded == queued)
 }
 
-@Test func generationJobStoreExpiresCompletedJobsWithoutDroppingArtifactMetadata() throws {
+@Test func `generation job store expires completed jobs without dropping artifact metadata`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -128,9 +128,9 @@ import Testing
             text: "Hello from a completed file job.",
             textProfileName: nil,
             textContext: nil,
-            sourceFormat: nil
+            sourceFormat: nil,
         ),
-        createdAt: Date(timeIntervalSince1970: 2_100)
+        createdAt: Date(timeIntervalSince1970: 2100),
     )
 
     _ = try store.markCompleted(
@@ -139,29 +139,29 @@ import Testing
             SpeakSwiftly.GenerationArtifact(
                 artifactID: "artifact-2",
                 kind: .audioWAV,
-                createdAt: Date(timeIntervalSince1970: 2_101),
+                createdAt: Date(timeIntervalSince1970: 2101),
                 filePath: "/tmp/artifact-2.wav",
-                sampleRate: 24_000,
+                sampleRate: 24000,
                 profileName: "default-femme",
-                textProfileName: nil
-            )
+                textProfileName: nil,
+            ),
         ],
-        completedAt: Date(timeIntervalSince1970: 2_102)
+        completedAt: Date(timeIntervalSince1970: 2102),
     )
 
     let expired = try store.markExpired(
         id: "job-file-2",
-        expiredAt: Date(timeIntervalSince1970: 2_103)
+        expiredAt: Date(timeIntervalSince1970: 2103),
     )
 
     #expect(expired.state == .expired)
-    #expect(expired.expiresAt == Date(timeIntervalSince1970: 2_103))
-    #expect(expired.completedAt == Date(timeIntervalSince1970: 2_102))
+    #expect(expired.expiresAt == Date(timeIntervalSince1970: 2103))
+    #expect(expired.completedAt == Date(timeIntervalSince1970: 2102))
     #expect(expired.artifacts.count == 1)
     #expect(expired.artifacts[0].artifactID == "artifact-2")
 }
 
-@Test func generationJobStoreRejectsExpiringQueuedJobs() throws {
+@Test func `generation job store rejects expiring queued jobs`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -176,17 +176,17 @@ import Testing
             text: "Queued",
             textProfileName: nil,
             textContext: nil,
-            sourceFormat: nil
+            sourceFormat: nil,
         ),
-        createdAt: Date(timeIntervalSince1970: 2_200)
+        createdAt: Date(timeIntervalSince1970: 2200),
     )
 
     #expect(
         throws: WorkerError(
             code: .generationJobNotExpirable,
-            message: "Generation job 'job-file-queued' is still queued and cannot be expired until it has either completed or failed."
-        )
+            message: "Generation job 'job-file-queued' is still queued and cannot be expired until it has either completed or failed.",
+        ),
     ) {
-        _ = try store.markExpired(id: "job-file-queued", expiredAt: Date(timeIntervalSince1970: 2_201))
+        _ = try store.markExpired(id: "job-file-queued", expiredAt: Date(timeIntervalSince1970: 2201))
     }
 }

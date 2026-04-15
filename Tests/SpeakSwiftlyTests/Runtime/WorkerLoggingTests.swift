@@ -1,10 +1,10 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 // MARK: - Structured Logging
 
-@Test func structuredWorkerLogSupportEncodesStableJSONLShape() throws {
+@Test func `structured worker log support encodes stable JSONL shape`() throws {
     let line = try WorkerStructuredLogSupport.encode(
         WorkerLogEvent(
             event: "stdin_read_failed",
@@ -18,12 +18,12 @@ import Testing
             details: [
                 "message": .string("stdin failed"),
                 "error": .string("Broken pipe"),
-            ]
-        )
+            ],
+        ),
     )
 
     let object = try #require(
-        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
     )
     let details = try #require(object["details"] as? [String: Any])
     #expect(object["event"] as? String == "stdin_read_failed")
@@ -32,14 +32,14 @@ import Testing
     #expect(details["error"] as? String == "Broken pipe")
 }
 
-@Test func structuredWorkerLogSupportFallsBackToStructuredWorkerErrorLine() throws {
+@Test func `structured worker log support falls back to structured worker error line`() throws {
     let line = WorkerStructuredLogSupport.encodingFailureLine(
         timestamp: "2026-04-08T12:00:00Z",
-        errorDescription: "encoding exploded"
+        errorDescription: "encoding exploded",
     )
 
     let object = try #require(
-        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
+        JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
     )
     let details = try #require(object["details"] as? [String: Any])
     #expect(object["event"] as? String == "worker_error")

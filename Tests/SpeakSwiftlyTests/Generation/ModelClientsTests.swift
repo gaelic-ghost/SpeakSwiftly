@@ -1,22 +1,22 @@
 import Foundation
 @preconcurrency import MLX
 import MLXAudioTTS
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
 // MARK: - Adaptive Playback Thresholds
 
-@Test func adaptivePlaybackThresholdsSeedFromTextComplexityClasses() {
+@Test func `adaptive playback thresholds seed from text complexity classes`() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7)
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
     ).thresholds
     let extended = PlaybackThresholdController(
         text: String(
             repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
-            count: 9
-        )
+            count: 9,
+        ),
     ).thresholds
 
     #expect(compact.complexityClass == .compact)
@@ -28,16 +28,16 @@ import TextForSpeech
     #expect(balanced.resumeBufferTargetMS < extended.resumeBufferTargetMS)
 }
 
-@Test func adaptivePlaybackThresholdsStartFromWarmupBiasedTargets() {
+@Test func `adaptive playback thresholds start from warmup biased targets`() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7)
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
     ).thresholds
     let extended = PlaybackThresholdController(
         text: String(
             repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
-            count: 9
-        )
+            count: 9,
+        ),
     ).thresholds
 
     #expect(compact.startupBufferTargetMS == 480)
@@ -46,12 +46,12 @@ import TextForSpeech
     #expect(balanced.startupBufferTargetMS == 720)
     #expect(balanced.lowWaterTargetMS == 340)
     #expect(balanced.resumeBufferTargetMS == 800)
-    #expect(extended.startupBufferTargetMS == 13_120)
-    #expect(extended.lowWaterTargetMS == 5_000)
-    #expect(extended.resumeBufferTargetMS == 16_480)
+    #expect(extended.startupBufferTargetMS == 13120)
+    #expect(extended.lowWaterTargetMS == 5000)
+    #expect(extended.resumeBufferTargetMS == 16480)
 }
 
-@Test func adaptivePlaybackThresholdsIgnoreContentShapeWhenLengthsMatch() {
+@Test func `adaptive playback thresholds ignore content shape when lengths match`() {
     let plainText = String(repeating: "Please explain this clearly. ", count: 8)
     let codeishSeed = """
     /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift
@@ -71,7 +71,7 @@ import TextForSpeech
     #expect(plain.scheduleGapWarningMS == codeish.scheduleGapWarningMS)
 }
 
-@Test func adaptivePlaybackThresholdsRaiseTargetsForSlowCadenceAndStarvation() {
+@Test func `adaptive playback thresholds raise targets for slow cadence and starvation`() {
     var controller = PlaybackThresholdController(text: "Hello there.")
     let seeded = controller.thresholds
 
@@ -90,13 +90,13 @@ import TextForSpeech
     #expect(starved.lowWaterTargetMS >= adapted.lowWaterTargetMS)
 }
 
-@Test func adaptivePlaybackThresholdsRaiseTargetsForRepeatedRebuffers() {
+@Test func `adaptive playback thresholds raise targets for repeated rebuffers`() {
     var controller = PlaybackThresholdController(
         text: """
         Please read this file path and code-heavy explanation carefully.
         /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/WorkerRuntime.swift
         let greeting = user?.displayName ?? "friend"
-        """
+        """,
     )
 
     for _ in 0..<6 {
@@ -120,13 +120,13 @@ import TextForSpeech
     #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
 }
 
-@Test func adaptivePlaybackThresholdsKeepEscalatedRebufferTargetsAcrossLaterChunks() {
+@Test func `adaptive playback thresholds keep escalated rebuffer targets across later chunks`() {
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
         /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
         let greeting = user?.displayName ?? "friend"
-        """
+        """,
     )
 
     for _ in 0..<6 {
@@ -150,13 +150,13 @@ import TextForSpeech
     #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
 }
 
-@Test func adaptivePlaybackThresholdsLeaveWarmupAfterStableChunkCadence() {
+@Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
         /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
         let greeting = user?.displayName ?? "friend"
-        """
+        """,
     )
 
     #expect(controller.phase == .warmup)
@@ -168,12 +168,12 @@ import TextForSpeech
     #expect(controller.phase == .steady)
 }
 
-@Test func adaptivePlaybackThresholdsStayInWarmupWhileEarlyCadenceTrailsRealtimePlayback() {
+@Test func `adaptive playback thresholds stay in warmup while early cadence trails realtime playback`() {
     var controller = PlaybackThresholdController(
         text: String(
             repeating: "This is ordinary spoken prose for playback buffering. ",
-            count: 7
-        )
+            count: 7,
+        ),
     )
 
     #expect(controller.phase == .warmup)
@@ -183,18 +183,18 @@ import TextForSpeech
     }
 
     #expect(controller.phase == .warmup)
-    #expect(controller.thresholds.startupBufferTargetMS >= 1_600)
+    #expect(controller.thresholds.startupBufferTargetMS >= 1600)
     #expect(controller.thresholds.lowWaterTargetMS >= 600)
-    #expect(controller.thresholds.resumeBufferTargetMS >= 1_400)
+    #expect(controller.thresholds.resumeBufferTargetMS >= 1400)
 }
 
-@Test func adaptivePlaybackThresholdsEnterRecoveryAfterRebufferAndReturnToSteadyAfterStableChunks() {
+@Test func `adaptive playback thresholds enter recovery after rebuffer and return to steady after stable chunks`() {
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
         /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
         let greeting = user?.displayName ?? "friend"
-        """
+        """,
     )
 
     for _ in 0..<12 {
@@ -214,7 +214,7 @@ import TextForSpeech
 
 // MARK: - Runtime Playback Integration
 
-@Test func speakLiveUsesStoredProfileDataWaitsForPlaybackDrainAndReusesPlaybackController() async throws {
+@Test func `speak live uses stored profile data waits for playback drain and reuses playback controller`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -228,8 +228,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -239,7 +239,7 @@ import TextForSpeech
         audioLoadRecorder: residentRecorder,
         residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
-        }
+        },
     )
 
     await runtime.start()
@@ -301,7 +301,7 @@ import TextForSpeech
 
 // MARK: - Deep Trace and Normalization
 
-@Test func speechTextDeepTraceFeaturesCaptureCodeHeavyAndWeirdTextShapes() {
+@Test func `speech text deep trace features capture code heavy and weird text shapes`() {
     let original = """
     # Header
 
@@ -320,7 +320,7 @@ import TextForSpeech
     let normalized = TextForSpeech.Normalize.text(original)
     let features = SpeakSwiftly.DeepTrace.features(
         originalText: original,
-        normalizedText: normalized
+        normalizedText: normalized,
     )
 
     #expect(features.originalCharacterCount > 0)
@@ -338,7 +338,7 @@ import TextForSpeech
     #expect(features.repeatedLetterRunCount >= 2)
 }
 
-@Test func speechTextDeepTraceSectionsAndWindowsTrackSegmentedMarkdownStructure() {
+@Test func `speech text deep trace sections and windows track segmented markdown structure`() {
     let original = """
     # Section One
 
@@ -368,13 +368,13 @@ import TextForSpeech
 
     let windows = SpeakSwiftly.DeepTrace.sectionWindows(
         originalText: original,
-        totalDurationMS: 12_000,
-        totalChunkCount: 75
+        totalDurationMS: 12000,
+        totalChunkCount: 75,
     )
     #expect(windows.count == 4)
     #expect(windows.first?.estimatedStartMS == 0)
     #expect(windows.first?.estimatedStartChunk == 0)
-    #expect(windows.last?.estimatedEndMS == 12_000)
+    #expect(windows.last?.estimatedEndMS == 12000)
     #expect(windows.last?.estimatedEndChunk == 75)
     let windowsAreContiguous = zip(windows, windows.dropFirst()).allSatisfy { lhs, rhs in
         lhs.estimatedEndMS == rhs.estimatedStartMS
@@ -383,7 +383,7 @@ import TextForSpeech
     #expect(windowsAreContiguous)
 }
 
-@Test func speechTextNormalizationMakesPathsAndIdentifiersMoreSpeakable() {
+@Test func `speech text normalization makes paths and identifiers more speakable`() {
     let original = """
     Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
     """
@@ -399,7 +399,7 @@ import TextForSpeech
 
 // MARK: - Playback Failure and Observability
 
-@Test func playbackTimeoutFailsOnlyThatRequestAndWorkerKeepsRunning() async throws {
+@Test func `playback timeout fails only that request and worker keeps running`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -410,23 +410,23 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let playback = PlaybackSpy(
         behavior: .throw(
             WorkerError(
                 code: .audioPlaybackTimeout,
-                message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within 5 seconds."
-            )
-        )
+                message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within 5 seconds.",
+            ),
+        ),
     )
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -461,7 +461,7 @@ import TextForSpeech
     })
 }
 
-@Test func stderrLogsUseJSONLAndIncludeExpandedPlaybackMetrics() async throws {
+@Test func `stderr logs use JSONL and include expanded playback metrics`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -472,15 +472,15 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .immediate),
-        residentModelLoader: { _ in makeResidentModel(chunkCount: 3) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 3) },
     )
 
     await runtime.start()
@@ -533,7 +533,7 @@ import TextForSpeech
     })
 }
 
-@Test func stderrLogsQueueDepthWarningsStarvationAndExpandedDurations() async throws {
+@Test func `stderr logs queue depth warnings starvation and expanded durations`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -544,15 +544,15 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .emitLowQueueThenStarve),
-        residentModelLoader: { _ in makeResidentModel(chunkCount: 1) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 1) },
     )
 
     await runtime.start()
@@ -605,7 +605,7 @@ import TextForSpeech
     })
 }
 
-@Test func stderrLogsPlaybackWarningsTraceAndBufferShapeSummaries() async throws {
+@Test func `stderr logs playback warnings trace and buffer shape summaries`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -616,15 +616,15 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .emitObservabilityBurst),
-        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
     )
 
     await runtime.start()
@@ -683,7 +683,7 @@ import TextForSpeech
     })
 }
 
-@Test func speakLivePassesNonNilReferenceAudioIntoResidentGeneration() async throws {
+@Test func `speak live passes non nil reference audio into resident generation`() async throws {
     let output = OutputRecorder()
     let residentRecorder = ResidentModelRecorder()
     let storeRoot = makeTempDirectoryURL()
@@ -695,8 +695,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -707,7 +707,7 @@ import TextForSpeech
         loadedAudioSamples: .mlxNone,
         residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
-        }
+        },
     )
 
     await runtime.start()
@@ -732,8 +732,8 @@ import TextForSpeech
     #expect(residentRecorder.audioLoadCallCount == 1)
 }
 
-@Test func speakLivePreparedQwenConditioningPersistsAndReloadsAcrossRuntimeRestarts() async throws {
-    guard mlxConditioningPersistenceTestsEnabled() else { return }
+@Test func `speak live prepared qwen conditioning persists and reloads across runtime restarts`() async throws {
+    #expect(mlxConditioningPersistenceTestsEnabled())
 
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
@@ -745,8 +745,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let firstRecorder = ResidentModelRecorder()
@@ -759,7 +759,7 @@ import TextForSpeech
         loadedAudioSamples: MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
         residentModelLoader: { _ in
             makeResidentModel(recorder: firstRecorder)
-        }
+        },
     )
 
     await firstRuntime.start()
@@ -795,7 +795,7 @@ import TextForSpeech
         loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
         residentModelLoader: { _ in
             makeResidentModel(recorder: secondRecorder)
-        }
+        },
     )
 
     await secondRuntime.start()
@@ -819,8 +819,8 @@ import TextForSpeech
     #expect(secondRecorder.audioLoadCallCount == 0)
 }
 
-@Test func speakLiveLegacyRawStrategyIgnoresPreparedQwenConditioningArtifacts() async throws {
-    guard mlxConditioningPersistenceTestsEnabled() else { return }
+@Test func `speak live legacy raw strategy ignores prepared qwen conditioning artifacts`() async throws {
+    #expect(mlxConditioningPersistenceTestsEnabled())
 
     let output = OutputRecorder()
     let residentRecorder = ResidentModelRecorder()
@@ -833,8 +833,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
     _ = try store.storeQwenConditioningArtifact(
         named: "default-femme",
@@ -845,8 +845,8 @@ import TextForSpeech
             referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
             referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
             resolvedLanguage: "English",
-            codecLanguageID: 7
-        )
+            codecLanguageID: 7,
+        ),
     )
 
     let runtime = try await makeRuntime(
@@ -858,7 +858,7 @@ import TextForSpeech
         loadedAudioSamples: MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
         residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
-        }
+        },
     )
 
     await runtime.start()
@@ -884,7 +884,7 @@ import TextForSpeech
     #expect(residentRecorder.lastRefText == "Reference transcript")
 }
 
-@Test func speakLiveNormalizesCodeHeavyMarkdownBeforeResidentGeneration() async throws {
+@Test func `speak live normalizes code heavy markdown before resident generation`() async throws {
     let output = OutputRecorder()
     let residentRecorder = ResidentModelRecorder()
     let storeRoot = makeTempDirectoryURL()
@@ -896,8 +896,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -907,7 +907,7 @@ import TextForSpeech
         audioLoadRecorder: residentRecorder,
         residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
-        }
+        },
     )
 
     await runtime.start()
@@ -921,7 +921,7 @@ import TextForSpeech
     await runtime.accept(
         line: #"""
         {"id":"req-1","op":"generate_speech","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
-        """#
+        """#,
     )
 
     #expect(await waitUntil { residentRecorder.lastText != nil })
@@ -935,7 +935,7 @@ import TextForSpeech
     #expect(normalized.contains("nil coalescing"))
 }
 
-@Test func speakLiveAppliesStoredTextProfileBeforeResidentGeneration() async throws {
+@Test func `speak live applies stored text profile before resident generation`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -945,7 +945,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) },
     )
 
     let store = try makeProfileStore(rootURL: storeRoot)
@@ -954,8 +954,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     try await runtime.normalizer.profiles.store(
@@ -967,17 +967,17 @@ import TextForSpeech
                 TextForSpeech.Replacement(
                     "snake case stuff",
                     with: "settings token",
-                    during: .afterBuiltIns
-                )
-            ]
-        )
+                    during: .afterBuiltIns,
+                ),
+            ],
+        ),
     )
     await runtime.start()
 
     await runtime.accept(
         line: #"""
         {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_name":"logs","text_format":"plain_text"}
-        """#
+        """#,
     )
 
     #expect(await waitUntil { residentRecorder.lastText != nil })
@@ -987,7 +987,7 @@ import TextForSpeech
     #expect(normalized.contains("settings token"))
 }
 
-@Test func speakLiveUsesExplicitWholeSourceLaneBeforeResidentGeneration() async throws {
+@Test func `speak live uses explicit whole source lane before resident generation`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -997,7 +997,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: residentRecorder) },
     )
 
     let store = try makeProfileStore(rootURL: storeRoot)
@@ -1006,8 +1006,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     await runtime.start()
@@ -1015,7 +1015,7 @@ import TextForSpeech
     await runtime.accept(
         line: #"""
         {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
-        """#
+        """#,
     )
 
     #expect(await waitUntil { residentRecorder.lastText != nil })
@@ -1027,12 +1027,12 @@ import TextForSpeech
 
 // MARK: - Sample Shaping
 
-@Test func shapePlaybackSamplesSmoothsBoundaryJumpsAndSanitizesInvalidValues() {
+@Test func `shape playback samples smooths boundary jumps and sanitizes invalid values`() {
     let shaped = shapePlaybackSamples(
         [Float.nan, 1.8, -1.6, 0.25],
-        sampleRate: 24_000,
+        sampleRate: 24000,
         previousTrailingSample: 0.35,
-        applyFadeIn: false
+        applyFadeIn: false,
     )
 
     #expect(shaped.count == 4)

@@ -1,19 +1,18 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Generated Batch E2E")
     struct GeneratedBatchSuite {
-        @Test func managedReads() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `managed reads`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true
+                silentPlayback: true,
             )
             defer { Task { await worker.stop() } }
 
@@ -24,7 +23,7 @@ extension SpeakSwiftlyE2ETests {
                 profileName: SpeakSwiftlyE2ETests.testingProfileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
             )
 
             let generatedBatch = try await SpeakSwiftlyE2ETests.runGeneratedBatchSpeech(
@@ -36,7 +35,7 @@ extension SpeakSwiftlyE2ETests {
                   {"text":"\(SpeakSwiftlyE2ETests.testingPlaybackText.jsonEscaped)"},
                   {"artifact_id":"custom-generated-batch-artifact","text":"\(SpeakSwiftlyE2ETests.testingProfileText.jsonEscaped)","text_profile_name":"logs"}
                 ]
-                """
+                """,
             )
 
             #expect(generatedBatch["batch_id"] as? String == "req-generated-batch-e2e")
@@ -57,7 +56,7 @@ extension SpeakSwiftlyE2ETests {
             try worker.sendJSON(
                 """
                 {"id":"req-generated-batch-read","op":"get_generated_batch","batch_id":"req-generated-batch-e2e"}
-                """
+                """,
             )
 
             let fetchedGeneratedBatch = try #require(
@@ -73,7 +72,7 @@ extension SpeakSwiftlyE2ETests {
 
                     return generatedBatch["batch_id"] as? String == "req-generated-batch-e2e"
                         && artifacts.count == 2
-                }
+                },
             )
             let fetchedGeneratedBatchPayload = try #require(fetchedGeneratedBatch["generated_batch"] as? [String: Any])
             let fetchedArtifacts = try #require(fetchedGeneratedBatchPayload["artifacts"] as? [[String: Any]])
@@ -82,7 +81,7 @@ extension SpeakSwiftlyE2ETests {
             try worker.sendJSON(
                 """
                 {"id":"req-generated-batches-read","op":"list_generated_batches"}
-                """
+                """,
             )
 
             #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {

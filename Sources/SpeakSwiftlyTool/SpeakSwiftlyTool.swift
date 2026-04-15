@@ -17,7 +17,7 @@ enum SpeakSwiftlyTool {
             let timestamp = ISO8601DateFormatter().string(from: Date())
             let details = [
                 "message": WorkerLogValue.string(
-                    "SpeakSwiftly stopped reading stdin because the standard input stream failed unexpectedly."
+                    "SpeakSwiftly stopped reading stdin because the standard input stream failed unexpectedly.",
                 ),
                 "error": WorkerLogValue.string(error.localizedDescription),
             ]
@@ -30,13 +30,13 @@ enum SpeakSwiftlyTool {
                 profileName: nil,
                 queueDepth: nil,
                 elapsedMS: nil,
-                details: details
+                details: details,
             )
 
             let line = (try? WorkerStructuredLogSupport.encode(event))
                 ?? WorkerStructuredLogSupport.encodingFailureLine(
                     timestamp: timestamp,
-                    errorDescription: error.localizedDescription
+                    errorDescription: error.localizedDescription,
                 )
             try? FileHandle.standardError.write(contentsOf: Data((line + "\n").utf8))
         }

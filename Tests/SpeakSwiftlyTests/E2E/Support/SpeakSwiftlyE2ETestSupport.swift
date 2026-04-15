@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
     static var isQwenBenchmarkE2EEnabled: Bool {
@@ -128,7 +128,7 @@ extension SpeakSwiftlyE2ETests {
 
     static func awaitWorkerReady(
         _ worker: WorkerProcess,
-        expectPlaybackEngine: Bool
+        expectPlaybackEngine: Bool,
     ) async throws {
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["event"] as? String == "worker_status"
@@ -162,12 +162,12 @@ extension SpeakSwiftlyE2ETests {
         text: String,
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
-        outputURL: URL? = nil
+        outputURL: URL? = nil,
     ) async throws {
         if let outputURL {
             try FileManager.default.createDirectory(
                 at: outputURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
+                withIntermediateDirectories: true,
             )
         }
 
@@ -175,7 +175,7 @@ extension SpeakSwiftlyE2ETests {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"create_voice_profile_from_description","profile_name":"\(profileName)","text":"\(text.jsonEscaped)","vibe":"\(vibe.rawValue)","voice_description":"\(voiceDescription.jsonEscaped)"\(outputPathFragment)}
-            """
+            """,
         )
 
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
@@ -193,7 +193,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["ok"] as? Bool == true
-            }
+            },
         )
 
         #expect(success["profile_name"] as? String == profileName)
@@ -209,13 +209,13 @@ extension SpeakSwiftlyE2ETests {
         referenceAudioURL: URL,
         vibe: SpeakSwiftly.Vibe,
         transcript: String?,
-        expectTranscription: Bool
+        expectTranscription: Bool,
     ) async throws {
         let transcriptFragment = transcript.map { #","transcript":"\#($0.jsonEscaped)""# } ?? ""
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"create_voice_profile_from_audio","profile_name":"\(profileName)","reference_audio_path":"\(referenceAudioURL.path)","vibe":"\(vibe.rawValue)"\(transcriptFragment)}
-            """
+            """,
         )
 
         if expectTranscription {
@@ -235,7 +235,7 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForJSONObject(timeout: e2eTimeout) {
                 $0["id"] as? String == id
                     && $0["ok"] as? Bool == true
-            }
+            },
         )
 
         #expect(success["profile_name"] as? String == profileName)
@@ -245,12 +245,12 @@ extension SpeakSwiftlyE2ETests {
         on worker: WorkerProcess,
         id: String,
         text: String,
-        profileName: String
+        profileName: String,
     ) async throws {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
-            """
+            """,
         )
 
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
@@ -278,17 +278,17 @@ extension SpeakSwiftlyE2ETests {
         on worker: WorkerProcess,
         id: String,
         text: String,
-        profileName: String
+        profileName: String,
     ) async throws {
         try await queueAudibleSpeech(
             on: worker,
             id: id,
             text: text,
-            profileName: profileName
+            profileName: profileName,
         )
         _ = try await awaitAudibleSpeechCompletion(
             on: worker,
-            id: id
+            id: id,
         )
     }
 
@@ -296,12 +296,12 @@ extension SpeakSwiftlyE2ETests {
         on worker: WorkerProcess,
         id: String,
         text: String,
-        profileName: String
+        profileName: String,
     ) async throws {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
-            """
+            """,
         )
 
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
@@ -313,7 +313,7 @@ extension SpeakSwiftlyE2ETests {
     @discardableResult
     static func awaitAudibleSpeechCompletion(
         on worker: WorkerProcess,
-        id: String
+        id: String,
     ) async throws -> [String: Any] {
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["id"] as? String == id
@@ -382,7 +382,7 @@ extension SpeakSwiftlyE2ETests {
                     && details["mlx_active_memory_bytes"] as? Int != nil
                     && details["mlx_cache_memory_bytes"] as? Int != nil
                     && details["mlx_peak_memory_bytes"] as? Int != nil
-            }
+            },
         )
 
         #expect(playbackFinished["event"] as? String == "playback_finished")
@@ -398,12 +398,12 @@ extension SpeakSwiftlyE2ETests {
         on worker: WorkerProcess,
         id: String,
         text: String,
-        profileName: String
+        profileName: String,
     ) async throws -> [String: Any] {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"generate_audio_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
-            """
+            """,
         )
 
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
@@ -438,7 +438,7 @@ extension SpeakSwiftlyE2ETests {
                 }
 
                 return generatedFile["artifact_id"] as? String == "\(id)-artifact-1"
-            }
+            },
         )
 
         return try #require(success["generated_file"] as? [String: Any])
@@ -448,7 +448,7 @@ extension SpeakSwiftlyE2ETests {
         on worker: WorkerProcess,
         id: String,
         profileName: String,
-        itemsJSON: String
+        itemsJSON: String,
     ) async throws -> [String: Any] {
         let batchTimeout: Duration = .seconds(180)
         let compactItemsJSON = try compactJSONArrayString(itemsJSON)
@@ -456,7 +456,7 @@ extension SpeakSwiftlyE2ETests {
         try worker.sendJSON(
             """
             {"id":"\(id)","op":"generate_batch","profile_name":"\(profileName)","items":\(compactItemsJSON)}
-            """
+            """,
         )
 
         #expect(try await worker.waitForJSONObject(timeout: batchTimeout) {
@@ -484,7 +484,7 @@ extension SpeakSwiftlyE2ETests {
                 return generatedBatch["batch_id"] as? String == id
                     && generatedBatch["state"] as? String == "completed"
                     && artifacts.count >= 1
-            }
+            },
         )
 
         return try #require(success["generated_batch"] as? [String: Any])
@@ -493,14 +493,14 @@ extension SpeakSwiftlyE2ETests {
     static func compactJSONArrayString(_ source: String) throws -> String {
         guard let data = source.data(using: .utf8) else {
             throw WorkerProcessError(
-                "The batch items payload could not be encoded as UTF-8 before sending it to the SpeakSwiftly worker."
+                "The batch items payload could not be encoded as UTF-8 before sending it to the SpeakSwiftly worker.",
             )
         }
 
         let object = try JSONSerialization.jsonObject(with: data)
         guard JSONSerialization.isValidJSONObject(object) else {
             throw WorkerProcessError(
-                "The batch items payload is not valid JSON and cannot be compacted into a single-line worker request."
+                "The batch items payload is not valid JSON and cannot be compacted into a single-line worker request.",
             )
         }
 
@@ -511,7 +511,7 @@ extension SpeakSwiftlyE2ETests {
     static func expectMarvisVoiceSelection(
         on worker: WorkerProcess,
         requestID: String,
-        expectedVoice: String
+        expectedVoice: String,
     ) async throws {
         #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
             guard
@@ -554,12 +554,12 @@ extension SpeakSwiftlyE2ETests {
             normalized
                 .split(whereSeparator: \.isWhitespace)
                 .map(String.init)
-                .filter { !$0.isEmpty }
+                .filter { !$0.isEmpty },
         )
     }
 
     static var e2eTimeout: Duration {
-        .seconds(1_200)
+        .seconds(1200)
     }
 
     static var isE2EEnabled: Bool {
@@ -579,6 +579,8 @@ extension SpeakSwiftlyE2ETests {
     }
 }
 
+// MARK: - E2ESandbox
+
 struct E2ESandbox {
     let rootURL: URL
     let profileRootURL: URL
@@ -595,6 +597,8 @@ struct E2ESandbox {
         try? FileManager.default.removeItem(at: rootURL)
     }
 }
+
+// MARK: - JSONLineRecorder
 
 final class JSONLineRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -678,6 +682,8 @@ final class JSONLineRecorder: @unchecked Sendable {
     }
 }
 
+// MARK: - WorkerProcess
+
 final class WorkerProcess: @unchecked Sendable {
     private enum Environment {
         static let dyldFrameworkPath = "DYLD_FRAMEWORK_PATH"
@@ -704,7 +710,7 @@ final class WorkerProcess: @unchecked Sendable {
         playbackTrace: Bool = false,
         speechBackend: SpeakSwiftly.SpeechBackend? = nil,
         configuration: SpeakSwiftly.Configuration? = nil,
-        caller: StaticString = #function
+        caller: StaticString = #function,
     ) throws {
         let packageRootURL = try Self.packageRootURL()
         let buildConfiguration = "Debug"
@@ -722,21 +728,21 @@ final class WorkerProcess: @unchecked Sendable {
 
         let executableURL = try Self.workerExecutableURL(
             packageRootURL: packageRootURL,
-            configuration: buildConfiguration
+            configuration: buildConfiguration,
         )
         artifacts = try E2EWorkerArtifacts(
             packageRootURL: packageRootURL,
             configuration: buildConfiguration,
             caller: String(describing: caller),
             executableURL: executableURL,
-            profileRootURL: profileRootURL
+            profileRootURL: profileRootURL,
         )
         if let runtimeConfiguration {
             try runtimeConfiguration.save(
                 to: SpeakSwiftly.Configuration.defaultPersistenceURL(
                     fileManager: .default,
-                    profileRootOverride: profileRootURL.path
-                )
+                    profileRootOverride: profileRootURL.path,
+                ),
             )
         }
 
@@ -765,7 +771,7 @@ final class WorkerProcess: @unchecked Sendable {
             append: { [artifacts, recorder] line in
                 artifacts.appendStdout(line)
                 recorder.appendStdout(line)
-            }
+            },
         )
 
         stderrTask = Self.captureLines(
@@ -773,7 +779,7 @@ final class WorkerProcess: @unchecked Sendable {
             append: { [artifacts, recorder] line in
                 artifacts.appendStderr(line)
                 recorder.appendStderr(line)
-            }
+            },
         )
 
         try process.run()
@@ -784,6 +790,168 @@ final class WorkerProcess: @unchecked Sendable {
         closeCapturedOutputs()
         stdoutTask.cancel()
         stderrTask.cancel()
+    }
+
+    private static func captureLines(
+        from fileHandle: FileHandle,
+        append: @escaping @Sendable (String) -> Void,
+    ) -> Task<Void, Never> {
+        Task.detached {
+            var buffer = Data()
+
+            while !Task.isCancelled {
+                let data = fileHandle.availableData
+                guard !data.isEmpty else { break }
+
+                buffer.append(data)
+
+                while let newlineRange = buffer.firstRange(of: Data([0x0A])) {
+                    let lineData = buffer[..<newlineRange.lowerBound]
+                    if let line = String(data: lineData, encoding: .utf8) {
+                        append(line)
+                    }
+                    buffer.removeSubrange(..<newlineRange.upperBound)
+                }
+            }
+
+            if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
+                append(line)
+            }
+        }
+    }
+
+    private static func workerExecutableURL(
+        packageRootURL: URL,
+        configuration: String,
+    ) throws -> URL {
+        let result = Result {
+            try computeWorkerExecutableURL(
+                packageRootURL: packageRootURL,
+                configuration: configuration,
+            )
+        }
+        return try result.get()
+    }
+
+    private static func computeWorkerExecutableURL(
+        packageRootURL: URL,
+        configuration: String,
+    ) throws -> URL {
+        let runtime = try loadPublishedRuntime(
+            packageRootURL: packageRootURL,
+            configuration: configuration,
+        )
+
+        guard FileManager.default.isExecutableFile(atPath: runtime.executableURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly worker executable recorded in '\(runtime.metadataURL.path)' was expected at '\(runtime.executableURL.path)', but no executable was found there.",
+            )
+        }
+        guard FileManager.default.fileExists(atPath: runtime.metallibURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its MLX Metal shader bundle at '\(runtime.metallibURL.path)'. The worker cannot run real MLX-backed e2e tests without `default.metallib`.",
+            )
+        }
+        guard FileManager.default.isExecutableFile(atPath: runtime.launcherURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its launcher script at '\(runtime.launcherURL.path)'.",
+            )
+        }
+
+        return runtime.launcherURL
+    }
+
+    private static func loadPublishedRuntime(
+        packageRootURL: URL,
+        configuration: String,
+    ) throws -> PublishedRuntime {
+        let metadataURL = packageRootURL
+            .appendingPathComponent(".local/xcode/SpeakSwiftly.\(configuration.lowercased()).json", isDirectory: false)
+
+        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
+            throw WorkerProcessError(
+                "The published SpeakSwiftly runtime metadata manifest was expected at '\(metadataURL.path)', but no manifest was found there.",
+            )
+        }
+
+        let data = try Data(contentsOf: metadataURL)
+        let manifest = try JSONDecoder().decode(PublishedRuntimeManifest.self, from: data)
+
+        return PublishedRuntime(
+            metadataURL: metadataURL,
+            productsURL: URL(fileURLWithPath: manifest.productsPath),
+            executableURL: URL(fileURLWithPath: manifest.executablePath),
+            launcherURL: URL(fileURLWithPath: manifest.launcherPath),
+            metallibURL: URL(fileURLWithPath: manifest.metallibPath),
+            aliasURL: URL(fileURLWithPath: manifest.aliasPath),
+        )
+    }
+
+    private static func packageRootURL() throws -> URL {
+        let fileManager = FileManager.default
+        var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+        while true {
+            let manifestURL = candidateURL.appendingPathComponent("Package.swift", isDirectory: false)
+            if fileManager.fileExists(atPath: manifestURL.path) {
+                return candidateURL
+            }
+
+            let parentURL = candidateURL.deletingLastPathComponent()
+            guard parentURL != candidateURL else {
+                throw WorkerProcessError(
+                    "SpeakSwiftly e2e tests could not find the package root while walking upward from '\(#filePath)'. Expected to find a directory containing 'Package.swift'.",
+                )
+            }
+
+            candidateURL = parentURL
+        }
+    }
+
+    private static func buildWorkerProduct(
+        packageRootURL: URL,
+        configuration: String,
+    ) throws {
+        let process = Process()
+        let logURL = packageRootURL
+            .appendingPathComponent(".local/xcode/SpeakSwiftly-e2e-publish-\(configuration.lowercased()).log", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: packageRootURL.appendingPathComponent(".local/xcode", isDirectory: true),
+            withIntermediateDirectories: true,
+        )
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        let logHandle = try FileHandle(forWritingTo: logURL)
+        defer { try? logHandle.close() }
+
+        process.currentDirectoryURL = packageRootURL
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "scripts/repo-maintenance/publish-runtime.sh",
+            "--configuration", configuration,
+        ]
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let outputData = try Data(contentsOf: logURL)
+            let output = String(decoding: outputData, as: UTF8.self)
+            throw WorkerProcessError(
+                "The SpeakSwiftly runtime publisher failed with status \(process.terminationStatus). Publisher output:\n\(output)",
+            )
+        }
+    }
+
+    private static func publishWorkerRuntime(
+        packageRootURL: URL,
+        configuration: String,
+    ) throws {
+        try buildWorkerProduct(
+            packageRootURL: packageRootURL,
+            configuration: configuration,
+        )
     }
 
     func sendJSON(_ jsonLine: String) throws {
@@ -813,7 +981,7 @@ final class WorkerProcess: @unchecked Sendable {
 
     func waitForJSONObject(
         timeout: Duration,
-        _ predicate: @escaping @Sendable ([String: Any]) -> Bool
+        _ predicate: @escaping @Sendable ([String: Any]) -> Bool,
     ) async throws -> [String: Any]? {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
@@ -844,7 +1012,7 @@ final class WorkerProcess: @unchecked Sendable {
 
             Current stderr:
             \(stderr)
-            """
+            """,
         )
     }
 
@@ -852,14 +1020,14 @@ final class WorkerProcess: @unchecked Sendable {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
 
-        while process.isRunning && clock.now < deadline {
+        while process.isRunning, clock.now < deadline {
             try await Task.sleep(for: .milliseconds(250))
         }
 
         guard !process.isRunning else {
             let stderr = recorder.stderrText()
             throw WorkerProcessError(
-                "The SpeakSwiftly worker did not exit before the timeout expired. Current stderr:\n\(stderr)"
+                "The SpeakSwiftly worker did not exit before the timeout expired. Current stderr:\n\(stderr)",
             )
         }
 
@@ -871,7 +1039,7 @@ final class WorkerProcess: @unchecked Sendable {
             let stderr = recorder.stderrText()
             finalizeArtifactsIfNeeded()
             throw WorkerProcessError(
-                "The SpeakSwiftly worker exited with status \(process.terminationStatus). Current stderr:\n\(stderr)"
+                "The SpeakSwiftly worker exited with status \(process.terminationStatus). Current stderr:\n\(stderr)",
             )
         }
 
@@ -880,7 +1048,7 @@ final class WorkerProcess: @unchecked Sendable {
 
     func waitForStderrJSONObject(
         timeout: Duration,
-        _ predicate: @escaping @Sendable ([String: Any]) -> Bool
+        _ predicate: @escaping @Sendable ([String: Any]) -> Bool,
     ) async throws -> [String: Any]? {
         let clock = ContinuousClock()
         let deadline = clock.now + timeout
@@ -903,39 +1071,12 @@ final class WorkerProcess: @unchecked Sendable {
 
         let stderr = recorder.stderrText()
         throw WorkerProcessError(
-            "Timed out waiting for a matching worker stderr JSON event. Current stderr:\n\(stderr)"
+            "Timed out waiting for a matching worker stderr JSON event. Current stderr:\n\(stderr)",
         )
     }
 
     func stdoutObjects() -> [[String: Any]] {
         recorder.allStdoutObjects()
-    }
-
-    private static func captureLines(
-        from fileHandle: FileHandle,
-        append: @escaping @Sendable (String) -> Void
-    ) -> Task<Void, Never> {
-        Task.detached {
-            var buffer = Data()
-
-            while !Task.isCancelled {
-                let data = fileHandle.availableData
-                guard !data.isEmpty else { break }
-                buffer.append(data)
-
-                while let newlineRange = buffer.firstRange(of: Data([0x0A])) {
-                    let lineData = buffer[..<newlineRange.lowerBound]
-                    if let line = String(data: lineData, encoding: .utf8) {
-                        append(line)
-                    }
-                    buffer.removeSubrange(..<newlineRange.upperBound)
-                }
-            }
-
-            if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
-                append(line)
-            }
-        }
     }
 
     private func closeCapturedOutputs() {
@@ -946,153 +1087,20 @@ final class WorkerProcess: @unchecked Sendable {
     private func finalizeArtifactsIfNeeded() {
         finalizedLock.withLock {
             guard !didFinalizeArtifacts else { return }
+
             didFinalizeArtifacts = true
 
             artifacts.finalize(
                 terminationStatus: Int(process.terminationStatus),
                 terminationReason: process.terminationReason,
                 stdoutObjects: recorder.allStdoutObjects(),
-                stderrObjects: recorder.allStderrObjects()
+                stderrObjects: recorder.allStderrObjects(),
             )
         }
-    }
-
-    private static func workerExecutableURL(
-        packageRootURL: URL,
-        configuration: String
-    ) throws -> URL {
-        let result = Result {
-            try computeWorkerExecutableURL(
-                packageRootURL: packageRootURL,
-                configuration: configuration
-            )
-        }
-        return try result.get()
-    }
-
-    private static func computeWorkerExecutableURL(
-        packageRootURL: URL,
-        configuration: String
-    ) throws -> URL {
-        let runtime = try loadPublishedRuntime(
-            packageRootURL: packageRootURL,
-            configuration: configuration
-        )
-
-        guard FileManager.default.isExecutableFile(atPath: runtime.executableURL.path) else {
-            throw WorkerProcessError(
-                "The published SpeakSwiftly worker executable recorded in '\(runtime.metadataURL.path)' was expected at '\(runtime.executableURL.path)', but no executable was found there."
-            )
-        }
-
-        guard FileManager.default.fileExists(atPath: runtime.metallibURL.path) else {
-            throw WorkerProcessError(
-                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its MLX Metal shader bundle at '\(runtime.metallibURL.path)'. The worker cannot run real MLX-backed e2e tests without `default.metallib`."
-            )
-        }
-
-        guard FileManager.default.isExecutableFile(atPath: runtime.launcherURL.path) else {
-            throw WorkerProcessError(
-                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its launcher script at '\(runtime.launcherURL.path)'."
-            )
-        }
-
-        return runtime.launcherURL
-    }
-
-    private static func loadPublishedRuntime(
-        packageRootURL: URL,
-        configuration: String
-    ) throws -> PublishedRuntime {
-        let metadataURL = packageRootURL
-            .appendingPathComponent(".local/xcode/SpeakSwiftly.\(configuration.lowercased()).json", isDirectory: false)
-
-        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
-            throw WorkerProcessError(
-                "The published SpeakSwiftly runtime metadata manifest was expected at '\(metadataURL.path)', but no manifest was found there."
-            )
-        }
-
-        let data = try Data(contentsOf: metadataURL)
-        let manifest = try JSONDecoder().decode(PublishedRuntimeManifest.self, from: data)
-
-        return PublishedRuntime(
-            metadataURL: metadataURL,
-            productsURL: URL(fileURLWithPath: manifest.productsPath),
-            executableURL: URL(fileURLWithPath: manifest.executablePath),
-            launcherURL: URL(fileURLWithPath: manifest.launcherPath),
-            metallibURL: URL(fileURLWithPath: manifest.metallibPath),
-            aliasURL: URL(fileURLWithPath: manifest.aliasPath)
-        )
-    }
-
-    private static func packageRootURL() throws -> URL {
-        let fileManager = FileManager.default
-        var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-
-        while true {
-            let manifestURL = candidateURL.appendingPathComponent("Package.swift", isDirectory: false)
-            if fileManager.fileExists(atPath: manifestURL.path) {
-                return candidateURL
-            }
-
-            let parentURL = candidateURL.deletingLastPathComponent()
-            guard parentURL != candidateURL else {
-                throw WorkerProcessError(
-                    "SpeakSwiftly e2e tests could not find the package root while walking upward from '\(#filePath)'. Expected to find a directory containing 'Package.swift'."
-                )
-            }
-
-            candidateURL = parentURL
-        }
-    }
-
-    private static func buildWorkerProduct(
-        packageRootURL: URL,
-        configuration: String
-    ) throws {
-        let process = Process()
-        let logURL = packageRootURL
-            .appendingPathComponent(".local/xcode/SpeakSwiftly-e2e-publish-\(configuration.lowercased()).log", isDirectory: false)
-        try FileManager.default.createDirectory(
-            at: packageRootURL.appendingPathComponent(".local/xcode", isDirectory: true),
-            withIntermediateDirectories: true
-        )
-        FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        let logHandle = try FileHandle(forWritingTo: logURL)
-        defer { try? logHandle.close() }
-
-        process.currentDirectoryURL = packageRootURL
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = [
-            "scripts/repo-maintenance/publish-runtime.sh",
-            "--configuration", configuration,
-        ]
-        process.standardOutput = logHandle
-        process.standardError = logHandle
-
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            let outputData = try Data(contentsOf: logURL)
-            let output = String(decoding: outputData, as: UTF8.self)
-            throw WorkerProcessError(
-                "The SpeakSwiftly runtime publisher failed with status \(process.terminationStatus). Publisher output:\n\(output)"
-            )
-        }
-    }
-
-    private static func publishWorkerRuntime(
-        packageRootURL: URL,
-        configuration: String
-    ) throws {
-        try buildWorkerProduct(
-            packageRootURL: packageRootURL,
-            configuration: configuration
-        )
     }
 }
+
+// MARK: - PublishedRuntimeManifest
 
 private struct PublishedRuntimeManifest: Decodable {
     let productsPath: String
@@ -1110,6 +1118,8 @@ private struct PublishedRuntimeManifest: Decodable {
     }
 }
 
+// MARK: - PublishedRuntime
+
 private struct PublishedRuntime {
     let metadataURL: URL
     let productsURL: URL
@@ -1119,6 +1129,8 @@ private struct PublishedRuntime {
     let aliasURL: URL
 }
 
+// MARK: - WorkerProcessError
+
 struct WorkerProcessError: Error, CustomStringConvertible {
     let description: String
 
@@ -1126,6 +1138,8 @@ struct WorkerProcessError: Error, CustomStringConvertible {
         self.description = description
     }
 }
+
+// MARK: - E2EWorkerArtifacts
 
 private final class E2EWorkerArtifacts: @unchecked Sendable {
     private let lock = NSLock()
@@ -1149,7 +1163,7 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
         configuration: String,
         caller: String,
         executableURL: URL,
-        profileRootURL: URL
+        profileRootURL: URL,
     ) throws {
         runID = Self.runTimestampString(for: startedAt)
             + "-" + UUID().uuidString.lowercased()
@@ -1185,6 +1199,13 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
         try? stderrHandle.close()
     }
 
+    private static func runTimestampString(for date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+        return formatter.string(from: date)
+            .replacingOccurrences(of: ":", with: "-")
+    }
+
     func recordProcessID(_ processID: Int32) {
         lock.withLock {
             self.processID = processID
@@ -1203,7 +1224,7 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
         terminationStatus: Int,
         terminationReason: Process.TerminationReason,
         stdoutObjects: [[String: Any]],
-        stderrObjects: [[String: Any]]
+        stderrObjects: [[String: Any]],
     ) {
         lock.withLock {
             let finishedAt = Date()
@@ -1225,7 +1246,7 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
                 stderrLogPath: stderrURL.path,
                 stdoutEventCount: stdoutObjects.count,
                 stderrEventCount: stderrObjects.count,
-                lastRuntimeMetrics: lastRuntimeMetrics(from: stderrObjects)
+                lastRuntimeMetrics: lastRuntimeMetrics(from: stderrObjects),
             )
 
             do {
@@ -1255,14 +1276,14 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
 
             let hasMetrics =
                 details["process_resident_bytes"] != nil
-                || details["process_phys_footprint_bytes"] != nil
-                || details["process_user_cpu_time_ns"] != nil
-                || details["process_system_cpu_time_ns"] != nil
-                || details["mlx_active_memory_bytes"] != nil
-                || details["mlx_cache_memory_bytes"] != nil
-                || details["mlx_peak_memory_bytes"] != nil
-                || details["mlx_cache_limit_bytes"] != nil
-                || details["mlx_memory_limit_bytes"] != nil
+                    || details["process_phys_footprint_bytes"] != nil
+                    || details["process_user_cpu_time_ns"] != nil
+                    || details["process_system_cpu_time_ns"] != nil
+                    || details["mlx_active_memory_bytes"] != nil
+                    || details["mlx_cache_memory_bytes"] != nil
+                    || details["mlx_peak_memory_bytes"] != nil
+                    || details["mlx_cache_limit_bytes"] != nil
+                    || details["mlx_memory_limit_bytes"] != nil
 
             guard hasMetrics else { continue }
 
@@ -1277,20 +1298,15 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
                 mlxCacheMemoryBytes: details["mlx_cache_memory_bytes"] as? Int,
                 mlxPeakMemoryBytes: details["mlx_peak_memory_bytes"] as? Int,
                 mlxCacheLimitBytes: details["mlx_cache_limit_bytes"] as? Int,
-                mlxMemoryLimitBytes: details["mlx_memory_limit_bytes"] as? Int
+                mlxMemoryLimitBytes: details["mlx_memory_limit_bytes"] as? Int,
             )
         }
 
         return nil
     }
-
-    private static func runTimestampString(for date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
-        return formatter.string(from: date)
-            .replacingOccurrences(of: ":", with: "-")
-    }
 }
+
+// MARK: - E2ERunSummary
 
 private struct E2ERunSummary: Codable {
     let runID: String
@@ -1311,6 +1327,8 @@ private struct E2ERunSummary: Codable {
     let stderrEventCount: Int
     let lastRuntimeMetrics: E2ERuntimeMetrics?
 }
+
+// MARK: - E2ERuntimeMetrics
 
 private struct E2ERuntimeMetrics: Codable {
     let event: String?
@@ -1334,7 +1352,6 @@ private extension JSONEncoder {
         return encoder
     }
 }
-
 
 extension String {
     var jsonEscaped: String {

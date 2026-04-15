@@ -1,12 +1,11 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Qwen E2E")
     struct QwenWorkflowSuite {
-        @Test func voiceDesignSilentThenAudible() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `voice design silent then audible`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -15,7 +14,7 @@ extension SpeakSwiftlyE2ETests {
             do {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
-                    silentPlayback: true
+                    silentPlayback: true,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -26,13 +25,13 @@ extension SpeakSwiftlyE2ETests {
                     profileName: profileName,
                     text: SpeakSwiftlyE2ETests.testingProfileText,
                     vibe: .masc,
-                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
                 )
                 try await SpeakSwiftlyE2ETests.runSilentSpeech(
                     on: worker,
                     id: "req-live-voice-design-silent",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: profileName
+                    profileName: profileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))
@@ -42,7 +41,7 @@ extension SpeakSwiftlyE2ETests {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
                     silentPlayback: false,
-                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -51,29 +50,29 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-voice-design-audible",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: profileName
+                    profileName: profileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))
             }
         }
 
-        @Test func preparedConditioningPersistsAndReloadsAcrossWorkerRestart() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `prepared conditioning persists and reloads across worker restart`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
             let profileName = "prepared-conditioning-profile"
             let runtimeConfiguration = SpeakSwiftly.Configuration(
                 speechBackend: .qwen3,
-                qwenConditioningStrategy: .preparedConditioning
+                qwenConditioningStrategy: .preparedConditioning,
             )
 
             do {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
                     silentPlayback: true,
-                    configuration: runtimeConfiguration
+                    configuration: runtimeConfiguration,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -84,13 +83,13 @@ extension SpeakSwiftlyE2ETests {
                     profileName: profileName,
                     text: SpeakSwiftlyE2ETests.testingProfileText,
                     vibe: .masc,
-                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                    voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
                 )
                 try await SpeakSwiftlyE2ETests.runSilentSpeech(
                     on: worker,
                     id: "req-live-prepared-conditioning-first-pass",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: profileName
+                    profileName: profileName,
                 )
                 #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
                     $0["event"] as? String == "qwen_reference_conditioning_persisted"
@@ -108,7 +107,7 @@ extension SpeakSwiftlyE2ETests {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
                     silentPlayback: true,
-                    configuration: runtimeConfiguration
+                    configuration: runtimeConfiguration,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -117,7 +116,7 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-prepared-conditioning-second-pass",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: profileName
+                    profileName: profileName,
                 )
                 #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
                     $0["event"] as? String == "qwen_reference_conditioning_loaded"
@@ -128,8 +127,8 @@ extension SpeakSwiftlyE2ETests {
             }
         }
 
-        @Test func cloneWithProvidedTranscript() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `clone with provided transcript`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -140,7 +139,7 @@ extension SpeakSwiftlyE2ETests {
             do {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
-                    silentPlayback: true
+                    silentPlayback: true,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -152,7 +151,7 @@ extension SpeakSwiftlyE2ETests {
                     text: SpeakSwiftlyE2ETests.testingCloneSourceText,
                     vibe: .masc,
                     voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
-                    outputURL: referenceAudioURL
+                    outputURL: referenceAudioURL,
                 )
                 #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
 
@@ -163,7 +162,7 @@ extension SpeakSwiftlyE2ETests {
                     referenceAudioURL: referenceAudioURL,
                     vibe: .masc,
                     transcript: SpeakSwiftlyE2ETests.testingCloneSourceText,
-                    expectTranscription: false
+                    expectTranscription: false,
                 )
 
                 let store = ProfileStore(rootURL: sandbox.profileRootURL)
@@ -177,7 +176,7 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-clone-provided-transcript-silent",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: cloneProfileName
+                    profileName: cloneProfileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))
@@ -187,7 +186,7 @@ extension SpeakSwiftlyE2ETests {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
                     silentPlayback: false,
-                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -196,15 +195,15 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-clone-provided-transcript-audible",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: cloneProfileName
+                    profileName: cloneProfileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))
             }
         }
 
-        @Test func cloneWithInferredTranscript() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `clone with inferred transcript`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -215,7 +214,7 @@ extension SpeakSwiftlyE2ETests {
             do {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
-                    silentPlayback: true
+                    silentPlayback: true,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -227,7 +226,7 @@ extension SpeakSwiftlyE2ETests {
                     text: SpeakSwiftlyE2ETests.testingCloneSourceText,
                     vibe: .masc,
                     voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
-                    outputURL: referenceAudioURL
+                    outputURL: referenceAudioURL,
                 )
                 #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
 
@@ -238,7 +237,7 @@ extension SpeakSwiftlyE2ETests {
                     referenceAudioURL: referenceAudioURL,
                     vibe: .masc,
                     transcript: nil,
-                    expectTranscription: true
+                    expectTranscription: true,
                 )
 
                 let store = ProfileStore(rootURL: sandbox.profileRootURL)
@@ -248,7 +247,7 @@ extension SpeakSwiftlyE2ETests {
                 #expect(storedProfile.manifest.transcriptProvenance?.source == .inferred)
                 #expect(
                     storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo
-                        == ModelFactory.cloneTranscriptionModelRepo
+                        == ModelFactory.cloneTranscriptionModelRepo,
                 )
                 #expect(!inferredTranscript.isEmpty)
                 #expect(SpeakSwiftlyE2ETests.transcriptLooksCloseToCloneSource(inferredTranscript))
@@ -257,7 +256,7 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-clone-inferred-transcript-silent",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: cloneProfileName
+                    profileName: cloneProfileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))
@@ -267,7 +266,7 @@ extension SpeakSwiftlyE2ETests {
                 let worker = try WorkerProcess(
                     profileRootURL: sandbox.profileRootURL,
                     silentPlayback: false,
-                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled
+                    playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
                 )
                 defer { Task { await worker.stop() } }
 
@@ -276,7 +275,7 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: "req-live-clone-inferred-transcript-audible",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: cloneProfileName
+                    profileName: cloneProfileName,
                 )
                 try worker.closeInput()
                 try await worker.waitForExit(timeout: .seconds(30))

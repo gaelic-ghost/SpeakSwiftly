@@ -1,7 +1,9 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
+
+// MARK: - BlockingFilesystemCoordinator
 
 final class BlockingFilesystemCoordinator: @unchecked Sendable {
     private let enteredSemaphore = DispatchSemaphore(value: 0)
@@ -25,6 +27,8 @@ final class BlockingFilesystemCoordinator: @unchecked Sendable {
     }
 }
 
+// MARK: - CopyBlockingFileManager
+
 final class CopyBlockingFileManager: FileManager, @unchecked Sendable {
     let blockedDestinationPath: String
     let coordinator: BlockingFilesystemCoordinator
@@ -45,6 +49,8 @@ final class CopyBlockingFileManager: FileManager, @unchecked Sendable {
     }
 }
 
+// MARK: - LockedFlag
+
 final class LockedFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var storedValue = false
@@ -62,7 +68,7 @@ final class LockedFlag: @unchecked Sendable {
 
 // MARK: - Shutdown Behavior
 
-@Test func shutdownCancelsActivePlaybackAndQueuedRequestsExactlyOnce() async throws {
+@Test func `shutdown cancels active playback and queued requests exactly once`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -73,8 +79,8 @@ final class LockedFlag: @unchecked Sendable {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
@@ -82,7 +88,7 @@ final class LockedFlag: @unchecked Sendable {
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -140,7 +146,7 @@ final class LockedFlag: @unchecked Sendable {
     #expect(playback.stopCount == 1)
 }
 
-@Test func shutdownPathEmitsCancellationNotPlaybackTimeout() async throws {
+@Test func `shutdown path emits cancellation not playback timeout`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -151,8 +157,8 @@ final class LockedFlag: @unchecked Sendable {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
@@ -160,7 +166,7 @@ final class LockedFlag: @unchecked Sendable {
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -196,7 +202,7 @@ final class LockedFlag: @unchecked Sendable {
     })
 }
 
-@Test func shutdownFailsTypedRequestStreamsForActiveAndQueuedRequests() async throws {
+@Test func `shutdown fails typed request streams for active and queued requests`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy(behavior: .sleep(.seconds(30)))
     let storeRoot = makeTempDirectoryURL()
@@ -208,8 +214,8 @@ final class LockedFlag: @unchecked Sendable {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -221,7 +227,7 @@ final class LockedFlag: @unchecked Sendable {
             makeProfileModel {
                 try? await Task.sleep(for: .seconds(30))
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -240,16 +246,16 @@ final class LockedFlag: @unchecked Sendable {
             textProfileName: nil,
             jobType: .live,
             textContext: nil,
-            sourceFormat: nil
-        )
+            sourceFormat: nil,
+        ),
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 
     let activeStarted = try await activeIterator.next()
     #expect(
         activeStarted == .acknowledged(
-            WorkerSuccessResponse(id: "req-active-shutdown-stream")
-        )
+            WorkerSuccessResponse(id: "req-active-shutdown-stream"),
+        ),
     )
 
     let queuedHandle = await runtime.submit(
@@ -260,8 +266,8 @@ final class LockedFlag: @unchecked Sendable {
             vibe: .femme,
             voiceDescription: "Warm and bright",
             outputPath: nil,
-            cwd: nil
-        )
+            cwd: nil,
+        ),
     )
     var queuedIterator = queuedHandle.events.makeAsyncIterator()
     #expect(await waitUntil {
@@ -289,12 +295,12 @@ final class LockedFlag: @unchecked Sendable {
     }
 }
 
-@Test func shutdownRejectsNewRequests() async throws {
+@Test func `shutdown rejects new requests`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -310,7 +316,7 @@ final class LockedFlag: @unchecked Sendable {
     })
 }
 
-@Test func shutdownCancelsActiveProfileCreationBeforeProfileIsWritten() async throws {
+@Test func `shutdown cancels active profile creation before profile is written`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -322,7 +328,7 @@ final class LockedFlag: @unchecked Sendable {
         residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             AnySpeechModel(
-                sampleRate: 24_000,
+                sampleRate: 24000,
                 generate: { _, _, _, _, _, _ in
                     try await Task.sleep(for: .seconds(30))
                     return [0.1, 0.2, 0.3]
@@ -331,9 +337,9 @@ final class LockedFlag: @unchecked Sendable {
                     AsyncThrowingStream { continuation in
                         continuation.finish()
                     }
-                }
+                },
             )
-        }
+        },
     )
 
     await runtime.start()
@@ -345,7 +351,7 @@ final class LockedFlag: @unchecked Sendable {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -367,13 +373,13 @@ final class LockedFlag: @unchecked Sendable {
     #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-guide").path))
 }
 
-@Test func shutdownWaitsForActiveProfileCreationToUnwindBeforeEmittingCancellationDuringTempWAVWrite() async throws {
+@Test func `shutdown waits for active profile creation to unwind before emitting cancellation during temp WAV write`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
     let writeCoordinator = BlockingFilesystemCoordinator()
-    let blockedRuntime = WorkerRuntime(
+    let blockedRuntime = try WorkerRuntime(
         dependencies: WorkerDependencies(
             fileManager: .default,
             loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
@@ -393,17 +399,17 @@ final class LockedFlag: @unchecked Sendable {
             writeStdout: output.writeStdout,
             writeStderr: output.writeStderr,
             now: Date.init,
-            readRuntimeMemory: { nil }
+            readRuntimeMemory: { nil },
         ),
         speechBackend: .qwen3,
         qwenConditioningStrategy: .legacyRaw,
-        profileStore: try makeProfileStore(rootURL: storeRoot),
-        generatedFileStore: try makeGeneratedFileStore(rootURL: storeRoot),
-        generationJobStore: try makeGenerationJobStore(rootURL: storeRoot),
-        normalizer: try SpeakSwiftly.Normalizer(
-            persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
+        profileStore: makeProfileStore(rootURL: storeRoot),
+        generatedFileStore: makeGeneratedFileStore(rootURL: storeRoot),
+        generationJobStore: makeGenerationJobStore(rootURL: storeRoot),
+        normalizer: SpeakSwiftly.Normalizer(
+            persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName),
         ),
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent())
+        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
     )
     await blockedRuntime.installPlaybackHooks()
     await blockedRuntime.start()
@@ -415,7 +421,7 @@ final class LockedFlag: @unchecked Sendable {
     })
 
     await blockedRuntime.accept(
-        line: #"{"id":"req-write-gate","op":"create_voice_profile_from_description","profile_name":"bright-gate","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-write-gate","op":"create_voice_profile_from_description","profile_name":"bright-gate","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -453,7 +459,7 @@ final class LockedFlag: @unchecked Sendable {
     #expect(!FileManager.default.fileExists(atPath: storeRoot.appendingPathComponent("bright-gate").path))
 }
 
-@Test func shutdownWaitsForActiveProfileExportToUnwindBeforeEmittingCancellation() async throws {
+@Test func `shutdown waits for active profile export to unwind before emitting cancellation`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -462,24 +468,24 @@ final class LockedFlag: @unchecked Sendable {
     let exportCoordinator = BlockingFilesystemCoordinator()
     let fileManager = CopyBlockingFileManager(
         blockedDestinationPath: exportURL.path,
-        coordinator: exportCoordinator
+        coordinator: exportCoordinator,
     )
 
     let profileStore = ProfileStore(rootURL: storeRoot, fileManager: fileManager)
     let generatedFileStore = GeneratedFileStore(
         rootURL: storeRoot.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
-        fileManager: fileManager
+        fileManager: fileManager,
     )
     let generationJobStore = GenerationJobStore(
         rootURL: storeRoot.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
-        fileManager: fileManager
+        fileManager: fileManager,
     )
     try profileStore.ensureRootExists()
     try generatedFileStore.ensureRootExists()
     try generationJobStore.ensureRootExists()
 
     let normalizer = try SpeakSwiftly.Normalizer(
-        persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName)
+        persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName),
     )
 
     let dependencies = WorkerDependencies(
@@ -499,7 +505,7 @@ final class LockedFlag: @unchecked Sendable {
         writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,
         now: Date.init,
-        readRuntimeMemory: { nil }
+        readRuntimeMemory: { nil },
     )
 
     let runtime = WorkerRuntime(
@@ -510,7 +516,7 @@ final class LockedFlag: @unchecked Sendable {
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent())
+        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
     )
     await runtime.installPlaybackHooks()
 
@@ -525,7 +531,7 @@ final class LockedFlag: @unchecked Sendable {
     await runtime.accept(
         line: """
         {"id":"req-export-gate","op":"create_voice_profile_from_description","profile_name":"bright-export","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"\(exportURL.path)"}
-        """
+        """,
     )
     #expect(await waitUntil {
         output.containsJSONObject {

@@ -248,7 +248,7 @@ Tickets:
 Scope:
 
 - [ ] Add first-class package documentation and index metadata so Swift package consumers can discover and understand the library surface without reading the source tree.
-- [ ] Standardize repository formatting expectations for Swift code so contributor output stays predictable across local work and CI.
+- [x] Standardize repository formatting expectations for Swift code so contributor output stays predictable across local work and CI.
 - [ ] Keep Swift Package Index presentation aligned with the actual package surface without adding maintenance-only metadata that the package does not need.
 
 Tickets:
@@ -300,7 +300,7 @@ Exit criteria:
 Exit criteria:
 
 - [ ] A new consumer can navigate the main package API through DocC instead of relying on README snippets alone.
-- [ ] Swift formatting expectations are explicit, repeatable, and checked into the repo.
+- [x] Swift formatting expectations are explicit, repeatable, and checked into the repo.
 - [ ] Swift Package Index has the minimal metadata it needs to render the package cleanly without stale or speculative configuration.
 - [x] Add playback queue-depth instrumentation so low-buffer and starvation conditions are visible in stderr logs.
 - [x] Add profile-store instrumentation for create, load, list, remove, and export with concrete filesystem paths.

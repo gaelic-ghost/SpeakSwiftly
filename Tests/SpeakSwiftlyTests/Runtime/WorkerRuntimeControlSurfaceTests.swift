@@ -1,13 +1,15 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
-// MARK: - Control Operations and Typed Surface
+// MARK: - WeakRuntimeBox
 
 private final class WeakRuntimeBox: @unchecked Sendable {
     weak var value: WorkerRuntime?
 }
+
+// MARK: - BackendLoadRecorder
 
 private actor BackendLoadRecorder {
     private var backends = [SpeakSwiftly.SpeechBackend]()
@@ -21,7 +23,7 @@ private actor BackendLoadRecorder {
     }
 }
 
-@Test func listQueueReturnsActiveAndQueuedRequestsWithoutWaitingForActivePlayback() async throws {
+@Test func `list queue returns active and queued requests without waiting for active playback`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -34,15 +36,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -56,7 +58,7 @@ private actor BackendLoadRecorder {
     let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-                $0["id"] as? String == activeHandle.id
+            $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
@@ -87,7 +89,7 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
-@Test func playbackStateStaysConsistentWhileLivePlaybackOwnsTheActiveRequest() async throws {
+@Test func `playback state stays consistent while live playback owns the active request`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -100,15 +102,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -150,7 +152,7 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
-@Test func runtimeOverviewCapturesDualLaneMarvisGenerationAndPlaybackStability() async throws {
+@Test func `runtime overview captures dual lane marvis generation and playback stability`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -161,19 +163,19 @@ private actor BackendLoadRecorder {
 
     @Sendable func makeLaneModel(_ gate: AsyncGate) -> AnySpeechModel {
         AnySpeechModel(
-            sampleRate: 24_000,
+            sampleRate: 24000,
             generate: { _, _, _, _, _, _ in
                 [0.1, 0.2]
             },
             generateSamplesStream: { _, _, _, _, _, _, _ in
                 AsyncThrowingStream { continuation in
-                    continuation.yield(Array(repeating: 0.1, count: 24_000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
                     Task {
                         await gate.wait()
                         continuation.finish()
                     }
                 }
-            }
+            },
         )
     }
 
@@ -183,8 +185,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
     _ = try store.createProfile(
         profileName: "lane-b-secondary",
@@ -192,8 +194,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Grounded and rich.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x03, 0x04])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x03, 0x04]),
     )
     _ = try store.createProfile(
         profileName: "lane-a-tertiary",
@@ -201,8 +203,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Balanced and clear.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x05, 0x06])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x05, 0x06]),
     )
 
     let runtime = try await makeRuntime(
@@ -214,10 +216,10 @@ private actor BackendLoadRecorder {
             ResidentSpeechModels.marvis(
                 MarvisResidentModels(
                     conversationalA: makeLaneModel(laneAGenerationDrain),
-                    conversationalB: makeLaneModel(laneBGenerationDrain)
-                )
+                    conversationalB: makeLaneModel(laneBGenerationDrain),
+                ),
             )
-        }
+        },
     )
 
     await runtime.start()
@@ -289,13 +291,13 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
-@Test func statusReturnsCurrentResidentBackendAndStage() async throws {
+@Test func `status returns current resident backend and stage`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
         speechBackend: .qwen3,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -326,13 +328,13 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func switchSpeechBackendReloadsResidentModelsWithoutRestartingRuntime() async throws {
+@Test func `switch speech backend reloads resident models without restarting runtime`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
         speechBackend: .qwen3,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -369,7 +371,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func unloadAndReloadModelsParkResidentGenerationUntilResidencyReturns() async throws {
+@Test func `unload and reload models park resident generation until residency returns`() async throws {
     let output = OutputRecorder()
     let backendLoads = BackendLoadRecorder()
     let storeRoot = makeTempDirectoryURL()
@@ -381,8 +383,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -393,7 +395,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { backend in
             await backendLoads.record(backend)
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -430,10 +432,12 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let queuedFileID = await runtime.generate.audio(
-        text: "Save this request once the resident models are back.",
-        with: "default-femme"
-    ).id
+    let queuedFileID = await runtime.generate
+        .audio(
+            text: "Save this request once the resident models are back.",
+            with: "default-femme",
+        )
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == queuedFileID
@@ -480,7 +484,7 @@ private actor BackendLoadRecorder {
     #expect(await backendLoads.values() == [.qwen3, .qwen3])
 }
 
-@Test func switchSpeechBackendActsAsAnOrderedBarrierWhilePlaybackDrains() async throws {
+@Test func `switch speech backend acts as an ordered barrier while playback drains`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -494,8 +498,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
@@ -506,7 +510,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { backend in
             await backendLoads.record(backend)
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -520,17 +524,19 @@ private actor BackendLoadRecorder {
     let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-                $0["id"] as? String == activeHandle.id
+            $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
 
     let switchID = await runtime.switchSpeechBackend(to: .marvis).id
-    let queuedFileID = await runtime.generate.audio(
-        text: "Save this request after the backend switch barrier.",
-        with: "default-femme"
-    ).id
+    let queuedFileID = await runtime.generate
+        .audio(
+            text: "Save this request after the backend switch barrier.",
+            with: "default-femme",
+        )
+        .id
 
     #expect(!output.containsJSONObject {
         $0["id"] as? String == queuedFileID
@@ -600,7 +606,7 @@ private actor BackendLoadRecorder {
     #expect(await backendLoads.values() == [.qwen3, .marvis])
 }
 
-@Test func clearQueueFailsQueuedRequestsWhenGenerationQueueHasWaitingWork() async throws {
+@Test func `clear queue fails queued requests when generation queue has waiting work`() async throws {
     let output = OutputRecorder()
     let profileGate = AsyncGate()
 
@@ -612,7 +618,7 @@ private actor BackendLoadRecorder {
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -623,11 +629,12 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let activeCreateID = await runtime.voices.create(design: "bright-guide",
-        from: "Hello there",
-        vibe: .femme,
-        voice: "Warm and bright"
-    ).id
+    let activeCreateID = await runtime.voices
+        .create(design: "bright-guide",
+                from: "Hello there",
+                vibe: .femme,
+                voice: "Warm and bright")
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeCreateID
@@ -643,9 +650,9 @@ private actor BackendLoadRecorder {
             WorkerQueuedEvent(
                 id: "req-queued",
                 reason: .waitingForActiveRequest,
-                queuePosition: 1
-            )
-        )
+                queuePosition: 1,
+            ),
+        ),
     )
 
     let clearID = await runtime.player.clearQueue().id
@@ -679,7 +686,7 @@ private actor BackendLoadRecorder {
     await profileGate.open()
 }
 
-@Test func cancelRequestCanCancelActivePlaybackImmediately() async throws {
+@Test func `cancel request can cancel active playback immediately`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -692,15 +699,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     let activeHandle = await runtime.submit(
@@ -711,8 +718,8 @@ private actor BackendLoadRecorder {
             textProfileName: nil,
             jobType: .live,
             textContext: nil,
-            sourceFormat: nil
-        )
+            sourceFormat: nil,
+        ),
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()
 
@@ -725,7 +732,7 @@ private actor BackendLoadRecorder {
     })
 
     while let event = try await activeIterator.next() {
-        if case .progress(let progress) = event, progress.stage == .prerollReady {
+        if case let .progress(progress) = event, progress.stage == .prerollReady {
             break
         }
     }
@@ -758,7 +765,7 @@ private actor BackendLoadRecorder {
     await playbackDrain.open()
 }
 
-@Test func cancelRequestCanCancelQueuedWorkImmediately() async throws {
+@Test func `cancel request can cancel queued work immediately`() async throws {
     let output = OutputRecorder()
     let profileGate = AsyncGate()
 
@@ -770,7 +777,7 @@ private actor BackendLoadRecorder {
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -781,11 +788,12 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let activeCreateID = await runtime.voices.create(design: "bright-guide",
-        from: "Hello there",
-        vibe: .femme,
-        voice: "Warm and bright"
-    ).id
+    let activeCreateID = await runtime.voices
+        .create(design: "bright-guide",
+                from: "Hello there",
+                vibe: .femme,
+                voice: "Warm and bright")
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeCreateID
@@ -801,9 +809,9 @@ private actor BackendLoadRecorder {
             WorkerQueuedEvent(
                 id: "req-queued",
                 reason: .waitingForActiveRequest,
-                queuePosition: 1
-            )
-        )
+                queuePosition: 1,
+            ),
+        ),
     )
 
     let cancelID = await runtime.player.cancelRequest("req-queued").id
@@ -832,7 +840,7 @@ private actor BackendLoadRecorder {
     await profileGate.open()
 }
 
-@Test func libraryHelpersSubmitProfileAndGeneratedFileWorkerProtocolRequests() async throws {
+@Test func `library helpers submit profile and generated file worker protocol requests`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -841,7 +849,7 @@ private actor BackendLoadRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -852,12 +860,13 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.voices.create(design: "bright-guide",
-        from: "Hello there",
-        vibe: .femme,
-        voice: "Warm and bright",
-        outputPath: nil
-    ).id
+    let createID = await runtime.voices
+        .create(design: "bright-guide",
+                from: "Hello there",
+                vibe: .femme,
+                voice: "Warm and bright",
+                outputPath: nil)
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == createID
@@ -915,10 +924,12 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let speakFileID = await runtime.generate.audio(
-        text: "Save this request as an artifact.",
-        with: "clear-guide"
-    ).id
+    let speakFileID = await runtime.generate
+        .audio(
+            text: "Save this request as an artifact.",
+            with: "clear-guide",
+        )
+        .id
     let fileArtifactID = "\(speakFileID)-artifact-1"
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1014,7 +1025,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func rerollRebuildsAnExistingProfileInPlaceFromItsStoredInputs() async throws {
+@Test func `reroll rebuilds an existing profile in place from its stored inputs`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1027,8 +1038,8 @@ private actor BackendLoadRecorder {
         modelRepo: ModelFactory.profileModelRepo,
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: originalAudio
+        sampleRate: 24000,
+        canonicalAudioData: originalAudio,
     )
 
     let rerolledSamples: [Float] = [0.7, 0.8, 0.9]
@@ -1039,15 +1050,15 @@ private actor BackendLoadRecorder {
         residentModelLoader: { _ in makeResidentModel() },
         profileModelLoader: {
             AnySpeechModel(
-                sampleRate: 24_000,
+                sampleRate: 24000,
                 generate: { _, _, _, _, _, _ in rerolledSamples },
                 generateSamplesStream: { _, _, _, _, _, _, _ in
                     AsyncThrowingStream { continuation in
                         continuation.finish()
                     }
-                }
+                },
             )
-        }
+        },
     )
 
     await runtime.start()
@@ -1074,7 +1085,7 @@ private actor BackendLoadRecorder {
     #expect(try Data(contentsOf: rerolledProfile.referenceAudioURL) == rawTestAudioData(for: rerolledSamples))
 }
 
-@Test func createProfileResolvesRelativeOutputPathAgainstExplicitCallerWorkingDirectory() async throws {
+@Test func `create profile resolves relative output path against explicit caller working directory`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     let callerWorkingDirectory = makeTempDirectoryURL()
@@ -1087,7 +1098,7 @@ private actor BackendLoadRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1100,7 +1111,7 @@ private actor BackendLoadRecorder {
 
     let exportURL = callerWorkingDirectory.appendingPathComponent("exports/voice.wav")
     await runtime.accept(
-        line: #"{"id":"req-relative-export","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav","cwd":"\#(callerWorkingDirectory.path)"}"#
+        line: #"{"id":"req-relative-export","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav","cwd":"\#(callerWorkingDirectory.path)"}"#,
     )
 
     #expect(await waitUntil {
@@ -1113,7 +1124,7 @@ private actor BackendLoadRecorder {
     #expect(FileManager.default.fileExists(atPath: exportURL.path))
 }
 
-@Test func createProfileRejectsRelativeOutputPathWithoutExplicitCallerWorkingDirectory() async throws {
+@Test func `create profile rejects relative output path without explicit caller working directory`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1122,7 +1133,7 @@ private actor BackendLoadRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1134,7 +1145,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-relative-export-missing-cwd","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav"}"#
+        line: #"{"id":"req-relative-export-missing-cwd","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright","output_path":"exports/voice.wav"}"#,
     )
 
     #expect(await waitUntil {
@@ -1147,7 +1158,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func generateBatchAcknowledgesQueueThenCompletesWithGeneratedBatchMetadata() async throws {
+@Test func `generate batch acknowledges queue then completes with generated batch metadata`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let storeRoot = makeTempDirectoryURL()
@@ -1159,15 +1170,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1178,17 +1189,19 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let batchID = await runtime.generate.batch(
-        [
-            SpeakSwiftly.BatchItem(text: "First generated file."),
-            SpeakSwiftly.BatchItem(
-                artifactID: "custom-batch-artifact",
-                text: "Second generated file.",
-                textProfileName: "logs"
-            ),
-        ],
-        with: "default-femme"
-    ).id
+    let batchID = await runtime.generate
+        .batch(
+            [
+                SpeakSwiftly.BatchItem(text: "First generated file."),
+                SpeakSwiftly.BatchItem(
+                    artifactID: "custom-batch-artifact",
+                    text: "Second generated file.",
+                    textProfileName: "logs",
+                ),
+            ],
+            with: "default-femme",
+        )
+        .id
 
     #expect(await waitUntil {
         output.countJSONObjects {
@@ -1276,7 +1289,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func createCloneStoresProvidedTranscriptWithoutTranscription() async throws {
+@Test func `create clone stores provided transcript without transcription`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1290,7 +1303,7 @@ private actor BackendLoadRecorder {
         output: output,
         playback: PlaybackSpy(),
         loadedCloneAudioSamples: [0.1, 0.2, 0.3],
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1301,10 +1314,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.voices.create(clone: "ghost-copy",
-        from: referenceAudioURL,
-        transcript: "Provided transcript"
-    ).id
+    let createID = await runtime.voices
+        .create(clone: "ghost-copy",
+                from: referenceAudioURL,
+                transcript: "Provided transcript")
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == createID
@@ -1323,7 +1337,7 @@ private actor BackendLoadRecorder {
     #expect(storedProfile.manifest.modelRepo == ModelFactory.importedCloneModelRepo)
 }
 
-@Test func createCloneResolvesRelativeReferenceAudioAgainstExplicitCallerWorkingDirectory() async throws {
+@Test func `create clone resolves relative reference audio against explicit caller working directory`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     let callerWorkingDirectory = makeTempDirectoryURL()
@@ -1342,7 +1356,7 @@ private actor BackendLoadRecorder {
         output: output,
         playback: PlaybackSpy(),
         loadedCloneAudioSamples: [0.1, 0.2, 0.3],
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1354,7 +1368,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-relative-clone","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"reference.wav","vibe":"masc","transcript":"Provided transcript","cwd":"\#(callerWorkingDirectory.path)"}"#
+        line: #"{"id":"req-relative-clone","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"reference.wav","vibe":"masc","transcript":"Provided transcript","cwd":"\#(callerWorkingDirectory.path)"}"#,
     )
 
     #expect(await waitUntil {
@@ -1366,7 +1380,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func createCloneCanInferTranscriptFromReferenceAudio() async throws {
+@Test func `create clone can infer transcript from reference audio`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1383,7 +1397,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { _ in makeResidentModel() },
         cloneTranscriptionModelLoader: {
             makeCloneTranscriptionModel(transcript: "Inferred transcript")
-        }
+        },
     )
 
     await runtime.start()
@@ -1394,10 +1408,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.voices.create(clone: "ghost-copy",
-        from: referenceAudioURL,
-        transcript: nil
-    ).id
+    let createID = await runtime.voices
+        .create(clone: "ghost-copy",
+                from: referenceAudioURL,
+                transcript: nil)
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == createID
@@ -1420,7 +1435,7 @@ private actor BackendLoadRecorder {
     #expect(storedProfile.manifest.sourceText == "Inferred transcript")
 }
 
-@Test func createCloneFailsWhenTranscriptInferenceReturnsNothing() async throws {
+@Test func `create clone fails when transcript inference returns nothing`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1437,7 +1452,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { _ in makeResidentModel() },
         cloneTranscriptionModelLoader: {
             makeCloneTranscriptionModel(transcript: "")
-        }
+        },
     )
 
     await runtime.start()
@@ -1448,10 +1463,11 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let createID = await runtime.voices.create(clone: "ghost-copy",
-        from: referenceAudioURL,
-        transcript: nil
-    ).id
+    let createID = await runtime.voices
+        .create(clone: "ghost-copy",
+                from: referenceAudioURL,
+                transcript: nil)
+        .id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == createID
@@ -1461,7 +1477,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func typedStatusAndRequestStreamsExposeWorkerOutputForLibraryConsumers() async throws {
+@Test func `typed status and request streams expose worker output for library consumers`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1472,15 +1488,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     let statuses = await runtime.statusEvents()
@@ -1494,7 +1510,7 @@ private actor BackendLoadRecorder {
     #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
 
     let handle = await runtime.submit(
-        .listProfiles(id: "req-stream")
+        .listProfiles(id: "req-stream"),
     )
     var iterator = handle.events.makeAsyncIterator()
     let createdAt = try store.loadProfile(named: "default-femme").manifest.createdAt
@@ -1504,36 +1520,35 @@ private actor BackendLoadRecorder {
 
     while let event = try await iterator.next() {
         switch event {
-        case .queued:
-            continue
+            case .queued:
+                continue
 
-        case .started(let started):
-            #expect(started == WorkerStartedEvent(id: "req-stream", op: "list_voice_profiles"))
-            sawStarted = true
+            case let .started(started):
+                #expect(started == WorkerStartedEvent(id: "req-stream", op: "list_voice_profiles"))
+                sawStarted = true
 
-        case .completed(let response):
-            #expect(
-                response == WorkerSuccessResponse(
-                    id: "req-stream",
-                    profiles: [
-                        ProfileSummary(
-                            profileName: "default-femme",
-                            vibe: .femme,
-                            createdAt: createdAt,
-                            voiceDescription: "Warm and bright.",
-                            sourceText: "Reference transcript",
-                            transcriptSource: nil,
-                            transcriptResolvedAt: nil,
-                            transcriptionModelRepo: nil
-                        )
-                    ]
+            case let .completed(response):
+                #expect(
+                    response == WorkerSuccessResponse(
+                        id: "req-stream",
+                        profiles: [
+                            ProfileSummary(
+                                profileName: "default-femme",
+                                vibe: .femme,
+                                createdAt: createdAt,
+                                voiceDescription: "Warm and bright.",
+                                sourceText: "Reference transcript",
+                                transcriptSource: nil,
+                                transcriptResolvedAt: nil,
+                                transcriptionModelRepo: nil,
+                            ),
+                        ],
+                    ),
                 )
-            )
-            sawCompleted = true
-            break
+                sawCompleted = true
 
-        case .progress, .acknowledged:
-            Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
+            case .progress, .acknowledged:
+                Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
         }
     }
 
@@ -1541,7 +1556,7 @@ private actor BackendLoadRecorder {
     #expect(sawCompleted)
 }
 
-@Test func typedListProfilesResponseIncludesTranscriptProvenanceSummary() async throws {
+@Test func `typed list profiles response includes transcript provenance summary`() async throws {
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
@@ -1557,17 +1572,17 @@ private actor BackendLoadRecorder {
         transcriptProvenance: TranscriptProvenance(
             source: .inferred,
             createdAt: transcriptResolvedAt,
-            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo,
         ),
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1578,42 +1593,42 @@ private actor BackendLoadRecorder {
 
     while let event = try await iterator.next() {
         switch event {
-        case .queued, .started:
-            continue
+            case .queued, .started:
+                continue
 
-        case .completed(let response):
-            #expect(
-                response == WorkerSuccessResponse(
-                    id: "req-provenance",
-                    profiles: [
-                        ProfileSummary(
-                            profileName: "clone-profile",
-                            vibe: .masc,
-                            createdAt: createdAt,
-                            voiceDescription: ModelFactory.importedCloneVoiceDescription,
-                            sourceText: "Recovered transcript",
-                            transcriptSource: .inferred,
-                            transcriptResolvedAt: transcriptResolvedAt,
-                            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
-                        )
-                    ]
+            case let .completed(response):
+                #expect(
+                    response == WorkerSuccessResponse(
+                        id: "req-provenance",
+                        profiles: [
+                            ProfileSummary(
+                                profileName: "clone-profile",
+                                vibe: .masc,
+                                createdAt: createdAt,
+                                voiceDescription: ModelFactory.importedCloneVoiceDescription,
+                                sourceText: "Recovered transcript",
+                                transcriptSource: .inferred,
+                                transcriptResolvedAt: transcriptResolvedAt,
+                                transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo,
+                            ),
+                        ],
+                    ),
                 )
-            )
-            return
+                return
 
-        case .progress, .acknowledged:
-            Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
+            case .progress, .acknowledged:
+                Issue.record("The typed list-voice-profiles request stream emitted an unexpected event before completion: \(event)")
         }
     }
 
     Issue.record("The typed list-voice-profiles request stream finished without emitting a completion event.")
 }
 
-@Test func requestObservationReturnsNilAndFinishedStreamForUnknownRequestID() async throws {
+@Test func `request observation returns nil and finished stream for unknown request ID`() async throws {
     let runtime = try await makeRuntime(
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -1626,7 +1641,7 @@ private actor BackendLoadRecorder {
     #expect(first == nil)
 }
 
-@Test func requestObservationExposesReplayableGenerationEventsForQwenRequests() async throws {
+@Test func `request observation exposes replayable generation events for qwen requests`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1637,15 +1652,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) }
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
     )
 
     await runtime.start()
@@ -1658,19 +1673,19 @@ private actor BackendLoadRecorder {
 
     let handle = await runtime.generate.audio(
         text: "Hello from the generation event side channel.",
-        with: "default-femme"
+        with: "default-femme",
     )
 
     let runtimeEvents = await runtime.generationEvents(for: handle.id)
     var runtimeIterator = runtimeEvents.makeAsyncIterator()
 
-    if case .token(let token)? = try await runtimeIterator.next()?.event {
+    if case let .token(token)? = try await runtimeIterator.next()?.event {
         #expect(token == 101)
     } else {
         Issue.record("Expected the first replayed generation event to be a qwen token.")
     }
 
-    if case .info(let info)? = try await runtimeIterator.next()?.event {
+    if case let .info(info)? = try await runtimeIterator.next()?.event {
         #expect(info.promptTokenCount == 12)
         #expect(info.generationTokenCount == 8)
         #expect(info.prefillTime == 0.12)
@@ -1681,13 +1696,13 @@ private actor BackendLoadRecorder {
         Issue.record("Expected the second replayed generation event to carry qwen generation info.")
     }
 
-    if case .audioChunk(let sampleCount)? = try await runtimeIterator.next()?.event {
+    if case let .audioChunk(sampleCount)? = try await runtimeIterator.next()?.event {
         #expect(sampleCount == 2)
     } else {
         Issue.record("Expected the third replayed generation event to describe the first audio chunk.")
     }
 
-    if case .audioChunk(let sampleCount)? = try await runtimeIterator.next()?.event {
+    if case let .audioChunk(sampleCount)? = try await runtimeIterator.next()?.event {
         #expect(sampleCount == 2)
     } else {
         Issue.record("Expected the fourth replayed generation event to describe the second audio chunk.")
@@ -1696,22 +1711,22 @@ private actor BackendLoadRecorder {
     #expect(try await runtimeIterator.next() == nil)
 
     var handleIterator = handle.generationEvents.makeAsyncIterator()
-    if case .token(let token)? = try await handleIterator.next()?.event {
+    if case let .token(token)? = try await handleIterator.next()?.event {
         #expect(token == 101)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the qwen token event.")
     }
-    if case .info(let info)? = try await handleIterator.next()?.event {
+    if case let .info(info)? = try await handleIterator.next()?.event {
         #expect(info.promptTokenCount == 12)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the qwen info event.")
     }
-    if case .audioChunk(let sampleCount)? = try await handleIterator.next()?.event {
+    if case let .audioChunk(sampleCount)? = try await handleIterator.next()?.event {
         #expect(sampleCount == 2)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the first audio chunk event.")
     }
-    if case .audioChunk(let sampleCount)? = try await handleIterator.next()?.event {
+    if case let .audioChunk(sampleCount)? = try await handleIterator.next()?.event {
         #expect(sampleCount == 2)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the second audio chunk event.")
@@ -1719,7 +1734,7 @@ private actor BackendLoadRecorder {
     #expect(try await handleIterator.next() == nil)
 }
 
-@Test func requestObservationReplaysQueuedStateAndFansOutToMultipleSubscribers() async throws {
+@Test func `request observation replays queued state and fans out to multiple subscribers`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let runtime = try await makeRuntime(
@@ -1728,7 +1743,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -1748,10 +1763,10 @@ private actor BackendLoadRecorder {
     #expect(snapshot?.sequence == 1)
     if let snapshot {
         switch snapshot.state {
-        case .queued(let queued):
-            #expect(queued == WorkerQueuedEvent(id: "req-late", reason: .waitingForResidentModel, queuePosition: 1))
-        default:
-            Issue.record("Expected queued state in the late-attach snapshot, got \(snapshot.state)")
+            case let .queued(queued):
+                #expect(queued == WorkerQueuedEvent(id: "req-late", reason: .waitingForResidentModel, queuePosition: 1))
+            default:
+                Issue.record("Expected queued state in the late-attach snapshot, got \(snapshot.state)")
         }
         #expect(snapshot.acceptedAt <= snapshot.lastUpdatedAt)
     }
@@ -1765,12 +1780,12 @@ private actor BackendLoadRecorder {
     let replayB = try await iteratorB.next()
     #expect(replayA?.sequence == 1)
     #expect(replayB?.sequence == 1)
-    if case .queued(let queuedA)? = replayA?.state {
+    if case let .queued(queuedA)? = replayA?.state {
         #expect(queuedA.reason == .waitingForResidentModel)
     } else {
         Issue.record("Expected subscriber A to replay a queued update first.")
     }
-    if case .queued(let queuedB)? = replayB?.state {
+    if case let .queued(queuedB)? = replayB?.state {
         #expect(queuedB.reason == .waitingForResidentModel)
     } else {
         Issue.record("Expected subscriber B to replay a queued update first.")
@@ -1782,12 +1797,12 @@ private actor BackendLoadRecorder {
     let startedB = try await iteratorB.next()
     #expect(startedA?.sequence == 2)
     #expect(startedB?.sequence == 2)
-    if case .started(let eventA)? = startedA?.state {
+    if case let .started(eventA)? = startedA?.state {
         #expect(eventA == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
     } else {
         Issue.record("Expected subscriber A to receive a started update second.")
     }
-    if case .started(let eventB)? = startedB?.state {
+    if case let .started(eventB)? = startedB?.state {
         #expect(eventB == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
     } else {
         Issue.record("Expected subscriber B to receive a started update second.")
@@ -1797,12 +1812,12 @@ private actor BackendLoadRecorder {
     let completedB = try await iteratorB.next()
     #expect(completedA?.sequence == 3)
     #expect(completedB?.sequence == 3)
-    if case .completed(let successA)? = completedA?.state {
+    if case let .completed(successA)? = completedA?.state {
         #expect(successA.id == "req-late")
     } else {
         Issue.record("Expected subscriber A to receive a completed update third.")
     }
-    if case .completed(let successB)? = completedB?.state {
+    if case let .completed(successB)? = completedB?.state {
         #expect(successB.id == "req-late")
     } else {
         Issue.record("Expected subscriber B to receive a completed update third.")
@@ -1815,17 +1830,17 @@ private actor BackendLoadRecorder {
     let handleQueued = try await handleIterator.next()
     let handleStarted = try await handleIterator.next()
     let handleCompleted = try await handleIterator.next()
-    if case .queued(let queued)? = handleQueued {
+    if case let .queued(queued)? = handleQueued {
         #expect(queued == WorkerQueuedEvent(id: "req-late", reason: .waitingForResidentModel, queuePosition: 1))
     } else {
         Issue.record("Expected the original handle stream to retain the queued event history.")
     }
-    if case .started(let started)? = handleStarted {
+    if case let .started(started)? = handleStarted {
         #expect(started == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
     } else {
         Issue.record("Expected the original handle stream to retain the started event history.")
     }
-    if case .completed(let success)? = handleCompleted {
+    if case let .completed(success)? = handleCompleted {
         #expect(success.id == "req-late")
     } else {
         Issue.record("Expected the original handle stream to retain the completed event history.")
@@ -1834,14 +1849,14 @@ private actor BackendLoadRecorder {
 
     let completedSnapshot = await runtime.request(id: "req-late")
     #expect(completedSnapshot?.sequence == 3)
-    if case .completed(let success)? = completedSnapshot?.state {
+    if case let .completed(success)? = completedSnapshot?.state {
         #expect(success.id == "req-late")
     } else {
         Issue.record("Expected the retained request snapshot to stay completed after terminal success.")
     }
 }
 
-@Test func requestObservationReportsCancellationAsDataWhileHandleStreamStillThrows() async throws {
+@Test func `request observation reports cancellation as data while handle stream still throws`() async throws {
     let output = OutputRecorder()
     let profileGate = AsyncGate()
 
@@ -1853,7 +1868,7 @@ private actor BackendLoadRecorder {
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -1865,10 +1880,9 @@ private actor BackendLoadRecorder {
     })
 
     _ = await runtime.voices.create(design: "bright-guide",
-        from: "Hello there",
-        vibe: .femme,
-        voice: "Warm and bright"
-    )
+                                    from: "Hello there",
+                                    vibe: .femme,
+                                    voice: "Warm and bright")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "started"
@@ -1887,7 +1901,7 @@ private actor BackendLoadRecorder {
 
     let updates = await runtime.updates(for: "req-cancelled")
     var updatesIterator = updates.makeAsyncIterator()
-    if case .queued(let queued)? = try await updatesIterator.next()?.state {
+    if case let .queued(queued)? = try await updatesIterator.next()?.state {
         #expect(queued == WorkerQueuedEvent(id: "req-cancelled", reason: .waitingForActiveRequest, queuePosition: 1))
     } else {
         Issue.record("Expected the reconnecting observer to replay the queued state first.")
@@ -1903,7 +1917,7 @@ private actor BackendLoadRecorder {
     })
 
     let cancelledUpdate = try await updatesIterator.next()
-    if case .cancelled(let failure)? = cancelledUpdate?.state {
+    if case let .cancelled(failure)? = cancelledUpdate?.state {
         #expect(failure.id == "req-cancelled")
         #expect(failure.code == .requestCancelled)
     } else {
@@ -1912,7 +1926,7 @@ private actor BackendLoadRecorder {
     #expect(try await updatesIterator.next() == nil)
 
     let cancelledSnapshot = await runtime.request(id: "req-cancelled")
-    if case .cancelled(let failure)? = cancelledSnapshot?.state {
+    if case let .cancelled(failure)? = cancelledSnapshot?.state {
         #expect(failure.code == .requestCancelled)
     } else {
         Issue.record("Expected the retained request snapshot to stay cancelled after terminal failure.")
@@ -1929,7 +1943,7 @@ private actor BackendLoadRecorder {
     await profileGate.open()
 }
 
-@Test func speakLiveUsesStableResidentGenerationParameters() async throws {
+@Test func `speak live uses stable resident generation parameters`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -1940,8 +1954,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let recorder = ResidentModelRecorder()
@@ -1949,7 +1963,7 @@ private actor BackendLoadRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel(recorder: recorder) }
+        residentModelLoader: { _ in makeResidentModel(recorder: recorder) },
     )
 
     await runtime.start()
@@ -1960,10 +1974,12 @@ private actor BackendLoadRecorder {
         }
     })
 
-    let requestID = await runtime.generate.speech(
-        text: "Hello there, galew.",
-        with: "default-femme"
-    ).id
+    let requestID = await runtime.generate
+        .speech(
+            text: "Hello there, galew.",
+            with: "default-femme",
+        )
+        .id
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1980,12 +1996,12 @@ private actor BackendLoadRecorder {
     #expect(recorder.lastGenerationParameters?.repetitionPenalty == 1.05)
 }
 
-@Test func lateStatusSubscribersReceiveCurrentReadySnapshot() async throws {
+@Test func `late status subscribers receive current ready snapshot`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -2002,14 +2018,14 @@ private actor BackendLoadRecorder {
     #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
 }
 
-@Test func droppingStatusSubscriptionDoesNotRetainRuntime() async throws {
+@Test func `dropping status subscription does not retain runtime`() async throws {
     let output = OutputRecorder()
     let weakRuntime = WeakRuntimeBox()
 
     var runtime: WorkerRuntime? = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
     weakRuntime.value = runtime
 
@@ -2022,7 +2038,7 @@ private actor BackendLoadRecorder {
     #expect(await waitUntil { weakRuntime.value == nil })
 }
 
-@Test func startIsIdempotentForLibraryConsumers() async throws {
+@Test func `start is idempotent for library consumers`() async throws {
     actor LoadCounter {
         private(set) var count = 0
 
@@ -2043,7 +2059,7 @@ private actor BackendLoadRecorder {
         residentModelLoader: { _ in
             await loadCounter.increment()
             return makeResidentModel()
-        }
+        },
     )
 
     let statuses = await runtime.statusEvents()
@@ -2062,17 +2078,17 @@ private actor BackendLoadRecorder {
         output.countJSONObjects {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "warming_resident_model"
-        } == 1
+        } == 1,
     )
     #expect(
         output.countJSONObjects {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-        } == 1
+        } == 1,
     )
 }
 
-@Test func typedRequestStreamKeepsBackgroundAcknowledgementAndLaterCompletionSeparate() async throws {
+@Test func `typed request stream keeps background acknowledgement and later completion separate`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -2085,15 +2101,15 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -2107,7 +2123,7 @@ private actor BackendLoadRecorder {
     let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
-                $0["id"] as? String == activeHandle.id
+            $0["id"] as? String == activeHandle.id
                 && $0["event"] as? String == "progress"
                 && $0["stage"] as? String == "preroll_ready"
         }
@@ -2121,8 +2137,8 @@ private actor BackendLoadRecorder {
             textProfileName: nil,
             jobType: .live,
             textContext: nil,
-            sourceFormat: nil
-        )
+            sourceFormat: nil,
+        ),
     )
     var iterator = handle.events.makeAsyncIterator()
 
@@ -2142,7 +2158,7 @@ private actor BackendLoadRecorder {
     #expect(sawCompletion)
 }
 
-@Test func listProfilesSkipsCorruptEntriesAndStillReturnsHealthyProfiles() async throws {
+@Test func `list profiles skips corrupt entries and still returns healthy profiles`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
@@ -2153,8 +2169,8 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Healthy transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01]),
     )
 
     let brokenDirectory = store.profileDirectoryURL(for: "broken")
@@ -2165,7 +2181,7 @@ private actor BackendLoadRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -2194,7 +2210,7 @@ private actor BackendLoadRecorder {
     })
 }
 
-@Test func waitingSpeakLiveRunsBeforeWaitingProfileManagementAfterActiveWorkFinishes() async throws {
+@Test func `waiting speak live runs before waiting profile management after active work finishes`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let profileGate = AsyncGate()
@@ -2209,7 +2225,7 @@ private actor BackendLoadRecorder {
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
     let store = try makeProfileStore(rootURL: storeRoot)
     _ = try store.createProfile(
@@ -2217,16 +2233,16 @@ private actor BackendLoadRecorder {
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01]),
     )
     _ = try store.createProfile(
         profileName: "remove-me",
         modelRepo: "test-model",
         voiceDescription: "Remove me.",
         sourceText: "Remove me.",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x02]),
     )
 
     await runtime.start()
@@ -2238,7 +2254,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -2272,7 +2288,7 @@ private actor BackendLoadRecorder {
     #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-3:generate_speech", "req-2:delete_voice_profile"])
 }
 
-@Test func waitingSpeakLiveForQueuedProfileCreationDoesNotJumpAheadOfThatProfile() async throws {
+@Test func `waiting speak live for queued profile creation does not jump ahead of that profile`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let profileGate = AsyncGate()
@@ -2284,7 +2300,7 @@ private actor BackendLoadRecorder {
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -2296,7 +2312,7 @@ private actor BackendLoadRecorder {
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"brand-new","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"brand-new","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {

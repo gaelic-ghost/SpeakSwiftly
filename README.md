@@ -260,11 +260,14 @@ Use this repository as the source-of-truth development home for SpeakSwiftly. Ke
 For package-focused development, prefer:
 
 ```bash
+sh scripts/repo-maintenance/validate-all.sh
 swift build
 swift test
 swiftformat --lint --config .swiftformat .
 swiftlint lint --config .swiftlint.yml
 ```
+
+`validate-all.sh` is the shared formatting-and-guidance gate. The sample pre-commit hook runs it locally, the release script runs it before tagging work by default, and CI now calls the same script before package build and test steps.
 
 For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](CONTRIBUTING.md).
 

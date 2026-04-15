@@ -1,9 +1,9 @@
 import Foundation
 @preconcurrency import MLX
-@preconcurrency import MLXLMCommon
 import MLXAudioTTS
-import Testing
+@preconcurrency import MLXLMCommon
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
 // MARK: - Opt-In Test Gates
@@ -22,7 +22,7 @@ private extension NSLock {
     }
 }
 
-// MARK: - Output Capture
+// MARK: - OutputRecorder
 
 final class OutputRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -137,7 +137,7 @@ final class OutputRecorder: @unchecked Sendable {
     }
 }
 
-// MARK: - Async Coordination
+// MARK: - AsyncGate
 
 actor AsyncGate {
     private var continuation: CheckedContinuation<Void, Never>?
@@ -158,10 +158,10 @@ actor AsyncGate {
     }
 }
 
-// MARK: - Playback Spies
+// MARK: - PlaybackSpy
 
 final class PlaybackSpy: @unchecked Sendable {
-    enum Behavior: Sendable {
+    enum Behavior {
         case immediate
         case gate(AsyncGate)
         case sleep(Duration)
@@ -170,16 +170,17 @@ final class PlaybackSpy: @unchecked Sendable {
         case `throw`(WorkerError)
     }
 
-    private let lock = NSLock()
-    private let behavior: Behavior
-    private let environmentEvents: [PlaybackEnvironmentEvent]
     private(set) var playCount = 0
     private(set) var prepareCount = 0
     private(set) var stopCount = 0
 
+    private let lock = NSLock()
+    private let behavior: Behavior
+    private let environmentEvents: [PlaybackEnvironmentEvent]
+
     init(
         behavior: Behavior = .immediate,
-        environmentEvents: [PlaybackEnvironmentEvent] = []
+        environmentEvents: [PlaybackEnvironmentEvent] = [],
     ) {
         self.behavior = behavior
         self.environmentEvents = environmentEvents
@@ -221,7 +222,7 @@ final class PlaybackSpy: @unchecked Sendable {
                 var playedBackCallbackCount = 0
 
                 func bufferedAudioMS() -> Int {
-                    Int((Double(pendingSampleCount) / 24_000.0 * 1_000).rounded())
+                    Int((Double(pendingSampleCount) / 24000.0 * 1000).rounded())
                 }
 
                 func recordQueueDepth() {
@@ -234,6 +235,7 @@ final class PlaybackSpy: @unchecked Sendable {
 
                 for try await (chunkIndex, chunk) in [Float].asyncEnumerated(stream) {
                     guard !chunk.isEmpty else { continue }
+
                     chunkCount += 1
                     sampleCount += chunk.count
                     pendingSampleCount += chunk.count
@@ -274,88 +276,88 @@ final class PlaybackSpy: @unchecked Sendable {
                 }
 
                 switch behavior {
-                case .immediate:
-                    break
-                case .gate(let drainGate):
-                    await drainGate.wait()
-                case .sleep(let duration):
-                    try await Task.sleep(for: duration)
-                case .emitLowQueueThenStarve:
-                    await onEvent(.rebufferStarted(queuedAudioMS: 120, thresholds: thresholds))
-                    await onEvent(.rebufferResumed(bufferedAudioMS: 320, thresholds: thresholds))
-                    rebufferEventCount = 1
-                    rebufferTotalDurationMS = 90
-                    longestRebufferDurationMS = 90
-                    await onEvent(.queueDepthLow(queuedAudioMS: 50))
-                    await onEvent(.starved)
-                    starvationEventCount = 1
-                    minQueuedAudioMS = 0
-                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? 320, 320)
-                    maxInterChunkGapMS = 510
-                    avgInterChunkGapMS = 510
-                    maxScheduleGapMS = 220
-                    avgScheduleGapMS = 220
-                case .emitObservabilityBurst:
-                    await onEvent(.chunkGapWarning(gapMS: 520, chunkIndex: 2))
-                    await onEvent(.scheduleGapWarning(gapMS: 210, bufferIndex: 2, queuedAudioMS: 140))
-                    await onEvent(.rebufferStarted(queuedAudioMS: 90, thresholds: thresholds))
-                    await onEvent(.rebufferResumed(bufferedAudioMS: 340, thresholds: thresholds))
-                    await onEvent(.rebufferThrashWarning(rebufferEventCount: 3, windowMS: 2_000))
-                    await onEvent(
-                        .bufferShapeSummary(
-                            maxBoundaryDiscontinuity: 0.42,
-                            maxLeadingAbsAmplitude: 0.31,
-                            maxTrailingAbsAmplitude: 0.37,
-                            fadeInChunkCount: 1
+                    case .immediate:
+                        break
+                    case let .gate(drainGate):
+                        await drainGate.wait()
+                    case let .sleep(duration):
+                        try await Task.sleep(for: duration)
+                    case .emitLowQueueThenStarve:
+                        await onEvent(.rebufferStarted(queuedAudioMS: 120, thresholds: thresholds))
+                        await onEvent(.rebufferResumed(bufferedAudioMS: 320, thresholds: thresholds))
+                        rebufferEventCount = 1
+                        rebufferTotalDurationMS = 90
+                        longestRebufferDurationMS = 90
+                        await onEvent(.queueDepthLow(queuedAudioMS: 50))
+                        await onEvent(.starved)
+                        starvationEventCount = 1
+                        minQueuedAudioMS = 0
+                        maxQueuedAudioMS = max(maxQueuedAudioMS ?? 320, 320)
+                        maxInterChunkGapMS = 510
+                        avgInterChunkGapMS = 510
+                        maxScheduleGapMS = 220
+                        avgScheduleGapMS = 220
+                    case .emitObservabilityBurst:
+                        await onEvent(.chunkGapWarning(gapMS: 520, chunkIndex: 2))
+                        await onEvent(.scheduleGapWarning(gapMS: 210, bufferIndex: 2, queuedAudioMS: 140))
+                        await onEvent(.rebufferStarted(queuedAudioMS: 90, thresholds: thresholds))
+                        await onEvent(.rebufferResumed(bufferedAudioMS: 340, thresholds: thresholds))
+                        await onEvent(.rebufferThrashWarning(rebufferEventCount: 3, windowMS: 2000))
+                        await onEvent(
+                            .bufferShapeSummary(
+                                maxBoundaryDiscontinuity: 0.42,
+                                maxLeadingAbsAmplitude: 0.31,
+                                maxTrailingAbsAmplitude: 0.37,
+                                fadeInChunkCount: 1,
+                            ),
                         )
-                    )
-                    await onEvent(
-                        .trace(
-                            PlaybackTraceEvent(
-                                name: "chunk_received",
-                                chunkIndex: 1,
-                                bufferIndex: nil,
-                                sampleCount: 9_600,
-                                durationMS: 400,
-                                queuedAudioBeforeMS: 0,
-                                queuedAudioAfterMS: 400,
-                                gapMS: nil,
-                                isRebuffering: false,
-                                fadeInApplied: true
-                            )
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
+                                    name: "chunk_received",
+                                    chunkIndex: 1,
+                                    bufferIndex: nil,
+                                    sampleCount: 9600,
+                                    durationMS: 400,
+                                    queuedAudioBeforeMS: 0,
+                                    queuedAudioAfterMS: 400,
+                                    gapMS: nil,
+                                    isRebuffering: false,
+                                    fadeInApplied: true,
+                                ),
+                            ),
                         )
-                    )
-                    await onEvent(
-                        .trace(
-                            PlaybackTraceEvent(
-                                name: "buffer_scheduled",
-                                chunkIndex: 1,
-                                bufferIndex: 1,
-                                sampleCount: 9_600,
-                                durationMS: 400,
-                                queuedAudioBeforeMS: 0,
-                                queuedAudioAfterMS: 400,
-                                gapMS: nil,
-                                isRebuffering: false,
-                                fadeInApplied: true
-                            )
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
+                                    name: "buffer_scheduled",
+                                    chunkIndex: 1,
+                                    bufferIndex: 1,
+                                    sampleCount: 9600,
+                                    durationMS: 400,
+                                    queuedAudioBeforeMS: 0,
+                                    queuedAudioAfterMS: 400,
+                                    gapMS: nil,
+                                    isRebuffering: false,
+                                    fadeInApplied: true,
+                                ),
+                            ),
                         )
-                    )
-                    rebufferEventCount = 3
-                    rebufferTotalDurationMS = 180
-                    longestRebufferDurationMS = 80
-                    minQueuedAudioMS = 90
-                    maxQueuedAudioMS = 400
-                    maxInterChunkGapMS = 520
-                    avgInterChunkGapMS = 410
-                    maxScheduleGapMS = 210
-                    avgScheduleGapMS = 155
-                    maxBoundaryDiscontinuity = 0.42
-                    maxLeadingAbsAmplitude = 0.31
-                    maxTrailingAbsAmplitude = 0.37
-                    fadeInChunkCount = 1
-                case .throw(let error):
-                    throw error
+                        rebufferEventCount = 3
+                        rebufferTotalDurationMS = 180
+                        longestRebufferDurationMS = 80
+                        minQueuedAudioMS = 90
+                        maxQueuedAudioMS = 400
+                        maxInterChunkGapMS = 520
+                        avgInterChunkGapMS = 410
+                        maxScheduleGapMS = 210
+                        avgScheduleGapMS = 155
+                        maxBoundaryDiscontinuity = 0.42
+                        maxLeadingAbsAmplitude = 0.31
+                        maxTrailingAbsAmplitude = 0.37
+                        fadeInChunkCount = 1
+                    case let .throw(error):
+                        throw error
                 }
 
                 return PlaybackSummary(
@@ -383,7 +385,7 @@ final class PlaybackSpy: @unchecked Sendable {
                     maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
                     maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
                     maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                    fadeInChunkCount: fadeInChunkCount
+                    fadeInChunkCount: fadeInChunkCount,
                 )
             },
             stop: { [self] in
@@ -394,18 +396,18 @@ final class PlaybackSpy: @unchecked Sendable {
             state: { .idle },
             bindEnvironmentEvents: { [environmentEvents] sink in
                 guard let sink else { return }
+
                 for event in environmentEvents {
                     await sink(event)
                 }
-            }
+            },
         )
     }
 }
 
-// MARK: - Model Recorders
+// MARK: - ResidentModelRecorder
 
 final class ResidentModelRecorder: @unchecked Sendable {
-    private let lock = NSLock()
     private(set) var lastText: String?
     private(set) var lastVoice: String?
     private(set) var lastRefText: String?
@@ -415,12 +417,14 @@ final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var conditionedGenerationCallCount = 0
     private(set) var lastGenerationParameters: GenerateParameters?
 
+    private let lock = NSLock()
+
     func record(
         text: String,
         voice: String?,
         refAudioWasProvided: Bool,
         refText: String?,
-        generationParameters: GenerateParameters
+        generationParameters: GenerateParameters,
     ) {
         lock.withLock {
             lastText = text
@@ -445,7 +449,7 @@ final class ResidentModelRecorder: @unchecked Sendable {
 
     func recordConditionedGeneration(
         text: String,
-        generationParameters: GenerateParameters
+        generationParameters: GenerateParameters,
     ) {
         lock.withLock {
             conditionedGenerationCallCount += 1
@@ -466,7 +470,7 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
     let conditionedSpeakerEmbedding = MLXArray([Float(0.25), 0.5]).reshaped([1, 2])
 
     return AnySpeechModel(
-        sampleRate: 24_000,
+        sampleRate: 24000,
         generate: { _, _, _, _, _, _ in
             [0.1, 0.2]
         },
@@ -476,7 +480,7 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                 voice: voice,
                 refAudioWasProvided: refAudio != nil,
                 refText: refText,
-                generationParameters: generationParameters
+                generationParameters: generationParameters,
             )
 
             return AsyncThrowingStream { continuation in
@@ -493,7 +497,7 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                 voice: voice,
                 refAudioWasProvided: refAudio != nil,
                 refText: refText,
-                generationParameters: generationParameters
+                generationParameters: generationParameters,
             )
 
             return AsyncThrowingStream { continuation in
@@ -506,9 +510,9 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                             prefillTime: 0.12,
                             generateTime: 0.34,
                             tokensPerSecond: 56.7,
-                            peakMemoryUsage: 1.23
-                        )
-                    )
+                            peakMemoryUsage: 1.23,
+                        ),
+                    ),
                 )
                 for chunkIndex in 0..<chunkCount {
                     let base = Float(chunkIndex + 1) / 10
@@ -524,13 +528,13 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                 referenceSpeechCodes: conditionedReferenceAudio,
                 referenceTextTokenIDs: conditionedReferenceText,
                 resolvedLanguage: language ?? "English",
-                codecLanguageID: 7
+                codecLanguageID: 7,
             )
         },
         generateConditionedEventStream: { text, _, generationParameters, _ in
             recorder?.recordConditionedGeneration(
                 text: text,
-                generationParameters: generationParameters
+                generationParameters: generationParameters,
             )
 
             return AsyncThrowingStream { continuation in
@@ -543,9 +547,9 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                             prefillTime: 0.08,
                             generateTime: 0.21,
                             tokensPerSecond: 73.2,
-                            peakMemoryUsage: 0.92
-                        )
-                    )
+                            peakMemoryUsage: 0.92,
+                        ),
+                    ),
                 )
                 for chunkIndex in 0..<chunkCount {
                     let base = Float(chunkIndex + 1) / 10
@@ -553,31 +557,31 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
                 }
                 continuation.finish()
             }
-        }
+        },
     )
 }
 
 func makeResidentModels(
     for backend: SpeakSwiftly.SpeechBackend,
     recorder: ResidentModelRecorder? = nil,
-    chunkCount: Int = 1
+    chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
     switch backend {
-    case .qwen3, .qwen3CustomVoice:
-        .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
-    case .marvis:
-        .marvis(
-            MarvisResidentModels(
-                conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
-                conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount)
+        case .qwen3, .qwen3CustomVoice:
+            .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
+        case .marvis:
+            .marvis(
+                MarvisResidentModels(
+                    conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
+                    conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
+                ),
             )
-        )
     }
 }
 
 func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -> AnySpeechModel {
     AnySpeechModel(
-        sampleRate: 24_000,
+        sampleRate: 24000,
         generate: { _, _, _, _, _, _ in
             if let waitBeforeGenerate {
                 await waitBeforeGenerate()
@@ -588,16 +592,16 @@ func makeProfileModel(waitBeforeGenerate: (@Sendable () async -> Void)? = nil) -
             AsyncThrowingStream { continuation in
                 continuation.finish()
             }
-        }
+        },
     )
 }
 
 func makeCloneTranscriptionModel(
-    transcript: String = "Inferred transcript from reference audio."
+    transcript: String = "Inferred transcript from reference audio.",
 ) -> AnyCloneTranscriptionModel {
     AnyCloneTranscriptionModel(
         sampleRate: ModelFactory.cloneTranscriptionSampleRate,
-        transcribe: { _, _ in transcript }
+        transcribe: { _, _ in transcript },
     )
 }
 
@@ -610,7 +614,7 @@ func makeProfileStore(rootURL: URL) throws -> ProfileStore {
 func makeGeneratedFileStore(rootURL: URL) throws -> GeneratedFileStore {
     let store = GeneratedFileStore(
         rootURL: rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
-        fileManager: .default
+        fileManager: .default,
     )
     try store.ensureRootExists()
     return store
@@ -619,13 +623,13 @@ func makeGeneratedFileStore(rootURL: URL) throws -> GeneratedFileStore {
 func makeGenerationJobStore(rootURL: URL) throws -> GenerationJobStore {
     let store = GenerationJobStore(
         rootURL: rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
-        fileManager: .default
+        fileManager: .default,
     )
     try store.ensureRootExists()
     return store
 }
 
-func makeRuntime<ResidentModelResult>(
+func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
     playback: PlaybackSpy,
@@ -634,20 +638,20 @@ func makeRuntime<ResidentModelResult>(
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
     loadedCloneAudioSamples: [Float] = [],
-    residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> ResidentModelResult,
+    residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> some Any,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
         makeProfileModel()
     },
     cloneTranscriptionModelLoader: @escaping @Sendable () async throws -> AnyCloneTranscriptionModel = {
         makeCloneTranscriptionModel()
     },
-    readRuntimeMemory: @escaping @Sendable () -> RuntimeMemorySnapshot? = { nil }
+    readRuntimeMemory: @escaping @Sendable () -> RuntimeMemorySnapshot? = { nil },
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     let normalizer = try SpeakSwiftly.Normalizer(
-        persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName)
+        persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName),
     )
     let playbackController = playback.controller()
     let dependencies = WorkerDependencies(
@@ -659,15 +663,15 @@ func makeRuntime<ResidentModelResult>(
             }
             if let model = loaded as? AnySpeechModel {
                 switch backend {
-                case .qwen3, .qwen3CustomVoice:
-                    return .qwen3(model)
-                case .marvis:
-                    return .marvis(
-                        MarvisResidentModels(
-                            conversationalA: model,
-                            conversationalB: model
+                    case .qwen3, .qwen3CustomVoice:
+                        return .qwen3(model)
+                    case .marvis:
+                        return .marvis(
+                            MarvisResidentModels(
+                                conversationalA: model,
+                                conversationalB: model,
+                            ),
                         )
-                    )
                 }
             }
             fatalError("Test support received an unexpected resident model loader result type: \(type(of: loaded))")
@@ -691,7 +695,7 @@ func makeRuntime<ResidentModelResult>(
         writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,
         now: Date.init,
-        readRuntimeMemory: readRuntimeMemory
+        readRuntimeMemory: readRuntimeMemory,
     )
 
     let runtime = WorkerRuntime(
@@ -702,7 +706,7 @@ func makeRuntime<ResidentModelResult>(
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,
-        playbackController: PlaybackController(driver: playbackController)
+        playbackController: PlaybackController(driver: playbackController),
     )
     await runtime.installPlaybackHooks()
     return runtime
@@ -715,7 +719,7 @@ extension ProfileStore {
         voiceDescription: String,
         sourceText: String,
         sampleRate: Int,
-        canonicalAudioData: Data
+        canonicalAudioData: Data,
     ) throws -> StoredProfile {
         try createProfile(
             profileName: profileName,
@@ -724,7 +728,7 @@ extension ProfileStore {
             voiceDescription: voiceDescription,
             sourceText: sourceText,
             sampleRate: sampleRate,
-            canonicalAudioData: canonicalAudioData
+            canonicalAudioData: canonicalAudioData,
         )
     }
 }
@@ -745,27 +749,27 @@ extension SpeakSwiftly.Voices {
         design named: SpeakSwiftly.Name,
         from text: String,
         voice voiceDescription: String,
-        outputPath: String? = nil
+        outputPath: String? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await create(
             design: named,
             from: text,
             vibe: inferredTestVibe(profileName: named, voiceDescription: voiceDescription),
             voice: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
         )
     }
 
     func create(
         clone named: SpeakSwiftly.Name,
         from referenceAudioURL: URL,
-        transcript: String? = nil
+        transcript: String? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await create(
             clone: named,
             from: referenceAudioURL,
             vibe: inferredTestVibe(profileName: named, voiceDescription: transcript ?? ""),
-            transcript: transcript
+            transcript: transcript,
         )
     }
 }
@@ -775,7 +779,7 @@ func makeTempDirectoryURL() -> URL {
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
 }
 
-func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
+func jsonObject(_ value: some Encodable) throws -> [String: Any] {
     let data = try JSONEncoder().encode(value)
     return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
@@ -785,7 +789,7 @@ func jsonObject<T: Encodable>(_ value: T) throws -> [String: Any] {
 func waitUntil(
     timeout: Duration = .seconds(1),
     pollInterval: Duration = .milliseconds(10),
-    _ condition: @escaping @Sendable () -> Bool
+    _ condition: @escaping @Sendable () -> Bool,
 ) async -> Bool {
     let clock = ContinuousClock()
     let deadline = clock.now + timeout
@@ -801,9 +805,9 @@ func waitUntil(
     return condition()
 }
 
-private extension Array where Element == Float {
+private extension [Float] {
     static func asyncEnumerated(
-        _ stream: AsyncThrowingStream<[Float], Error>
+        _ stream: AsyncThrowingStream<[Float], Error>,
     ) -> AsyncThrowingStream<(Int, [Float]), Error> {
         AsyncThrowingStream { continuation in
             Task {

@@ -1,11 +1,11 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
 // MARK: - Generated File Queueing
 
-@Test func speakFileAcknowledgesQueueThenCompletesWithGeneratedFileMetadata() async throws {
+@Test func `speak file acknowledges queue then completes with generated file metadata`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let storeRoot = makeTempDirectoryURL()
@@ -17,15 +17,15 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -36,10 +36,12 @@ import TextForSpeech
         }
     })
 
-    let requestID = await runtime.generate.audio(
-        text: "Hello from the generated file path.",
-        with: "default-femme"
-    ).id
+    let requestID = await runtime.generate
+        .audio(
+            text: "Hello from the generated file path.",
+            with: "default-femme",
+        )
+        .id
 
     #expect(await waitUntil {
         output.countJSONObjects {
@@ -100,7 +102,7 @@ import TextForSpeech
     })
 }
 
-@Test func generatedFileReadOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+@Test func `generated file read operations run during resident warmup without queueing`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let rootURL = makeTempDirectoryURL()
@@ -111,8 +113,8 @@ import TextForSpeech
         artifactID: "req-file-lookup",
         profileName: "default-femme",
         textProfileName: nil,
-        sampleRate: 24_000,
-        audioData: Data([0x01, 0x02, 0x03])
+        sampleRate: 24000,
+        audioData: Data([0x01, 0x02, 0x03]),
     )
 
     let runtime = try await makeRuntime(
@@ -122,7 +124,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -168,7 +170,7 @@ import TextForSpeech
     await preloadGate.open()
 }
 
-@Test func generationJobReadOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+@Test func `generation job read operations run during resident warmup without queueing`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let rootURL = makeTempDirectoryURL()
@@ -185,9 +187,9 @@ import TextForSpeech
             text: "Hello from a persisted file job.",
             textProfileName: nil,
             textContext: nil,
-            sourceFormat: nil
+            sourceFormat: nil,
         ),
-        createdAt: Date(timeIntervalSince1970: 1_234)
+        createdAt: Date(timeIntervalSince1970: 1234),
     )
 
     let runtime = try await makeRuntime(
@@ -197,7 +199,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -245,7 +247,7 @@ import TextForSpeech
     await preloadGate.open()
 }
 
-@Test func expireGenerationJobRemovesCompletedFileArtifactsAndKeepsExpiredJobReadable() async throws {
+@Test func `expire generation job removes completed file artifacts and keeps expired job readable`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let rootURL = makeTempDirectoryURL()
@@ -256,8 +258,8 @@ import TextForSpeech
         artifactID: "job-expire-file-artifact-1",
         profileName: "default-femme",
         textProfileName: nil,
-        sampleRate: 24_000,
-        audioData: Data([0x01, 0x02, 0x03])
+        sampleRate: 24000,
+        audioData: Data([0x01, 0x02, 0x03]),
     )
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     _ = try generationJobStore.createFileJob(
@@ -270,9 +272,9 @@ import TextForSpeech
             text: "Persisted file job",
             textProfileName: nil,
             textContext: nil,
-            sourceFormat: nil
+            sourceFormat: nil,
         ),
-        createdAt: Date(timeIntervalSince1970: 3_000)
+        createdAt: Date(timeIntervalSince1970: 3000),
     )
     _ = try generationJobStore.markCompleted(
         id: "job-expire-file",
@@ -284,10 +286,10 @@ import TextForSpeech
                 filePath: storedFile.summary.filePath,
                 sampleRate: storedFile.summary.sampleRate,
                 profileName: storedFile.summary.profileName,
-                textProfileName: storedFile.summary.textProfileName
-            )
+                textProfileName: storedFile.summary.textProfileName,
+            ),
         ],
-        completedAt: Date(timeIntervalSince1970: 3_001)
+        completedAt: Date(timeIntervalSince1970: 3001),
     )
 
     let runtime = try await makeRuntime(
@@ -297,7 +299,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -337,7 +339,7 @@ import TextForSpeech
     await preloadGate.open()
 }
 
-@Test func expireGenerationJobKeepsExpiredBatchReadableWithoutArtifactFiles() async throws {
+@Test func `expire generation job keeps expired batch readable without artifact files`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let rootURL = makeTempDirectoryURL()
@@ -348,15 +350,15 @@ import TextForSpeech
         artifactID: "job-expire-batch-artifact-1",
         profileName: "default-femme",
         textProfileName: nil,
-        sampleRate: 24_000,
-        audioData: Data([0x01])
+        sampleRate: 24000,
+        audioData: Data([0x01]),
     )
     let second = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-batch-artifact-2",
         profileName: "default-femme",
         textProfileName: "logs",
-        sampleRate: 24_000,
-        audioData: Data([0x02])
+        sampleRate: 24000,
+        audioData: Data([0x02]),
     )
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     _ = try generationJobStore.createBatchJob(
@@ -370,17 +372,17 @@ import TextForSpeech
                 text: "First",
                 textProfileName: nil,
                 textContext: nil,
-                sourceFormat: nil
+                sourceFormat: nil,
             ),
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-2",
                 text: "Second",
                 textProfileName: "logs",
                 textContext: nil,
-                sourceFormat: nil
+                sourceFormat: nil,
             ),
         ],
-        createdAt: Date(timeIntervalSince1970: 3_100)
+        createdAt: Date(timeIntervalSince1970: 3100),
     )
     _ = try generationJobStore.markCompleted(
         id: "job-expire-batch",
@@ -392,7 +394,7 @@ import TextForSpeech
                 filePath: first.summary.filePath,
                 sampleRate: first.summary.sampleRate,
                 profileName: first.summary.profileName,
-                textProfileName: first.summary.textProfileName
+                textProfileName: first.summary.textProfileName,
             ),
             SpeakSwiftly.GenerationArtifact(
                 artifactID: second.summary.artifactID,
@@ -401,10 +403,10 @@ import TextForSpeech
                 filePath: second.summary.filePath,
                 sampleRate: second.summary.sampleRate,
                 profileName: second.summary.profileName,
-                textProfileName: second.summary.textProfileName
+                textProfileName: second.summary.textProfileName,
             ),
         ],
-        completedAt: Date(timeIntervalSince1970: 3_101)
+        completedAt: Date(timeIntervalSince1970: 3101),
     )
 
     let runtime = try await makeRuntime(
@@ -414,7 +416,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()

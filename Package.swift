@@ -11,26 +11,26 @@ let package = Package(
     products: [
         .library(
             name: "SpeakSwiftly",
-            targets: ["SpeakSwiftly"]
+            targets: ["SpeakSwiftly"],
         ),
         .executable(
             name: "SpeakSwiftlyTool",
-            targets: ["SpeakSwiftlyTool"]
+            targets: ["SpeakSwiftlyTool"],
         ),
         .executable(
             name: "SpeakSwiftlyTesting",
-            targets: ["SpeakSwiftlyTesting"]
+            targets: ["SpeakSwiftlyTesting"],
         ),
     ],
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.16.0")
+            .upToNextMajor(from: "0.16.0"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            from: "69.1.3"
-        )
+            from: "69.1.3",
+        ),
     ],
     targets: [
         .target(
@@ -39,27 +39,27 @@ let package = Package(
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
-                .product(name: "MLXAudioCore", package: "mlx-audio-swift")
+                .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
             ],
             path: "Sources/SpeakSwiftly",
             resources: [
                 .copy("Resources/mlx-swift_Cmlx.bundle"),
-            ]
+            ],
         ),
         .executableTarget(
             name: "SpeakSwiftlyTool",
-            dependencies: ["SpeakSwiftly"]
+            dependencies: ["SpeakSwiftly"],
         ),
         .testTarget(
             name: "SpeakSwiftlyTests",
             dependencies: [
                 "SpeakSwiftly",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
-            ]
+            ],
         ),
         .executableTarget(
             name: "SpeakSwiftlyTesting",
-            dependencies: ["SpeakSwiftly"]
+            dependencies: ["SpeakSwiftly"],
         ),
-    ]
+    ],
 )

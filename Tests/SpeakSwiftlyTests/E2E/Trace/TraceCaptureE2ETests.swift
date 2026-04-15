@@ -1,12 +1,12 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Trace Capture E2E")
     struct TraceCaptureSuite {
-        @Test func captureOnDemand() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled, SpeakSwiftlyE2ETests.isPlaybackTraceEnabled else { return }
+        @Test func `capture on demand`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
+            #expect(SpeakSwiftlyE2ETests.isPlaybackTraceEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -14,7 +14,7 @@ extension SpeakSwiftlyE2ETests {
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: true
+                playbackTrace: true,
             )
             defer { Task { await worker.stop() } }
 
@@ -25,13 +25,13 @@ extension SpeakSwiftlyE2ETests {
                 profileName: SpeakSwiftlyE2ETests.testingProfileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
                 {"id":"req-live-trace","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.testingPlaybackText)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
-                """
+                """,
             )
 
             #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {

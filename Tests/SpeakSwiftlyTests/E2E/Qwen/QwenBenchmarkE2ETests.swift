@@ -1,19 +1,17 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 private let qwenBenchmarkSchemaVersion = 2
 
+// MARK: - SpeakSwiftlyE2ETests.QwenBenchmarkSuite
+
 extension SpeakSwiftlyE2ETests {
-    @Suite("Qwen Benchmark E2E", .serialized)
+    @Suite(.serialized)
     struct QwenBenchmarkSuite {
-        @Test func compareResidentBackends() async throws {
-            guard
-                SpeakSwiftlyE2ETests.isE2EEnabled,
-                SpeakSwiftlyE2ETests.isQwenBenchmarkE2EEnabled
-            else {
-                return
-            }
+        @Test func `compare resident backends`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
+            #expect(SpeakSwiftlyE2ETests.isQwenBenchmarkE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -26,12 +24,12 @@ extension SpeakSwiftlyE2ETests {
 
             for backend in [SpeakSwiftly.SpeechBackend.qwen3, .qwen3CustomVoice] {
                 for iteration in 1...iterations {
-                    samples.append(
-                        try await Self.runBenchmarkSample(
+                    try await samples.append(
+                        Self.runBenchmarkSample(
                             profileRootURL: sandbox.profileRootURL,
                             backend: backend,
-                            iteration: iteration
-                        )
+                            iteration: iteration,
+                        ),
                     )
                 }
             }
@@ -43,9 +41,9 @@ extension SpeakSwiftlyE2ETests {
                 settings: .current(
                     iterations: iterations,
                     benchmarkProfileName: Self.benchmarkProfileName,
-                    playbackTextCharacterCount: SpeakSwiftlyE2ETests.testingPlaybackText.count
+                    playbackTextCharacterCount: SpeakSwiftlyE2ETests.testingPlaybackText.count,
                 ),
-                backends: QwenBackendBenchmarkReport.make(from: samples)
+                backends: QwenBackendBenchmarkReport.make(from: samples),
             )
             let summaryURL = try Self.writeBenchmarkSummary(summary)
 
@@ -68,7 +66,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
                 design: benchmarkProfileName,
                 from: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .masc,
-                voice: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                voice: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
             )
             _ = try await awaitSuccess(from: handle)
         }
@@ -77,21 +75,21 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static func runBenchmarkSample(
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
-        iteration: Int
+        iteration: Int,
     ) async throws -> QwenBenchmarkSample {
         try await withBenchmarkRuntime(profileRootURL: profileRootURL, backend: backend) { runtime in
             let preloadMS = try await awaitResidentReady(on: runtime)
             let generatedFile = try await runRequestBenchmark(
-                handle: await runtime.generate.audio(
+                handle: runtime.generate.audio(
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    with: benchmarkProfileName
-                )
+                    with: benchmarkProfileName,
+                ),
             )
             let liveSpeech = try await runRequestBenchmark(
-                handle: await runtime.generate.speech(
+                handle: runtime.generate.speech(
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    with: benchmarkProfileName
-                )
+                    with: benchmarkProfileName,
+                ),
             )
 
             return QwenBenchmarkSample(
@@ -99,7 +97,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
                 iteration: iteration,
                 residentPreloadMS: preloadMS,
                 generatedFile: generatedFile,
-                liveSpeech: liveSpeech
+                liveSpeech: liveSpeech,
             )
         }
     }
@@ -107,11 +105,11 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static func withBenchmarkRuntime<T>(
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
-        operation: @escaping @Sendable (SpeakSwiftly.Runtime) async throws -> T
+        operation: @escaping @Sendable (SpeakSwiftly.Runtime) async throws -> T,
     ) async throws -> T {
         let runtime = try await makeBenchmarkRuntime(
             profileRootURL: profileRootURL,
-            backend: backend
+            backend: backend,
         )
 
         do {
@@ -126,7 +124,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
 
     static func makeBenchmarkRuntime(
         profileRootURL: URL,
-        backend: SpeakSwiftly.SpeechBackend
+        backend: SpeakSwiftly.SpeechBackend,
     ) async throws -> SpeakSwiftly.Runtime {
         _ = try SpeakSwiftly.SupportResources.mlxBundleURL()
         _ = try SpeakSwiftly.SupportResources.defaultMetallibURL()
@@ -148,25 +146,25 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
                 fputs("SpeakSwiftly benchmark runtime stderr: \(message)\n", stderr)
             },
             now: liveDependencies.now,
-            readRuntimeMemory: liveDependencies.readRuntimeMemory
+            readRuntimeMemory: liveDependencies.readRuntimeMemory,
         )
 
         let profileStore = ProfileStore(
             rootURL: profileRootURL,
-            fileManager: dependencies.fileManager
+            fileManager: dependencies.fileManager,
         )
         let generatedFileStore = GeneratedFileStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
-            fileManager: dependencies.fileManager
+            fileManager: dependencies.fileManager,
         )
         let generationJobStore = GenerationJobStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
-            fileManager: dependencies.fileManager
+            fileManager: dependencies.fileManager,
         )
         let normalizer = try SpeakSwiftly.Normalizer(
-            persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
+            persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName),
         )
-        let playbackController = PlaybackController(driver: await dependencies.makePlaybackController())
+        let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
 
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
@@ -175,7 +173,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
-            playbackController: playbackController
+            playbackController: playbackController,
         )
         await runtime.installPlaybackHooks()
         return runtime
@@ -190,12 +188,12 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
 
         for await status in statuses {
             switch status.stage {
-            case .residentModelReady:
-                return milliseconds(since: startedAt, clock: clock)
-            case .residentModelFailed:
-                throw BenchmarkError("SpeakSwiftly benchmark runtime failed before the resident models became ready.")
-            case .warmingResidentModel, .residentModelsUnloaded:
-                continue
+                case .residentModelReady:
+                    return milliseconds(since: startedAt, clock: clock)
+                case .residentModelFailed:
+                    throw BenchmarkError("SpeakSwiftly benchmark runtime failed before the resident models became ready.")
+                case .warmingResidentModel, .residentModelsUnloaded:
+                    continue
             }
         }
 
@@ -203,18 +201,18 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     }
 
     static func awaitSuccess(
-        from handle: SpeakSwiftly.RequestHandle
+        from handle: SpeakSwiftly.RequestHandle,
     ) async throws -> SpeakSwiftly.Success {
         var acknowledgedSuccess: SpeakSwiftly.Success?
 
         for try await event in handle.events {
             switch event {
-            case .acknowledged(let success):
-                acknowledgedSuccess = success
-            case .completed(let success):
-                return success
-            case .queued, .started, .progress:
-                continue
+                case let .acknowledged(success):
+                    acknowledgedSuccess = success
+                case let .completed(success):
+                    return success
+                case .queued, .started, .progress:
+                    continue
             }
         }
 
@@ -226,7 +224,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     }
 
     static func runRequestBenchmark(
-        handle: SpeakSwiftly.RequestHandle
+        handle: SpeakSwiftly.RequestHandle,
     ) async throws -> QwenRequestBenchmark {
         let clock = ContinuousClock()
         let submittedAt = clock.now
@@ -234,12 +232,12 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
         async let lifecycle = collectLifecycleMetrics(
             from: handle.events,
             submittedAt: submittedAt,
-            clock: clock
+            clock: clock,
         )
         async let generation = collectGenerationMetrics(
             from: handle.generationEvents,
             submittedAt: submittedAt,
-            clock: clock
+            clock: clock,
         )
 
         let (lifecycleMetrics, success) = try await lifecycle
@@ -250,14 +248,14 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             operation: handle.operation,
             generatedArtifactID: success.generatedFile?.artifactID,
             lifecycle: lifecycleMetrics,
-            generation: generationMetrics
+            generation: generationMetrics,
         )
     }
 
     static func collectLifecycleMetrics(
         from events: AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
-        clock: ContinuousClock
+        clock: ContinuousClock,
     ) async throws -> (QwenLifecycleMetrics, SpeakSwiftly.Success) {
         var metrics = QwenLifecycleMetrics()
         var acknowledgedSuccess: SpeakSwiftly.Success?
@@ -266,33 +264,33 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             let elapsedMS = milliseconds(since: submittedAt, clock: clock)
 
             switch event {
-            case .queued(let queued):
-                metrics.queuedAtMS = metrics.queuedAtMS ?? elapsedMS
-                metrics.queueReason = queued.reason.rawValue
-                metrics.queuePosition = queued.queuePosition
+                case let .queued(queued):
+                    metrics.queuedAtMS = metrics.queuedAtMS ?? elapsedMS
+                    metrics.queueReason = queued.reason.rawValue
+                    metrics.queuePosition = queued.queuePosition
 
-            case .acknowledged(let success):
-                metrics.acknowledgedAtMS = metrics.acknowledgedAtMS ?? elapsedMS
-                acknowledgedSuccess = success
+                case let .acknowledged(success):
+                    metrics.acknowledgedAtMS = metrics.acknowledgedAtMS ?? elapsedMS
+                    acknowledgedSuccess = success
 
-            case .started:
-                metrics.startedAtMS = metrics.startedAtMS ?? elapsedMS
+                case .started:
+                    metrics.startedAtMS = metrics.startedAtMS ?? elapsedMS
 
-            case .progress(let progress):
-                switch progress.stage {
-                case .bufferingAudio:
-                    metrics.bufferingAudioAtMS = metrics.bufferingAudioAtMS ?? elapsedMS
-                case .prerollReady:
-                    metrics.prerollReadyAtMS = metrics.prerollReadyAtMS ?? elapsedMS
-                case .playbackFinished:
-                    metrics.playbackFinishedAtMS = metrics.playbackFinishedAtMS ?? elapsedMS
-                default:
-                    continue
-                }
+                case let .progress(progress):
+                    switch progress.stage {
+                        case .bufferingAudio:
+                            metrics.bufferingAudioAtMS = metrics.bufferingAudioAtMS ?? elapsedMS
+                        case .prerollReady:
+                            metrics.prerollReadyAtMS = metrics.prerollReadyAtMS ?? elapsedMS
+                        case .playbackFinished:
+                            metrics.playbackFinishedAtMS = metrics.playbackFinishedAtMS ?? elapsedMS
+                        default:
+                            continue
+                    }
 
-            case .completed(let success):
-                metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
-                return (metrics, success)
+                case let .completed(success):
+                    metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
+                    return (metrics, success)
             }
         }
 
@@ -306,7 +304,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static func collectGenerationMetrics(
         from events: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
-        clock: ContinuousClock
+        clock: ContinuousClock,
     ) async throws -> QwenGenerationMetrics {
         var metrics = QwenGenerationMetrics()
 
@@ -314,23 +312,23 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             let elapsedMS = milliseconds(since: submittedAt, clock: clock)
 
             switch update.event {
-            case .token:
-                metrics.firstTokenAtMS = metrics.firstTokenAtMS ?? elapsedMS
-                metrics.observedTokenCount += 1
+                case .token:
+                    metrics.firstTokenAtMS = metrics.firstTokenAtMS ?? elapsedMS
+                    metrics.observedTokenCount += 1
 
-            case .info(let info):
-                metrics.infoAtMS = metrics.infoAtMS ?? elapsedMS
-                metrics.promptTokenCount = info.promptTokenCount
-                metrics.generationTokenCount = info.generationTokenCount
-                metrics.prefillTimeMS = info.prefillTime * 1_000
-                metrics.generateTimeMS = info.generateTime * 1_000
-                metrics.tokensPerSecond = info.tokensPerSecond
-                metrics.peakMemoryUsageGB = info.peakMemoryUsage
+                case let .info(info):
+                    metrics.infoAtMS = metrics.infoAtMS ?? elapsedMS
+                    metrics.promptTokenCount = info.promptTokenCount
+                    metrics.generationTokenCount = info.generationTokenCount
+                    metrics.prefillTimeMS = info.prefillTime * 1000
+                    metrics.generateTimeMS = info.generateTime * 1000
+                    metrics.tokensPerSecond = info.tokensPerSecond
+                    metrics.peakMemoryUsageGB = info.peakMemoryUsage
 
-            case .audioChunk(let sampleCount):
-                metrics.firstAudioChunkAtMS = metrics.firstAudioChunkAtMS ?? elapsedMS
-                metrics.audioChunkCount += 1
-                metrics.totalAudioSampleCount += sampleCount
+                case let .audioChunk(sampleCount):
+                    metrics.firstAudioChunkAtMS = metrics.firstAudioChunkAtMS ?? elapsedMS
+                    metrics.audioChunkCount += 1
+                    metrics.totalAudioSampleCount += sampleCount
             }
         }
 
@@ -372,20 +370,23 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             guard parentURL != candidateURL else {
                 throw BenchmarkError("The qwen benchmark suite could not find the package root while walking upward from '\(#filePath)'.")
             }
+
             candidateURL = parentURL
         }
     }
 
     static func milliseconds(
         since instant: ContinuousClock.Instant,
-        clock: ContinuousClock
+        clock: ContinuousClock,
     ) -> Double {
         let duration = clock.now - instant
         let components = duration.components
-        return Double(components.seconds) * 1_000
+        return Double(components.seconds) * 1000
             + Double(components.attoseconds) / 1_000_000_000_000_000
     }
 }
+
+// MARK: - QwenBenchmarkSummary
 
 private struct QwenBenchmarkSummary: Codable {
     let schemaVersion: Int
@@ -394,6 +395,8 @@ private struct QwenBenchmarkSummary: Codable {
     let settings: QwenBenchmarkSettings
     let backends: [QwenBackendBenchmarkReport]
 }
+
+// MARK: - QwenBenchmarkHost
 
 private struct QwenBenchmarkHost: Codable {
     let machineArchitecture: String
@@ -407,13 +410,14 @@ private struct QwenBenchmarkHost: Codable {
             machineArchitecture: hostMachineArchitecture(),
             operatingSystemVersion: processInfo.operatingSystemVersionString,
             activeProcessorCount: processInfo.activeProcessorCount,
-            physicalMemoryBytes: processInfo.physicalMemory
+            physicalMemoryBytes: processInfo.physicalMemory,
         )
     }
 
     private static func hostMachineArchitecture() -> String {
         var systemInfo = utsname()
         guard uname(&systemInfo) == 0 else { return "unknown" }
+
         let machine = systemInfo.machine
         return withUnsafePointer(to: machine) {
             $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: machine)) {
@@ -422,6 +426,8 @@ private struct QwenBenchmarkHost: Codable {
         }
     }
 }
+
+// MARK: - QwenBenchmarkSettings
 
 private struct QwenBenchmarkSettings: Codable {
     let iterations: Int
@@ -434,7 +440,7 @@ private struct QwenBenchmarkSettings: Codable {
     static func current(
         iterations: Int,
         benchmarkProfileName: String,
-        playbackTextCharacterCount: Int
+        playbackTextCharacterCount: Int,
     ) -> Self {
         Self(
             iterations: iterations,
@@ -442,10 +448,12 @@ private struct QwenBenchmarkSettings: Codable {
             playbackTextCharacterCount: playbackTextCharacterCount,
             timestampedSummaryPattern: "qwen-resident-benchmark-<ISO8601>.json",
             latestSummaryFilename: "qwen-resident-benchmark-latest.json",
-            comparedBackends: [.qwen3, .qwen3CustomVoice]
+            comparedBackends: [.qwen3, .qwen3CustomVoice],
         )
     }
 }
+
+// MARK: - QwenBackendBenchmarkReport
 
 private struct QwenBackendBenchmarkReport: Codable {
     let backend: SpeakSwiftly.SpeechBackend
@@ -470,12 +478,14 @@ private struct QwenBackendBenchmarkReport: Codable {
                     residentPreloadMS: .make(from: backendSamples.map(\.residentPreloadMS)),
                     generatedFile: .make(from: backendSamples.map(\.generatedFile)),
                     liveSpeech: .make(from: backendSamples.map(\.liveSpeech)),
-                    samples: backendSamples.sorted { $0.iteration < $1.iteration }
+                    samples: backendSamples.sorted { $0.iteration < $1.iteration },
                 )
             }
             .sorted { $0.backend.rawValue < $1.backend.rawValue }
     }
 }
+
+// MARK: - QwenBenchmarkSample
 
 private struct QwenBenchmarkSample: Codable {
     let backend: SpeakSwiftly.SpeechBackend
@@ -485,6 +495,8 @@ private struct QwenBenchmarkSample: Codable {
     let liveSpeech: QwenRequestBenchmark
 }
 
+// MARK: - QwenRequestBenchmark
+
 private struct QwenRequestBenchmark: Codable {
     let requestID: String
     let operation: String
@@ -492,6 +504,8 @@ private struct QwenRequestBenchmark: Codable {
     let lifecycle: QwenLifecycleMetrics
     let generation: QwenGenerationMetrics
 }
+
+// MARK: - QwenLifecycleMetrics
 
 private struct QwenLifecycleMetrics: Codable {
     var queuedAtMS: Double?
@@ -504,6 +518,8 @@ private struct QwenLifecycleMetrics: Codable {
     var playbackFinishedAtMS: Double?
     var completedAtMS: Double?
 }
+
+// MARK: - QwenGenerationMetrics
 
 private struct QwenGenerationMetrics: Codable {
     var firstTokenAtMS: Double?
@@ -520,6 +536,8 @@ private struct QwenGenerationMetrics: Codable {
     var peakMemoryUsageGB: Double?
 }
 
+// MARK: - QwenRequestBenchmarkAggregate
+
 private struct QwenRequestBenchmarkAggregate: Codable {
     let sampleCount: Int
     let lifecycle: QwenLifecycleMetricAggregate
@@ -529,10 +547,12 @@ private struct QwenRequestBenchmarkAggregate: Codable {
         Self(
             sampleCount: samples.count,
             lifecycle: .make(from: samples.map(\.lifecycle)),
-            generation: .make(from: samples.map(\.generation))
+            generation: .make(from: samples.map(\.generation)),
         )
     }
 }
+
+// MARK: - QwenLifecycleMetricAggregate
 
 private struct QwenLifecycleMetricAggregate: Codable {
     let acknowledgedMS: QwenMetricSummary
@@ -549,10 +569,12 @@ private struct QwenLifecycleMetricAggregate: Codable {
             bufferingAudioMS: .make(from: samples.compactMap(\.bufferingAudioAtMS)),
             prerollReadyMS: .make(from: samples.compactMap(\.prerollReadyAtMS)),
             playbackFinishedMS: .make(from: samples.compactMap(\.playbackFinishedAtMS)),
-            completedMS: .make(from: samples.compactMap(\.completedAtMS))
+            completedMS: .make(from: samples.compactMap(\.completedAtMS)),
         )
     }
 }
+
+// MARK: - QwenGenerationMetricAggregate
 
 private struct QwenGenerationMetricAggregate: Codable {
     let firstTokenMS: QwenMetricSummary
@@ -581,10 +603,12 @@ private struct QwenGenerationMetricAggregate: Codable {
             prefillTimeMS: .make(from: samples.compactMap(\.prefillTimeMS)),
             generateTimeMS: .make(from: samples.compactMap(\.generateTimeMS)),
             tokensPerSecond: .make(from: samples.compactMap(\.tokensPerSecond)),
-            peakMemoryUsageGB: .make(from: samples.compactMap(\.peakMemoryUsageGB))
+            peakMemoryUsageGB: .make(from: samples.compactMap(\.peakMemoryUsageGB)),
         )
     }
 }
+
+// MARK: - QwenMetricSummary
 
 private struct QwenMetricSummary: Codable {
     let count: Int
@@ -594,6 +618,7 @@ private struct QwenMetricSummary: Codable {
 
     var prettyAverage: String {
         guard let average else { return "n/a" }
+
         return String(format: "%.2f", average)
     }
 
@@ -606,10 +631,12 @@ private struct QwenMetricSummary: Codable {
             count: values.count,
             min: values.min(),
             average: values.reduce(0, +) / Double(values.count),
-            max: values.max()
+            max: values.max(),
         )
     }
 }
+
+// MARK: - BenchmarkError
 
 private struct BenchmarkError: Error, CustomStringConvertible {
     let description: String

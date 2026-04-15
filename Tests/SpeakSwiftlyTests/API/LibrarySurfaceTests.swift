@@ -1,31 +1,31 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
 // MARK: - Runtime Construction
 
-@Test func publicLibrarySurfaceConstructsRuntimeFromLiftoff() async {
+@Test func `public library surface constructs runtime from liftoff`() async {
     _ = await SpeakSwiftly.liftoff()
 }
 
-@Test func publicLibrarySurfaceConstructsTopLevelNormalizer() throws {
+@Test func `public library surface constructs top level normalizer`() throws {
     let persistenceURL = URL(fileURLWithPath: "/tmp/speakswiftly-test-profiles.json")
     let normalizer = try SpeakSwiftly.Normalizer(persistenceURL: persistenceURL)
     _ = normalizer
 }
 
-@Test func publicLibrarySurfaceConstructsConfiguration() {
+@Test func `public library surface constructs configuration`() {
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
-        qwenConditioningStrategy: .preparedConditioning
+        qwenConditioningStrategy: .preparedConditioning,
     )
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.textNormalizer == nil)
 }
 
-@Test func publicConfigurationRoundTripsToDisk() throws {
+@Test func `public configuration round trips to disk`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: rootURL) }
@@ -33,7 +33,7 @@ import TextForSpeech
     let persistenceURL = rootURL.appendingPathComponent("configuration.json")
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
-        qwenConditioningStrategy: .preparedConditioning
+        qwenConditioningStrategy: .preparedConditioning,
     )
 
     try configuration.save(to: persistenceURL)
@@ -44,7 +44,7 @@ import TextForSpeech
     #expect(loaded.textNormalizer == nil)
 }
 
-@Test func publicConfigurationLoadThrowsTypedErrorWhenFileIsMissing() throws {
+@Test func `public configuration load throws typed error when file is missing`() throws {
     let missingURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
         .appendingPathComponent("missing-configuration.json")
@@ -54,12 +54,12 @@ import TextForSpeech
     }
 }
 
-@Test func publicConfigurationCanCarryATextNormalizer() throws {
+@Test func `public configuration can carry A text normalizer`() throws {
     let normalizer = try SpeakSwiftly.Normalizer()
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         qwenConditioningStrategy: .legacyRaw,
-        textNormalizer: normalizer
+        textNormalizer: normalizer,
     )
 
     #expect(configuration.speechBackend == .marvis)
@@ -67,7 +67,7 @@ import TextForSpeech
     #expect(configuration.textNormalizer != nil)
 }
 
-@Test func defaultPackagePersistencePathsUseTheDebugNamespaceOutsideProduction() async throws {
+@Test func `default package persistence paths use the debug namespace outside production`() async throws {
     let rootURL = ProfileStore.defaultRootURL()
     let configurationURL = ProfileStore.defaultConfigurationURL()
     let textProfilesURL = ProfileStore.defaultTextProfilesURL()
@@ -81,7 +81,7 @@ import TextForSpeech
 
 // MARK: - Runtime Helpers
 
-@Test func publicLibrarySurfaceExposesQueueingHelpers() throws {
+@Test func `public library surface exposes queueing helpers`() {
     let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
@@ -94,7 +94,7 @@ import TextForSpeech
             with: profileName,
             textProfileName: textProfileName,
             textContext: textContext,
-            sourceFormat: sourceFormat
+            sourceFormat: sourceFormat,
         )
     }
     let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
@@ -109,7 +109,7 @@ import TextForSpeech
             with: profileName,
             textProfileName: textProfileName,
             textContext: textContext,
-            sourceFormat: sourceFormat
+            sourceFormat: sourceFormat,
         )
     }
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
@@ -239,7 +239,7 @@ import TextForSpeech
             from: text,
             vibe: vibe,
             voice: voiceDescription,
-            outputPath: outputPath
+            outputPath: outputPath,
         )
     }
     let createClone: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name, URL, SpeakSwiftly.Vibe, String?) async -> SpeakSwiftly.RequestHandle = {
@@ -252,7 +252,7 @@ import TextForSpeech
             clone: profileName,
             from: referenceAudioURL,
             vibe: vibe,
-            transcript: transcript
+            transcript: transcript,
         )
     }
     let profiles: @Sendable (SpeakSwiftly.Voices) async -> SpeakSwiftly.RequestHandle = { voices in
@@ -414,7 +414,7 @@ import TextForSpeech
 
 // MARK: - Handle Metadata
 
-@Test func publicWorkerRequestHandleExposesStableMetadata() {
+@Test func `public worker request handle exposes stable metadata`() {
     let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation
     let profileName: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.profileName
     let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
@@ -426,7 +426,7 @@ import TextForSpeech
     _ = generationEvents
 }
 
-@Test func publicRequestObservationSurfaceExposesStableMetadata() {
+@Test func `public request observation surface exposes stable metadata`() {
     let generationInfoPromptTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.promptTokenCount
     let generationInfoGenerationTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.generationTokenCount
     let generationInfoPrefillTime: KeyPath<SpeakSwiftly.GenerationEventInfo, TimeInterval> = \.prefillTime
@@ -472,7 +472,7 @@ import TextForSpeech
     _ = snapshotState
 }
 
-@Test func publicGeneratedFileSurfaceExposesStableMetadata() {
+@Test func `public generated file surface exposes stable metadata`() {
     let artifactID: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.artifactID
     let createdAt: KeyPath<SpeakSwiftly.GeneratedFile, Date> = \.createdAt
     let profileName: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.profileName
@@ -488,7 +488,7 @@ import TextForSpeech
     _ = filePath
 }
 
-@Test func publicStatusSurfaceExposesStableMetadata() {
+@Test func `public status surface exposes stable metadata`() {
     let speechBackend: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.SpeechBackend> = \.speechBackend
     let residentState: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.ResidentModelState> = \.residentState
     let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
@@ -502,7 +502,7 @@ import TextForSpeech
     _ = successActiveRequests
 }
 
-@Test func publicTextNormalizationSurfaceExposesReplacementMetadata() {
+@Test func `public text normalization surface exposes replacement metadata`() {
     let successReplacements: KeyPath<SpeakSwiftly.Success, [TextForSpeech.Replacement]?> = \.replacements
 
     _ = successReplacements

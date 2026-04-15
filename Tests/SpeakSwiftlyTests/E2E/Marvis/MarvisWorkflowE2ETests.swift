@@ -1,12 +1,11 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Marvis E2E")
     struct MarvisWorkflowSuite {
-        @Test func femmeRoutesToConversationalA() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `femme routes to conversational A`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -15,7 +14,7 @@ extension SpeakSwiftlyE2ETests {
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: true,
-                speechBackend: .marvis
+                speechBackend: .marvis,
             )
             defer { Task { await worker.stop() } }
 
@@ -26,39 +25,39 @@ extension SpeakSwiftlyE2ETests {
                 profileName: profileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .femme,
-                voiceDescription: "A warm, bright, feminine narrator voice."
+                voiceDescription: "A warm, bright, feminine narrator voice.",
             )
 
             try await SpeakSwiftlyE2ETests.runSilentSpeech(
                 on: worker,
                 id: "req-live-marvis-femme",
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                profileName: profileName
+                profileName: profileName,
             )
             try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                 on: worker,
                 requestID: "req-live-marvis-femme",
-                expectedVoice: "conversational_a"
+                expectedVoice: "conversational_a",
             )
 
             _ = try await SpeakSwiftlyE2ETests.runGeneratedFileSpeech(
                 on: worker,
                 id: "req-file-marvis-femme",
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                profileName: profileName
+                profileName: profileName,
             )
             try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                 on: worker,
                 requestID: "req-file-marvis-femme",
-                expectedVoice: "conversational_a"
+                expectedVoice: "conversational_a",
             )
 
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func mascCloneRoutesToConversationalB() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `masc clone routes to conversational B`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -69,7 +68,7 @@ extension SpeakSwiftlyE2ETests {
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: true,
-                speechBackend: .marvis
+                speechBackend: .marvis,
             )
             defer { Task { await worker.stop() } }
 
@@ -81,7 +80,7 @@ extension SpeakSwiftlyE2ETests {
                 text: SpeakSwiftlyE2ETests.testingCloneSourceText,
                 vibe: .masc,
                 voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL
+                outputURL: referenceAudioURL,
             )
 
             try await SpeakSwiftlyE2ETests.createCloneProfile(
@@ -91,7 +90,7 @@ extension SpeakSwiftlyE2ETests {
                 referenceAudioURL: referenceAudioURL,
                 vibe: .masc,
                 transcript: SpeakSwiftlyE2ETests.testingCloneSourceText,
-                expectTranscription: false
+                expectTranscription: false,
             )
 
             let store = ProfileStore(rootURL: sandbox.profileRootURL)
@@ -102,20 +101,20 @@ extension SpeakSwiftlyE2ETests {
                 on: worker,
                 id: "req-live-marvis-masc",
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                profileName: cloneProfileName
+                profileName: cloneProfileName,
             )
             try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                 on: worker,
                 requestID: "req-live-marvis-masc",
-                expectedVoice: "conversational_b"
+                expectedVoice: "conversational_b",
             )
 
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func androgenousRoutesToConversationalA() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `androgenous routes to conversational A`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -124,7 +123,7 @@ extension SpeakSwiftlyE2ETests {
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: true,
-                speechBackend: .marvis
+                speechBackend: .marvis,
             )
             defer { Task { await worker.stop() } }
 
@@ -135,27 +134,27 @@ extension SpeakSwiftlyE2ETests {
                 profileName: profileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .androgenous,
-                voiceDescription: "A calm, balanced, and gentle speaking voice."
+                voiceDescription: "A calm, balanced, and gentle speaking voice.",
             )
 
             try await SpeakSwiftlyE2ETests.runSilentSpeech(
                 on: worker,
                 id: "req-live-marvis-androgenous",
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                profileName: profileName
+                profileName: profileName,
             )
             try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                 on: worker,
                 requestID: "req-live-marvis-androgenous",
-                expectedVoice: "conversational_a"
+                expectedVoice: "conversational_a",
             )
 
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func audiblePlaybackAcrossVibes() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `audible playback across vibes`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -176,7 +175,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-triplet-femme-profile",
                     vibe: .femme,
                     voiceDescription: "A warm, bright, feminine narrator voice.",
-                    expectedVoice: "conversational_a"
+                    expectedVoice: "conversational_a",
                 ),
                 MarvisProfileLane(
                     createID: "req-create-marvis-triplet-masc",
@@ -184,7 +183,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-triplet-masc-profile",
                     vibe: .masc,
                     voiceDescription: "A grounded, rich, masculine speaking voice.",
-                    expectedVoice: "conversational_b"
+                    expectedVoice: "conversational_b",
                 ),
                 MarvisProfileLane(
                     createID: "req-create-marvis-triplet-androgenous",
@@ -192,7 +191,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-triplet-androgenous-profile",
                     vibe: .androgenous,
                     voiceDescription: "A calm, balanced, and gentle speaking voice.",
-                    expectedVoice: "conversational_a"
+                    expectedVoice: "conversational_a",
                 ),
             ]
 
@@ -200,7 +199,7 @@ extension SpeakSwiftlyE2ETests {
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
                 playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
-                speechBackend: .marvis
+                speechBackend: .marvis,
             )
             defer { Task { await worker.stop() } }
 
@@ -213,7 +212,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: lane.profileName,
                     text: SpeakSwiftlyE2ETests.testingProfileText,
                     vibe: lane.vibe,
-                    voiceDescription: lane.voiceDescription
+                    voiceDescription: lane.voiceDescription,
                 )
             }
 
@@ -228,12 +227,12 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: lane.liveID,
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: lane.profileName
+                    profileName: lane.profileName,
                 )
                 try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                     on: worker,
                     requestID: lane.liveID,
-                    expectedVoice: lane.expectedVoice
+                    expectedVoice: lane.expectedVoice,
                 )
             }
 
@@ -241,8 +240,8 @@ extension SpeakSwiftlyE2ETests {
             try await worker.waitForExit(timeout: .seconds(30))
         }
 
-        @Test func prequeuedJobsDrainInOrder() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `prequeued jobs drain in order`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -263,7 +262,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-queued-femme-profile",
                     vibe: .femme,
                     voiceDescription: "A warm, bright, feminine narrator voice.",
-                    expectedVoice: "conversational_a"
+                    expectedVoice: "conversational_a",
                 ),
                 MarvisQueuedLane(
                     createID: "req-create-marvis-queued-masc",
@@ -271,7 +270,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-queued-masc-profile",
                     vibe: .masc,
                     voiceDescription: "A grounded, rich, masculine speaking voice.",
-                    expectedVoice: "conversational_b"
+                    expectedVoice: "conversational_b",
                 ),
                 MarvisQueuedLane(
                     createID: "req-create-marvis-queued-androgenous",
@@ -279,7 +278,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: "marvis-queued-androgenous-profile",
                     vibe: .androgenous,
                     voiceDescription: "A calm, balanced, and gentle speaking voice.",
-                    expectedVoice: "conversational_a"
+                    expectedVoice: "conversational_a",
                 ),
             ]
 
@@ -287,7 +286,7 @@ extension SpeakSwiftlyE2ETests {
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
                 playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
-                speechBackend: .marvis
+                speechBackend: .marvis,
             )
             defer { Task { await worker.stop() } }
 
@@ -300,7 +299,7 @@ extension SpeakSwiftlyE2ETests {
                     profileName: lane.profileName,
                     text: SpeakSwiftlyE2ETests.testingProfileText,
                     vibe: lane.vibe,
-                    voiceDescription: lane.voiceDescription
+                    voiceDescription: lane.voiceDescription,
                 )
             }
 
@@ -315,7 +314,7 @@ extension SpeakSwiftlyE2ETests {
                     on: worker,
                     id: lane.liveID,
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                    profileName: lane.profileName
+                    profileName: lane.profileName,
                 )
             }
 
@@ -366,12 +365,12 @@ extension SpeakSwiftlyE2ETests {
             for lane in lanes {
                 _ = try await SpeakSwiftlyE2ETests.awaitAudibleSpeechCompletion(
                     on: worker,
-                    id: lane.liveID
+                    id: lane.liveID,
                 )
                 try await SpeakSwiftlyE2ETests.expectMarvisVoiceSelection(
                     on: worker,
                     requestID: lane.liveID,
-                    expectedVoice: lane.expectedVoice
+                    expectedVoice: lane.expectedVoice,
                 )
             }
 

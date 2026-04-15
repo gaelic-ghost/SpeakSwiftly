@@ -1,11 +1,11 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
 
 // MARK: - Queueing and Preload
 
-@Test func requestsQueuedDuringPreloadEmitWaitingStatusThenProcess() async throws {
+@Test func `requests queued during preload emit waiting status then process`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let playback = PlaybackSpy()
@@ -15,7 +15,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -44,12 +44,12 @@ import TextForSpeech
     })
 }
 
-@Test func requestsThatStartImmediatelyDoNotEmitQueuedEvents() async throws {
+@Test func `requests that start immediately do not emit queued events`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.start()
@@ -74,7 +74,7 @@ import TextForSpeech
     })
 }
 
-@Test func marvisQueuedLiveGenerationResumesAcrossResidentLanesAfterPlaybackBecomesStable() async throws {
+@Test func `marvis queued live generation resumes across resident lanes after playback becomes stable`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -85,19 +85,19 @@ import TextForSpeech
 
     @Sendable func makeLaneModel(_ gate: AsyncGate) -> AnySpeechModel {
         AnySpeechModel(
-            sampleRate: 24_000,
+            sampleRate: 24000,
             generate: { _, _, _, _, _, _ in
                 [0.1, 0.2]
             },
             generateSamplesStream: { _, _, _, _, _, _, _ in
                 AsyncThrowingStream { continuation in
-                    continuation.yield(Array(repeating: 0.1, count: 24_000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
                     Task {
                         await gate.wait()
                         continuation.finish()
                     }
                 }
-            }
+            },
         )
     }
 
@@ -107,8 +107,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01, 0x02])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
     )
     _ = try store.createProfile(
         profileName: "lane-b-secondary",
@@ -116,8 +116,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Grounded and rich.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x03, 0x04])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x03, 0x04]),
     )
     _ = try store.createProfile(
         profileName: "lane-a-tertiary",
@@ -125,8 +125,8 @@ import TextForSpeech
         modelRepo: "test-model",
         voiceDescription: "Balanced and clear.",
         sourceText: "Reference transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x05, 0x06])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x05, 0x06]),
     )
 
     let runtime = try await makeRuntime(
@@ -138,10 +138,10 @@ import TextForSpeech
             ResidentSpeechModels.marvis(
                 MarvisResidentModels(
                     conversationalA: makeLaneModel(laneAGenerationDrain),
-                    conversationalB: makeLaneModel(laneBGenerationDrain)
-                )
+                    conversationalB: makeLaneModel(laneBGenerationDrain),
+                ),
             )
-        }
+        },
     )
 
     await runtime.start()
@@ -192,7 +192,7 @@ import TextForSpeech
                 && $0["reason"] as? String == "waiting_for_marvis_generation_lane"
         }
     })
-    let generationQueueID = (await runtime.jobs.generationQueue()).id
+    let generationQueueID = await (runtime.jobs.generationQueue()).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
@@ -234,7 +234,7 @@ import TextForSpeech
     await playbackDrain.open()
 }
 
-@Test func runtimeUsesConfiguredSpeechBackendForResidentModelPreload() async throws {
+@Test func `runtime uses configured speech backend for resident model preload`() async throws {
     let output = OutputRecorder()
     let recorder = LoadedBackendRecorder()
     let runtime = try await makeRuntime(
@@ -244,7 +244,7 @@ import TextForSpeech
         residentModelLoader: { backend in
             await recorder.record(backend)
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -258,33 +258,33 @@ import TextForSpeech
     #expect(await recorder.backends == [.marvis])
 }
 
-@Test func resolvedSpeechBackendPrefersExplicitConfigurationOverPersistedValue() throws {
+@Test func `resolved speech backend prefers explicit configuration over persisted value`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
     let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
     let dependencies = makeSpeechBackendResolutionDependencies()
     try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
-        profileRootOverride: profileRoot.path
+        profileRootOverride: profileRoot.path,
     )
 
     let resolved = WorkerRuntime.resolvedSpeechBackend(
         dependencies: dependencies,
-        environment: [ "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path ],
-        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis)
+        environment: ["SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path],
+        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis),
     )
 
     #expect(resolved == .marvis)
 }
 
-@Test func resolvedSpeechBackendPrefersEnvironmentOverPersistedConfiguration() throws {
+@Test func `resolved speech backend prefers environment over persisted configuration`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
     let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
     let dependencies = makeSpeechBackendResolutionDependencies()
     try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
-        profileRootOverride: profileRoot.path
+        profileRootOverride: profileRoot.path,
     )
 
     let resolved = WorkerRuntime.resolvedSpeechBackend(
@@ -293,13 +293,13 @@ import TextForSpeech
             "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path,
             SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.marvis.rawValue,
         ],
-        configuration: nil
+        configuration: nil,
     )
 
     #expect(resolved == .marvis)
 }
 
-@Test func residentModelPreloadFailureFailsQueuedRequests() async throws {
+@Test func `resident model preload failure fails queued requests`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let runtime = try await makeRuntime(
@@ -309,9 +309,9 @@ import TextForSpeech
             await preloadGate.wait()
             throw WorkerError(
                 code: .modelGenerationFailed,
-                message: "Resident model preload failed while loading test-resident. The local test intentionally forced this failure."
+                message: "Resident model preload failed while loading test-resident. The local test intentionally forced this failure.",
             )
-        }
+        },
     )
 
     await runtime.start()
@@ -333,7 +333,7 @@ import TextForSpeech
     })
 }
 
-@Test func typedRequestStreamFailsWhenQueuedRequestDiesDuringResidentModelPreloadFailure() async throws {
+@Test func `typed request stream fails when queued request dies during resident model preload failure`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let runtime = try await makeRuntime(
@@ -343,9 +343,9 @@ import TextForSpeech
             await preloadGate.wait()
             throw WorkerError(
                 code: .modelGenerationFailed,
-                message: "Resident model preload failed while loading test-resident. The local test intentionally forced this failure."
+                message: "Resident model preload failed while loading test-resident. The local test intentionally forced this failure.",
             )
-        }
+        },
     )
 
     let handle = await runtime.submit(.listProfiles(id: "req-preload-stream-fail"))
@@ -359,9 +359,9 @@ import TextForSpeech
             WorkerQueuedEvent(
                 id: "req-preload-stream-fail",
                 reason: .waitingForResidentModel,
-                queuePosition: 1
-            )
-        )
+                queuePosition: 1,
+            ),
+        ),
     )
 
     await preloadGate.open()
@@ -374,7 +374,7 @@ import TextForSpeech
     }
 }
 
-@Test func persistedTextProfilesReloadAcrossRuntimeConstruction() async throws {
+@Test func `persisted text profiles reload across runtime construction`() async throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -382,32 +382,32 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
     try await firstRuntime.normalizer.profiles.store(
         TextForSpeech.Profile(
             id: "logs",
             name: "Logs",
             replacements: [
-                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")
-            ]
-        )
+                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
+            ],
+        ),
     )
     try await firstRuntime.normalizer.profiles.use(
         TextForSpeech.Profile(
             id: "ops",
             name: "Ops",
             replacements: [
-                TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")
-            ]
-        )
+                TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule"),
+            ],
+        ),
     )
 
     let secondRuntime = try await makeRuntime(
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     #expect(await secondRuntime.normalizer.profiles.stored(id: "logs")?.replacements.map(\.id) == ["logs-rule"])
@@ -418,7 +418,7 @@ import TextForSpeech
     #expect(effectiveLogsReplacementIDs.contains("base-url"))
 }
 
-@Test func textProfileEditingHelpersMutateAndPersistStoredProfiles() async throws {
+@Test func `text profile editing helpers mutate and persist stored profiles`() async throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -426,7 +426,7 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     let created = try await runtime.normalizer.profiles.create(id: "logs", name: "Logs")
@@ -434,19 +434,19 @@ import TextForSpeech
 
     let added = try await runtime.normalizer.profiles.add(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
-        toStoredProfileID: "logs"
+        toStoredProfileID: "logs",
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
     let replaced = try await runtime.normalizer.profiles.replace(
         TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
-        inStoredProfileID: "logs"
+        inStoredProfileID: "logs",
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
     #expect(await runtime.normalizer.profiles.replacements(inStoredProfileID: "logs")?.map(\.id) == ["stderr-rule"])
 
     let emptied = try await runtime.normalizer.profiles.clearReplacements(
-        fromStoredProfileID: "logs"
+        fromStoredProfileID: "logs",
     )
     #expect(emptied.replacements.isEmpty)
 
@@ -454,12 +454,12 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
     #expect(await reloaded.normalizer.profiles.stored(id: "logs")?.replacements.isEmpty == true)
 }
 
-@Test func activeTextProfileEditingHelpersMutateAndPersistCustomProfile() async throws {
+@Test func `active text profile editing helpers mutate and persist custom profile`() async throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -467,16 +467,16 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     let added = try await runtime.normalizer.profiles.add(
-        TextForSpeech.Replacement("stdout", with: "standard output", id: "stdout-rule")
+        TextForSpeech.Replacement("stdout", with: "standard output", id: "stdout-rule"),
     )
     #expect(added.replacements.map(\.id) == ["stdout-rule"])
 
     let replaced = try await runtime.normalizer.profiles.replace(
-        TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule")
+        TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule"),
     )
     #expect(replaced.replacements.first?.replacement == "standard out")
     #expect(await runtime.normalizer.profiles.replacements().map(\.id) == ["stdout-rule"])
@@ -488,12 +488,12 @@ import TextForSpeech
         rootURL: rootURL,
         output: OutputRecorder(),
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
     #expect(await reloaded.normalizer.profiles.active()?.replacements.isEmpty == true)
 }
 
-@Test func textProfileProtocolOperationsMutateAndExposeNormalizerState() async throws {
+@Test func `text profile protocol operations mutate and expose normalizer state`() async throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
@@ -502,11 +502,11 @@ import TextForSpeech
         rootURL: rootURL,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() }
+        residentModelLoader: { _ in makeResidentModel() },
     )
 
     await runtime.accept(
-        line: #"{"id":"req-create-text","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}"#
+        line: #"{"id":"req-create-text","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -517,7 +517,7 @@ import TextForSpeech
     })
 
     await runtime.accept(
-        line: #"{"id":"req-add-text","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#
+        line: #"{"id":"req-add-text","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -538,11 +538,11 @@ import TextForSpeech
     let activeProfile = TextForSpeech.Profile(
         id: "ops",
         name: "Ops",
-        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")]
+        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")],
     )
     let activeProfileJSON = try String(decoding: JSONEncoder().encode(activeProfile), as: UTF8.self)
     await runtime.accept(
-        line: #"{"id":"req-use-text","op":"replace_active_text_profile","text_profile":"# + activeProfileJSON + #"}"#
+        line: #"{"id":"req-use-text","op":"replace_active_text_profile","text_profile":"# + activeProfileJSON + #"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -561,7 +561,7 @@ import TextForSpeech
     })
 
     await runtime.accept(
-        line: #"{"id":"req-text-style","op":"set_text_profile_style","text_profile_style":"explicit"}"#
+        line: #"{"id":"req-text-style","op":"set_text_profile_style","text_profile_style":"explicit"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -599,7 +599,7 @@ import TextForSpeech
     })
 }
 
-@Test func textProfileProtocolOperationsRunDuringResidentWarmupWithoutQueueing() async throws {
+@Test func `text profile protocol operations run during resident warmup without queueing`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()
     let runtime = try await makeRuntime(
@@ -608,7 +608,7 @@ import TextForSpeech
         residentModelLoader: { _ in
             await preloadGate.wait()
             return makeResidentModel()
-        }
+        },
     )
 
     await runtime.start()
@@ -634,7 +634,7 @@ import TextForSpeech
     await preloadGate.open()
 }
 
-@Test func waitingRequestsReportPriorityQueuePositions() async throws {
+@Test func `waiting requests report priority queue positions`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let profileGate = AsyncGate()
@@ -646,7 +646,7 @@ import TextForSpeech
             makeProfileModel {
                 await profileGate.wait()
             }
-        }
+        },
     )
 
     await runtime.start()
@@ -658,7 +658,7 @@ import TextForSpeech
     })
 
     await runtime.accept(
-        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#
+        line: #"{"id":"req-1","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {

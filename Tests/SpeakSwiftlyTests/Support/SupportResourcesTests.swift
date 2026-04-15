@@ -2,7 +2,7 @@ import Foundation
 import SpeakSwiftly
 import Testing
 
-@Test func vendoredMLXBundleIsPresentAndReadable() throws {
+@Test func `vendored MLX bundle is present and readable`() throws {
     let mlxBundleURL = try SpeakSwiftly.SupportResources.mlxBundleURL()
     #expect(mlxBundleURL.lastPathComponent == "mlx-swift_Cmlx.bundle")
 
@@ -10,7 +10,7 @@ import Testing
     #expect(mlxBundle.bundleURL == mlxBundleURL)
 }
 
-@Test func vendoredDefaultMetallibIsPresent() throws {
+@Test func `vendored default metallib is present`() throws {
     let metallibURL = try SpeakSwiftly.SupportResources.defaultMetallibURL()
     #expect(metallibURL.lastPathComponent == "default.metallib")
     #expect(FileManager.default.fileExists(atPath: metallibURL.path))

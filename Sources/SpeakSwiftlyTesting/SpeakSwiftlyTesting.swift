@@ -1,6 +1,8 @@
 import Foundation
 import SpeakSwiftly
 
+// MARK: - SpeakSwiftlyTestingMain
+
 @main
 struct SpeakSwiftlyTestingMain {
     enum Command: String {
@@ -22,13 +24,13 @@ struct SpeakSwiftlyTestingMain {
         let command = try parseCommand()
 
         switch command {
-        case .resources:
-            try printResources()
-        case .status:
-            try await printStatus()
-        case .smoke:
-            try printResources()
-            try await printStatus()
+            case .resources:
+                try printResources()
+            case .status:
+                try await printStatus()
+            case .smoke:
+                try printResources()
+                try await printStatus()
         }
     }
 
@@ -43,6 +45,7 @@ struct SpeakSwiftlyTestingMain {
         guard arguments.count == 1 else {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
         }
+
         return command
     }
 
@@ -66,18 +69,18 @@ struct SpeakSwiftlyTestingMain {
 
         for try await event in handle.events {
             switch event {
-            case .queued(let queued):
-                print("queued: position=\(queued.queuePosition) reason=\(queued.reason.rawValue)")
-            case .acknowledged(let success):
-                print("acknowledged: \(formatStatus(success.status))")
-                return
-            case .started(let started):
-                print("started: op=\(started.op)")
-            case .progress(let progress):
-                print("progress: stage=\(progress.stage.rawValue)")
-            case .completed(let success):
-                print("completed: \(formatStatus(success.status))")
-                return
+                case let .queued(queued):
+                    print("queued: position=\(queued.queuePosition) reason=\(queued.reason.rawValue)")
+                case let .acknowledged(success):
+                    print("acknowledged: \(formatStatus(success.status))")
+                    return
+                case let .started(started):
+                    print("started: op=\(started.op)")
+                case let .progress(progress):
+                    print("progress: stage=\(progress.stage.rawValue)")
+                case let .completed(success):
+                    print("completed: \(formatStatus(success.status))")
+                    return
             }
         }
 
@@ -88,9 +91,12 @@ struct SpeakSwiftlyTestingMain {
         guard let status else {
             return "status payload missing"
         }
+
         return "stage=\(status.stage.rawValue) resident_state=\(status.residentState.rawValue) speech_backend=\(status.speechBackend.rawValue)"
     }
 }
+
+// MARK: SpeakSwiftlyTestingMain.UsageError
 
 extension SpeakSwiftlyTestingMain {
     enum UsageError: LocalizedError {
@@ -101,14 +107,14 @@ extension SpeakSwiftlyTestingMain {
 
         var errorDescription: String? {
             switch self {
-            case .missingCommand:
-                usage
-            case .unknownCommand(let command):
-                "Unknown SpeakSwiftlyTesting command '\(command)'.\n\(usage)"
-            case .unexpectedArguments(let arguments):
-                "SpeakSwiftlyTesting received unexpected extra arguments: \(arguments).\n\(usage)"
-            case .statusStreamEndedWithoutTerminalEvent:
-                "SpeakSwiftlyTesting watched the runtime status stream, but it ended before an acknowledged or completed status payload arrived."
+                case .missingCommand:
+                    usage
+                case let .unknownCommand(command):
+                    "Unknown SpeakSwiftlyTesting command '\(command)'.\n\(usage)"
+                case let .unexpectedArguments(arguments):
+                    "SpeakSwiftlyTesting received unexpected extra arguments: \(arguments).\n\(usage)"
+                case .statusStreamEndedWithoutTerminalEvent:
+                    "SpeakSwiftlyTesting watched the runtime status stream, but it ended before an acknowledged or completed status payload arrived."
             }
         }
 

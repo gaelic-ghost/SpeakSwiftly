@@ -1,12 +1,12 @@
 import Foundation
 @preconcurrency import MLX
-import Testing
-@testable import SpeakSwiftly
 import MLXAudioTTS
+@testable import SpeakSwiftly
+import Testing
 
 // MARK: - Profile Lifecycle
 
-@Test func createsListsLoadsAndRemovesProfiles() throws {
+@Test func `creates lists loads and removes profiles`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -20,8 +20,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     #expect(stored.manifest.profileName == "default-femme")
@@ -48,7 +48,7 @@ import MLXAudioTTS
     #expect(empty.isEmpty)
 }
 
-@Test func rejectsDuplicateProfiles() throws {
+@Test func `rejects duplicate profiles`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -62,8 +62,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     #expect(throws: WorkerError.self) {
@@ -73,13 +73,13 @@ import MLXAudioTTS
             modelRepo: "test-model",
             voiceDescription: "Duplicate",
             sourceText: "Hello again",
-            sampleRate: 24_000,
-            canonicalAudioData: audioData
+            sampleRate: 24000,
+            canonicalAudioData: audioData,
         )
     }
 }
 
-@Test func renamesProfilesAndRewritesTheStoredManifestName() throws {
+@Test func `renames profiles and rewrites the stored manifest name`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -93,8 +93,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     let renamed = try store.renameProfile(named: "default-femme", to: "guide-femme")
@@ -109,7 +109,7 @@ import MLXAudioTTS
     }
 }
 
-@Test func renameRejectsAnExistingDestinationProfileName() throws {
+@Test func `rename rejects an existing destination profile name`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -123,8 +123,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
     _ = try store.createProfile(
         profileName: "default-masc",
@@ -132,8 +132,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and low.",
         sourceText: "Hello again",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     #expect(throws: WorkerError.self) {
@@ -143,7 +143,7 @@ import MLXAudioTTS
 
 // MARK: - Audio Export
 
-@Test func exportsCanonicalAudioWithoutOverwritingExistingFiles() throws {
+@Test func `exports canonical audio without overwriting existing files`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -156,8 +156,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     let exportURL = tempRoot.appendingPathComponent("exports/reference.wav")
@@ -172,7 +172,7 @@ import MLXAudioTTS
 
 // MARK: - Listing and Validation
 
-@Test func listsProfilesInSortedOrder() throws {
+@Test func `lists profiles in sorted order`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -186,8 +186,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Zeta",
         sourceText: "Zeta",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
     _ = try store.createProfile(
         profileName: "alpha",
@@ -195,15 +195,15 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Alpha",
         sourceText: "Alpha",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     let listed = try store.listProfiles()
     #expect(listed.map(\.profileName) == ["alpha", "zeta"])
 }
 
-@Test func listProfilesSkipsCorruptManifestInsteadOfFailingWholeListing() throws {
+@Test func `list profiles skips corrupt manifest instead of failing whole listing`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -217,8 +217,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Healthy voice.",
         sourceText: "Healthy transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01]),
     )
 
     let profileDirectory = store.profileDirectoryURL(for: "broken")
@@ -229,7 +229,7 @@ import MLXAudioTTS
     #expect(listed.map(\.profileName) == ["healthy"])
 }
 
-@Test func listProfilesSkipsStrayFilesAndPartialDirectories() throws {
+@Test func `list profiles skips stray files and partial directories`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -243,21 +243,21 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Healthy voice.",
         sourceText: "Healthy transcript",
-        sampleRate: 24_000,
-        canonicalAudioData: Data([0x01])
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01]),
     )
 
     try Data("junk".utf8).write(to: tempRoot.appendingPathComponent("README.txt"))
     try fileManager.createDirectory(
         at: tempRoot.appendingPathComponent("partial-profile", isDirectory: true),
-        withIntermediateDirectories: false
+        withIntermediateDirectories: false,
     )
 
     let listed = try store.listProfiles()
     #expect(listed.map(\.profileName) == ["healthy"])
 }
 
-@Test func upgradesLegacyManifestIntoBackendMaterializations() throws {
+@Test func `upgrades legacy manifest into backend materializations`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -294,7 +294,7 @@ import MLXAudioTTS
     #expect(try loaded.qwenMaterialization().manifest.referenceText == "Legacy transcript")
 }
 
-@Test func storesCloneTranscriptProvenanceOnNewProfilesAndLegacyUpgradeLeavesItUnknown() throws {
+@Test func `stores clone transcript provenance on new profiles and legacy upgrade leaves it unknown`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: tempRoot) }
@@ -311,10 +311,10 @@ import MLXAudioTTS
         transcriptProvenance: TranscriptProvenance(
             source: .provided,
             createdAt: Date(timeIntervalSince1970: 1_712_345_678),
-            transcriptionModelRepo: nil
+            transcriptionModelRepo: nil,
         ),
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
     #expect(providedTranscriptProfile.manifest.sourceKind == .importedClone)
     #expect(providedTranscriptProfile.manifest.transcriptProvenance?.source == .provided)
@@ -329,15 +329,15 @@ import MLXAudioTTS
         transcriptProvenance: TranscriptProvenance(
             source: .inferred,
             createdAt: Date(timeIntervalSince1970: 1_712_345_679),
-            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo
+            transcriptionModelRepo: ModelFactory.cloneTranscriptionModelRepo,
         ),
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
     #expect(inferredTranscriptProfile.manifest.transcriptProvenance?.source == .inferred)
     #expect(
         inferredTranscriptProfile.manifest.transcriptProvenance?.transcriptionModelRepo
-            == ModelFactory.cloneTranscriptionModelRepo
+            == ModelFactory.cloneTranscriptionModelRepo,
     )
 
     let listedProfiles = try store.listProfiles()
@@ -387,8 +387,8 @@ import MLXAudioTTS
     #expect(upgradedLegacyClone.manifest.transcriptProvenance == nil)
 }
 
-@Test func storesAndLoadsPreparedQwenConditioningArtifacts() throws {
-    guard mlxConditioningPersistenceTestsEnabled() else { return }
+@Test func `stores and loads prepared qwen conditioning artifacts`() throws {
+    #expect(mlxConditioningPersistenceTestsEnabled())
 
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
@@ -403,8 +403,8 @@ import MLXAudioTTS
         modelRepo: "test-model",
         voiceDescription: "Warm and bright.",
         sourceText: "Hello there",
-        sampleRate: 24_000,
-        canonicalAudioData: audioData
+        sampleRate: 24000,
+        canonicalAudioData: audioData,
     )
 
     let conditioning = Qwen3TTSModel.Qwen3TTSReferenceConditioning(
@@ -412,7 +412,7 @@ import MLXAudioTTS
         referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
         referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
         resolvedLanguage: "English",
-        codecLanguageID: 7
+        codecLanguageID: 7,
     )
 
     let stored = try store.storeQwenConditioningArtifact(
@@ -420,7 +420,7 @@ import MLXAudioTTS
         backend: .qwen3CustomVoice,
         modelRepo: ModelFactory.residentModelRepo(for: .qwen3CustomVoice),
         conditioning: conditioning,
-        createdAt: Date(timeIntervalSince1970: 1_712_800_000)
+        createdAt: Date(timeIntervalSince1970: 1_712_800_000),
     )
 
     let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3CustomVoice))

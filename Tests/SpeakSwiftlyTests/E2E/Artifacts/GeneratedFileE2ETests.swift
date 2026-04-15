@@ -1,19 +1,18 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 
 extension SpeakSwiftlyE2ETests {
-    @Suite("Generated File E2E")
     struct GeneratedFileSuite {
-        @Test func managedReads() async throws {
-            guard SpeakSwiftlyE2ETests.isE2EEnabled else { return }
+        @Test func `managed reads`() async throws {
+            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true
+                silentPlayback: true,
             )
             defer { Task { await worker.stop() } }
 
@@ -24,14 +23,14 @@ extension SpeakSwiftlyE2ETests {
                 profileName: SpeakSwiftlyE2ETests.testingProfileName,
                 text: SpeakSwiftlyE2ETests.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription
+                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
             )
 
             let generatedFile = try await SpeakSwiftlyE2ETests.runGeneratedFileSpeech(
                 on: worker,
                 id: "req-generated-file-e2e",
                 text: SpeakSwiftlyE2ETests.testingPlaybackText,
-                profileName: SpeakSwiftlyE2ETests.testingProfileName
+                profileName: SpeakSwiftlyE2ETests.testingProfileName,
             )
             let artifactID = "req-generated-file-e2e-artifact-1"
             #expect(generatedFile["artifact_id"] as? String == artifactID)
@@ -43,7 +42,7 @@ extension SpeakSwiftlyE2ETests {
             try worker.sendJSON(
                 """
                 {"id":"req-generated-file-read","op":"get_generated_file","artifact_id":"\(artifactID)"}
-                """
+                """,
             )
 
             let fetchedGeneratedFile = try #require(
@@ -57,7 +56,7 @@ extension SpeakSwiftlyE2ETests {
                     }
 
                     return generatedFile["artifact_id"] as? String == artifactID
-                }
+                },
             )
             let fetchedGeneratedFilePayload = try #require(fetchedGeneratedFile["generated_file"] as? [String: Any])
             #expect(fetchedGeneratedFilePayload["file_path"] as? String == generatedFilePath)
@@ -65,7 +64,7 @@ extension SpeakSwiftlyE2ETests {
             try worker.sendJSON(
                 """
                 {"id":"req-generated-files-read","op":"list_generated_files"}
-                """
+                """,
             )
 
             #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {

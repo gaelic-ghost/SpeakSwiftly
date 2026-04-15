@@ -1,7 +1,9 @@
 import Foundation
-import Testing
 @testable import SpeakSwiftly
+import Testing
 import TextForSpeech
+
+// MARK: - LoadedBackendRecorder
 
 actor LoadedBackendRecorder {
     private(set) var backends = [SpeakSwiftly.SpeechBackend]()
@@ -13,7 +15,7 @@ actor LoadedBackendRecorder {
 
 func makeSpeechBackendResolutionDependencies(
     fileManager: FileManager = .default,
-    stderrMessages: @escaping @Sendable (String) -> Void = { _ in }
+    stderrMessages: @escaping @Sendable (String) -> Void = { _ in },
 ) -> WorkerDependencies {
     WorkerDependencies(
         fileManager: fileManager,
@@ -27,6 +29,6 @@ func makeSpeechBackendResolutionDependencies(
         writeStdout: { _ in },
         writeStderr: stderrMessages,
         now: Date.init,
-        readRuntimeMemory: { nil }
+        readRuntimeMemory: { nil },
     )
 }
