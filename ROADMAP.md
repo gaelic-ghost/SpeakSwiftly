@@ -306,7 +306,18 @@ Stage notes:
   - `rebuffer_total_duration_ms`: `25188` -> `23991`
   - `longest_rebuffer_duration_ms`: `7041` -> `9399`
 - The stage-two logs show the intended policy change actually taking effect. On the first active rebuffer, the resumed target rose from the stage-one `3282` range into the `3403` range, and the later repeated-rebuffer recovery ceiling stayed strong at `4980` instead of falling back toward the standard profile.
-- Stage 2 is a real improvement, but still not a full fix. Total rebuffer time dropped by about `1.2s`, yet the first request still suffered four rebuffers and one longer recovery window. The next bounded pass should probably stay in the policy lane and target earlier distress reaction before the first rebuffer finishes growing, or widen into resident Marvis cadence only if that narrower pass still stalls out.
+- Stage 2 is a real improvement, but still not a full fix. Total rebuffer time dropped by about `1.2s`, yet the first request still suffered four rebuffers and one longer recovery window.
+- Stage 3 landed on `2026-04-15` as a bounded pre-rebuffer distress pass. The first drained live Marvis request now treats repeated schedule-gap warnings inside the low-queue risk band as an early recovery signal instead of waiting for the first rebuffer pause to fully form.
+- Stage 3 artifact: `.local/e2e-runs/2026-04-15T18-02-46Z-16d980ae-1226-4db6-9095-59fdcff155f1-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-two to stage-three stderr metrics changed like this:
+  - `time_to_preroll_ready_ms`: `3810` -> `3760`
+  - `startup_buffered_audio_ms`: `2400` -> `2400`
+  - `rebuffer_event_count`: `4` -> `4`
+  - `rebuffer_total_duration_ms`: `23991` -> `23773`
+  - `longest_rebuffer_duration_ms`: `9399` -> `6678`
+- The stage-three logs show the intended earlier reaction taking effect before the first long pause finishes growing. The first active rebuffer now starts at `queued_audio_ms = 1760` instead of the stage-two `1120`, and the strongest recovery window is shorter even though the run still ends with four rebuffers.
+- The restored dual-lane overlap model still held during stage three. The second Marvis lane remained parked on `waiting_for_playback_stability`, then resumed once playback reported `playback_is_stable_for_concurrency = true` at a `2320 ms` stable buffer target and `2400 ms` buffered reserve.
+- Stage 3 is another real improvement, but still not a full fix. The next decision is whether one more bounded policy pass is likely to keep paying off, or whether Milestone 22 should widen into resident Marvis cadence and warmup behavior now that the obvious first-request threshold work is in place.
 
 Exit criteria:
 

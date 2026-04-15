@@ -225,6 +225,47 @@ import TextForSpeech
     #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
 }
 
+@Test func `first drained live marvis tuning hardens on repeated pre-rebuffer schedule gaps`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 1920)
+    #expect(controller.thresholds == adapted)
+
+    controller.recordScheduleGapDistress(gapMS: 440, queuedAudioMS: 1600)
+    let hardened = controller.thresholds
+
+    #expect(controller.phase == .recovery)
+    #expect(hardened.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(hardened.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
+}
+
+@Test func `pre-rebuffer schedule gap hardening ignores low-risk queued audio`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2600)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2400)
+
+    #expect(controller.phase == .warmup)
+    #expect(controller.thresholds == adapted)
+}
+
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {
     var controller = PlaybackThresholdController(
         text: """
