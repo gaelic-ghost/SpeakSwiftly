@@ -42,7 +42,7 @@ extension SpeakSwiftlyE2ETests {
 
     ## Section Two
 
-    Read these symbol-heavy identifiers carefully: NSApplication.didFinishLaunchingNotification, AVAudioEngine.mainMixerNode, dot.syntax.stuff, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
+    Read these symbol-heavy identifiers carefully: NSApplication.didFinishLaunchingNotification, AVAudioEngine.mainMixerNode, dot.syntax.stuff, camelCaseStuff, snake_case_stuff, `profile?.sampleRate ?? 24000`, and the URL https://example.com/deep-trace.
 
     ## Section Three
 
@@ -77,7 +77,7 @@ extension SpeakSwiftlyE2ETests {
 
     ## Section Two
 
-    Read these symbol-heavy identifiers carefully: NSApplication.didFinishLaunchingNotification, AVAudioEngine.mainMixerNode, dot.syntax.stuff, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
+    Read these symbol-heavy identifiers carefully: NSApplication.didFinishLaunchingNotification, AVAudioEngine.mainMixerNode, dot.syntax.stuff, camelCaseStuff, snake_case_stuff, `profile?.sampleRate ?? 24000`, and the URL https://example.com/deep-trace.
 
     ## Section One
 
@@ -696,6 +696,7 @@ final class WorkerProcess: @unchecked Sendable {
     private let artifacts: E2EWorkerArtifacts
     private let process: Process
     private let stdinPipe: Pipe
+    private let stdinWriteHandle: FileHandle
     private let stdoutHandle: FileHandle
     private let stderrHandle: FileHandle
     private let recorder: JSONLineRecorder
@@ -719,6 +720,7 @@ final class WorkerProcess: @unchecked Sendable {
 
         process = Process()
         stdinPipe = Pipe()
+        stdinWriteHandle = stdinPipe.fileHandleForWriting
         let recorder = JSONLineRecorder()
         self.recorder = recorder
         let stdoutPipe = Pipe()
@@ -955,11 +957,15 @@ final class WorkerProcess: @unchecked Sendable {
     }
 
     func sendJSON(_ jsonLine: String) throws {
-        try stdinPipe.fileHandleForWriting.write(contentsOf: Data((jsonLine + "\n").utf8))
+        try stdinWriteHandle.write(contentsOf: Data((jsonLine + "\n").utf8))
     }
 
     func closeInput() throws {
-        try stdinPipe.fileHandleForWriting.close()
+        if #available(macOS 12.0, *) {
+            try stdinWriteHandle.close()
+        } else {
+            stdinWriteHandle.closeFile()
+        }
     }
 
     func stop() async {

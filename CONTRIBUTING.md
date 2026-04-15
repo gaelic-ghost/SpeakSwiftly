@@ -385,6 +385,8 @@ Chunk-level trace during e2e:
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests
 ```
 
+Without `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, the trace-capture suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
+
 Long deep-trace playback probe:
 
 ```bash
@@ -396,6 +398,8 @@ Opt-in qwen resident benchmark comparison:
 ```bash
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite
 ```
+
+Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
 
 Run multiple comparison samples per backend:
 

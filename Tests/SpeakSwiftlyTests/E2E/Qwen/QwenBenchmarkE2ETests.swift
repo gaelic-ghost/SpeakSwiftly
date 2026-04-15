@@ -7,12 +7,15 @@ private let qwenBenchmarkSchemaVersion = 2
 // MARK: - SpeakSwiftlyE2ETests.QwenBenchmarkSuite
 
 extension SpeakSwiftlyE2ETests {
-    @Suite(.serialized)
+    @Suite(
+        .serialized,
+        .enabled(
+            if: SpeakSwiftlyE2ETests.isQwenBenchmarkE2EEnabled,
+            "This Qwen resident benchmark suite is opt-in and requires SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1.",
+        ),
+    )
     struct QwenBenchmarkSuite {
         @Test func `compare resident backends`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isQwenBenchmarkE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 

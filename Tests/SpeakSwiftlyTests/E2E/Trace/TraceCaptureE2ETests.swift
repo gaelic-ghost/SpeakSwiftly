@@ -3,10 +3,15 @@ import Foundation
 import Testing
 
 extension SpeakSwiftlyE2ETests {
+    @Suite(
+        .enabled(
+            if: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+            "This trace-capture suite is opt-in and requires SPEAKSWIFTLY_PLAYBACK_TRACE=1.",
+        ),
+    )
     struct TraceCaptureSuite {
         @Test func `capture on demand`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isPlaybackTraceEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
