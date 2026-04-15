@@ -416,6 +416,12 @@ The active roadmap milestones for this work are:
 
 - `Milestone 22`: first-request Marvis playback tuning
 
+The current Milestone 22 operating decisions are:
+
+1. Smoother first audible Marvis playback is more important than squeezing the first audible reply to the absolute earliest possible moment. An extra 1 to 2 seconds of initial wait is an acceptable trade if it materially reduces early rebuffers.
+2. The queued-live dual-lane Marvis overlap model should stay intact in principle, but the second lane is allowed to start a little later if that protects the first active playback from obvious instability.
+3. Tuning work should land one bounded stage at a time, with before-and-after metrics captured after each pass, so later widening into resident warmup behavior happens only if the narrower pass is not enough.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:

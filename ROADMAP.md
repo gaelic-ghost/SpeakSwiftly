@@ -273,6 +273,9 @@ Tickets:
 
 - [ ] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
 - [ ] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before-and-after capture for each tuning change.
+- [ ] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
+- [ ] Preserve queued-live Marvis overlap in principle, but allow the second lane to start a little later if that materially reduces first-request rebuffering.
+- [ ] Take Milestone 22 one stage at a time: ship one bounded tuning pass, benchmark it, record what changed, then decide whether another pass should widen into resident warmup behavior.
 - [ ] Investigate whether resident preload is too eager about preparing local playback hardware, especially the `startResidentPreload()` -> `playbackController.prepare(...)` path that rebuilds playback hardware before an active live request exists.
 - [ ] Revisit warmup startup, low-water, and resume thresholds specifically for the first active Marvis playback request.
 - [ ] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
