@@ -16,7 +16,7 @@ extension SpeakSwiftly.Runtime {
             "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
             "chunk_count": .int(playbackSummary.chunkCount),
             "sample_count": .int(playbackSummary.sampleCount),
-            "streaming_interval": .double(PlaybackConfiguration.residentStreamingInterval),
+            "streaming_interval": .double(speechRequest.residentStreamingInterval),
             "startup_buffer_target_ms": .int(playbackSummary.thresholds.startupBufferTargetMS),
             "low_water_target_ms": .int(playbackSummary.thresholds.lowWaterTargetMS),
             "resume_buffer_target_ms": .int(playbackSummary.thresholds.resumeBufferTargetMS),

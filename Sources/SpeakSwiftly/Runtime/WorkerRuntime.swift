@@ -23,6 +23,23 @@ public extension SpeakSwiftly {
             /// Shorter chunk cadence gives playback a second chunk in reserve before
             /// the first one drains, which reduces audible shudder from one-chunk starts.
             static let residentStreamingInterval = 0.18
+
+            /// The first drained live Marvis request is the only path that has to
+            /// bootstrap audible reserve from nothing. Give it a tighter resident
+            /// streaming cadence so playback can accumulate preroll before overlap
+            /// opens the second generation lane.
+            static let firstDrainedLiveMarvisStreamingInterval = 0.12
+
+            static func residentStreamingInterval(
+                for tuningProfile: PlaybackTuningProfile,
+            ) -> Double {
+                switch tuningProfile {
+                    case .standard:
+                        residentStreamingInterval
+                    case .firstDrainedLiveMarvis:
+                        firstDrainedLiveMarvisStreamingInterval
+                }
+            }
         }
 
         // MARK: Runtime State

@@ -273,12 +273,12 @@ Tickets:
 
 - [x] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
 - [x] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before-and-after capture for each tuning change.
-- [ ] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
-- [ ] Preserve queued-live Marvis overlap in principle, but allow the second lane to start a little later if that materially reduces first-request rebuffering.
-- [ ] Take Milestone 22 one stage at a time: ship one bounded tuning pass, benchmark it, record what changed, then decide whether another pass should widen into resident warmup behavior.
-- [ ] Investigate whether resident preload is too eager about preparing local playback hardware, especially the `startResidentPreload()` -> `playbackController.prepare(...)` path that rebuilds playback hardware before an active live request exists.
+- [x] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
+- [x] Preserve queued-live Marvis overlap in principle, but allow the second lane to start a little later if that materially reduces first-request rebuffering.
+- [x] Take Milestone 22 one stage at a time: ship one bounded tuning pass, benchmark it, record what changed, then decide whether another pass should widen into resident warmup behavior.
+- [x] Investigate whether resident preload is too eager about preparing local playback hardware, especially the `startResidentPreload()` -> `playbackController.prepare(...)` path that rebuilds playback hardware before an active live request exists.
 - [ ] Revisit warmup startup, low-water, and resume thresholds specifically for the first active Marvis playback request.
-- [ ] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
+- [x] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
 - [ ] Keep the scheduler snapshot and lane-reservation logs aligned with any playback-tuning changes so queue truth stays obvious.
 - [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful tuning pass.
 
@@ -318,6 +318,32 @@ Stage notes:
 - The stage-three logs show the intended earlier reaction taking effect before the first long pause finishes growing. The first active rebuffer now starts at `queued_audio_ms = 1760` instead of the stage-two `1120`, and the strongest recovery window is shorter even though the run still ends with four rebuffers.
 - The restored dual-lane overlap model still held during stage three. The second Marvis lane remained parked on `waiting_for_playback_stability`, then resumed once playback reported `playback_is_stable_for_concurrency = true` at a `2320 ms` stable buffer target and `2400 ms` buffered reserve.
 - Stage 3 is another real improvement, but still not a full fix. The next decision is whether one more bounded policy pass is likely to keep paying off, or whether Milestone 22 should widen into resident Marvis cadence and warmup behavior now that the obvious first-request threshold work is in place.
+- The widened Milestone 22 investigation checked the resident preload path before changing code. The current evidence says the eager `startResidentPreload()` -> `playbackController.prepare(...)` path is not the leading problem surface, because first-request startup is dominated by slow resident chunk cadence rather than by audio-engine bring-up once a live request begins.
+- Stage 4 landed on `2026-04-15` as the first widened pass. The first drained live Marvis request now uses a tighter resident streaming cadence of `0.12` instead of the standard `0.18`, while later queued requests stay on the ordinary cadence.
+- Stage 4 artifact: `.local/e2e-runs/2026-04-15T18-16-17Z-7b199036-8540-4284-9a84-92dd16e13a30-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-three to stage-four stderr metrics changed like this:
+  - `time_to_first_chunk_ms`: `441` -> `333`
+  - `time_to_preroll_ready_ms`: `3760` -> `3833`
+  - `startup_buffered_audio_ms`: `2400` -> `2320`
+  - `rebuffer_event_count`: `4` -> `5`
+  - `rebuffer_total_duration_ms`: `23773` -> `22758`
+  - `longest_rebuffer_duration_ms`: `6678` -> `4801`
+  - `avg_inter_chunk_gap_ms`: `399` -> `202`
+  - `avg_schedule_gap_ms`: `364` -> `184`
+- Stage 4 improved startup chunk cadence decisively, but it also exposed a new mismatch: the second Marvis lane still reopened at bare preroll reserve, so the first request picked up shorter but more frequent disruptions after overlap resumed. That made stage four useful, but not sufficient to keep on its own.
+- Stage 5 landed on `2026-04-15` as the widened follow-up pass. The first drained live Marvis request now keeps the faster resident cadence from stage four, and playback no longer reopens concurrent generation at plain preroll for that first drained request. Instead, the first request has to build a stronger buffered-audio reserve before the scheduler sees playback as stable enough for the second Marvis lane.
+- Stage 5 artifact: `.local/e2e-runs/2026-04-15T18-24-15Z-95e656cc-c4b4-4e2a-8374-4ef353ac9b2a-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-four to stage-five stderr metrics changed like this:
+  - `time_to_first_chunk_ms`: `333` -> `325`
+  - `time_to_preroll_ready_ms`: `3833` -> `3828`
+  - `startup_buffered_audio_ms`: `2320` -> `2320`
+  - `rebuffer_event_count`: `5` -> `5`
+  - `rebuffer_total_duration_ms`: `22758` -> `18775`
+  - `longest_rebuffer_duration_ms`: `4801` -> `4385`
+  - `avg_inter_chunk_gap_ms`: `202` -> `183`
+  - `avg_schedule_gap_ms`: `184` -> `165`
+- The important stage-five architecture outcome is that overlap stayed intact while moving later in the flow. The second Marvis lane no longer reopened at the first request's bare preroll reserve; it stayed parked on `waiting_for_playback_stability` until the first playback had already recovered into a healthier reserve window, then resumed and kept the dual-lane model alive.
+- Milestone 22 is still open, but the current evidence now points more clearly at two facts: faster first-request cadence helps, and cadence changes need admission-gate changes alongside them or the first request gives the gains back as soon as overlap resumes.
 
 Exit criteria:
 

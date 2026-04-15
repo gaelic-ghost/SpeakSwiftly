@@ -12,6 +12,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
     let playbackTuningProfile: PlaybackTuningProfile
+    let residentStreamingInterval: Double
 
     init(
         request: WorkerRequest,
@@ -19,6 +20,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
         playbackTuningProfile: PlaybackTuningProfile,
+        residentStreamingInterval: Double,
     ) {
         guard case let .queueSpeech(
             id: _,
@@ -44,6 +46,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.textFeatures = textFeatures
         self.textSections = textSections
         self.playbackTuningProfile = playbackTuningProfile
+        self.residentStreamingInterval = residentStreamingInterval
     }
 
     var id: String {

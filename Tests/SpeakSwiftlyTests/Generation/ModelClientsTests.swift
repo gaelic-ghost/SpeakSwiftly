@@ -266,6 +266,36 @@ import TextForSpeech
     #expect(controller.thresholds == adapted)
 }
 
+@Test func `first drained live marvis uses tighter resident streaming cadence`() {
+    let standardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .standard,
+    )
+    let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .firstDrainedLiveMarvis,
+    )
+
+    #expect(standardInterval == 0.18)
+    #expect(firstRequestInterval == 0.12)
+    #expect(firstRequestInterval < standardInterval)
+}
+
+@Test func `first drained live marvis requires extra reserve before overlap opens`() {
+    let standardAdmission = PlaybackController.concurrencyAdmissionThresholds(
+        tuningProfile: .standard,
+        startupBufferTargetMS: 2320,
+        lowWaterTargetMS: 1040,
+    )
+    let firstRequestAdmission = PlaybackController.concurrencyAdmissionThresholds(
+        tuningProfile: .firstDrainedLiveMarvis,
+        startupBufferTargetMS: 2320,
+        lowWaterTargetMS: 1040,
+    )
+
+    #expect(standardAdmission.concurrentGenerationTargetMS == 2320)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 2800)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
+}
+
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {
     var controller = PlaybackThresholdController(
         text: """

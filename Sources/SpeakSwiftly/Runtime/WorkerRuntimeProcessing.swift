@@ -301,7 +301,7 @@ extension SpeakSwiftly.Runtime {
             text: playbackState.request.normalizedText,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(for: playbackState.request.normalizedText),
-            streamingInterval: PlaybackConfiguration.residentStreamingInterval,
+            streamingInterval: playbackState.request.residentStreamingInterval,
         )
 
         do {

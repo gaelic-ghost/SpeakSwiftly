@@ -444,6 +444,27 @@ The third bounded Milestone 22 pass also landed on `2026-04-15` as a pre-rebuffe
 - The important architectural outcome is that overlap still stayed intact after the earlier distress reaction. The second Marvis lane remained parked on `waiting_for_playback_stability`, then resumed once playback reported `playback_is_stable_for_concurrency = true` at a `2320 ms` stable buffer target and `2400 ms` buffered reserve.
 - The important tuning outcome is that the policy-only path is still helping, but the first drained-queue playback still is not clean enough to call fixed. The next decision is whether one more bounded policy pass is worth it, or whether Milestone 22 should now widen into resident cadence and warmup behavior.
 
+The widened Milestone 22 investigation also checked resident preload before changing the tuning path.
+
+- The current code still eagerly prepares playback hardware during resident preload through `startResidentPreload()` and `playbackController.prepare(...)`.
+- The current evidence says that is not the leading cause of the first drained live Marvis instability. In the stage-three trace, first-request startup was dominated by slow resident chunk cadence before playback started, not by a late playback-engine bring-up once the live request existed.
+- That means the first widened pass should stay focused on resident generation cadence and concurrency admission rather than treating playback-engine preparation as the primary fix surface.
+
+The fourth Milestone 22 pass landed on `2026-04-15` as the first widened change.
+
+- That pass tightened resident Marvis cadence only for the first drained live request by lowering its resident streaming interval from `0.18` to `0.12`, while leaving later queued requests on the ordinary cadence.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-16-17Z-7b199036-8540-4284-9a84-92dd16e13a30-prequeued-jobs-drain-in-order` showed that startup cadence improved decisively: `time_to_first_chunk_ms` dropped from `441` to `333`, `avg_inter_chunk_gap_ms` dropped from `399` to `202`, and `avg_schedule_gap_ms` dropped from `364` to `184`.
+- The important downside is that stage four exposed a policy mismatch instead of finishing the tuning job. `time_to_preroll_ready_ms` drifted slightly upward to `3833`, `startup_buffered_audio_ms` settled at `2320`, `rebuffer_event_count` rose from `4` to `5`, and the second Marvis lane still reopened at bare preroll reserve.
+- The useful conclusion from stage four is that faster first-request cadence helps, but cadence alone is not enough if playback still declares itself concurrency-stable at the old reserve threshold.
+
+The fifth Milestone 22 pass also landed on `2026-04-15` as the widened follow-up change.
+
+- That pass kept the stage-four faster first-request resident cadence and tightened playback's own concurrency-admission rule for the first drained live Marvis request.
+- The playback controller now keeps the runtime-facing admission surface narrow, but internally it makes the first drained live Marvis request earn a stronger buffered-audio reserve before reporting `allowsConcurrentGeneration = true`.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-24-15Z-95e656cc-c4b4-4e2a-8374-4ef353ac9b2a-prequeued-jobs-drain-in-order` shows why that follow-up is worth keeping: `time_to_first_chunk_ms` improved again to `325`, `time_to_preroll_ready_ms` stayed effectively flat at `3828`, `rebuffer_event_count` stayed at `5`, `rebuffer_total_duration_ms` dropped from `22758` to `18775`, and `longest_rebuffer_duration_ms` dropped from `4801` to `4385`.
+- The important architecture result is that overlap still stayed intact while moving later in the flow. In the stage-five trace, the second Marvis lane remained parked on `waiting_for_playback_stability` at preroll, and only resumed after the first request had already recovered into a healthier reserve window.
+- The important tuning result is that the widened path is now coherent: the faster first-request cadence helps startup, and the stronger first-request admission gate keeps those gains from getting spent immediately when overlap resumes.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:

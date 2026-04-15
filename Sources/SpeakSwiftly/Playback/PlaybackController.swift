@@ -13,6 +13,11 @@ struct PlaybackHooks {
 // MARK: - PlaybackController
 
 actor PlaybackController {
+    struct ConcurrencyAdmissionThresholds {
+        let startupBufferTargetMS: Int
+        let concurrentGenerationTargetMS: Int
+    }
+
     struct ActivePlayback {
         let requestID: String
         let task: Task<Void, Never>
@@ -37,6 +42,7 @@ actor PlaybackController {
     private var activePlaybackIsStableForConcurrentGeneration = false
     private var activePlaybackStableBufferedAudioMS: Int?
     private var activePlaybackStableBufferTargetMS: Int?
+    private var activePlaybackConcurrentGenerationTargetMS: Int?
     private var activePlaybackIsRebuffering = false
     private var jobs = [String: LiveSpeechPlaybackState]()
     private var queue = [String]()
@@ -223,6 +229,7 @@ actor PlaybackController {
         activePlaybackIsStableForConcurrentGeneration = false
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
+        activePlaybackConcurrentGenerationTargetMS = nil
         activePlaybackIsRebuffering = false
         playbackState.execution.playbackTask = task
     }
@@ -294,6 +301,7 @@ actor PlaybackController {
         activePlaybackIsStableForConcurrentGeneration = false
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
+        activePlaybackConcurrentGenerationTargetMS = nil
         activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
@@ -313,9 +321,16 @@ actor PlaybackController {
 
         switch event {
             case let .prerollReady(startupBufferedAudioMS, thresholds):
-                activePlaybackIsStableForConcurrentGeneration = true
+                let requestTuningProfile = jobs[requestID]?.request.playbackTuningProfile ?? .standard
+                let admissionThresholds = Self.concurrencyAdmissionThresholds(
+                    tuningProfile: requestTuningProfile,
+                    startupBufferTargetMS: thresholds.startupBufferTargetMS,
+                    lowWaterTargetMS: thresholds.lowWaterTargetMS,
+                )
+                activePlaybackConcurrentGenerationTargetMS = admissionThresholds.concurrentGenerationTargetMS
                 activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
-                activePlaybackStableBufferTargetMS = thresholds.startupBufferTargetMS
+                activePlaybackStableBufferTargetMS = admissionThresholds.concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = startupBufferedAudioMS >= admissionThresholds.concurrentGenerationTargetMS
                 activePlaybackIsRebuffering = false
             case .rebufferStarted:
                 activePlaybackIsStableForConcurrentGeneration = false
@@ -324,10 +339,25 @@ actor PlaybackController {
                 activePlaybackIsStableForConcurrentGeneration = true
                 activePlaybackStableBufferedAudioMS = bufferedAudioMS
                 activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
+                activePlaybackConcurrentGenerationTargetMS = thresholds.resumeBufferTargetMS
                 activePlaybackIsRebuffering = false
             case .starved:
                 activePlaybackIsStableForConcurrentGeneration = false
                 activePlaybackIsRebuffering = true
+            case let .trace(trace):
+                guard
+                    trace.name == "buffer_scheduled",
+                    !activePlaybackIsStableForConcurrentGeneration,
+                    !activePlaybackIsRebuffering,
+                    let queuedAudioAfterMS = trace.queuedAudioAfterMS,
+                    let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS
+                else {
+                    break
+                }
+
+                activePlaybackStableBufferedAudioMS = queuedAudioAfterMS
+                activePlaybackStableBufferTargetMS = concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = queuedAudioAfterMS >= concurrentGenerationTargetMS
             case .firstChunk,
                  .queueDepthLow,
                  .chunkGapWarning,
@@ -335,9 +365,27 @@ actor PlaybackController {
                  .rebufferThrashWarning,
                  .outputDeviceChanged,
                  .engineConfigurationChanged,
-                 .bufferShapeSummary,
-                 .trace:
+                 .bufferShapeSummary:
                 break
         }
+    }
+
+    static func concurrencyAdmissionThresholds(
+        tuningProfile: PlaybackTuningProfile,
+        startupBufferTargetMS: Int,
+        lowWaterTargetMS: Int,
+    ) -> ConcurrencyAdmissionThresholds {
+        guard tuningProfile == .firstDrainedLiveMarvis else {
+            return ConcurrencyAdmissionThresholds(
+                startupBufferTargetMS: startupBufferTargetMS,
+                concurrentGenerationTargetMS: startupBufferTargetMS,
+            )
+        }
+
+        let additionalReserveMS = min(480, max(320, lowWaterTargetMS / 2))
+        return ConcurrencyAdmissionThresholds(
+            startupBufferTargetMS: startupBufferTargetMS,
+            concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
+        )
     }
 }

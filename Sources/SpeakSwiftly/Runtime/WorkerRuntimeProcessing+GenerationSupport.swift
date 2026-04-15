@@ -206,12 +206,16 @@ extension SpeakSwiftly.Runtime {
             } else {
                 .standard
             }
+        let residentStreamingInterval = PlaybackConfiguration.residentStreamingInterval(
+            for: playbackTuningProfile,
+        )
         return LiveSpeechRequestState(
             request: request,
             normalizedText: normalizedText,
             textFeatures: textFeatures,
             textSections: textSections,
             playbackTuningProfile: playbackTuningProfile,
+            residentStreamingInterval: residentStreamingInterval,
         )
     }
 
