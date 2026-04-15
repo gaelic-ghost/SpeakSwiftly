@@ -73,11 +73,11 @@ extension SpeakSwiftly.Runtime {
     func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
         let activeJobs = await generationController.activeJobsOrdered()
         let queuedJobs = await generationController.queuedJobsOrdered()
-        let playbackSnapshot = await playbackController.concurrencySnapshot()
+        let playbackAdmission = await playbackController.generationAdmissionSnapshot()
         let decision = try? evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
-            playbackSnapshot: playbackSnapshot,
+            playbackAdmission: playbackAdmission,
         )
         guard let reason = decision?.parkReasons[job.token] else {
             return nil

@@ -10,11 +10,12 @@ extension SpeakSwiftly.Runtime {
 
         let activeJobs = await generationController.activeJobsOrdered()
         let queuedJobs = await generationController.queuedJobsOrdered()
-        let playbackSnapshot = await playbackController.concurrencySnapshot()
+        let playbackAdmission = await playbackController.generationAdmissionSnapshot()
+        let playbackTelemetry = await playbackController.coordinationTelemetrySnapshot()
         let decision = try evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
-            playbackSnapshot: playbackSnapshot,
+            playbackAdmission: playbackAdmission,
         )
 
         await logMarvisSchedulerSnapshotIfNeeded(
@@ -22,7 +23,7 @@ extension SpeakSwiftly.Runtime {
             queuedJobs: queuedJobs,
             runnableJobs: decision.runnableJobs,
             parkReasons: decision.parkReasons,
-            playbackSnapshot: playbackSnapshot,
+            playbackTelemetry: playbackTelemetry,
         )
         await syncQueuedGenerationParkReasons(
             queuedJobs: queuedJobs,
@@ -63,7 +64,7 @@ extension SpeakSwiftly.Runtime {
             await logMarvisGenerationLaneReservedIfNeeded(
                 for: job.request,
                 activeJobs: generationController.activeJobsOrdered(),
-                playbackSnapshot: playbackSnapshot,
+                playbackAdmission: playbackAdmission,
             )
         }
     }
@@ -71,7 +72,7 @@ extension SpeakSwiftly.Runtime {
     func evaluateGenerationSchedule(
         activeJobs: [GenerationController.Job],
         queuedJobs: [GenerationController.Job],
-        playbackSnapshot: PlaybackController.ConcurrencySnapshot,
+        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) throws -> GenerationScheduleDecision {
         guard !queuedJobs.isEmpty else {
             return GenerationScheduleDecision(runnableJobs: [], parkReasons: [:])
@@ -90,7 +91,7 @@ extension SpeakSwiftly.Runtime {
             let disposition = try generationDisposition(
                 for: job,
                 activeJobs: activeJobs + selectedJobs,
-                playbackSnapshot: playbackSnapshot,
+                playbackAdmission: playbackAdmission,
             )
             if job.request.formsOrderedControlBarrier, disposition != .run {
                 break
@@ -122,7 +123,7 @@ extension SpeakSwiftly.Runtime {
     func generationDisposition(
         for job: GenerationController.Job,
         activeJobs: [GenerationController.Job],
-        playbackSnapshot: PlaybackController.ConcurrencySnapshot,
+        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) throws -> GenerationJobDisposition {
         let request = job.request
 
@@ -144,14 +145,14 @@ extension SpeakSwiftly.Runtime {
                 break
         }
 
-        if request.requiresPlaybackDrainBeforeStart, playbackSnapshot.activeRequestID != nil {
+        if request.requiresPlaybackDrainBeforeStart, playbackAdmission.activeRequestID != nil {
             return .park(.waitingForActiveRequest)
         }
 
         if speechBackend == .marvis {
             if isLiveSpeechGenerationRequest(request),
-               playbackSnapshot.activeRequestID != nil,
-               !playbackSnapshot.isStableForConcurrentGeneration {
+               playbackAdmission.activeRequestID != nil,
+               !playbackAdmission.allowsConcurrentGeneration {
                 return .park(.waitingForPlaybackStability)
             }
 
@@ -243,10 +244,10 @@ extension SpeakSwiftly.Runtime {
         queuedJobs: [GenerationController.Job],
         runnableJobs: [GenerationController.Job],
         parkReasons: [UUID: GenerationParkReason],
-        playbackSnapshot: PlaybackController.ConcurrencySnapshot,
+        playbackTelemetry: PlaybackController.ConcurrencySnapshot,
     ) async {
         guard speechBackend == .marvis else { return }
-        guard !activeJobs.isEmpty || !queuedJobs.isEmpty || playbackSnapshot.activeRequestID != nil else {
+        guard !activeJobs.isEmpty || !queuedJobs.isEmpty || playbackTelemetry.activeRequestID != nil else {
             lastLoggedMarvisSchedulerState = nil
             return
         }
@@ -255,9 +256,9 @@ extension SpeakSwiftly.Runtime {
             "active=\(activeJobs.map(\.request.id).joined(separator: ","))",
             "queued=\(queuedJobs.map(\.request.id).joined(separator: ","))",
             "runnable=\(runnableJobs.map(\.request.id).joined(separator: ","))",
-            "playback=\(playbackSnapshot.activeRequestID ?? "none")",
-            "stable=\(playbackSnapshot.isStableForConcurrentGeneration)",
-            "rebuffering=\(playbackSnapshot.isRebuffering)",
+            "playback=\(playbackTelemetry.activeRequestID ?? "none")",
+            "stable=\(playbackTelemetry.isStableForConcurrentGeneration)",
+            "rebuffering=\(playbackTelemetry.isRebuffering)",
         ]
         .joined(separator: "|")
 
@@ -285,11 +286,11 @@ extension SpeakSwiftly.Runtime {
                 "active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
                 "queued_generation_request_ids": .string(queuedJobs.map(\.request.id).joined(separator: ",")),
                 "runnable_generation_request_ids": .string(runnableJobs.map(\.request.id).joined(separator: ",")),
-                "active_playback_request_id": .string(playbackSnapshot.activeRequestID ?? "none"),
-                "playback_is_stable_for_concurrency": .bool(playbackSnapshot.isStableForConcurrentGeneration),
-                "playback_is_rebuffering": .bool(playbackSnapshot.isRebuffering),
-                "playback_stable_buffered_audio_ms": .int(playbackSnapshot.stableBufferedAudioMS ?? 0),
-                "playback_stable_buffer_target_ms": .int(playbackSnapshot.stableBufferTargetMS ?? 0),
+                "active_playback_request_id": .string(playbackTelemetry.activeRequestID ?? "none"),
+                "playback_is_stable_for_concurrency": .bool(playbackTelemetry.isStableForConcurrentGeneration),
+                "playback_is_rebuffering": .bool(playbackTelemetry.isRebuffering),
+                "playback_stable_buffered_audio_ms": .int(playbackTelemetry.stableBufferedAudioMS ?? 0),
+                "playback_stable_buffer_target_ms": .int(playbackTelemetry.stableBufferTargetMS ?? 0),
                 "active_marvis_generation_lanes": .string(
                     activeLaneAssignments
                         .map { "\($0.key):\($0.value)" }
@@ -309,7 +310,7 @@ extension SpeakSwiftly.Runtime {
     func logMarvisGenerationLaneReservedIfNeeded(
         for request: WorkerRequest,
         activeJobs: [GenerationController.Job],
-        playbackSnapshot: PlaybackController.ConcurrencySnapshot,
+        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) async {
         guard let lane = try? marvisGenerationLane(for: request) else { return }
 
@@ -322,8 +323,8 @@ extension SpeakSwiftly.Runtime {
                 "marvis_lane": .string(lane.rawValue),
                 "active_generation_count": .int(activeJobs.count),
                 "active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
-                "playback_is_stable_for_concurrency": .bool(playbackSnapshot.isStableForConcurrentGeneration),
-                "active_playback_request_id": .string(playbackSnapshot.activeRequestID ?? "none"),
+                "playback_allows_concurrent_generation": .bool(playbackAdmission.allowsConcurrentGeneration),
+                "active_playback_request_id": .string(playbackAdmission.activeRequestID ?? "none"),
             ],
         )
     }

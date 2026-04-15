@@ -26,6 +26,11 @@ actor PlaybackController {
         let isRebuffering: Bool
     }
 
+    struct GenerationAdmissionSnapshot: Equatable {
+        let activeRequestID: String?
+        let allowsConcurrentGeneration: Bool
+    }
+
     private let driver: AnyPlaybackController
     private var hooks: PlaybackHooks?
     private var activePlayback: ActivePlayback?
@@ -107,13 +112,20 @@ actor PlaybackController {
         )
     }
 
-    func concurrencySnapshot() -> ConcurrencySnapshot {
+    func coordinationTelemetrySnapshot() -> ConcurrencySnapshot {
         ConcurrencySnapshot(
             activeRequestID: activePlayback?.requestID,
             isStableForConcurrentGeneration: activePlaybackIsStableForConcurrentGeneration,
             stableBufferedAudioMS: activePlaybackStableBufferedAudioMS,
             stableBufferTargetMS: activePlaybackStableBufferTargetMS,
             isRebuffering: activePlaybackIsRebuffering,
+        )
+    }
+
+    func generationAdmissionSnapshot() -> GenerationAdmissionSnapshot {
+        GenerationAdmissionSnapshot(
+            activeRequestID: activePlayback?.requestID,
+            allowsConcurrentGeneration: activePlayback == nil || activePlaybackIsStableForConcurrentGeneration,
         )
     }
 
@@ -137,15 +149,15 @@ actor PlaybackController {
 
     func stateSnapshot() async -> SpeakSwiftly.PlaybackStateSnapshot {
         let activeRequest = activeRequestSummary()
-        let concurrency = concurrencySnapshot()
+        let telemetry = coordinationTelemetrySnapshot()
         let driverState = await driver.state()
         return SpeakSwiftly.PlaybackStateSnapshot(
             state: resolvedPlaybackState(driverState: driverState, activeRequest: activeRequest),
             activeRequest: activeRequest,
-            isStableForConcurrentGeneration: concurrency.isStableForConcurrentGeneration,
-            isRebuffering: concurrency.isRebuffering,
-            stableBufferedAudioMS: concurrency.stableBufferedAudioMS,
-            stableBufferTargetMS: concurrency.stableBufferTargetMS,
+            isStableForConcurrentGeneration: telemetry.isStableForConcurrentGeneration,
+            isRebuffering: telemetry.isRebuffering,
+            stableBufferedAudioMS: telemetry.stableBufferedAudioMS,
+            stableBufferTargetMS: telemetry.stableBufferTargetMS,
         )
     }
 
