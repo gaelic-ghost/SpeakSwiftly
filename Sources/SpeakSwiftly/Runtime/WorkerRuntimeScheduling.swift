@@ -303,7 +303,8 @@ extension SpeakSwiftly.Runtime {
                         .sorted()
                         .joined(separator: ","),
                 ),
-            ],
+            ]
+            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
         )
     }
 
@@ -325,7 +326,8 @@ extension SpeakSwiftly.Runtime {
                 "active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
                 "playback_allows_concurrent_generation": .bool(playbackAdmission.allowsConcurrentGeneration),
                 "active_playback_request_id": .string(playbackAdmission.activeRequestID ?? "none"),
-            ],
+            ]
+            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
         )
     }
 
@@ -354,7 +356,8 @@ extension SpeakSwiftly.Runtime {
                 "generation_disposition": .string(dispositionSummary),
                 "remaining_active_generation_count": .int(activeJobs.count),
                 "remaining_active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
-            ],
+            ]
+            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
         )
     }
 

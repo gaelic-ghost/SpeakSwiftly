@@ -478,6 +478,15 @@ The seventh Milestone 22 pass also landed on `2026-04-15` as the next bounded ca
 - The benchmark comparison against `.local/e2e-runs/2026-04-15T18-46-12Z-ce51be64-6dd0-4e21-a125-3d1067397266-prequeued-jobs-drain-in-order` shows why this pass is worth keeping: for the first queued femme request, `time_to_first_chunk_ms` stayed flat at `324`, `time_to_preroll_ready_ms` drifted up to `3951`, `rebuffer_event_count` fell from `5` to `4`, and `rebuffer_total_duration_ms` dropped from `20055` to `17284`.
 - The important architecture result is that the overlap gate stayed honest while the first-request result improved. In the fresh stage-seven trace, the second Marvis lane still remained parked on `waiting_for_playback_stability`, and every later overlap reopen happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
 
+The eighth Milestone 22 pass landed on `2026-04-15` as a probing and observability pass rather than another tuning pass.
+
+- That pass added transition-level resource snapshots to the existing Marvis scheduler and playback rebuffer traces. `marvis_generation_scheduler_snapshot`, `marvis_generation_lane_reserved`, `marvis_generation_lane_released`, `playback_rebuffer_started`, and `playback_rebuffer_resumed` now all carry the same process and MLX memory details that were previously only captured in the final `playback_finished` summary.
+- The fresh artifact is `.local/e2e-runs/2026-04-15T19-08-53Z-f0de238e-3cf0-477a-ade2-c476ff05b134-prequeued-jobs-drain-in-order`.
+- The first queued femme request in that run did not beat the stage-seven audible result, which is expected because this pass was instrumentation-only. Its stderr `playback_finished` metrics came in at `time_to_first_chunk_ms = 340`, `time_to_preroll_ready_ms = 3926`, `startup_buffered_audio_ms = 2320`, `rebuffer_event_count = 5`, and `rebuffer_total_duration_ms = 20089`.
+- The important new finding is where the resource rise actually appears. At the first truthful overlap reopen, `playback_rebuffer_resumed` reported `buffered_audio_ms = 2720`, `resume_buffer_target_ms = 2700`, `mlx_active_memory_bytes = 2388309837`, and `process_phys_footprint_bytes = 2734345216`. The immediately following `marvis_generation_lane_reserved` event for the second lane stayed effectively flat at `mlx_active_memory_bytes = 2388309873` and `process_phys_footprint_bytes = 2734377984`.
+- The larger rise showed up only after overlap had already been active for a while. By the next `playback_rebuffer_started` event, the same first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still falling back into refill trouble.
+- That evidence shifts the working hypothesis. The current failure mode looks less like a sharp one-time startup spike when the second Marvis lane is reserved, and more like sustained dual-lane overlap pressure while the first playback is trying to rebuild reserve.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:

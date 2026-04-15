@@ -369,6 +369,18 @@ Stage notes:
   - `avg_schedule_gap_ms`: `166` -> `162`
 - The important stage-seven outcome is that the smoother first-request result came back without reintroducing the false overlap signal from stage five. The second Marvis lane still stayed parked on `waiting_for_playback_stability`, and every overlap reopen in the fresh trace happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
 - Milestone 22 is still open, but the current evidence now points more clearly at two facts: faster first-request cadence helps, and cadence changes need admission-gate changes alongside them or the first request gives the gains back as soon as overlap resumes.
+- Stage 8 landed on `2026-04-15` as a probing pass instead of another tuning pass. The scheduler snapshots, lane reserve and release events, and playback rebuffer start and resume events now all carry the same process and MLX memory details that were previously only available in the final `playback_finished` event.
+- Stage 8 artifact: `.local/e2e-runs/2026-04-15T19-08-53Z-f0de238e-3cf0-477a-ade2-c476ff05b134-prequeued-jobs-drain-in-order`
+- For the first queued femme request, the measured stage-seven to stage-eight stderr metrics changed like this:
+  - `time_to_first_chunk_ms`: `324` -> `340`
+  - `time_to_preroll_ready_ms`: `3951` -> `3926`
+  - `startup_buffered_audio_ms`: `2320` -> `2320`
+  - `rebuffer_event_count`: `4` -> `5`
+  - `rebuffer_total_duration_ms`: `17284` -> `20089`
+  - `longest_rebuffer_duration_ms`: `4897` -> `4469`
+- The important stage-eight finding is not the audible regression. It is the new transition evidence. At the first truthful overlap reopen, `playback_rebuffer_resumed` reported `mlx_active_memory_bytes = 2388309837` and `process_phys_footprint_bytes = 2734345216`, while the immediately following `marvis_generation_lane_reserved` event for the second lane stayed effectively flat at `mlx_active_memory_bytes = 2388309873` and `process_phys_footprint_bytes = 2734377984`.
+- The larger resource rise showed up only after dual-lane overlap had already been active. By the next `playback_rebuffer_started` event, the first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still losing refill headroom.
+- That changes the working read on the problem. The current bottleneck looks less like a sharp one-time second-lane startup spike and more like sustained overlap pressure on the first request while it is trying to rebuild reserve.
 
 Exit criteria:
 

@@ -59,7 +59,8 @@ extension SpeakSwiftly.Runtime {
                         "queued_audio_ms": .int(queuedAudioMS),
                         "low_water_target_ms": .int(thresholds.lowWaterTargetMS),
                         "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
-                    ],
+                    ]
+                    .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
             case let .rebufferResumed(bufferedAudioMS, thresholds):
                 await logRequestEvent(
@@ -70,7 +71,8 @@ extension SpeakSwiftly.Runtime {
                     details: [
                         "buffered_audio_ms": .int(bufferedAudioMS),
                         "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
-                    ],
+                    ]
+                    .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
                 try? await startNextGenerationIfPossible()
             case let .chunkGapWarning(gapMS, chunkIndex):
