@@ -381,6 +381,16 @@ Stage notes:
 - The important stage-eight finding is not the audible regression. It is the new transition evidence. At the first truthful overlap reopen, `playback_rebuffer_resumed` reported `mlx_active_memory_bytes = 2388309837` and `process_phys_footprint_bytes = 2734345216`, while the immediately following `marvis_generation_lane_reserved` event for the second lane stayed effectively flat at `mlx_active_memory_bytes = 2388309873` and `process_phys_footprint_bytes = 2734377984`.
 - The larger resource rise showed up only after dual-lane overlap had already been active. By the next `playback_rebuffer_started` event, the first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still losing refill headroom.
 - That changes the working read on the problem. The current bottleneck looks less like a sharp one-time second-lane startup spike and more like sustained overlap pressure on the first request while it is trying to rebuild reserve.
+- Stage 11 landed on `2026-04-15` as the first explicit overlap-follower cadence experiment. The runtime now has a separate `ResidentStreamingCadenceProfile` role for the second lane during the first drained Marvis overlap window, so future cadence work can tune that follower path without overloading the first-request playback profile.
+- Stage 11 artifact: `.local/e2e-runs/2026-04-15T21-52-43Z-236ce29a-5d5c-470f-a51e-f38dfbc3361d-prequeued-jobs-drain-in-order`
+- The first follower experiment itself is not a keeper as tuning. With the overlap follower slowed to `0.20`, the second lane still reserved before the first playback finished, so overlap remained alive, but the first queued femme request got worse instead of better:
+  - `time_to_first_chunk_ms`: `340` -> `349`
+  - `time_to_preroll_ready_ms`: `3926` -> `3844`
+  - `startup_buffered_audio_ms`: `2320` -> `2320`
+  - `rebuffer_event_count`: `5` -> `6`
+  - `rebuffer_total_duration_ms`: `20089` -> `20769`
+  - `longest_rebuffer_duration_ms`: `4469` -> `4566`
+- The useful outcome is architectural rather than audible. The package now has an explicit follower-cadence role, but the follower interval itself is back on the ordinary `0.18` baseline until a better overlap-pressure experiment earns a real tuning change.
 
 Exit criteria:
 

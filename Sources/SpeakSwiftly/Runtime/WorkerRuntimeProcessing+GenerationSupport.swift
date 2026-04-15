@@ -200,14 +200,19 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
+        let existingPlaybackJobCount = await playbackController.jobCount()
         let playbackTuningProfile: PlaybackTuningProfile =
-            if speechBackend == .marvis, await playbackController.jobCount() == 0 {
+            if speechBackend == .marvis, existingPlaybackJobCount == 0 {
                 .firstDrainedLiveMarvis
             } else {
                 .standard
             }
+        let residentStreamingCadenceProfile = PlaybackConfiguration.residentStreamingCadenceProfile(
+            speechBackend: speechBackend,
+            existingPlaybackJobCount: existingPlaybackJobCount,
+        )
         let residentStreamingInterval = PlaybackConfiguration.residentStreamingInterval(
-            for: playbackTuningProfile,
+            for: residentStreamingCadenceProfile,
         )
         return LiveSpeechRequestState(
             request: request,
@@ -215,6 +220,7 @@ extension SpeakSwiftly.Runtime {
             textFeatures: textFeatures,
             textSections: textSections,
             playbackTuningProfile: playbackTuningProfile,
+            residentStreamingCadenceProfile: residentStreamingCadenceProfile,
             residentStreamingInterval: residentStreamingInterval,
         )
     }

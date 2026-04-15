@@ -266,17 +266,46 @@ import TextForSpeech
     #expect(controller.thresholds == adapted)
 }
 
-@Test func `first drained live marvis uses tighter resident streaming cadence`() {
+@Test func `marvis live cadence roles keep the first request faster without slowing the follower by default`() {
     let standardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .standard,
     )
     let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .firstDrainedLiveMarvis,
     )
+    let overlapSecondLaneInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .overlapSecondLaneDuringFirstDrain,
+    )
 
     #expect(standardInterval == 0.18)
     #expect(firstRequestInterval == 0.10)
+    #expect(overlapSecondLaneInterval == 0.18)
     #expect(firstRequestInterval < standardInterval)
+    #expect(overlapSecondLaneInterval == standardInterval)
+}
+
+@Test func `marvis live cadence role selection distinguishes first request from overlap follower`() {
+    let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .qwen3,
+        existingPlaybackJobCount: 0,
+    )
+    let firstMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 0,
+    )
+    let overlapFollowerProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 1,
+    )
+    let laterMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 2,
+    )
+
+    #expect(qwenProfile == .standard)
+    #expect(firstMarvisProfile == .firstDrainedLiveMarvis)
+    #expect(overlapFollowerProfile == .overlapSecondLaneDuringFirstDrain)
+    #expect(laterMarvisProfile == .standard)
 }
 
 @Test func `first drained live marvis requires extra reserve before overlap opens`() {

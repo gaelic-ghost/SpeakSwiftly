@@ -12,6 +12,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
     let playbackTuningProfile: PlaybackTuningProfile
+    let residentStreamingCadenceProfile: SpeakSwiftly.Runtime.PlaybackConfiguration.ResidentStreamingCadenceProfile
     let residentStreamingInterval: Double
 
     init(
@@ -20,6 +21,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
         playbackTuningProfile: PlaybackTuningProfile,
+        residentStreamingCadenceProfile: SpeakSwiftly.Runtime.PlaybackConfiguration.ResidentStreamingCadenceProfile,
         residentStreamingInterval: Double,
     ) {
         guard case let .queueSpeech(
@@ -46,6 +48,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.textFeatures = textFeatures
         self.textSections = textSections
         self.playbackTuningProfile = playbackTuningProfile
+        self.residentStreamingCadenceProfile = residentStreamingCadenceProfile
         self.residentStreamingInterval = residentStreamingInterval
     }
 

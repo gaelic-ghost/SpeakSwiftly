@@ -487,6 +487,13 @@ The eighth Milestone 22 pass landed on `2026-04-15` as a probing and observabili
 - The larger rise showed up only after overlap had already been active for a while. By the next `playback_rebuffer_started` event, the same first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still falling back into refill trouble.
 - That evidence shifts the working hypothesis. The current failure mode looks less like a sharp one-time startup spike when the second Marvis lane is reserved, and more like sustained dual-lane overlap pressure while the first playback is trying to rebuild reserve.
 
+The eleventh Milestone 22 pass landed on `2026-04-15` as the first explicit overlap-follower cadence experiment.
+
+- That pass introduced a separate `ResidentStreamingCadenceProfile` for the second Marvis lane during the first drained overlap window, so future cadence work can tune that follower path independently from the first-request playback profile.
+- The experiment artifact is `.local/e2e-runs/2026-04-15T21-52-43Z-236ce29a-5d5c-470f-a51e-f38dfbc3361d-prequeued-jobs-drain-in-order`.
+- The first follower experiment itself is not a tuning win. Slowing the overlap follower to `0.20` kept overlap alive, but the first queued femme request regressed from the stage-eight probe result: `time_to_first_chunk_ms` moved from `340` to `349`, `time_to_preroll_ready_ms` moved from `3926` to `3844`, `rebuffer_event_count` rose from `5` to `6`, and `rebuffer_total_duration_ms` rose from `20089` to `20769`.
+- The useful outcome is the new control seam, not the slowed follower interval. The repository now keeps the follower cadence role explicit, but the follower interval itself stays on the ordinary `0.18` baseline until a better overlap-pressure experiment earns a real tuning change.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
