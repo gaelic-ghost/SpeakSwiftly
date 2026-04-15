@@ -214,7 +214,7 @@ public extension SpeakSwiftly {
 
         enum GenerationCompletionDisposition {
             case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
-            case requestStillPendingPlayback(String)
+            case requestStillPendingPlayback
         }
 
         struct OutgoingWorkerRequest: Encodable {

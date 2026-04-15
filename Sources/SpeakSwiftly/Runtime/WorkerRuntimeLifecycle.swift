@@ -16,7 +16,7 @@ extension SpeakSwiftly.Runtime {
                     await self?.handlePlaybackEnvironmentEvent(event, activeRequest: activeRequest)
                 },
                 logFinished: { [weak self] job, playbackSummary, sampleRate in
-                    await self?.emitProgress(id: job.requestID, stage: .playbackFinished)
+                    await self?.emitProgress(id: job.id, stage: .playbackFinished)
                     await self?.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
                 },
                 completeJob: { [weak self] job, result in

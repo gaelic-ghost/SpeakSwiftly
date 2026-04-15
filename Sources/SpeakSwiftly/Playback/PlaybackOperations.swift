@@ -30,16 +30,16 @@ extension SpeakSwiftly.Runtime {
             await emitFailure(id: job.request.id, error: cancellation)
         }
 
-        for job in waitingPlaybackJobs {
-            job.generationTask?.cancel()
-            job.playbackTask?.cancel()
-            job.continuation.finish(throwing: cancellation)
+        for speechRequest in waitingPlaybackJobs {
+            speechRequest.generationTask?.cancel()
+            speechRequest.playbackTask?.cancel()
+            speechRequest.continuation.finish(throwing: cancellation)
             await logError(
                 cancellation.message,
-                requestID: job.requestID,
+                requestID: speechRequest.id,
                 details: ["failure_code": .string(cancellation.code.rawValue)],
             )
-            await completePlaybackJob(job, result: .failure(cancellation))
+            await completePlaybackJob(speechRequest, result: .failure(cancellation))
         }
 
         return queuedJobs.count + waitingPlaybackJobs.count
@@ -50,11 +50,11 @@ extension SpeakSwiftly.Runtime {
         let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
         let waitingPlaybackJobs = await playbackController.clearQueued(excluding: protectedRequestIDs)
 
-        for job in waitingPlaybackJobs {
-            job.generationTask?.cancel()
-            job.playbackTask?.cancel()
-            job.continuation.finish(throwing: error)
-            await completePlaybackJob(job, result: .failure(error))
+        for speechRequest in waitingPlaybackJobs {
+            speechRequest.generationTask?.cancel()
+            speechRequest.playbackTask?.cancel()
+            speechRequest.continuation.finish(throwing: error)
+            await completePlaybackJob(speechRequest, result: .failure(error))
         }
     }
 
@@ -66,9 +66,9 @@ extension SpeakSwiftly.Runtime {
 
         let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID)
 
-        if let job = await playbackController.cancel(requestID: targetRequestID) {
-            job.continuation.finish(throwing: cancellation)
-            await completePlaybackJob(job, result: .failure(cancellation))
+        if let speechRequest = await playbackController.cancel(requestID: targetRequestID) {
+            speechRequest.continuation.finish(throwing: cancellation)
+            await completePlaybackJob(speechRequest, result: .failure(cancellation))
             try? await startNextGenerationIfPossible()
             await playbackController.startNextIfPossible()
             return targetRequestID
@@ -110,20 +110,11 @@ extension SpeakSwiftly.Runtime {
     // MARK: - Playback Completion
 
     func completePlaybackJob(
-        _ job: PlaybackJob,
+        _ speechRequest: LiveSpeechRequestState,
         result: Result<WorkerSuccessPayload, WorkerError>,
     ) async {
-        job.generationTask = nil
-        job.playbackTask = nil
-        let request = WorkerRequest.queueSpeech(
-            id: job.requestID,
-            text: job.text,
-            profileName: job.profileName,
-            textProfileName: job.textProfileName,
-            jobType: .live,
-            textContext: job.textContext,
-            sourceFormat: job.sourceFormat,
-        )
-        await completeRequest(request: request, result: result)
+        speechRequest.generationTask = nil
+        speechRequest.playbackTask = nil
+        await completeRequest(request: speechRequest.request, result: result)
     }
 }

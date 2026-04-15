@@ -3,10 +3,10 @@ import Foundation
 extension SpeakSwiftly.Runtime {
     // MARK: - Playback Events
 
-    func handlePlaybackEvent(_ event: PlaybackEvent, for speechJob: PlaybackJob) async {
-        let id = speechJob.requestID
-        let op = speechJob.op
-        let profileName = speechJob.profileName
+    func handlePlaybackEvent(_ event: PlaybackEvent, for speechRequest: LiveSpeechRequestState) async {
+        let id = speechRequest.id
+        let op = speechRequest.op
+        let profileName = speechRequest.profileName
 
         switch event {
             case .firstChunk:
@@ -37,7 +37,7 @@ extension SpeakSwiftly.Runtime {
                         "resume_buffer_target_ms": .int(thresholds.resumeBufferTargetMS),
                         "startup_buffered_audio_ms": .int(startupBufferedAudioMS),
                     ]
-                    .merging(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
+                    .merging(textFeatureDetails(speechRequest.textFeatures), uniquingKeysWith: { _, new in new })
                     .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
                 try? await startNextGenerationIfPossible()

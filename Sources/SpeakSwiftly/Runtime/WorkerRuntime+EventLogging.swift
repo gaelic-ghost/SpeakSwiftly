@@ -4,13 +4,13 @@ import Foundation
 
 extension SpeakSwiftly.Runtime {
     func logPlaybackFinished(
-        for speechJob: PlaybackJob,
+        for speechRequest: LiveSpeechRequestState,
         playbackSummary: PlaybackSummary,
         sampleRate: Double,
     ) async {
-        let id = speechJob.requestID
-        let op = speechJob.op
-        let profileName = speechJob.profileName
+        let id = speechRequest.id
+        let op = speechRequest.op
+        let profileName = speechRequest.profileName
 
         var details: [String: LogValue] = [
             "text_complexity_class": .string(playbackSummary.thresholds.complexityClass.rawValue),
@@ -74,8 +74,8 @@ extension SpeakSwiftly.Runtime {
         if let maxTrailingAbsAmplitude = playbackSummary.maxTrailingAbsAmplitude {
             details["max_trailing_abs_amplitude"] = .double(maxTrailingAbsAmplitude)
         }
-        details.merge(textFeatureDetails(speechJob.textFeatures), uniquingKeysWith: { _, new in new })
-        details["section_count"] = .int(speechJob.textSections.count)
+        details.merge(textFeatureDetails(speechRequest.textFeatures), uniquingKeysWith: { _, new in new })
+        details["section_count"] = .int(speechRequest.textSections.count)
         details.merge(memoryDetails(), uniquingKeysWith: { _, new in new })
         await logRequestEvent(
             "playback_finished",
@@ -87,7 +87,7 @@ extension SpeakSwiftly.Runtime {
 
         let totalDurationMS = Int((Double(playbackSummary.sampleCount) / sampleRate * 1000).rounded())
         let sectionWindows = SpeakSwiftly.DeepTrace.sectionWindows(
-            originalText: speechJob.text,
+            originalText: speechRequest.text,
             totalDurationMS: totalDurationMS,
             totalChunkCount: playbackSummary.chunkCount,
         )

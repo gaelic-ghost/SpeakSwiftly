@@ -1,61 +1,12 @@
 import Foundation
-import TextForSpeech
-
-// MARK: - PlaybackJob
-
-final class PlaybackJob: @unchecked Sendable {
-    let requestID: String
-    let op: String
-    let text: String
-    let normalizedText: String
-    let profileName: String
-    let textProfileName: String?
-    let textContext: TextForSpeech.Context?
-    let sourceFormat: TextForSpeech.SourceFormat?
-    let textFeatures: SpeechTextDeepTraceFeatures
-    let textSections: [SpeechTextDeepTraceSection]
-    let stream: AsyncThrowingStream<[Float], any Swift.Error>
-    let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
-    var sampleRate: Double?
-    var generationTask: Task<Void, Never>?
-    var playbackTask: Task<Void, Never>?
-
-    init(
-        requestID: String,
-        op: String,
-        text: String,
-        normalizedText: String,
-        profileName: String,
-        textProfileName: String?,
-        textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?,
-        textFeatures: SpeechTextDeepTraceFeatures,
-        textSections: [SpeechTextDeepTraceSection],
-        stream: AsyncThrowingStream<[Float], any Swift.Error>,
-        continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation,
-    ) {
-        self.requestID = requestID
-        self.op = op
-        self.text = text
-        self.normalizedText = normalizedText
-        self.profileName = profileName
-        self.textProfileName = textProfileName
-        self.textContext = textContext
-        self.sourceFormat = sourceFormat
-        self.textFeatures = textFeatures
-        self.textSections = textSections
-        self.stream = stream
-        self.continuation = continuation
-    }
-}
 
 // MARK: - PlaybackHooks
 
 struct PlaybackHooks {
-    let handleEvent: @Sendable (PlaybackEvent, PlaybackJob) async -> Void
+    let handleEvent: @Sendable (PlaybackEvent, LiveSpeechRequestState) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
-    let logFinished: @Sendable (PlaybackJob, PlaybackSummary, Double) async -> Void
-    let completeJob: @Sendable (PlaybackJob, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
+    let logFinished: @Sendable (LiveSpeechRequestState, PlaybackSummary, Double) async -> Void
+    let completeJob: @Sendable (LiveSpeechRequestState, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
     let resumeQueue: @Sendable () async -> Void
 }
 
@@ -82,7 +33,7 @@ actor PlaybackController {
     private var activePlaybackStableBufferedAudioMS: Int?
     private var activePlaybackStableBufferTargetMS: Int?
     private var activePlaybackIsRebuffering = false
-    private var jobs = [String: PlaybackJob]()
+    private var jobs = [String: LiveSpeechRequestState]()
     private var queue = [String]()
 
     init(driver: AnyPlaybackController) {
@@ -125,16 +76,16 @@ actor PlaybackController {
 
     // MARK: - Queue Ownership
 
-    func enqueue(_ job: PlaybackJob) {
-        jobs[job.requestID] = job
-        queue.append(job.requestID)
+    func enqueue(_ job: LiveSpeechRequestState) {
+        jobs[job.id] = job
+        queue.append(job.id)
     }
 
     func setGenerationTask(_ task: Task<Void, Never>?, for requestID: String) {
         jobs[requestID]?.generationTask = task
     }
 
-    func job(for requestID: String) -> PlaybackJob? {
+    func job(for requestID: String) -> LiveSpeechRequestState? {
         jobs[requestID]
     }
 
@@ -190,7 +141,7 @@ actor PlaybackController {
         )
     }
 
-    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [PlaybackJob] {
+    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [LiveSpeechRequestState] {
         let waitingRequestIDs = queue.filter { !protectedRequestIDs.contains($0) }
         return waitingRequestIDs.compactMap { requestID in
             let job = jobs.removeValue(forKey: requestID)
@@ -199,7 +150,7 @@ actor PlaybackController {
         }
     }
 
-    func cancel(requestID: String) async -> PlaybackJob? {
+    func cancel(requestID: String) async -> LiveSpeechRequestState? {
         guard let job = jobs[requestID] else { return nil }
 
         job.generationTask?.cancel()
@@ -215,12 +166,12 @@ actor PlaybackController {
         return job
     }
 
-    func discard(requestID: String) -> PlaybackJob? {
+    func discard(requestID: String) -> LiveSpeechRequestState? {
         queue.removeAll { $0 == requestID }
         return jobs.removeValue(forKey: requestID)
     }
 
-    func shutdown() async -> [PlaybackJob] {
+    func shutdown() async -> [LiveSpeechRequestState] {
         let activeTask = activePlayback?.task
         activePlayback = nil
         activeTask?.cancel()
@@ -273,7 +224,7 @@ actor PlaybackController {
     }
 
     private func runPlayback(
-        for job: PlaybackJob,
+        for job: LiveSpeechRequestState,
         sampleRate: Double,
         hooks: PlaybackHooks,
     ) async {
@@ -285,16 +236,16 @@ actor PlaybackController {
                 text: job.normalizedText,
                 stream: job.stream,
             ) { event in
-                await self.recordConcurrencyEvent(event, for: job.requestID)
+                await self.recordConcurrencyEvent(event, for: job.id)
                 await hooks.handleEvent(event, job)
             }
             await hooks.logFinished(job, playbackSummary, sampleRate)
-            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: job.requestID))
+            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: job.id))
         } catch is CancellationError {
             result = .failure(
                 WorkerError(
                     code: .requestCancelled,
-                    message: "Request '\(job.requestID)' was cancelled before it could complete.",
+                    message: "Request '\(job.id)' was cancelled before it could complete.",
                 ),
             )
         } catch let workerError as WorkerError {
@@ -303,12 +254,12 @@ actor PlaybackController {
             result = .failure(
                 WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "Live playback failed for request '\(job.requestID)' due to an unexpected internal error. \(error.localizedDescription)",
+                    message: "Live playback failed for request '\(job.id)' due to an unexpected internal error. \(error.localizedDescription)",
                 ),
             )
         }
 
-        await finishPlayback(requestID: job.requestID, result: result, hooks: hooks)
+        await finishPlayback(requestID: job.id, result: result, hooks: hooks)
     }
 
     private func finishPlayback(

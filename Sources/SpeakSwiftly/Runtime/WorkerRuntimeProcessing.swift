@@ -11,7 +11,7 @@ extension SpeakSwiftly.Runtime {
             switch request {
                 case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
-                    disposition = .requestStillPendingPlayback(id)
+                    disposition = .requestStillPendingPlayback
 
                 case .queueSpeech(
                 id: let id,
