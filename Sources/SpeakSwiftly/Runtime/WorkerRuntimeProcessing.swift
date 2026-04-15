@@ -278,7 +278,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
-        guard let speechJob = await playbackController.job(for: id) else {
+        guard let playbackState = await playbackController.playbackState(for: id) else {
             throw WorkerError(
                 code: .internalError,
                 message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug.",
@@ -291,27 +291,27 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
         )
         let residentModel = residentInputs.model
-        speechJob.sampleRate = Double(residentModel.sampleRate)
+        playbackState.execution.sampleRate = Double(residentModel.sampleRate)
         await playbackController.startNextIfPossible()
         try? await startNextGenerationIfPossible()
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentGenerationStream(
             requestID: id,
-            text: speechJob.normalizedText,
+            text: playbackState.request.normalizedText,
             inputs: residentInputs,
-            generationParameters: GenerationPolicy.residentParameters(for: speechJob.normalizedText),
+            generationParameters: GenerationPolicy.residentParameters(for: playbackState.request.normalizedText),
             streamingInterval: PlaybackConfiguration.residentStreamingInterval,
         )
 
         do {
             for try await chunk in stream {
                 try Task.checkCancellation()
-                speechJob.continuation.yield(chunk)
+                playbackState.execution.continuation.yield(chunk)
             }
-            speechJob.continuation.finish()
+            playbackState.execution.continuation.finish()
         } catch {
-            speechJob.continuation.finish(throwing: error)
+            playbackState.execution.continuation.finish(throwing: error)
             if let workerError = error as? WorkerError {
                 throw workerError
             }

@@ -33,7 +33,7 @@ actor PlaybackController {
     private var activePlaybackStableBufferedAudioMS: Int?
     private var activePlaybackStableBufferTargetMS: Int?
     private var activePlaybackIsRebuffering = false
-    private var jobs = [String: LiveSpeechRequestState]()
+    private var jobs = [String: LiveSpeechPlaybackState]()
     private var queue = [String]()
 
     init(driver: AnyPlaybackController) {
@@ -76,16 +76,20 @@ actor PlaybackController {
 
     // MARK: - Queue Ownership
 
-    func enqueue(_ job: LiveSpeechRequestState) {
-        jobs[job.id] = job
-        queue.append(job.id)
+    func enqueue(_ request: LiveSpeechRequestState) {
+        let playbackState = LiveSpeechPlaybackState(
+            request: request,
+            execution: .make(requestID: request.id),
+        )
+        jobs[playbackState.id] = playbackState
+        queue.append(playbackState.id)
     }
 
     func setGenerationTask(_ task: Task<Void, Never>?, for requestID: String) {
-        jobs[requestID]?.generationTask = task
+        jobs[requestID]?.execution.generationTask = task
     }
 
-    func job(for requestID: String) -> LiveSpeechRequestState? {
+    func playbackState(for requestID: String) -> LiveSpeechPlaybackState? {
         jobs[requestID]
     }
 
@@ -94,9 +98,13 @@ actor PlaybackController {
     }
 
     func activeRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let requestID = activePlayback?.requestID, let job = jobs[requestID] else { return nil }
+        guard let requestID = activePlayback?.requestID, let playbackState = jobs[requestID] else { return nil }
 
-        return ActiveWorkerRequestSummary(id: requestID, op: job.op, profileName: job.profileName)
+        return ActiveWorkerRequestSummary(
+            id: requestID,
+            op: playbackState.request.op,
+            profileName: playbackState.request.profileName,
+        )
     }
 
     func concurrencySnapshot() -> ConcurrencySnapshot {
@@ -116,12 +124,12 @@ actor PlaybackController {
     func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
         let waitingQueue = queue.filter { $0 != activePlayback?.requestID }
         return waitingQueue.enumerated().compactMap { offset, requestID in
-            guard let job = jobs[requestID] else { return nil }
+            guard let playbackState = jobs[requestID] else { return nil }
 
             return QueuedWorkerRequestSummary(
                 id: requestID,
-                op: job.op,
-                profileName: job.profileName,
+                op: playbackState.request.op,
+                profileName: playbackState.request.profileName,
                 queuePosition: offset + 1,
             )
         }
@@ -141,20 +149,20 @@ actor PlaybackController {
         )
     }
 
-    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [LiveSpeechRequestState] {
+    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [LiveSpeechPlaybackState] {
         let waitingRequestIDs = queue.filter { !protectedRequestIDs.contains($0) }
         return waitingRequestIDs.compactMap { requestID in
-            let job = jobs.removeValue(forKey: requestID)
+            let playbackState = jobs.removeValue(forKey: requestID)
             queue.removeAll { $0 == requestID }
-            return job
+            return playbackState
         }
     }
 
-    func cancel(requestID: String) async -> LiveSpeechRequestState? {
-        guard let job = jobs[requestID] else { return nil }
+    func cancel(requestID: String) async -> LiveSpeechPlaybackState? {
+        guard let playbackState = jobs[requestID] else { return nil }
 
-        job.generationTask?.cancel()
-        job.playbackTask?.cancel()
+        playbackState.execution.generationTask?.cancel()
+        playbackState.execution.playbackTask?.cancel()
         queue.removeAll { $0 == requestID }
         jobs.removeValue(forKey: requestID)
 
@@ -163,22 +171,22 @@ actor PlaybackController {
             await driver.stop()
         }
 
-        return job
+        return playbackState
     }
 
-    func discard(requestID: String) -> LiveSpeechRequestState? {
+    func discard(requestID: String) -> LiveSpeechPlaybackState? {
         queue.removeAll { $0 == requestID }
         return jobs.removeValue(forKey: requestID)
     }
 
-    func shutdown() async -> [LiveSpeechRequestState] {
+    func shutdown() async -> [LiveSpeechPlaybackState] {
         let activeTask = activePlayback?.task
         activePlayback = nil
         activeTask?.cancel()
 
-        for job in jobs.values {
-            job.generationTask?.cancel()
-            job.playbackTask?.cancel()
+        for playbackState in jobs.values {
+            playbackState.execution.generationTask?.cancel()
+            playbackState.execution.playbackTask?.cancel()
         }
 
         let cancelledJobs = Array(jobs.values)
@@ -192,19 +200,19 @@ actor PlaybackController {
 
     func startNextIfPossible() async {
         guard activePlayback == nil else { return }
-        guard let requestID = queue.first, let job = jobs[requestID] else { return }
-        guard let sampleRate = job.sampleRate else { return }
+        guard let requestID = queue.first, let playbackState = jobs[requestID] else { return }
+        guard let sampleRate = playbackState.execution.sampleRate else { return }
         guard let hooks else { return }
 
         let task = Task {
-            await self.runPlayback(for: job, sampleRate: sampleRate, hooks: hooks)
+            await self.runPlayback(for: playbackState, sampleRate: sampleRate, hooks: hooks)
         }
         activePlayback = ActivePlayback(requestID: requestID, task: task)
         activePlaybackIsStableForConcurrentGeneration = false
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
         activePlaybackIsRebuffering = false
-        job.playbackTask = task
+        playbackState.execution.playbackTask = task
     }
 
     private func resolvedPlaybackState(
@@ -224,7 +232,7 @@ actor PlaybackController {
     }
 
     private func runPlayback(
-        for job: LiveSpeechRequestState,
+        for playbackState: LiveSpeechPlaybackState,
         sampleRate: Double,
         hooks: PlaybackHooks,
     ) async {
@@ -233,19 +241,19 @@ actor PlaybackController {
         do {
             let playbackSummary = try await driver.play(
                 sampleRate: sampleRate,
-                text: job.normalizedText,
-                stream: job.stream,
+                text: playbackState.request.normalizedText,
+                stream: playbackState.execution.stream,
             ) { event in
-                await self.recordConcurrencyEvent(event, for: job.id)
-                await hooks.handleEvent(event, job)
+                await self.recordConcurrencyEvent(event, for: playbackState.id)
+                await hooks.handleEvent(event, playbackState.request)
             }
-            await hooks.logFinished(job, playbackSummary, sampleRate)
-            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: job.id))
+            await hooks.logFinished(playbackState.request, playbackSummary, sampleRate)
+            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: playbackState.id))
         } catch is CancellationError {
             result = .failure(
                 WorkerError(
                     code: .requestCancelled,
-                    message: "Request '\(job.id)' was cancelled before it could complete.",
+                    message: "Request '\(playbackState.id)' was cancelled before it could complete.",
                 ),
             )
         } catch let workerError as WorkerError {
@@ -254,12 +262,12 @@ actor PlaybackController {
             result = .failure(
                 WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "Live playback failed for request '\(job.id)' due to an unexpected internal error. \(error.localizedDescription)",
+                    message: "Live playback failed for request '\(playbackState.id)' due to an unexpected internal error. \(error.localizedDescription)",
                 ),
             )
         }
 
-        await finishPlayback(requestID: job.id, result: result, hooks: hooks)
+        await finishPlayback(requestID: playbackState.id, result: result, hooks: hooks)
     }
 
     private func finishPlayback(
@@ -276,14 +284,14 @@ actor PlaybackController {
         activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
-        guard let job = jobs.removeValue(forKey: requestID) else {
+        guard let playbackState = jobs.removeValue(forKey: requestID) else {
             await startNextIfPossible()
             return
         }
 
-        job.generationTask = nil
-        job.playbackTask = nil
-        await hooks.completeJob(job, result)
+        playbackState.execution.generationTask = nil
+        playbackState.execution.playbackTask = nil
+        await hooks.completeJob(playbackState.request, result)
         await hooks.resumeQueue()
     }
 

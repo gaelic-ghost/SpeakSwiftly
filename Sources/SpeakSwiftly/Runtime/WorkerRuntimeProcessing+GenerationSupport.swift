@@ -164,7 +164,6 @@ extension SpeakSwiftly.Runtime {
     }
 
     func makeSpeechJobState(for request: WorkerRequest) async -> LiveSpeechRequestState {
-        let requestID = request.id
         let text = switch request {
             case .queueSpeech(id: _, text: let text, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _):
                 text
@@ -201,21 +200,11 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
-        var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
-        let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
-        guard let continuation else {
-            fatalError(
-                "SpeakSwiftly could not create a playback stream continuation for request '\(requestID)'. AsyncThrowingStream did not provide its continuation during job creation.",
-            )
-        }
-
         return LiveSpeechRequestState(
             request: request,
             normalizedText: normalizedText,
             textFeatures: textFeatures,
             textSections: textSections,
-            stream: stream,
-            continuation: continuation,
         )
     }
 
