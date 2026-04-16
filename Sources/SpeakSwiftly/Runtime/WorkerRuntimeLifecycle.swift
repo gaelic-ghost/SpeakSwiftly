@@ -15,6 +15,9 @@ extension SpeakSwiftly.Runtime {
                 handleEnvironmentEvent: { [weak self] event, activeRequest in
                     await self?.handlePlaybackEnvironmentEvent(event, activeRequest: activeRequest)
                 },
+                logEngineReady: { [weak self] job, sampleRate in
+                    await self?.logPlaybackEngineReady(for: job, sampleRate: sampleRate)
+                },
                 logFinished: { [weak self] job, playbackSummary, sampleRate in
                     await self?.emitProgress(id: job.id, stage: .playbackFinished)
                     await self?.logPlaybackFinished(for: job, playbackSummary: playbackSummary, sampleRate: sampleRate)
@@ -81,9 +84,6 @@ extension SpeakSwiftly.Runtime {
             do {
                 try profileStore.ensureRootExists()
                 let residentModels = try await dependencies.loadResidentModels(targetSpeechBackend)
-                let playbackEngineWasPrepared = try await playbackController.prepare(
-                    sampleRate: Double(primaryResidentSampleRate(for: residentModels)),
-                )
                 guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
 
                 residentState = .ready(residentModels)
@@ -96,15 +96,6 @@ extension SpeakSwiftly.Runtime {
                         "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
                     ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
-                if playbackEngineWasPrepared {
-                    await logEvent(
-                        "playback_engine_ready",
-                        details: [
-                            "sample_rate": .int(primaryResidentSampleRate(for: residentModels)),
-                            "duration_ms": .int(elapsedMS(since: preloadStartedAt)),
-                        ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
-                    )
-                }
                 try await startNextGenerationIfPossible()
                 await playbackController.startNextIfPossible()
             } catch is CancellationError {

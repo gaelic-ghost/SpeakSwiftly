@@ -5,6 +5,7 @@ import Foundation
 struct PlaybackHooks {
     let handleEvent: @Sendable (PlaybackEvent, LiveSpeechRequestState) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
+    let logEngineReady: @Sendable (LiveSpeechRequestState, Double) async -> Void
     let logFinished: @Sendable (LiveSpeechRequestState, PlaybackSummary, Double) async -> Void
     let completeJob: @Sendable (LiveSpeechRequestState, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
     let resumeQueue: @Sendable () async -> Void
@@ -258,6 +259,10 @@ actor PlaybackController {
         let result: Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>
 
         do {
+            let playbackEngineWasPrepared = try await driver.prepare(sampleRate: sampleRate)
+            if playbackEngineWasPrepared {
+                await hooks.logEngineReady(playbackState.request, sampleRate)
+            }
             let playbackSummary = try await driver.play(
                 sampleRate: sampleRate,
                 text: playbackState.request.normalizedText,

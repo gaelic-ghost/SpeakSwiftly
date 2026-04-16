@@ -66,17 +66,19 @@ final class AudioPlaybackDriver {
         _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
     ) {
         environmentEventSink = sink
-        guard let sink else { return }
-
-        Task {
-            await sink(PlaybackEnvironmentEvent.outputDeviceObserved(currentDevice: lastObservedOutputDeviceDescription))
-        }
     }
 
     func prepare(sampleRate: Double) async throws -> Bool {
         let needsSetup = audioEngine == nil || playerNode == nil || engineSampleRate != sampleRate
         if needsSetup {
             try await rebuildEngine(sampleRate: sampleRate)
+            if let environmentEventSink {
+                await environmentEventSink(
+                    PlaybackEnvironmentEvent.outputDeviceObserved(
+                        currentDevice: lastObservedOutputDeviceDescription,
+                    ),
+                )
+            }
         } else if audioEngine?.isRunning == false {
             try audioEngine?.start()
         }

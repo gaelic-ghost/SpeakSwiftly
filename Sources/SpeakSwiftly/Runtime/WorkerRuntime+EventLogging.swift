@@ -3,6 +3,21 @@ import Foundation
 // MARK: - Event Logging
 
 extension SpeakSwiftly.Runtime {
+    func logPlaybackEngineReady(
+        for speechRequest: LiveSpeechRequestState,
+        sampleRate: Double,
+    ) async {
+        await logRequestEvent(
+            "playback_engine_ready",
+            requestID: speechRequest.id,
+            op: speechRequest.op,
+            profileName: speechRequest.profileName,
+            details: [
+                "sample_rate": .int(Int(sampleRate.rounded())),
+            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
+        )
+    }
+
     func logPlaybackFinished(
         for speechRequest: LiveSpeechRequestState,
         playbackSummary: PlaybackSummary,

@@ -18,7 +18,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-marvis-femme",
@@ -72,7 +72,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-marvis-clone-fixture",
@@ -127,7 +127,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-marvis-androgenous",
@@ -203,7 +203,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
 
             for lane in lanes {
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
@@ -290,7 +290,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
 
             for lane in lanes {
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(

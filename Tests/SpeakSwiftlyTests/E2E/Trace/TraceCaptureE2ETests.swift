@@ -23,7 +23,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-trace",
