@@ -1,5 +1,5 @@
 {
-  "originHash" : "facda62b22d9833a05de08bec630cc836a4adff7912344179e3fb82f1b0ba25c",
+  "originHash" : "8edceba8be651594120b702ab42b6deca9b20698789d904d108c044ba191a4a6",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/mlx-audio-swift.git",
       "state" : {
-        "revision" : "b0a75a89562c8514d68892498955354a62380b83",
-        "version" : "69.1.3"
+        "revision" : "42fc7c25c07d8c4817dfdc9b125338fd8aff3a9e",
+        "version" : "69.1.4"
       }
     },
     {
