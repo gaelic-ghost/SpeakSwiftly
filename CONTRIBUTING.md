@@ -621,6 +621,7 @@ For the targeted first-request Marvis tuning lane, the current reliable rerun pa
 - direct `swift test` is still blocked by the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`
 - direct `xcodebuild test` does not currently carry `SPEAKSWIFTLY_E2E=1` through the Swift Testing suite gate on its own
 - the working path is `xcodebuild build-for-testing`, then an `.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building` against this exact test identifier:
+- on current Xcode manifests, that override lives under `TestConfigurations -> TestTargets -> EnvironmentVariables`
 
 ```text
 SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
