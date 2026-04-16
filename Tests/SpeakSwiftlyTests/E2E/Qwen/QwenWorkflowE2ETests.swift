@@ -18,7 +18,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                     on: worker,
                     id: "req-create-voice-design",
@@ -45,7 +45,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.runAudibleSpeech(
                     on: worker,
                     id: "req-live-voice-design-audible",
@@ -76,7 +76,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                     on: worker,
                     id: "req-create-prepared-conditioning-profile",
@@ -111,7 +111,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.runSilentSpeech(
                     on: worker,
                     id: "req-live-prepared-conditioning-second-pass",
@@ -143,7 +143,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                     on: worker,
                     id: "req-create-clone-fixture",
@@ -190,7 +190,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.runAudibleSpeech(
                     on: worker,
                     id: "req-live-clone-provided-transcript-audible",
@@ -218,7 +218,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: false)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                     on: worker,
                     id: "req-create-inferred-clone-fixture",
@@ -270,7 +270,7 @@ extension SpeakSwiftlyE2ETests {
                 )
                 defer { Task { await worker.stop() } }
 
-                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+                try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
                 try await SpeakSwiftlyE2ETests.runAudibleSpeech(
                     on: worker,
                     id: "req-live-clone-inferred-transcript-audible",

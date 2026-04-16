@@ -11,7 +11,7 @@ extension SpeakSwiftly.Runtime {
             switch request {
                 case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
-                    disposition = .requestStillPendingPlayback(id)
+                    disposition = .requestStillPendingPlayback
 
                 case .queueSpeech(
                 id: let id,
@@ -278,7 +278,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
-        guard let speechJob = await playbackController.job(for: id) else {
+        guard let playbackState = await playbackController.playbackState(for: id) else {
             throw WorkerError(
                 code: .internalError,
                 message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug.",
@@ -291,27 +291,27 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
         )
         let residentModel = residentInputs.model
-        speechJob.sampleRate = Double(residentModel.sampleRate)
+        playbackState.execution.sampleRate = Double(residentModel.sampleRate)
         await playbackController.startNextIfPossible()
         try? await startNextGenerationIfPossible()
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentGenerationStream(
             requestID: id,
-            text: speechJob.normalizedText,
+            text: playbackState.request.normalizedText,
             inputs: residentInputs,
-            generationParameters: GenerationPolicy.residentParameters(for: speechJob.normalizedText),
-            streamingInterval: PlaybackConfiguration.residentStreamingInterval,
+            generationParameters: GenerationPolicy.residentParameters(for: playbackState.request.normalizedText),
+            streamingInterval: playbackState.request.residentStreamingInterval,
         )
 
         do {
             for try await chunk in stream {
                 try Task.checkCancellation()
-                speechJob.continuation.yield(chunk)
+                playbackState.execution.continuation.yield(chunk)
             }
-            speechJob.continuation.finish()
+            playbackState.execution.continuation.finish()
         } catch {
-            speechJob.continuation.finish(throwing: error)
+            playbackState.execution.continuation.finish(throwing: error)
             if let workerError = error as? WorkerError {
                 throw workerError
             }

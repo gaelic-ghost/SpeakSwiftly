@@ -216,6 +216,7 @@ import TextForSpeech
         $0["request_id"] as? String == "req-live-2"
             && $0["event"] as? String == "marvis_generation_lane_reserved"
             && (($0["details"] as? [String: Any])?["marvis_lane"] as? String) == "conversational_b"
+            && (($0["details"] as? [String: Any])?["playback_allows_concurrent_generation"] as? Bool) == true
     })
     #expect(output.containsStderrJSONObject {
         $0["event"] as? String == "marvis_generation_scheduler_snapshot"

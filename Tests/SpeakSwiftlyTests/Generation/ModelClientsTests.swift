@@ -51,6 +51,34 @@ import TextForSpeech
     #expect(extended.resumeBufferTargetMS == 16480)
 }
 
+@Test func `first drained live marvis tuning raises compact and balanced warmup floors`() {
+    let compact = PlaybackThresholdController(
+        text: "Hello there.",
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+    let balanced = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+    let extended = PlaybackThresholdController(
+        text: String(
+            repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
+            count: 9,
+        ),
+        tuningProfile: .firstDrainedLiveMarvis,
+    ).thresholds
+
+    #expect(compact.startupBufferTargetMS == 1440)
+    #expect(compact.lowWaterTargetMS == 640)
+    #expect(compact.resumeBufferTargetMS == 1700)
+    #expect(balanced.startupBufferTargetMS == 2320)
+    #expect(balanced.lowWaterTargetMS == 1040)
+    #expect(balanced.resumeBufferTargetMS == 2700)
+    #expect(extended.startupBufferTargetMS == 13120)
+    #expect(extended.lowWaterTargetMS == 5000)
+    #expect(extended.resumeBufferTargetMS == 16480)
+}
+
 @Test func `adaptive playback thresholds ignore content shape when lengths match`() {
     let plainText = String(repeating: "Please explain this clearly. ", count: 8)
     let codeishSeed = """
@@ -120,6 +148,25 @@ import TextForSpeech
     #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
 }
 
+@Test func `first drained live marvis tuning escalates on the first rebuffer`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordRebuffer()
+    let afterFirstRebuffer = controller.thresholds
+
+    #expect(afterFirstRebuffer.startupBufferTargetMS > adapted.startupBufferTargetMS)
+    #expect(afterFirstRebuffer.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(afterFirstRebuffer.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+}
+
 @Test func `adaptive playback thresholds keep escalated rebuffer targets across later chunks`() {
     var controller = PlaybackThresholdController(
         text: """
@@ -148,6 +195,149 @@ import TextForSpeech
     #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
     #expect(afterMoreChunks.chunkGapWarningMS >= escalated.chunkGapWarningMS)
     #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
+}
+
+@Test func `first drained live marvis tuning keeps stronger recovery floors during later chunks`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    controller.recordRebuffer()
+    let escalated = controller.thresholds
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 190)
+    }
+
+    let afterMoreChunks = controller.thresholds
+
+    #expect(controller.phase == .recovery || controller.phase == .steady)
+    #expect(afterMoreChunks.startupBufferTargetMS >= 1660)
+    #expect(afterMoreChunks.lowWaterTargetMS >= 760)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= 2000)
+    #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
+    #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
+}
+
+@Test func `first drained live marvis tuning hardens on repeated pre-rebuffer schedule gaps`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 1920)
+    #expect(controller.thresholds == adapted)
+
+    controller.recordScheduleGapDistress(gapMS: 440, queuedAudioMS: 1600)
+    let hardened = controller.thresholds
+
+    #expect(controller.phase == .recovery)
+    #expect(hardened.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(hardened.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
+}
+
+@Test func `pre-rebuffer schedule gap hardening ignores low-risk queued audio`() {
+    var controller = PlaybackThresholdController(
+        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
+        tuningProfile: .firstDrainedLiveMarvis,
+    )
+
+    for _ in 0..<6 {
+        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
+    }
+
+    let adapted = controller.thresholds
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2600)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2400)
+
+    #expect(controller.phase == .warmup)
+    #expect(controller.thresholds == adapted)
+}
+
+@Test func `marvis live cadence roles keep the first request faster without slowing the follower by default`() {
+    let standardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .standard,
+    )
+    let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .firstDrainedLiveMarvis,
+    )
+    let overlapSecondLaneInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .overlapSecondLaneDuringFirstDrain,
+    )
+
+    #expect(standardInterval == 0.18)
+    #expect(firstRequestInterval == 0.10)
+    #expect(overlapSecondLaneInterval == 0.18)
+    #expect(firstRequestInterval < standardInterval)
+    #expect(overlapSecondLaneInterval == standardInterval)
+}
+
+@Test func `marvis live cadence role selection distinguishes first request from overlap follower`() {
+    let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .qwen3,
+        existingPlaybackJobCount: 0,
+    )
+    let firstMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 0,
+    )
+    let overlapFollowerProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 1,
+    )
+    let laterMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+        speechBackend: .marvis,
+        existingPlaybackJobCount: 2,
+    )
+
+    #expect(qwenProfile == .standard)
+    #expect(firstMarvisProfile == .firstDrainedLiveMarvis)
+    #expect(overlapFollowerProfile == .overlapSecondLaneDuringFirstDrain)
+    #expect(laterMarvisProfile == .standard)
+}
+
+@Test func `first drained live marvis requires extra reserve before overlap opens`() {
+    let standardAdmission = PlaybackController.concurrencyAdmissionThresholds(
+        tuningProfile: .standard,
+        startupBufferTargetMS: 2320,
+        lowWaterTargetMS: 1040,
+    )
+    let firstRequestAdmission = PlaybackController.concurrencyAdmissionThresholds(
+        tuningProfile: .firstDrainedLiveMarvis,
+        startupBufferTargetMS: 2320,
+        lowWaterTargetMS: 1040,
+    )
+
+    #expect(standardAdmission.concurrentGenerationTargetMS == 2320)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 2800)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
+}
+
+@Test func `concurrent generation stays closed below the claimed reserve target`() {
+    #expect(
+        PlaybackController.allowsConcurrentGeneration(
+            bufferedAudioMS: 2160,
+            targetMS: 2700,
+        ) == false,
+    )
+    #expect(
+        PlaybackController.allowsConcurrentGeneration(
+            bufferedAudioMS: 2720,
+            targetMS: 2700,
+        ) == true,
+    )
 }
 
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {

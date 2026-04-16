@@ -32,6 +32,8 @@ public extension SpeakSwiftly {
     struct PlaybackStateSnapshot: Codable, Sendable, Equatable {
         public let state: PlaybackState
         public let activeRequest: ActiveRequest?
+        /// These fields remain part of the runtime overview as playback telemetry for operators.
+        /// Runtime scheduling no longer depends directly on this richer surface.
         public let isStableForConcurrentGeneration: Bool
         public let isRebuffering: Bool
         public let stableBufferedAudioMS: Int?

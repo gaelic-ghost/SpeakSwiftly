@@ -18,7 +18,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-deep-trace",
@@ -91,7 +91,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-segmented",
@@ -174,7 +174,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-reversed-segmented",
@@ -257,7 +257,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-conversational",
@@ -339,7 +339,7 @@ extension SpeakSwiftlyE2ETests {
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker, expectPlaybackEngine: true)
+            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
             try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-reversed-conversational",

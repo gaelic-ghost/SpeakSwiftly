@@ -1,67 +1,24 @@
 import Foundation
-import TextForSpeech
-
-// MARK: - PlaybackJob
-
-final class PlaybackJob: @unchecked Sendable {
-    let requestID: String
-    let op: String
-    let text: String
-    let normalizedText: String
-    let profileName: String
-    let textProfileName: String?
-    let textContext: TextForSpeech.Context?
-    let sourceFormat: TextForSpeech.SourceFormat?
-    let textFeatures: SpeechTextDeepTraceFeatures
-    let textSections: [SpeechTextDeepTraceSection]
-    let stream: AsyncThrowingStream<[Float], any Swift.Error>
-    let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
-    var sampleRate: Double?
-    var generationTask: Task<Void, Never>?
-    var playbackTask: Task<Void, Never>?
-
-    init(
-        requestID: String,
-        op: String,
-        text: String,
-        normalizedText: String,
-        profileName: String,
-        textProfileName: String?,
-        textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?,
-        textFeatures: SpeechTextDeepTraceFeatures,
-        textSections: [SpeechTextDeepTraceSection],
-        stream: AsyncThrowingStream<[Float], any Swift.Error>,
-        continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation,
-    ) {
-        self.requestID = requestID
-        self.op = op
-        self.text = text
-        self.normalizedText = normalizedText
-        self.profileName = profileName
-        self.textProfileName = textProfileName
-        self.textContext = textContext
-        self.sourceFormat = sourceFormat
-        self.textFeatures = textFeatures
-        self.textSections = textSections
-        self.stream = stream
-        self.continuation = continuation
-    }
-}
 
 // MARK: - PlaybackHooks
 
 struct PlaybackHooks {
-    let handleEvent: @Sendable (PlaybackEvent, PlaybackJob) async -> Void
+    let handleEvent: @Sendable (PlaybackEvent, LiveSpeechRequestState) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
-    let logFinished: @Sendable (PlaybackJob, PlaybackSummary, Double) async -> Void
-    let completeJob: @Sendable (PlaybackJob, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
+    let logEngineReady: @Sendable (LiveSpeechRequestState, Double) async -> Void
+    let logFinished: @Sendable (LiveSpeechRequestState, PlaybackSummary, Double) async -> Void
+    let completeJob: @Sendable (LiveSpeechRequestState, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
     let resumeQueue: @Sendable () async -> Void
 }
 
 // MARK: - PlaybackController
 
 actor PlaybackController {
+    struct ConcurrencyAdmissionThresholds {
+        let startupBufferTargetMS: Int
+        let concurrentGenerationTargetMS: Int
+    }
+
     struct ActivePlayback {
         let requestID: String
         let task: Task<Void, Never>
@@ -75,18 +32,50 @@ actor PlaybackController {
         let isRebuffering: Bool
     }
 
+    struct GenerationAdmissionSnapshot: Equatable {
+        let activeRequestID: String?
+        let allowsConcurrentGeneration: Bool
+    }
+
     private let driver: AnyPlaybackController
     private var hooks: PlaybackHooks?
     private var activePlayback: ActivePlayback?
     private var activePlaybackIsStableForConcurrentGeneration = false
     private var activePlaybackStableBufferedAudioMS: Int?
     private var activePlaybackStableBufferTargetMS: Int?
+    private var activePlaybackConcurrentGenerationTargetMS: Int?
     private var activePlaybackIsRebuffering = false
-    private var jobs = [String: PlaybackJob]()
+    private var jobs = [String: LiveSpeechPlaybackState]()
     private var queue = [String]()
 
     init(driver: AnyPlaybackController) {
         self.driver = driver
+    }
+
+    static func concurrencyAdmissionThresholds(
+        tuningProfile: PlaybackTuningProfile,
+        startupBufferTargetMS: Int,
+        lowWaterTargetMS: Int,
+    ) -> ConcurrencyAdmissionThresholds {
+        guard tuningProfile == .firstDrainedLiveMarvis else {
+            return ConcurrencyAdmissionThresholds(
+                startupBufferTargetMS: startupBufferTargetMS,
+                concurrentGenerationTargetMS: startupBufferTargetMS,
+            )
+        }
+
+        let additionalReserveMS = min(480, max(320, lowWaterTargetMS / 2))
+        return ConcurrencyAdmissionThresholds(
+            startupBufferTargetMS: startupBufferTargetMS,
+            concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
+        )
+    }
+
+    static func allowsConcurrentGeneration(
+        bufferedAudioMS: Int,
+        targetMS: Int,
+    ) -> Bool {
+        bufferedAudioMS >= targetMS
     }
 
     // MARK: - Binding
@@ -125,16 +114,20 @@ actor PlaybackController {
 
     // MARK: - Queue Ownership
 
-    func enqueue(_ job: PlaybackJob) {
-        jobs[job.requestID] = job
-        queue.append(job.requestID)
+    func enqueue(_ request: LiveSpeechRequestState) {
+        let playbackState = LiveSpeechPlaybackState(
+            request: request,
+            execution: .make(requestID: request.id),
+        )
+        jobs[playbackState.id] = playbackState
+        queue.append(playbackState.id)
     }
 
     func setGenerationTask(_ task: Task<Void, Never>?, for requestID: String) {
-        jobs[requestID]?.generationTask = task
+        jobs[requestID]?.execution.generationTask = task
     }
 
-    func job(for requestID: String) -> PlaybackJob? {
+    func playbackState(for requestID: String) -> LiveSpeechPlaybackState? {
         jobs[requestID]
     }
 
@@ -143,18 +136,29 @@ actor PlaybackController {
     }
 
     func activeRequestSummary() -> ActiveWorkerRequestSummary? {
-        guard let requestID = activePlayback?.requestID, let job = jobs[requestID] else { return nil }
+        guard let requestID = activePlayback?.requestID, let playbackState = jobs[requestID] else { return nil }
 
-        return ActiveWorkerRequestSummary(id: requestID, op: job.op, profileName: job.profileName)
+        return ActiveWorkerRequestSummary(
+            id: requestID,
+            op: playbackState.request.op,
+            profileName: playbackState.request.profileName,
+        )
     }
 
-    func concurrencySnapshot() -> ConcurrencySnapshot {
+    func coordinationTelemetrySnapshot() -> ConcurrencySnapshot {
         ConcurrencySnapshot(
             activeRequestID: activePlayback?.requestID,
             isStableForConcurrentGeneration: activePlaybackIsStableForConcurrentGeneration,
             stableBufferedAudioMS: activePlaybackStableBufferedAudioMS,
             stableBufferTargetMS: activePlaybackStableBufferTargetMS,
             isRebuffering: activePlaybackIsRebuffering,
+        )
+    }
+
+    func generationAdmissionSnapshot() -> GenerationAdmissionSnapshot {
+        GenerationAdmissionSnapshot(
+            activeRequestID: activePlayback?.requestID,
+            allowsConcurrentGeneration: activePlayback == nil || activePlaybackIsStableForConcurrentGeneration,
         )
     }
 
@@ -165,12 +169,12 @@ actor PlaybackController {
     func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
         let waitingQueue = queue.filter { $0 != activePlayback?.requestID }
         return waitingQueue.enumerated().compactMap { offset, requestID in
-            guard let job = jobs[requestID] else { return nil }
+            guard let playbackState = jobs[requestID] else { return nil }
 
             return QueuedWorkerRequestSummary(
                 id: requestID,
-                op: job.op,
-                profileName: job.profileName,
+                op: playbackState.request.op,
+                profileName: playbackState.request.profileName,
                 queuePosition: offset + 1,
             )
         }
@@ -178,32 +182,32 @@ actor PlaybackController {
 
     func stateSnapshot() async -> SpeakSwiftly.PlaybackStateSnapshot {
         let activeRequest = activeRequestSummary()
-        let concurrency = concurrencySnapshot()
+        let telemetry = coordinationTelemetrySnapshot()
         let driverState = await driver.state()
         return SpeakSwiftly.PlaybackStateSnapshot(
             state: resolvedPlaybackState(driverState: driverState, activeRequest: activeRequest),
             activeRequest: activeRequest,
-            isStableForConcurrentGeneration: concurrency.isStableForConcurrentGeneration,
-            isRebuffering: concurrency.isRebuffering,
-            stableBufferedAudioMS: concurrency.stableBufferedAudioMS,
-            stableBufferTargetMS: concurrency.stableBufferTargetMS,
+            isStableForConcurrentGeneration: telemetry.isStableForConcurrentGeneration,
+            isRebuffering: telemetry.isRebuffering,
+            stableBufferedAudioMS: telemetry.stableBufferedAudioMS,
+            stableBufferTargetMS: telemetry.stableBufferTargetMS,
         )
     }
 
-    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [PlaybackJob] {
+    func clearQueued(excluding protectedRequestIDs: Set<String>) -> [LiveSpeechPlaybackState] {
         let waitingRequestIDs = queue.filter { !protectedRequestIDs.contains($0) }
         return waitingRequestIDs.compactMap { requestID in
-            let job = jobs.removeValue(forKey: requestID)
+            let playbackState = jobs.removeValue(forKey: requestID)
             queue.removeAll { $0 == requestID }
-            return job
+            return playbackState
         }
     }
 
-    func cancel(requestID: String) async -> PlaybackJob? {
-        guard let job = jobs[requestID] else { return nil }
+    func cancel(requestID: String) async -> LiveSpeechPlaybackState? {
+        guard let playbackState = jobs[requestID] else { return nil }
 
-        job.generationTask?.cancel()
-        job.playbackTask?.cancel()
+        playbackState.execution.generationTask?.cancel()
+        playbackState.execution.playbackTask?.cancel()
         queue.removeAll { $0 == requestID }
         jobs.removeValue(forKey: requestID)
 
@@ -212,22 +216,22 @@ actor PlaybackController {
             await driver.stop()
         }
 
-        return job
+        return playbackState
     }
 
-    func discard(requestID: String) -> PlaybackJob? {
+    func discard(requestID: String) -> LiveSpeechPlaybackState? {
         queue.removeAll { $0 == requestID }
         return jobs.removeValue(forKey: requestID)
     }
 
-    func shutdown() async -> [PlaybackJob] {
+    func shutdown() async -> [LiveSpeechPlaybackState] {
         let activeTask = activePlayback?.task
         activePlayback = nil
         activeTask?.cancel()
 
-        for job in jobs.values {
-            job.generationTask?.cancel()
-            job.playbackTask?.cancel()
+        for playbackState in jobs.values {
+            playbackState.execution.generationTask?.cancel()
+            playbackState.execution.playbackTask?.cancel()
         }
 
         let cancelledJobs = Array(jobs.values)
@@ -241,19 +245,20 @@ actor PlaybackController {
 
     func startNextIfPossible() async {
         guard activePlayback == nil else { return }
-        guard let requestID = queue.first, let job = jobs[requestID] else { return }
-        guard let sampleRate = job.sampleRate else { return }
+        guard let requestID = queue.first, let playbackState = jobs[requestID] else { return }
+        guard let sampleRate = playbackState.execution.sampleRate else { return }
         guard let hooks else { return }
 
         let task = Task {
-            await self.runPlayback(for: job, sampleRate: sampleRate, hooks: hooks)
+            await self.runPlayback(for: playbackState, sampleRate: sampleRate, hooks: hooks)
         }
         activePlayback = ActivePlayback(requestID: requestID, task: task)
         activePlaybackIsStableForConcurrentGeneration = false
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
+        activePlaybackConcurrentGenerationTargetMS = nil
         activePlaybackIsRebuffering = false
-        job.playbackTask = task
+        playbackState.execution.playbackTask = task
     }
 
     private func resolvedPlaybackState(
@@ -273,28 +278,33 @@ actor PlaybackController {
     }
 
     private func runPlayback(
-        for job: PlaybackJob,
+        for playbackState: LiveSpeechPlaybackState,
         sampleRate: Double,
         hooks: PlaybackHooks,
     ) async {
         let result: Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>
 
         do {
+            let playbackEngineWasPrepared = try await driver.prepare(sampleRate: sampleRate)
+            if playbackEngineWasPrepared {
+                await hooks.logEngineReady(playbackState.request, sampleRate)
+            }
             let playbackSummary = try await driver.play(
                 sampleRate: sampleRate,
-                text: job.normalizedText,
-                stream: job.stream,
+                text: playbackState.request.normalizedText,
+                tuningProfile: playbackState.request.playbackTuningProfile,
+                stream: playbackState.execution.stream,
             ) { event in
-                await self.recordConcurrencyEvent(event, for: job.requestID)
-                await hooks.handleEvent(event, job)
+                await self.recordConcurrencyEvent(event, for: playbackState.id)
+                await hooks.handleEvent(event, playbackState.request)
             }
-            await hooks.logFinished(job, playbackSummary, sampleRate)
-            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: job.requestID))
+            await hooks.logFinished(playbackState.request, playbackSummary, sampleRate)
+            result = .success(SpeakSwiftly.Runtime.WorkerSuccessPayload(id: playbackState.id))
         } catch is CancellationError {
             result = .failure(
                 WorkerError(
                     code: .requestCancelled,
-                    message: "Request '\(job.requestID)' was cancelled before it could complete.",
+                    message: "Request '\(playbackState.id)' was cancelled before it could complete.",
                 ),
             )
         } catch let workerError as WorkerError {
@@ -303,12 +313,12 @@ actor PlaybackController {
             result = .failure(
                 WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "Live playback failed for request '\(job.requestID)' due to an unexpected internal error. \(error.localizedDescription)",
+                    message: "Live playback failed for request '\(playbackState.id)' due to an unexpected internal error. \(error.localizedDescription)",
                 ),
             )
         }
 
-        await finishPlayback(requestID: job.requestID, result: result, hooks: hooks)
+        await finishPlayback(requestID: playbackState.id, result: result, hooks: hooks)
     }
 
     private func finishPlayback(
@@ -322,17 +332,18 @@ actor PlaybackController {
         activePlaybackIsStableForConcurrentGeneration = false
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
+        activePlaybackConcurrentGenerationTargetMS = nil
         activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
-        guard let job = jobs.removeValue(forKey: requestID) else {
+        guard let playbackState = jobs.removeValue(forKey: requestID) else {
             await startNextIfPossible()
             return
         }
 
-        job.generationTask = nil
-        job.playbackTask = nil
-        await hooks.completeJob(job, result)
+        playbackState.execution.generationTask = nil
+        playbackState.execution.playbackTask = nil
+        await hooks.completeJob(playbackState.request, result)
         await hooks.resumeQueue()
     }
 
@@ -341,21 +352,52 @@ actor PlaybackController {
 
         switch event {
             case let .prerollReady(startupBufferedAudioMS, thresholds):
-                activePlaybackIsStableForConcurrentGeneration = true
+                let requestTuningProfile = jobs[requestID]?.request.playbackTuningProfile ?? .standard
+                let admissionThresholds = Self.concurrencyAdmissionThresholds(
+                    tuningProfile: requestTuningProfile,
+                    startupBufferTargetMS: thresholds.startupBufferTargetMS,
+                    lowWaterTargetMS: thresholds.lowWaterTargetMS,
+                )
+                activePlaybackConcurrentGenerationTargetMS = admissionThresholds.concurrentGenerationTargetMS
                 activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
-                activePlaybackStableBufferTargetMS = thresholds.startupBufferTargetMS
+                activePlaybackStableBufferTargetMS = admissionThresholds.concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: startupBufferedAudioMS,
+                    targetMS: admissionThresholds.concurrentGenerationTargetMS,
+                )
                 activePlaybackIsRebuffering = false
             case .rebufferStarted:
                 activePlaybackIsStableForConcurrentGeneration = false
                 activePlaybackIsRebuffering = true
             case let .rebufferResumed(bufferedAudioMS, thresholds):
-                activePlaybackIsStableForConcurrentGeneration = true
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: bufferedAudioMS,
+                    targetMS: thresholds.resumeBufferTargetMS,
+                )
                 activePlaybackStableBufferedAudioMS = bufferedAudioMS
                 activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
+                activePlaybackConcurrentGenerationTargetMS = thresholds.resumeBufferTargetMS
                 activePlaybackIsRebuffering = false
             case .starved:
                 activePlaybackIsStableForConcurrentGeneration = false
                 activePlaybackIsRebuffering = true
+            case let .trace(trace):
+                guard
+                    trace.name == "buffer_scheduled",
+                    !activePlaybackIsStableForConcurrentGeneration,
+                    !activePlaybackIsRebuffering,
+                    let queuedAudioAfterMS = trace.queuedAudioAfterMS,
+                    let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS
+                else {
+                    break
+                }
+
+                activePlaybackStableBufferedAudioMS = queuedAudioAfterMS
+                activePlaybackStableBufferTargetMS = concurrentGenerationTargetMS
+                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                    bufferedAudioMS: queuedAudioAfterMS,
+                    targetMS: concurrentGenerationTargetMS,
+                )
             case .firstChunk,
                  .queueDepthLow,
                  .chunkGapWarning,
@@ -363,8 +405,7 @@ actor PlaybackController {
                  .rebufferThrashWarning,
                  .outputDeviceChanged,
                  .engineConfigurationChanged,
-                 .bufferShapeSummary,
-                 .trace:
+                 .bufferShapeSummary:
                 break
         }
     }

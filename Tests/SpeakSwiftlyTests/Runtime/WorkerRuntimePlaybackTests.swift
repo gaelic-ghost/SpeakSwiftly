@@ -3,6 +3,20 @@ import Foundation
 import Testing
 import TextForSpeech
 
+// MARK: - EnvironmentEventRecorder
+
+private actor EnvironmentEventRecorder {
+    private var storedEvents = [PlaybackEnvironmentEvent]()
+
+    func record(_ event: PlaybackEnvironmentEvent) {
+        storedEvents.append(event)
+    }
+
+    func events() -> [PlaybackEnvironmentEvent] {
+        storedEvents
+    }
+}
+
 // MARK: - Playback Utilities
 
 @Test func `inter job boop samples are short faded and audible`() {
@@ -162,8 +176,9 @@ import TextForSpeech
     } == 1)
 }
 
-@Test func `playback events include runtime CPU and memory metrics when available`() async throws {
+@Test func `resident preload stays playback cold until the first audible request`() async throws {
     let output = OutputRecorder()
+    let playback = PlaybackSpy()
     let storeRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: storeRoot) }
 
@@ -180,7 +195,66 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
-        playback: PlaybackSpy(),
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    #expect(playback.prepareCount == 0)
+    #expect(!output.containsStderrJSONObject {
+        $0["event"] as? String == "playback_engine_ready"
+    })
+
+    let playbackID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            with: "default-femme",
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_engine_ready",
+                $0["request_id"] as? String == playbackID,
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["sample_rate"] as? Int == 24000
+        }
+    })
+    #expect(playback.prepareCount >= 1)
+}
+
+@Test func `playback events include runtime CPU and memory metrics when available`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
         residentModelLoader: { _ in makeResidentModel() },
         readRuntimeMemory: {
             RuntimeMemorySnapshot(
@@ -199,8 +273,24 @@ import TextForSpeech
 
     await runtime.start()
     #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+    #expect(playback.prepareCount == 0)
+
+    let metricsID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            with: "default-femme",
+        )
+        .id
+
+    #expect(await waitUntil {
         output.containsStderrJSONObject {
             guard
+                $0["request_id"] as? String == metricsID,
                 $0["event"] as? String == "playback_engine_ready",
                 let details = $0["details"] as? [String: Any]
             else {
@@ -218,14 +308,6 @@ import TextForSpeech
                 && details["mlx_memory_limit_bytes"] as? Int == 9000
         }
     })
-
-    let metricsID = await runtime.generate
-        .speech(
-            text: "Hello there",
-            with: "default-femme",
-        )
-        .id
-
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             guard
@@ -242,6 +324,19 @@ import TextForSpeech
                 && details["process_system_cpu_time_ns"] as? Int == 4000
         }
     })
+}
+
+@MainActor
+@Test func `binding playback environment sink does not emit output device observation until playback preparation`() async throws {
+    let driver = AudioPlaybackDriver()
+    let recorder = EnvironmentEventRecorder()
+
+    driver.setEnvironmentEventSink { event in
+        await recorder.record(event)
+    }
+
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await recorder.events().isEmpty)
 }
 
 @Test func `playback environment events are logged for power session and recovery changes`() async throws {

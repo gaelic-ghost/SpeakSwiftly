@@ -163,16 +163,13 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func makeSpeechJobState(for request: WorkerRequest) async -> PlaybackJob {
-        let requestID = request.id
-        let op = request.opName
+    func makeSpeechJobState(for request: WorkerRequest) async -> LiveSpeechRequestState {
         let text = switch request {
             case .queueSpeech(id: _, text: let text, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _):
                 text
             default:
                 ""
         }
-        let profileName = request.profileName ?? "unknown-profile"
         let textProfileName = request.textProfileName
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
@@ -203,27 +200,28 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
-        var continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation?
-        let stream = AsyncThrowingStream<[Float], any Swift.Error> { continuation = $0 }
-        guard let continuation else {
-            fatalError(
-                "SpeakSwiftly could not create a playback stream continuation for request '\(requestID)'. AsyncThrowingStream did not provide its continuation during job creation.",
-            )
-        }
-
-        return PlaybackJob(
-            requestID: requestID,
-            op: op,
-            text: text,
+        let existingPlaybackJobCount = await playbackController.jobCount()
+        let playbackTuningProfile: PlaybackTuningProfile =
+            if speechBackend == .marvis, existingPlaybackJobCount == 0 {
+                .firstDrainedLiveMarvis
+            } else {
+                .standard
+            }
+        let residentStreamingCadenceProfile = PlaybackConfiguration.residentStreamingCadenceProfile(
+            speechBackend: speechBackend,
+            existingPlaybackJobCount: existingPlaybackJobCount,
+        )
+        let residentStreamingInterval = PlaybackConfiguration.residentStreamingInterval(
+            for: residentStreamingCadenceProfile,
+        )
+        return LiveSpeechRequestState(
+            request: request,
             normalizedText: normalizedText,
-            profileName: profileName,
-            textProfileName: textProfileName,
-            textContext: textContext,
-            sourceFormat: sourceFormat,
             textFeatures: textFeatures,
             textSections: textSections,
-            stream: stream,
-            continuation: continuation,
+            playbackTuningProfile: playbackTuningProfile,
+            residentStreamingCadenceProfile: residentStreamingCadenceProfile,
+            residentStreamingInterval: residentStreamingInterval,
         )
     }
 

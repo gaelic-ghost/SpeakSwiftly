@@ -66,17 +66,19 @@ final class AudioPlaybackDriver {
         _ sink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?,
     ) {
         environmentEventSink = sink
-        guard let sink else { return }
-
-        Task {
-            await sink(PlaybackEnvironmentEvent.outputDeviceObserved(currentDevice: lastObservedOutputDeviceDescription))
-        }
     }
 
     func prepare(sampleRate: Double) async throws -> Bool {
         let needsSetup = audioEngine == nil || playerNode == nil || engineSampleRate != sampleRate
         if needsSetup {
             try await rebuildEngine(sampleRate: sampleRate)
+            if let environmentEventSink {
+                await environmentEventSink(
+                    PlaybackEnvironmentEvent.outputDeviceObserved(
+                        currentDevice: lastObservedOutputDeviceDescription,
+                    ),
+                )
+            }
         } else if audioEngine?.isRunning == false {
             try audioEngine?.start()
         }
@@ -91,6 +93,7 @@ final class AudioPlaybackDriver {
     func play(
         sampleRate: Double,
         text: String,
+        tuningProfile: PlaybackTuningProfile,
         stream: AsyncThrowingStream<[Float], Error>,
         onEvent: @escaping @Sendable (PlaybackEvent) async -> Void,
     ) async throws -> PlaybackSummary {
@@ -100,7 +103,7 @@ final class AudioPlaybackDriver {
         let startedAt = Date()
         let requestID = nextRequestID
         nextRequestID += 1
-        let state = AudioPlaybackRequestState(requestID: requestID, text: text)
+        let state = AudioPlaybackRequestState(requestID: requestID, text: text, tuningProfile: tuningProfile)
         activeRequestState = state
         activeEventSink = onEvent
         activeRuntimeFailure = nil
@@ -150,6 +153,12 @@ final class AudioPlaybackDriver {
                 if startedPlayback,
                    let bufferIndex = queuedBuffer.bufferIndex,
                    gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS {
+                    if !state.isRebuffering {
+                        state.thresholdsController.recordScheduleGapDistress(
+                            gapMS: gapMS,
+                            queuedAudioMS: queuedAudioBeforeMS,
+                        )
+                    }
                     await onEvent(
                         .scheduleGapWarning(
                             gapMS: gapMS,

@@ -20,9 +20,58 @@ public extension SpeakSwiftly {
         // MARK: Configuration
 
         enum PlaybackConfiguration {
+            enum ResidentStreamingCadenceProfile: String, Equatable {
+                case standard
+                case firstDrainedLiveMarvis = "first_drained_live_marvis"
+                case overlapSecondLaneDuringFirstDrain = "overlap_second_lane_during_first_drain"
+            }
+
             /// Shorter chunk cadence gives playback a second chunk in reserve before
             /// the first one drains, which reduces audible shudder from one-chunk starts.
             static let residentStreamingInterval = 0.18
+
+            /// The first drained live Marvis request is the only path that has to
+            /// bootstrap audible reserve from nothing. Give it a tighter resident
+            /// streaming cadence so playback can accumulate preroll before overlap
+            /// opens the second generation lane.
+            static let firstDrainedLiveMarvisStreamingInterval = 0.10
+
+            /// The queued follower behind that first drained Marvis request has its
+            /// own cadence role so overlap experiments can tune it without
+            /// overloading the first-request playback profile. The current baseline
+            /// keeps it on the ordinary resident cadence because the first `0.20`
+            /// follower experiment only helped modestly under clean conditions and
+            /// still left startup sounding too fragile to keep as the fixed policy.
+            static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.18
+
+            static func residentStreamingCadenceProfile(
+                speechBackend: SpeakSwiftly.SpeechBackend,
+                existingPlaybackJobCount: Int,
+            ) -> ResidentStreamingCadenceProfile {
+                guard speechBackend == .marvis else { return .standard }
+
+                return switch existingPlaybackJobCount {
+                    case 0:
+                        .firstDrainedLiveMarvis
+                    case 1:
+                        .overlapSecondLaneDuringFirstDrain
+                    default:
+                        .standard
+                }
+            }
+
+            static func residentStreamingInterval(
+                for cadenceProfile: ResidentStreamingCadenceProfile,
+            ) -> Double {
+                switch cadenceProfile {
+                    case .standard:
+                        residentStreamingInterval
+                    case .firstDrainedLiveMarvis:
+                        firstDrainedLiveMarvisStreamingInterval
+                    case .overlapSecondLaneDuringFirstDrain:
+                        overlapSecondLaneDuringFirstDrainStreamingInterval
+                }
+            }
         }
 
         // MARK: Runtime State
@@ -214,7 +263,7 @@ public extension SpeakSwiftly {
 
         enum GenerationCompletionDisposition {
             case requestCompleted(Result<WorkerSuccessPayload, WorkerError>)
-            case requestStillPendingPlayback(String)
+            case requestStillPendingPlayback
         }
 
         struct OutgoingWorkerRequest: Encodable {

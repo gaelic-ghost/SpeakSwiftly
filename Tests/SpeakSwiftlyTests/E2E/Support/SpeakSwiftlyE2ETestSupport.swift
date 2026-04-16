@@ -128,30 +128,10 @@ extension SpeakSwiftlyE2ETests {
 
     static func awaitWorkerReady(
         _ worker: WorkerProcess,
-        expectPlaybackEngine: Bool,
     ) async throws {
         #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-        } != nil)
-
-        guard expectPlaybackEngine else { return }
-
-        #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
-            guard
-                $0["event"] as? String == "playback_engine_ready",
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["process_phys_footprint_bytes"] as? Int != nil
-                && details["process_resident_bytes"] as? Int != nil
-                && details["process_user_cpu_time_ns"] as? Int != nil
-                && details["process_system_cpu_time_ns"] as? Int != nil
-                && details["mlx_active_memory_bytes"] as? Int != nil
-                && details["mlx_cache_memory_bytes"] as? Int != nil
-                && details["mlx_peak_memory_bytes"] as? Int != nil
         } != nil)
     }
 

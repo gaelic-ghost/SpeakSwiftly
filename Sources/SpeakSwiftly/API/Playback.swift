@@ -79,9 +79,9 @@ public extension SpeakSwiftly.Runtime {
         await failQueuedRequests(with: cancellationError)
         await failWaitingPlaybackRequests(with: cancellationError)
         let cancelledPlaybackJobs = await playbackController.shutdown()
-        for job in cancelledPlaybackJobs {
-            job.continuation.finish(throwing: cancellationError)
-            await completePlaybackJob(job, result: .failure(cancellationError))
+        for playbackState in cancelledPlaybackJobs {
+            playbackState.execution.continuation.finish(throwing: cancellationError)
+            await completePlaybackJob(playbackState.request, result: .failure(cancellationError))
         }
         await logEvent("worker_shutdown_completed", details: ["queue_depth": .int(generationQueueDepth())])
     }

@@ -275,6 +275,228 @@ Current generated-file behavior:
 - expired batch reads stay inspectable through `get_generated_batch` and `list_generated_batches`, but return an empty `artifacts` list because the saved files are intentionally gone
 - expired file and batch jobs keep artifact references inside `get_generation_job` and `list_generation_jobs` so operators can still see what existed before cleanup
 
+## Playback Architecture
+
+Playback is not only the audio-output layer. In the current runtime shape, playback is also one of the scheduler inputs that decides when later live generation work may proceed. That means maintainers should read the playback path as:
+
+1. public request entry
+2. runtime request acceptance and queueing
+3. live generation handoff
+4. playback execution
+5. terminal request completion after playback drains
+
+The public semantic entry point for audible playback is the Swift call `runtime.generate.speech(...)` or the wire op `generate_speech`. `runtime.player` is the control and inspection surface, not the request-creation surface.
+
+The main code anchors are:
+
+- [`Sources/SpeakSwiftly/API/Generation.swift`](Sources/SpeakSwiftly/API/Generation.swift)
+- [`Sources/SpeakSwiftly/API/Playback.swift`](Sources/SpeakSwiftly/API/Playback.swift)
+- [`Sources/SpeakSwiftly/Runtime/WorkerRuntimeLifecycle.swift`](Sources/SpeakSwiftly/Runtime/WorkerRuntimeLifecycle.swift)
+- [`Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing.swift`](Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing.swift)
+- [`Sources/SpeakSwiftly/Playback/PlaybackController.swift`](Sources/SpeakSwiftly/Playback/PlaybackController.swift)
+- [`Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift`](Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift)
+
+### Entry points
+
+The main entry points into the playback layer are:
+
+- typed Swift submission through `Generate.speech(...)`
+- JSONL submission through `generate_speech`
+- playback control reads and writes through `runtime.player` and the wire control ops such as `playback_pause`, `playback_resume`, `get_playback_state`, `list_playback_queue`, `clear_queue`, and `cancel_request`
+
+The runtime accepts a live speech request as a generation request first. It then creates the playback-side job state that will receive streamed audio and complete only after playback finishes.
+
+### Execution path
+
+The current live path is:
+
+1. `Generate.speech(...)` or `generate_speech` becomes `WorkerRequest.queueSpeech(..., jobType: .live)`.
+2. `WorkerRuntime.accept(line:)` validates and accepts the request.
+3. The runtime creates live playback job state and registers it with `PlaybackController`.
+4. `handleQueueSpeechLiveGeneration(...)` runs resident generation and pushes streamed audio chunks into the playback-side continuation.
+5. `PlaybackController` waits for enough playback-ready state, then hands audio to the type-erased playback driver.
+6. `AudioPlaybackDriver` owns AVFoundation scheduling, buffering, route and engine recovery, and final playback drain.
+7. Terminal request success is emitted only after local playback drain finishes, not when generation finishes producing samples.
+
+That split is intentional. Generated audio completion and local playback completion are not the same event.
+
+### Exit points
+
+Playback currently exits through four surfaces:
+
+- audible audio through `AVAudioEngine` and `AVAudioPlayerNode`
+- typed request events and snapshots for Swift callers
+- JSONL success, failure, and progress events on `stdout`
+- operator-facing diagnostics and playback trace output on `stderr`
+
+The key design point is that playback completion is a runtime event as well as an audio event. The worker does not treat "last chunk generated" as "request complete."
+
+### Apple behavior we rely on
+
+The playback implementation depends on documented Apple audio behavior and should stay aligned with it.
+
+Primary references:
+
+- [`AVAudioPlayerNode`](https://developer.apple.com/documentation/avfaudio/avaudioplayernode)
+- [`.dataPlayedBack`](https://developer.apple.com/documentation/avfaudio/avaudioplayernodecompletioncallbacktype/dataplayedback)
+- [`AVAudioPlayerNode.stop()`](https://developer.apple.com/documentation/avfaudio/avaudioplayernode/stop())
+
+Important documented constraints:
+
+- `.dataPlayedBack` is the completion callback type that reflects actual downstream playback completion rather than only buffer consumption by the player node.
+- `AVAudioPlayerNode.stop()` clears scheduled buffers and resets the player timeline.
+- Apple warns against stopping the player from a completion callback because that can deadlock.
+
+Those constraints are why the runtime keeps explicit drain and shutdown logic outside the raw callback body and why playback completion is tracked as a separate runtime concern.
+
+### Current strengths
+
+The playback architecture is strongest at the edges:
+
+- the public surface is clear: generation submits playback work, `Player` controls and inspects it
+- dependency injection is real: the runtime can swap playback implementations through `WorkerDependencies`
+- platform audio details are mostly boxed into `AudioPlaybackDriver`
+- tests can exercise runtime playback behavior without needing real hardware in every case
+
+This is the separation of concerns to preserve:
+
+- `API/` owns public typed surfaces
+- `Runtime/` owns request acceptance, queueing, lifecycle, and terminal semantics
+- `PlaybackController` owns playback job coordination and playback-facing state
+- `AudioPlaybackDriver` owns AVFoundation, engine state, route changes, and drain mechanics
+
+### Recently landed cleanup
+
+The first playback-architecture cleanup pass landed on `2026-04-15` in three steps:
+
+- live playback now keeps one runtime-owned `LiveSpeechRequestState` from request acceptance through terminal playback completion instead of reconstructing request identity late
+- playback execution mechanics now live in `PlaybackExecutionState` and `LiveSpeechPlaybackState`, which keeps streamed audio, continuations, sample rate, and task ownership playback-local
+- generation scheduling now depends on a narrow playback admission signal for concurrent-generation gating, while richer playback telemetry remains part of runtime overview and diagnostics for operators
+
+That means the current model is flatter than the earlier `PlaybackJob` design:
+
+- runtime owns request identity, normalization context, and deep-trace metadata
+- playback owns execution state and hardware-facing playback coordination
+- scheduling consumes an explicit admission decision instead of reaching directly into the full playback telemetry surface for lane gating
+
+### Current pressure points
+
+The weakest part of the current architecture is the middle, where one live request spans generation, playback, scheduling, and terminal completion at the same time.
+
+The main maintainership pain points today are:
+
+- live requests are represented in both generation and playback bookkeeping
+- runtime bridge code is still spread across both `Runtime/` and `Playback/`, which makes ownership harder to scan than it should be
+- live requests still span both generation and playback bookkeeping, even though the coordination path is now much easier to follow than before milestones 23 through 25 landed
+- the public playback state is intentionally thin, while runtime overview still exposes richer buffering telemetry, so maintainers need to stay clear about which surface is operator telemetry and which surface is scheduling policy
+- backend-specific playback tuning work, especially around first-request Marvis behavior, still needs to stay visibly policy-driven instead of slowly becoming hidden controller coupling again
+
+None of that means the design is bad. It means the existing public shape has held up well enough that the next cleanup should focus on flattening the internal coordination path instead of adding more layers.
+
+### Refactor map
+
+The first staged playback refactor sequence has now landed:
+
+1. Flatten live request coordination.
+   Landed. One runtime-owned `LiveSpeechRequestState` now survives from request acceptance through playback completion.
+
+2. Split playback execution ownership.
+   Landed. Playback-local execution state now lives in `PlaybackExecutionState` and `LiveSpeechPlaybackState` instead of staying mixed into the runtime-owned request record.
+
+3. Narrow the playback-to-scheduler boundary.
+   Landed. Generation scheduling now consumes a smaller playback admission signal, while richer playback telemetry stays available for operator-facing diagnostics and runtime overview.
+
+4. Rehome runtime bridge code.
+   Still open. Playback implementation files are cleaner than before, but some runtime-owned bridge logic still lives under `Playback/` and should move only if doing so makes ownership easier to scan rather than just reshuffling files.
+
+5. Keep the public playback state intentionally thin unless a real user-facing need appears.
+   Reviewed. The current outcome is to keep `PlaybackState` thin and keep richer buffering and rebuffer telemetry in runtime overview instead of widening the enum prematurely.
+
+The active roadmap milestones for this work are:
+
+- `Milestone 22`: first-request Marvis playback tuning
+
+The current Milestone 22 operating decisions are:
+
+1. Smoother first audible Marvis playback is more important than squeezing the first audible reply to the absolute earliest possible moment. An extra 1 to 2 seconds of initial wait is an acceptable trade if it materially reduces early rebuffers.
+2. The queued-live dual-lane Marvis overlap model should stay intact in principle, but the second lane is allowed to start a little later if that protects the first active playback from obvious instability.
+3. Tuning work should land one bounded stage at a time, with before-and-after metrics captured after each pass, so later widening into resident warmup behavior happens only if the narrower pass is not enough.
+
+The first bounded Milestone 22 pass landed on `2026-04-15` as a warmup-floor-only change for the first drained live Marvis request.
+
+- That pass raised the first-request warmup floors to `1440 / 640 / 1700` for compact text and `2320 / 1040 / 2700` for balanced text before ordinary adaptive playback thresholds take over.
+- The benchmark path compared `.local/e2e-runs/2026-04-15T03-14-57Z-166e3f0f-284e-45f9-ab95-618a3ea71e5a-prequeued-jobs-drain-in-order` against `.local/e2e-runs/2026-04-15T17-27-27Z-e8a7db8f-cc3e-44ee-8f35-65266fb949f4-prequeued-jobs-drain-in-order`.
+- For the first queued femme request, that moved `time_to_preroll_ready_ms` from `2320` to `3746`, raised `startup_buffered_audio_ms` from `1440` to `2400`, reduced `rebuffer_event_count` from `5` to `4`, and left `rebuffer_total_duration_ms` effectively unchanged at `24279` versus `25188`.
+
+The second bounded Milestone 22 pass also landed on `2026-04-15` as a first-rebuffer hardening change for that same first drained live Marvis request.
+
+- That follow-up pass kept the first drained live Marvis tuning profile active while adaptive playback thresholds move into recovery, and it let the first active rebuffer apply penalties immediately instead of waiting for rebuffer number two.
+- The next benchmark comparison against `.local/e2e-runs/2026-04-15T17-52-36Z-e575274b-31ec-486f-9ef7-50f080660f33-prequeued-jobs-drain-in-order` showed a narrower but real improvement: `time_to_preroll_ready_ms` rose slightly again to `3810`, `startup_buffered_audio_ms` stayed at `2400`, `rebuffer_event_count` stayed at `4`, and `rebuffer_total_duration_ms` fell to `23991`.
+- The important implementation detail is that stage two improved recovery posture rather than startup reserve. The first active rebuffer now resumes against a stronger `3403 ms` target instead of the stage-one `3282 ms` range, and later repeated-rebuffer recovery still climbs to `4980 ms` without dropping back to the standard profile.
+- The important architectural outcome is that overlap stayed intact across both stages: the second Marvis lane still waited for playback stability, then resumed cleanly instead of collapsing the system back into one-at-a-time generation.
+- The important tuning outcome is that stronger first-request preroll plus earlier rebuffer hardening is helping, but it still is not enough to make the first drained-queue playback clean.
+
+The third bounded Milestone 22 pass also landed on `2026-04-15` as a pre-rebuffer distress hardening change for that same first drained live Marvis request.
+
+- That follow-up pass taught the threshold controller to treat repeated schedule-gap warnings inside the low-queue risk band as an early recovery signal, so the first drained live Marvis request can harden before the first rebuffer pause fully forms.
+- The next benchmark comparison against `.local/e2e-runs/2026-04-15T18-02-46Z-16d980ae-1226-4db6-9095-59fdcff155f1-prequeued-jobs-drain-in-order` showed another modest but real improvement: `time_to_preroll_ready_ms` eased back down to `3760`, `startup_buffered_audio_ms` stayed at `2400`, `rebuffer_event_count` stayed at `4`, and `rebuffer_total_duration_ms` fell again to `23773`.
+- The important implementation detail is that stage three reacts earlier rather than simply recovering harder after the first pause. The first active rebuffer now begins at `queued_audio_ms = 1760` instead of the stage-two `1120`, and the longest recovery window drops back to `6678 ms` instead of the stage-two `9399 ms`.
+- The important architectural outcome is that overlap still stayed intact after the earlier distress reaction. The second Marvis lane remained parked on `waiting_for_playback_stability`, then resumed once playback reported `playback_is_stable_for_concurrency = true` at a `2320 ms` stable buffer target and `2400 ms` buffered reserve.
+- The important tuning outcome is that the policy-only path is still helping, but the first drained-queue playback still is not clean enough to call fixed. The next decision is whether one more bounded policy pass is worth it, or whether Milestone 22 should now widen into resident cadence and warmup behavior.
+
+The widened Milestone 22 investigation also checked resident preload before changing the tuning path.
+
+- The current code still eagerly prepares playback hardware during resident preload through `startResidentPreload()` and `playbackController.prepare(...)`.
+- The current evidence says that is not the leading cause of the first drained live Marvis instability. In the stage-three trace, first-request startup was dominated by slow resident chunk cadence before playback started, not by a late playback-engine bring-up once the live request existed.
+- That means the first widened pass should stay focused on resident generation cadence and concurrency admission rather than treating playback-engine preparation as the primary fix surface.
+
+The fourth Milestone 22 pass landed on `2026-04-15` as the first widened change.
+
+- That pass tightened resident Marvis cadence only for the first drained live request by lowering its resident streaming interval from `0.18` to `0.12`, while leaving later queued requests on the ordinary cadence.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-16-17Z-7b199036-8540-4284-9a84-92dd16e13a30-prequeued-jobs-drain-in-order` showed that startup cadence improved decisively: `time_to_first_chunk_ms` dropped from `441` to `333`, `avg_inter_chunk_gap_ms` dropped from `399` to `202`, and `avg_schedule_gap_ms` dropped from `364` to `184`.
+- The important downside is that stage four exposed a policy mismatch instead of finishing the tuning job. `time_to_preroll_ready_ms` drifted slightly upward to `3833`, `startup_buffered_audio_ms` settled at `2320`, `rebuffer_event_count` rose from `4` to `5`, and the second Marvis lane still reopened at bare preroll reserve.
+- The useful conclusion from stage four is that faster first-request cadence helps, but cadence alone is not enough if playback still declares itself concurrency-stable at the old reserve threshold.
+
+The fifth Milestone 22 pass also landed on `2026-04-15` as the widened follow-up change.
+
+- That pass kept the stage-four faster first-request resident cadence and tightened playback's own concurrency-admission rule for the first drained live Marvis request.
+- The playback controller now keeps the runtime-facing admission surface narrow, but internally it makes the first drained live Marvis request earn a stronger buffered-audio reserve before reporting `allowsConcurrentGeneration = true`.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-24-15Z-95e656cc-c4b4-4e2a-8374-4ef353ac9b2a-prequeued-jobs-drain-in-order` shows why that follow-up is worth keeping: `time_to_first_chunk_ms` improved again to `325`, `time_to_preroll_ready_ms` stayed effectively flat at `3828`, `rebuffer_event_count` stayed at `5`, `rebuffer_total_duration_ms` dropped from `22758` to `18775`, and `longest_rebuffer_duration_ms` dropped from `4801` to `4385`.
+- The important architecture result is that overlap still stayed intact while moving later in the flow. In the stage-five trace, the second Marvis lane remained parked on `waiting_for_playback_stability` at preroll, and only resumed after the first request had already recovered into a healthier reserve window.
+- The important tuning result is that the widened path is now coherent: the faster first-request cadence helps startup, and the stronger first-request admission gate keeps those gains from getting spent immediately when overlap resumes.
+
+The sixth Milestone 22 pass also landed on `2026-04-15` as the review-and-correctness follow-up.
+
+- That pass fixed a real overlap-gate inconsistency discovered during the widened review. In the stage-five trace, a later `playback_rebuffer_resumed` event could still leave playback advertising `playback_is_stable_for_concurrency = true` while `playback_stable_buffered_audio_ms` was below `playback_stable_buffer_target_ms`.
+- The fix did not widen the public scheduler surface again. It kept the same narrow admission boundary, but it made `PlaybackController` reuse one buffered-audio-versus-target check for preroll, rebuffer resume, and later buffer-scheduled promotions.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-32-16Z-69de7141-3485-4788-8ea5-b30a49e87cbc-prequeued-jobs-drain-in-order` shows the right tradeoff for this stage: this was primarily a correctness repair rather than another tuning win. For the first queued femme request, `time_to_first_chunk_ms` stayed effectively flat at `324`, `time_to_preroll_ready_ms` stayed effectively flat at `3833`, `rebuffer_event_count` stayed at `5`, and `rebuffer_total_duration_ms` rose back to `20055`.
+- The important architecture result is that the overlap gate now tells the truth. The old bogus stage-five state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
+
+The seventh Milestone 22 pass also landed on `2026-04-15` as the next bounded cadence follow-up.
+
+- That pass kept the truthful overlap gate from stage six and tightened only the first drained live Marvis resident streaming cadence again, from `0.12` to `0.10`.
+- The benchmark comparison against `.local/e2e-runs/2026-04-15T18-46-12Z-ce51be64-6dd0-4e21-a125-3d1067397266-prequeued-jobs-drain-in-order` shows why this pass is worth keeping: for the first queued femme request, `time_to_first_chunk_ms` stayed flat at `324`, `time_to_preroll_ready_ms` drifted up to `3951`, `rebuffer_event_count` fell from `5` to `4`, and `rebuffer_total_duration_ms` dropped from `20055` to `17284`.
+- The important architecture result is that the overlap gate stayed honest while the first-request result improved. In the fresh stage-seven trace, the second Marvis lane still remained parked on `waiting_for_playback_stability`, and every later overlap reopen happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
+
+The eighth Milestone 22 pass landed on `2026-04-15` as a probing and observability pass rather than another tuning pass.
+
+- That pass added transition-level resource snapshots to the existing Marvis scheduler and playback rebuffer traces. `marvis_generation_scheduler_snapshot`, `marvis_generation_lane_reserved`, `marvis_generation_lane_released`, `playback_rebuffer_started`, and `playback_rebuffer_resumed` now all carry the same process and MLX memory details that were previously only captured in the final `playback_finished` summary.
+- The fresh artifact is `.local/e2e-runs/2026-04-15T19-08-53Z-f0de238e-3cf0-477a-ade2-c476ff05b134-prequeued-jobs-drain-in-order`.
+- The first queued femme request in that run did not beat the stage-seven audible result, which is expected because this pass was instrumentation-only. Its stderr `playback_finished` metrics came in at `time_to_first_chunk_ms = 340`, `time_to_preroll_ready_ms = 3926`, `startup_buffered_audio_ms = 2320`, `rebuffer_event_count = 5`, and `rebuffer_total_duration_ms = 20089`.
+- The important new finding is where the resource rise actually appears. At the first truthful overlap reopen, `playback_rebuffer_resumed` reported `buffered_audio_ms = 2720`, `resume_buffer_target_ms = 2700`, `mlx_active_memory_bytes = 2388309837`, and `process_phys_footprint_bytes = 2734345216`. The immediately following `marvis_generation_lane_reserved` event for the second lane stayed effectively flat at `mlx_active_memory_bytes = 2388309873` and `process_phys_footprint_bytes = 2734377984`.
+- The larger rise showed up only after overlap had already been active for a while. By the next `playback_rebuffer_started` event, the same first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still falling back into refill trouble.
+- That evidence shifts the working hypothesis. The current failure mode looks less like a sharp one-time startup spike when the second Marvis lane is reserved, and more like sustained dual-lane overlap pressure while the first playback is trying to rebuild reserve.
+
+The eleventh Milestone 22 pass landed on `2026-04-15` as the first explicit overlap-follower cadence experiment.
+
+- That pass introduced a separate `ResidentStreamingCadenceProfile` for the second Marvis lane during the first drained overlap window, so future cadence work can tune that follower path independently from the first-request playback profile.
+- The experiment artifact is `.local/e2e-runs/2026-04-15T21-52-43Z-236ce29a-5d5c-470f-a51e-f38dfbc3361d-prequeued-jobs-drain-in-order`.
+- The first follower experiment itself is not a tuning win. Slowing the overlap follower to `0.20` kept overlap alive, but the first queued femme request regressed from the stage-eight probe result: `time_to_first_chunk_ms` moved from `340` to `349`, `time_to_preroll_ready_ms` moved from `3926` to `3844`, `rebuffer_event_count` rose from `5` to `6`, and `rebuffer_total_duration_ms` rose from `20089` to `20769`.
+- The useful outcome is the new control seam, not the slowed follower interval. The repository now keeps the follower cadence role explicit, but the follower interval itself stays on the ordinary `0.18` baseline until a better overlap-pressure experiment earns a real tuning change.
+- A cleaner rerun of that same follower experiment landed at `.local/e2e-runs/2026-04-15T22-10-00Z-7ccd26f6-62b6-4117-a4c5-3027d81ebacf-prequeued-jobs-drain-in-order` after background machine load was reduced. That rerun kept overlap alive and improved modestly over the stage-eight probe instead of regressing: `time_to_first_chunk_ms` stayed at `340`, `time_to_preroll_ready_ms` improved to `3833`, `rebuffer_event_count` stayed at `5`, and `rebuffer_total_duration_ms` fell to `19115`.
+- Even with the cleaner rerun, the first audible request was still subjectively too rough to justify fixed follower slowdown as the main policy. The working read is now that the unstable part on Gale's machine is the transition into simultaneous overlap itself, not just the follower's steady-state cadence after overlap opens.
+- The next useful design should therefore stay dynamic rather than fixed. Keep the truthful overlap gate and the explicit follower-cadence role, but add a short-lived `fragile first playback` window for the first drained live Marvis request so the second lane stays parked or lighter until reserve has crossed and briefly held a healthier target, then backs off again if reserve starts collapsing.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
@@ -332,6 +554,13 @@ swift build
 swift test
 ```
 
+When that plain SwiftPM lane fails in the current vendored `mlx-audio-swift`
+checkout with the `EnglishG2P.swift` parser error, treat that as a known
+validation-lane snag instead of a fresh local mystery. Do not keep retrying the
+same `swift build` / `swift test` commands. Switch to the Xcode-backed package
+workspace lane documented below and in
+[`docs/maintainers/validation-lanes.md`](docs/maintainers/validation-lanes.md).
+
 Publish and verify a real Xcode-backed runtime:
 
 ```bash
@@ -386,6 +615,28 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftl
 ```
 
 Without `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, the trace-capture suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
+
+For the targeted first-request Marvis tuning lane, the current reliable rerun path is the Xcode-backed runtime:
+
+- direct `swift test` is still blocked by the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`
+- direct `xcodebuild test` does not currently carry `SPEAKSWIFTLY_E2E=1` through the Swift Testing suite gate on its own
+- the working path is `xcodebuild build-for-testing`, then an `.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building` against this exact test identifier:
+
+```text
+SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
+```
+
+The same fallback principle applies to release hardening and narrow package
+validation when SwiftPM is blocked:
+
+1. Run `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`.
+2. Reuse the generated `.xctestrun` file for one targeted `xcodebuild test-without-building` run at a time.
+3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
+
+GitHub Actions should follow that same fallback lane for package compilation and
+tests. Keep `swift package dump-package` as the manifest sanity check, but use
+the repo-root Xcode-backed package lane for CI build-and-test coverage until
+the vendored parser failure is gone.
 
 Long deep-trace playback probe:
 
