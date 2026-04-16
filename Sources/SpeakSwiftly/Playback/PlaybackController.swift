@@ -52,6 +52,32 @@ actor PlaybackController {
         self.driver = driver
     }
 
+    static func concurrencyAdmissionThresholds(
+        tuningProfile: PlaybackTuningProfile,
+        startupBufferTargetMS: Int,
+        lowWaterTargetMS: Int,
+    ) -> ConcurrencyAdmissionThresholds {
+        guard tuningProfile == .firstDrainedLiveMarvis else {
+            return ConcurrencyAdmissionThresholds(
+                startupBufferTargetMS: startupBufferTargetMS,
+                concurrentGenerationTargetMS: startupBufferTargetMS,
+            )
+        }
+
+        let additionalReserveMS = min(480, max(320, lowWaterTargetMS / 2))
+        return ConcurrencyAdmissionThresholds(
+            startupBufferTargetMS: startupBufferTargetMS,
+            concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
+        )
+    }
+
+    static func allowsConcurrentGeneration(
+        bufferedAudioMS: Int,
+        targetMS: Int,
+    ) -> Bool {
+        bufferedAudioMS >= targetMS
+    }
+
     // MARK: - Binding
 
     func bind(_ hooks: PlaybackHooks) {
@@ -382,31 +408,5 @@ actor PlaybackController {
                  .bufferShapeSummary:
                 break
         }
-    }
-
-    static func concurrencyAdmissionThresholds(
-        tuningProfile: PlaybackTuningProfile,
-        startupBufferTargetMS: Int,
-        lowWaterTargetMS: Int,
-    ) -> ConcurrencyAdmissionThresholds {
-        guard tuningProfile == .firstDrainedLiveMarvis else {
-            return ConcurrencyAdmissionThresholds(
-                startupBufferTargetMS: startupBufferTargetMS,
-                concurrentGenerationTargetMS: startupBufferTargetMS,
-            )
-        }
-
-        let additionalReserveMS = min(480, max(320, lowWaterTargetMS / 2))
-        return ConcurrencyAdmissionThresholds(
-            startupBufferTargetMS: startupBufferTargetMS,
-            concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
-        )
-    }
-
-    static func allowsConcurrentGeneration(
-        bufferedAudioMS: Int,
-        targetMS: Int,
-    ) -> Bool {
-        bufferedAudioMS >= targetMS
     }
 }

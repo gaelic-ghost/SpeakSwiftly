@@ -20,8 +20,8 @@ public extension SpeakSwiftly {
         // MARK: Configuration
 
         enum PlaybackConfiguration {
-            enum ResidentStreamingCadenceProfile: String, Equatable, Sendable {
-                case standard = "standard"
+            enum ResidentStreamingCadenceProfile: String, Equatable {
+                case standard
                 case firstDrainedLiveMarvis = "first_drained_live_marvis"
                 case overlapSecondLaneDuringFirstDrain = "overlap_second_lane_during_first_drain"
             }

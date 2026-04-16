@@ -41,6 +41,7 @@ Known lane rule:
 
 - plain SwiftPM remains the fast default
 - if the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift` appears, switch to the documented Xcode-backed lane instead of retrying the same SwiftPM command
+- GitHub Actions should use that same Xcode-backed fallback for package build-and-test coverage until the vendored parser snag is resolved
 
 Validation already run on this branch:
 

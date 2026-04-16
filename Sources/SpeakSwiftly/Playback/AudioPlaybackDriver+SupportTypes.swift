@@ -140,7 +140,7 @@ enum PlaybackComplexityClass: String {
 
 // MARK: - PlaybackTuningProfile
 
-enum PlaybackTuningProfile: Equatable, Sendable {
+enum PlaybackTuningProfile: Equatable {
     case standard
     case firstDrainedLiveMarvis
 }
@@ -183,6 +183,7 @@ struct PlaybackThresholdController {
 
     private(set) var thresholds: PlaybackAdaptiveThresholds
     private(set) var phase: PlaybackPhase = .warmup
+
     private let tuningProfile: PlaybackTuningProfile
 
     private var chunkDurationsMS = [Int]()
@@ -583,7 +584,6 @@ struct PlaybackThresholdController {
             preRebufferScheduleGapWarnings = 0
             return
         }
-
         guard gapMS >= severeGapFloorMS else { return }
 
         preRebufferScheduleGapWarnings += 1

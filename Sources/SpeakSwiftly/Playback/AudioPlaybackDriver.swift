@@ -144,24 +144,24 @@ final class AudioPlaybackDriver {
             let queuedAudioBeforeMS = state.queuedAudioMS(sampleRate: sampleRate)
             let scheduledAt = Date()
             let scheduleGapMS: Int?
-                if let lastScheduleAt {
-                    let gapMS = milliseconds(since: lastScheduleAt)
-                    scheduleGapMS = gapMS
-                    maxScheduleGapMS = max(maxScheduleGapMS ?? gapMS, gapMS)
-                    scheduleGapTotalMS += gapMS
-                    scheduleGapCount += 1
-                    if startedPlayback,
-                       let bufferIndex = queuedBuffer.bufferIndex,
-                       gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS {
-                        if !state.isRebuffering {
-                            state.thresholdsController.recordScheduleGapDistress(
-                                gapMS: gapMS,
-                                queuedAudioMS: queuedAudioBeforeMS,
-                            )
-                        }
-                        await onEvent(
-                            .scheduleGapWarning(
-                                gapMS: gapMS,
+            if let lastScheduleAt {
+                let gapMS = milliseconds(since: lastScheduleAt)
+                scheduleGapMS = gapMS
+                maxScheduleGapMS = max(maxScheduleGapMS ?? gapMS, gapMS)
+                scheduleGapTotalMS += gapMS
+                scheduleGapCount += 1
+                if startedPlayback,
+                   let bufferIndex = queuedBuffer.bufferIndex,
+                   gapMS >= state.thresholdsController.thresholds.scheduleGapWarningMS {
+                    if !state.isRebuffering {
+                        state.thresholdsController.recordScheduleGapDistress(
+                            gapMS: gapMS,
+                            queuedAudioMS: queuedAudioBeforeMS,
+                        )
+                    }
+                    await onEvent(
+                        .scheduleGapWarning(
+                            gapMS: gapMS,
                             bufferIndex: bufferIndex,
                             queuedAudioMS: queuedAudioBeforeMS,
                         ),

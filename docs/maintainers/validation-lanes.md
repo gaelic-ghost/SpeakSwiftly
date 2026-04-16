@@ -62,6 +62,20 @@ xcodebuild test-without-building -quiet \
   -only-testing:'SpeakSwiftlyTests/WorkerRuntimePlaybackTests'
 ```
 
+For GitHub Actions, keep the manifest sanity check as:
+
+```bash
+swift package dump-package
+```
+
+Then use the same Xcode-backed package lane for build-and-test coverage instead
+of plain `swift build` / `swift test` until the vendored parser snag is gone.
+The current CI target set is:
+
+- `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
+- `SpeakSwiftlyTests/LibrarySurfaceTests`
+- `SpeakSwiftlyTests/ModelClientsTests`
+
 ## E2E and Real-Model Notes
 
 Plain `swift test` remains the default opt-in path for many e2e commands in

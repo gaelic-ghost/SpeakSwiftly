@@ -81,6 +81,7 @@
 - Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
 - If `swift build` or `swift test` hit the current vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`, stop retrying the same SwiftPM lane and switch to the Xcode-backed validation path documented in `CONTRIBUTING.md` and `docs/maintainers/validation-lanes.md`.
+- Treat the GitHub Actions package lane the same way: keep `swift package dump-package`, but use the Xcode-backed `build-for-testing` plus targeted `test-without-building` path until the vendored parser snag is gone.
 - Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
 - For release-grade real-model coverage, Marvis overlap investigation, or any validation pass that needs the current reliable MLX-backed lane, prefer `xcodebuild build-for-testing` on `.swiftpm/xcode/package.xcworkspace` followed by targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.

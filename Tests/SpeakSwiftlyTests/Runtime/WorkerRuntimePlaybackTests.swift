@@ -3,6 +3,8 @@ import Foundation
 import Testing
 import TextForSpeech
 
+// MARK: - EnvironmentEventRecorder
+
 private actor EnvironmentEventRecorder {
     private var storedEvents = [PlaybackEnvironmentEvent]()
 

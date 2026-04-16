@@ -15,6 +15,14 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let residentStreamingCadenceProfile: SpeakSwiftly.Runtime.PlaybackConfiguration.ResidentStreamingCadenceProfile
     let residentStreamingInterval: Double
 
+    var id: String {
+        request.id
+    }
+
+    var op: String {
+        request.opName
+    }
+
     init(
         request: WorkerRequest,
         normalizedText: String,
@@ -50,13 +58,5 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.playbackTuningProfile = playbackTuningProfile
         self.residentStreamingCadenceProfile = residentStreamingCadenceProfile
         self.residentStreamingInterval = residentStreamingInterval
-    }
-
-    var id: String {
-        request.id
-    }
-
-    var op: String {
-        request.opName
     }
 }

@@ -330,13 +330,13 @@ import TextForSpeech
         PlaybackController.allowsConcurrentGeneration(
             bufferedAudioMS: 2160,
             targetMS: 2700,
-        ) == false
+        ) == false,
     )
     #expect(
         PlaybackController.allowsConcurrentGeneration(
             bufferedAudioMS: 2720,
             targetMS: 2700,
-        ) == true
+        ) == true,
     )
 }
 

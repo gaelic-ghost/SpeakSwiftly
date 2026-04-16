@@ -633,6 +633,11 @@ validation when SwiftPM is blocked:
 2. Reuse the generated `.xctestrun` file for one targeted `xcodebuild test-without-building` run at a time.
 3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
 
+GitHub Actions should follow that same fallback lane for package compilation and
+tests. Keep `swift package dump-package` as the manifest sanity check, but use
+the Xcode-backed package workspace for CI build-and-test coverage until the
+vendored parser failure is gone.
+
 Long deep-trace playback probe:
 
 ```bash

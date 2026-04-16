@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - PlaybackExecutionState
+
 final class PlaybackExecutionState: @unchecked Sendable {
     let stream: AsyncThrowingStream<[Float], any Swift.Error>
     let continuation: AsyncThrowingStream<[Float], any Swift.Error>.Continuation
@@ -30,6 +32,8 @@ final class PlaybackExecutionState: @unchecked Sendable {
         )
     }
 }
+
+// MARK: - LiveSpeechPlaybackState
 
 final class LiveSpeechPlaybackState: @unchecked Sendable {
     let request: LiveSpeechRequestState
