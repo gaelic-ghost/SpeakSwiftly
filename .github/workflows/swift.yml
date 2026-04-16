@@ -39,13 +39,12 @@ jobs:
       - name: Validate package manifest
         run: swift package dump-package
 
-      - name: Build package tests with Xcode-backed workspace
+      - name: Build package tests with Xcode-backed package lane
         shell: bash
         run: |
           set -euo pipefail
 
           xcodebuild build-for-testing -quiet \
-            -workspace .swiftpm/xcode/package.xcworkspace \
             -scheme SpeakSwiftly-Package \
             -destination 'platform=macOS' \
             -derivedDataPath "$SPEAKSWIFTLY_CI_DERIVED_DATA" \

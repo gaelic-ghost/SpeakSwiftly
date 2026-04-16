@@ -44,7 +44,6 @@ Build once:
 
 ```bash
 xcodebuild build-for-testing -quiet \
-  -workspace .swiftpm/xcode/package.xcworkspace \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
   -derivedDataPath .local/xcode/derived-data/validation \

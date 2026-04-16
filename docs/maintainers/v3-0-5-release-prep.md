@@ -47,7 +47,6 @@ Validation already run on this branch:
 
 ```bash
 xcodebuild build-for-testing -quiet \
-  -workspace .swiftpm/xcode/package.xcworkspace \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
   -derivedDataPath .local/xcode/derived-data/release-v3-0-5-prep \

@@ -629,14 +629,14 @@ SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain
 The same fallback principle applies to release hardening and narrow package
 validation when SwiftPM is blocked:
 
-1. Use `xcodebuild build-for-testing` on `.swiftpm/xcode/package.xcworkspace`.
+1. Run `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`.
 2. Reuse the generated `.xctestrun` file for one targeted `xcodebuild test-without-building` run at a time.
 3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
 
 GitHub Actions should follow that same fallback lane for package compilation and
 tests. Keep `swift package dump-package` as the manifest sanity check, but use
-the Xcode-backed package workspace for CI build-and-test coverage until the
-vendored parser failure is gone.
+the repo-root Xcode-backed package lane for CI build-and-test coverage until
+the vendored parser failure is gone.
 
 Long deep-trace playback probe:
 

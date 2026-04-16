@@ -84,7 +84,7 @@
 - Treat the GitHub Actions package lane the same way: keep `swift package dump-package`, but use the Xcode-backed `build-for-testing` plus targeted `test-without-building` path until the vendored parser snag is gone.
 - Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
-- For release-grade real-model coverage, Marvis overlap investigation, or any validation pass that needs the current reliable MLX-backed lane, prefer `xcodebuild build-for-testing` on `.swiftpm/xcode/package.xcworkspace` followed by targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
+- For release-grade real-model coverage, Marvis overlap investigation, or any validation pass that needs the current reliable MLX-backed lane, prefer running `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`, then follow it with targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`
   - `voice_description`: `A generic, warm, masculine, slow speaking voice.`
