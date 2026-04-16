@@ -322,7 +322,6 @@ So a backend such as:
 would fit naturally beside:
 
 - `qwen3`
-- `qwen3_custom_voice`
 - `marvis`
 
 The near-term use case it unlocks is simple:

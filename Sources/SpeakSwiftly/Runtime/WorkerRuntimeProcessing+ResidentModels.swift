@@ -6,7 +6,7 @@ import TextForSpeech
 extension SpeakSwiftly.Runtime {
     func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
         switch speechBackend {
-            case .qwen3, .qwen3CustomVoice:
+            case .qwen3:
                 [ModelFactory.residentModelRepo(for: speechBackend)]
             case .marvis:
                 [ModelFactory.marvisResidentModelRepo]

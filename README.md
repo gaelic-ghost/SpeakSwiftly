@@ -31,7 +31,7 @@ SpeakSwiftly currently includes:
 - a typed runtime rooted at `SpeakSwiftly.liftoff(...)`
 - a JSONL worker surface for non-Swift hosts
 - stored voice profiles and text-normalization profiles
-- resident backend switching between `qwen3`, `qwen3_custom_voice`, and `marvis`
+- resident backend switching between `qwen3` and `marvis`
 - resident model unload and reload controls
 - retained generated-file and generated-batch artifacts
 
@@ -123,7 +123,7 @@ Runtime preferences have a matching typed surface:
 import SpeakSwiftly
 
 let configuration = SpeakSwiftly.Configuration(
-    speechBackend: .qwen3CustomVoice,
+    speechBackend: .qwen3,
     qwenConditioningStrategy: .preparedConditioning
 )
 try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration.json"))
@@ -131,7 +131,7 @@ try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
-For Qwen backends, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile.
+For Qwen generation, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile. The default configuration now uses `.preparedConditioning`, and legacy serialized `qwen3_custom_voice` backend values are normalized onto `qwen3` during load.
 
 If a host needs the packaged MLX bundle or metallib path directly, use the support-resource surface:
 

@@ -7,10 +7,11 @@ extension ProfileStore {
     func loadManifest(from directoryURL: URL) throws -> ProfileManifest {
         let manifestPath = manifestURL(for: directoryURL)
         let manifestData = try Data(contentsOf: manifestPath)
+        let requiresLegacyQwenNormalization = manifestDataRequiresLegacyQwenNormalization(manifestData)
 
         if let manifest = try? decoder.decode(ProfileManifest.self, from: manifestData) {
             let upgradedManifest = upgradeStoredManifest(manifest)
-            if upgradedManifest != manifest {
+            if requiresLegacyQwenNormalization || upgradedManifest != manifest {
                 try writeManifest(upgradedManifest, to: directoryURL)
             }
             return upgradedManifest
@@ -105,12 +106,12 @@ extension ProfileStore {
     }
 
     func upgradeStoredManifest(_ manifest: ProfileManifest) -> ProfileManifest {
-        guard manifest.version < Self.manifestVersion else {
-            return manifest
-        }
+        let normalizedMaterializations = manifest.backendMaterializations.map(normalizeQwenMaterialization)
+        let normalizedArtifacts = manifest.qwenConditioningArtifacts.map(normalizeQwenConditioningArtifactManifest)
+        let normalizedVersion = max(manifest.version, Self.manifestVersion)
 
         return ProfileManifest(
-            version: Self.manifestVersion,
+            version: normalizedVersion,
             profileName: manifest.profileName,
             vibe: manifest.vibe,
             createdAt: manifest.createdAt,
@@ -120,8 +121,50 @@ extension ProfileStore {
             sourceText: manifest.sourceText,
             transcriptProvenance: manifest.transcriptProvenance,
             sampleRate: manifest.sampleRate,
-            backendMaterializations: manifest.backendMaterializations,
-            qwenConditioningArtifacts: manifest.qwenConditioningArtifacts,
+            backendMaterializations: normalizedMaterializations,
+            qwenConditioningArtifacts: normalizedArtifacts,
+        )
+    }
+
+    func manifestDataRequiresLegacyQwenNormalization(_ manifestData: Data) -> Bool {
+        guard let manifestText = String(data: manifestData, encoding: .utf8) else {
+            return false
+        }
+
+        return manifestText.contains(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue)
+            || manifestText.contains(ModelFactory.legacyQwenCustomVoiceResidentModelRepo)
+    }
+
+    func normalizeQwenMaterialization(
+        _ materialization: ProfileMaterializationManifest,
+    ) -> ProfileMaterializationManifest {
+        guard materialization.backend.isQwenFamily else {
+            return materialization
+        }
+
+        return ProfileMaterializationManifest(
+            backend: .qwen3,
+            modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+            createdAt: materialization.createdAt,
+            referenceAudioFile: materialization.referenceAudioFile,
+            referenceText: materialization.referenceText,
+            sampleRate: materialization.sampleRate,
+        )
+    }
+
+    func normalizeQwenConditioningArtifactManifest(
+        _ manifest: QwenConditioningArtifactManifest,
+    ) -> QwenConditioningArtifactManifest {
+        guard manifest.backend.isQwenFamily else {
+            return manifest
+        }
+
+        return QwenConditioningArtifactManifest(
+            backend: .qwen3,
+            modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+            createdAt: manifest.createdAt,
+            artifactVersion: manifest.artifactVersion,
+            artifactFile: manifest.artifactFile,
         )
     }
 

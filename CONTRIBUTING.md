@@ -41,7 +41,7 @@ The current intended runtime shape is:
 
 - a long-lived executable owned by another process
 - newline-delimited JSON over `stdin` and `stdout`
-- resident backend selection between `qwen3`, `qwen3_custom_voice`, and `marvis`
+- resident backend selection between `qwen3` and `marvis`
 - stored voice profiles selected by name
 - text-normalization profiles that can be edited independently
 - persisted runtime configuration for the preferred resident backend
@@ -152,14 +152,18 @@ The same namespace split applies to the default profile store and `text-profiles
 Backend resolution precedence is:
 
 1. explicit `configuration.speechBackend` passed to `SpeakSwiftly.liftoff(...)`
-2. `SPEAKSWIFTLY_SPEECH_BACKEND`
-3. persisted `configuration.json`
+2. persisted `configuration.json`
+3. `SPEAKSWIFTLY_SPEECH_BACKEND`
 4. fallback `.qwen3`
+
+Legacy serialized or environment `qwen3_custom_voice` backend values are still accepted and normalized onto `.qwen3` so existing runtime config and stored profile manifests keep loading cleanly after the backend collapse.
 
 Qwen conditioning strategy values are:
 
 - `.legacyRaw`: keep passing raw `refAudio` and `refText` into the resident Qwen model on every request
 - `.preparedConditioning`: prepare Qwen reference conditioning once, persist it on the profile, cache it in memory after load, and reuse it on later requests
+
+The default runtime configuration now uses `.preparedConditioning`.
 
 The runtime currently reads `qwenConditioningStrategy` only from the explicit or persisted `SpeakSwiftly.Configuration` surface. There is no separate environment-variable override for that setting.
 
@@ -653,7 +657,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter SpeakSw
 
 Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
 
-Run multiple comparison samples per backend:
+Run multiple comparison samples per Qwen conditioning strategy:
 
 ```bash
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite

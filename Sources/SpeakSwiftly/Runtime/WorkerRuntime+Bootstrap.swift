@@ -132,7 +132,7 @@ extension SpeakSwiftly.Runtime {
     static func resolvedQwenConditioningStrategy(
         configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.QwenConditioningStrategy {
-        configuration?.qwenConditioningStrategy ?? .legacyRaw
+        configuration?.qwenConditioningStrategy ?? .preparedConditioning
     }
 
     private static func resolvedPersistedConfiguration(
