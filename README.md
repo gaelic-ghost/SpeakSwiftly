@@ -60,6 +60,11 @@ For package-local validation:
 swift build
 ```
 
+If that SwiftPM lane hits the current vendored `mlx-audio-swift` parser failure in
+`EnglishG2P.swift`, switch to the Xcode-backed validation path in
+[CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same
+plain `swift build` / `swift test` commands.
+
 For real MLX-backed worker runs, publish the Xcode-backed runtime first:
 
 ```bash
@@ -279,6 +284,11 @@ Baseline package verification:
 swift build
 swift test
 ```
+
+If the current vendored `mlx-audio-swift` parser issue blocks that SwiftPM lane,
+use the Xcode-backed validation fallback documented in
+[CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
 
 Real MLX-backed runtime verification starts by publishing the Xcode-backed runtime:
 

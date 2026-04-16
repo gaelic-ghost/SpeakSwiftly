@@ -554,6 +554,13 @@ swift build
 swift test
 ```
 
+When that plain SwiftPM lane fails in the current vendored `mlx-audio-swift`
+checkout with the `EnglishG2P.swift` parser error, treat that as a known
+validation-lane snag instead of a fresh local mystery. Do not keep retrying the
+same `swift build` / `swift test` commands. Switch to the Xcode-backed package
+workspace lane documented below and in
+[`docs/maintainers/validation-lanes.md`](docs/maintainers/validation-lanes.md).
+
 Publish and verify a real Xcode-backed runtime:
 
 ```bash
@@ -618,6 +625,13 @@ For the targeted first-request Marvis tuning lane, the current reliable rerun pa
 ```text
 SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
 ```
+
+The same fallback principle applies to release hardening and narrow package
+validation when SwiftPM is blocked:
+
+1. Use `xcodebuild build-for-testing` on `.swiftpm/xcode/package.xcworkspace`.
+2. Reuse the generated `.xctestrun` file for one targeted `xcodebuild test-without-building` run at a time.
+3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
 
 Long deep-trace playback probe:
 

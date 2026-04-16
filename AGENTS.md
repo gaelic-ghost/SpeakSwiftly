@@ -80,8 +80,10 @@
 - Never run multiple build toolchains, package managers, test runners, or other heavy validation commands at the same time on Gale's machine.
 - Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
+- If `swift build` or `swift test` hit the current vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`, stop retrying the same SwiftPM lane and switch to the Xcode-backed validation path documented in `CONTRIBUTING.md` and `docs/maintainers/validation-lanes.md`.
 - Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
+- For release-grade real-model coverage, Marvis overlap investigation, or any validation pass that needs the current reliable MLX-backed lane, prefer `xcodebuild build-for-testing` on `.swiftpm/xcode/package.xcworkspace` followed by targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`
   - `voice_description`: `A generic, warm, masculine, slow speaking voice.`
