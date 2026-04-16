@@ -78,6 +78,8 @@ xcodebuild test-without-building -quiet \
 The Xcode-backed rebuild was also rerun after updating `TextForSpeech` to
 `v0.17.0`.
 
+Proposed release notes live in `docs/maintainers/v3-0-5-release-notes.md`.
+
 ## Pre-PR Checklist
 
 - ensure `Package.resolved` is committed at `TextForSpeech` `0.17.0`
