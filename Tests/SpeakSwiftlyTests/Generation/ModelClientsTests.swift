@@ -325,6 +325,26 @@ import TextForSpeech
     #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
 }
 
+@Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
+    let configuration = PlaybackController.fragileOverlapWindowConfiguration(
+        tuningProfile: .firstDrainedLiveMarvis,
+        concurrentGenerationTargetMS: 2800,
+        lowWaterTargetMS: 1040,
+    )
+
+    #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
+        holdBufferTargetMS: 3120,
+        requiredStableBufferEventCount: 2,
+    ))
+    #expect(
+        PlaybackController.fragileOverlapWindowConfiguration(
+            tuningProfile: .standard,
+            concurrentGenerationTargetMS: 2800,
+            lowWaterTargetMS: 1040,
+        ) == nil,
+    )
+}
+
 @Test func `concurrent generation stays closed below the claimed reserve target`() {
     #expect(
         PlaybackController.allowsConcurrentGeneration(
@@ -338,6 +358,46 @@ import TextForSpeech
             targetMS: 2700,
         ) == true,
     )
+}
+
+@Test func `fragile overlap window requires a brief healthy hold and re closes when reserve sags`() {
+    let progress = PlaybackController.FragileOverlapWindowProgress(
+        configuration: .init(
+            holdBufferTargetMS: 3120,
+            requiredStableBufferEventCount: 2,
+        ),
+        stableBufferEventCount: 0,
+        hasSatisfiedHold: false,
+    )
+
+    let firstHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3200,
+        concurrentGenerationTargetMS: 2800,
+        fragileOverlapWindowProgress: progress,
+    )
+    #expect(firstHealthyEvent.allowsConcurrentGeneration == false)
+    #expect(firstHealthyEvent.effectiveTargetMS == 3120)
+    #expect(firstHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 1)
+    #expect(firstHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
+
+    let secondHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3250,
+        concurrentGenerationTargetMS: 2800,
+        fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
+    )
+    #expect(secondHealthyEvent.allowsConcurrentGeneration == true)
+    #expect(secondHealthyEvent.effectiveTargetMS == 2800)
+    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
+
+    let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3000,
+        concurrentGenerationTargetMS: 2800,
+        fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
+    )
+    #expect(collapsingReserveEvent.allowsConcurrentGeneration == false)
+    #expect(collapsingReserveEvent.effectiveTargetMS == 3120)
+    #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 0)
+    #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 }
 
 @Test func `adaptive playback thresholds leave warmup after stable chunk cadence`() {
