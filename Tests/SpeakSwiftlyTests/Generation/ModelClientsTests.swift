@@ -7,6 +7,12 @@ import TextForSpeech
 
 // MARK: - Adaptive Playback Thresholds
 
+@Test func `resident backend repos include chatterbox turbo 8bit`() {
+    #expect(ModelFactory.residentModelRepo(for: .qwen3) == ModelFactory.qwenResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
+    #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
+}
+
 @Test func `adaptive playback thresholds seed from text complexity classes`() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(

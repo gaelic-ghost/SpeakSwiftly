@@ -36,12 +36,15 @@ struct MarvisResidentModels {
 
 enum ResidentSpeechModels {
     case qwen3(AnySpeechModel)
+    case chatterboxTurbo(AnySpeechModel)
     case marvis(MarvisResidentModels)
 
     var preloadModelRepos: [String] {
         switch self {
             case .qwen3:
                 [ModelFactory.qwenResidentModelRepo]
+            case .chatterboxTurbo:
+                [ModelFactory.chatterboxResidentModelRepo]
             case .marvis:
                 [ModelFactory.marvisResidentModelRepo]
         }

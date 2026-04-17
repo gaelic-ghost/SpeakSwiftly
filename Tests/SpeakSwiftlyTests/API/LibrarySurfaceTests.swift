@@ -32,6 +32,13 @@ import TextForSpeech
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
 }
 
+@Test func `public configuration supports chatterbox turbo backend`() {
+    let configuration = SpeakSwiftly.Configuration(speechBackend: .chatterboxTurbo)
+
+    #expect(configuration.speechBackend == .chatterboxTurbo)
+    #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+}
+
 @Test func `public configuration round trips to disk`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)

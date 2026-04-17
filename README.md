@@ -31,7 +31,7 @@ SpeakSwiftly currently includes:
 - a typed runtime rooted at `SpeakSwiftly.liftoff(...)`
 - a JSONL worker surface for non-Swift hosts
 - stored voice profiles and text-normalization profiles
-- resident backend switching between `qwen3` and `marvis`
+- resident backend switching between `qwen3`, `chatterbox_turbo`, and `marvis`
 - resident model unload and reload controls
 - retained generated-file and generated-batch artifacts
 
@@ -132,6 +132,8 @@ let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
 For Qwen generation, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile. The default configuration now uses `.preparedConditioning`, and legacy serialized `qwen3_custom_voice` backend values are normalized onto `qwen3` during load.
+
+`chatterbox_turbo` uses the resident 8-bit Chatterbox Turbo model, is currently English-only, and reuses the stored profile reference audio when one is available. When no profile-specific clone audio is needed, the resident model falls back to Chatterbox Turbo's built-in default conditioning.
 
 If a host needs the packaged MLX bundle or metallib path directly, use the support-resource surface:
 
@@ -239,7 +241,7 @@ Representative request shapes:
 {"id":"req-status","op":"get_status"}
 {"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
 {"id":"req-generated-files","op":"list_generated_files"}
-{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}
+{"id":"req-switch","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}
 {"id":"req-reload","op":"reload_models"}
 {"id":"req-unload","op":"unload_models"}
 ```

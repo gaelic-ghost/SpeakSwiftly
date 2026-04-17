@@ -63,6 +63,7 @@ enum GenerationPolicy {
 
 enum ModelFactory {
     static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let chatterboxResidentModelRepo = "mlx-community/chatterbox-turbo-8bit"
     static let legacyQwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
     static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
@@ -76,6 +77,8 @@ enum ModelFactory {
         switch backend {
             case .qwen3:
                 return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
+            case .chatterboxTurbo:
+                return try await .chatterboxTurbo(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .marvis:
                 // Marvis keeps mutable generation caches on the model instance, so each
                 // resident lane needs its own model object even though both lanes load

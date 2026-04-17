@@ -573,6 +573,8 @@ func makeResidentModels(
     switch backend {
         case .qwen3:
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
+        case .chatterboxTurbo:
+            .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .marvis:
             .marvis(
                 MarvisResidentModels(
@@ -669,6 +671,8 @@ func makeRuntime(
                 switch backend {
                     case .qwen3:
                         return .qwen3(model)
+                    case .chatterboxTurbo:
+                        return .chatterboxTurbo(model)
                     case .marvis:
                         return .marvis(
                             MarvisResidentModels(
