@@ -468,6 +468,21 @@ These notes were archived and removed as standalone maintainer docs because they
 - `docs/maintainers/playback-forensics-2026-04-02.md`
   Result: early playback-threshold and adaptive-buffer tuning logs are now historical context rather than active guidance.
 
+### 2026-04-17 backend-planning cleanup
+
+These notes were archived and removed as standalone maintainer docs because their durable outcomes now live in active milestones, current package docs, or the landed runtime implementation.
+
+- `docs/maintainers/marvis-vs-qwen-cloning-plan-2026-04-07.md`
+  Result: the surviving durable conclusion is already captured by milestone 16 and the current profile-routing docs: keep one public profile system and make backend-specific materialization a follow-up instead of a caller-facing split.
+- `docs/maintainers/multi-backend-profile-plan-2026-04-07.md`
+  Result: the package now has one stable logical profile story, backend-specific resident routing, and a narrower remaining follow-up around backend-aware stored materializations tracked in milestone 16.
+- `docs/maintainers/qwen-base-default-migration-plan-2026-04-16.md`
+  Result: the Qwen backend collapse and prepared-conditioning default already landed, so the remaining durable guidance now lives in `CONTRIBUTING.md`, package tests, and milestone 16 follow-up work.
+- `docs/maintainers/v3-1-0-release-prep.md`
+  Result: this unreleased branch note became stale once the Chatterbox follow-up work widened after the original backend-add pass. Fresh release-prep notes should be written against the final chosen tag instead of preserving misleading version-specific prep.
+- `docs/maintainers/v3-1-0-release-notes.md`
+  Result: these unreleased draft notes are superseded by the current branch state and should be recreated for the final chosen release tag instead of preserved as stale pseudo-history.
+
 ### Completed milestone history
 
 - Milestones 0 through 3 established the package, JSONL worker contract, resident runtime, and on-demand voice-profile creation path.

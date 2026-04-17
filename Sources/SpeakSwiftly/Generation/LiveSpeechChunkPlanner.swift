@@ -3,7 +3,7 @@ import NaturalLanguage
 
 // MARK: - LiveSpeechTextChunk
 
-struct LiveSpeechTextChunk: Equatable, Sendable {
+struct LiveSpeechTextChunk: Equatable {
     let index: Int
     let text: String
     let wordCount: Int
@@ -35,6 +35,7 @@ enum LiveSpeechChunkPlanner {
         if chunkTexts.isEmpty {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return [] }
+
             chunkTexts = [trimmed]
         }
 
@@ -62,6 +63,7 @@ enum LiveSpeechChunkPlanner {
 
         func flushCurrentChunk() {
             guard !currentSentences.isEmpty else { return }
+
             chunks.append(currentSentences.joined(separator: " "))
             currentSentences.removeAll(keepingCapacity: true)
             currentWordCount = 0
@@ -126,6 +128,7 @@ enum LiveSpeechChunkPlanner {
 
         func flushCurrentTokens() {
             guard !currentTokens.isEmpty else { return }
+
             chunkedUnits.append(currentTokens.joined(separator: " "))
             currentTokens.removeAll(keepingCapacity: true)
         }
@@ -172,6 +175,7 @@ enum LiveSpeechChunkPlanner {
         func flushCurrentClause() {
             let trimmedClause = currentClause.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedClause.isEmpty else { return }
+
             clauses.append(trimmedClause)
             currentClause.removeAll(keepingCapacity: true)
         }

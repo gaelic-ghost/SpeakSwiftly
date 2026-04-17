@@ -158,7 +158,7 @@ Backend resolution precedence is:
 
 Legacy serialized or environment `qwen3_custom_voice` backend values are still accepted and normalized onto `.qwen3` so existing runtime config and stored profile manifests keep loading cleanly after the backend collapse.
 
-`chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, and uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact.
+`chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact, and relies on runtime-owned text chunking for live playback because upstream Chatterbox synthesis is still one waveform per chunk rather than truly incremental.
 
 The current Chatterbox end-to-end workflow coverage lives in `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
@@ -265,7 +265,7 @@ When JSONL naming changes, update this file and `README.md` in the same pass so 
 
 Current live-playback behavior:
 
-- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
+- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
 - The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_text_profile_style` and update it with `set_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
 - `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.

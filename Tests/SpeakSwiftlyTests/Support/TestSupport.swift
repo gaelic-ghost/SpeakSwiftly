@@ -420,6 +420,7 @@ final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var prepareConditioningCallCount = 0
     private(set) var conditionedGenerationCallCount = 0
     private(set) var lastGenerationParameters: GenerateParameters?
+
     private var recordedTextsStorage = [String]()
 
     private let lock = NSLock()

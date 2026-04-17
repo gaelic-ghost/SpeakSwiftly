@@ -133,7 +133,7 @@ let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 
 For Qwen generation, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile. The default configuration now uses `.preparedConditioning`, and legacy serialized `qwen3_custom_voice` backend values are normalized onto `qwen3` during load.
 
-`chatterbox_turbo` uses the resident 8-bit Chatterbox Turbo model, is currently English-only, and reuses the stored profile reference audio when one is available. When no profile-specific clone audio is needed, the resident model falls back to Chatterbox Turbo's built-in default conditioning.
+`chatterbox_turbo` uses the resident 8-bit Chatterbox Turbo model, is currently English-only, and reuses the stored profile reference audio when one is available. When no profile-specific clone audio is needed, the resident model falls back to Chatterbox Turbo's built-in default conditioning. For live playback, SpeakSwiftly now segments normalized text into speakable chunks up front and synthesizes those chunks sequentially, so Chatterbox can start feeding completed audio into playback without waiting for one full-request waveform.
 
 If a host needs the packaged MLX bundle or metallib path directly, use the support-resource surface:
 
@@ -300,6 +300,8 @@ sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 ```
 
 Extended e2e, trace-capture, and deep-trace workflows are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The serialized `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite` is the current end-to-end Chatterbox lane. It runs silently by default so the release lane stays safe on Gale's machine, and it switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
 ## License
 
