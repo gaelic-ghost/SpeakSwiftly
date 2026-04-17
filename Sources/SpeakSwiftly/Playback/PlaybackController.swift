@@ -506,8 +506,7 @@ actor PlaybackController {
                         trace.name == "buffer_scheduled",
                         !activePlaybackIsRebuffering,
                         let queuedAudioAfterMS = trace.queuedAudioAfterMS,
-                        let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS
-                    {
+                        let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS {
                         applyConcurrentGenerationAdmission(
                             bufferedAudioMS: queuedAudioAfterMS,
                             concurrentGenerationTargetMS: concurrentGenerationTargetMS,
