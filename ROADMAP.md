@@ -150,8 +150,10 @@ Tickets:
 - [ ] Compare the currently pinned `mlx-audio-swift` revision with the latest available tagged release or stable candidate.
 - [ ] Review upstream changes to Qwen3 TTS defaults, generation controls, streaming behavior, and model-loading expectations for any impact on `SpeakSwiftly`.
 - [ ] Preserve upstream `AudioGeneration` event detail through a first-class side-channel, trace stream, or equivalent logging surface instead of collapsing every resident generation path down to raw sample chunks at the first wrapper boundary.
+- [x] Add a first-class chunked live-generation path for non-streaming backends, so `SpeakSwiftly` can segment text up front, synthesize chunk waveforms sequentially, and feed completed audio chunks into playback without waiting for full-request synthesis to finish.
 - [ ] Evaluate whether the current resident backend defaults are still the right MLX choices on current Apple Silicon, and record the latency, memory, and audible tradeoffs explicitly.
 - [ ] Generalize stored Qwen materializations so profiles can load backend-appropriate conditioning material without assuming one hard-coded shape forever.
+- [ ] Make clone auto-transcription available to every cloning-capable backend instead of treating transcript inference as a Qwen-only implementation detail.
 - [ ] Re-run resident playback, profile-generation, and typed-library integration checks against a candidate upgrade in an isolated branch.
 - [ ] Record any concrete reasons to upgrade, defer, or stay pinned, including behavior changes that affect playback stability or generation length.
 
@@ -465,6 +467,21 @@ These notes were archived and removed as standalone maintainer docs because they
   Result: the immediate controller-owned playback-state fix landed, the architecture cleanup landed, and the remaining follow-up is now first-request Marvis tuning.
 - `docs/maintainers/playback-forensics-2026-04-02.md`
   Result: early playback-threshold and adaptive-buffer tuning logs are now historical context rather than active guidance.
+
+### 2026-04-17 backend-planning cleanup
+
+These notes were archived and removed as standalone maintainer docs because their durable outcomes now live in active milestones, current package docs, or the landed runtime implementation.
+
+- `docs/maintainers/marvis-vs-qwen-cloning-plan-2026-04-07.md`
+  Result: the surviving durable conclusion is already captured by milestone 16 and the current profile-routing docs: keep one public profile system and make backend-specific materialization a follow-up instead of a caller-facing split.
+- `docs/maintainers/multi-backend-profile-plan-2026-04-07.md`
+  Result: the package now has one stable logical profile story, backend-specific resident routing, and a narrower remaining follow-up around backend-aware stored materializations tracked in milestone 16.
+- `docs/maintainers/qwen-base-default-migration-plan-2026-04-16.md`
+  Result: the Qwen backend collapse and prepared-conditioning default already landed, so the remaining durable guidance now lives in `CONTRIBUTING.md`, package tests, and milestone 16 follow-up work.
+- `docs/maintainers/v3-1-0-release-prep.md`
+  Result: this unreleased branch note became stale once the Chatterbox follow-up work widened after the original backend-add pass. Fresh release-prep notes should be written against the final chosen tag instead of preserving misleading version-specific prep.
+- `docs/maintainers/v3-1-0-release-notes.md`
+  Result: these unreleased draft notes are superseded by the current branch state and should be recreated for the final chosen release tag instead of preserved as stale pseudo-history.
 
 ### Completed milestone history
 

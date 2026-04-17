@@ -371,6 +371,42 @@ private actor BackendLoadRecorder {
     })
 }
 
+@Test func `switch speech backend can move from qwen to chatterbox turbo`() async throws {
+    let output = OutputRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        speechBackend: .qwen3,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "qwen3"
+        }
+    })
+
+    let switchID = await runtime.switchSpeechBackend(to: .chatterboxTurbo).id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard
+                $0["id"] as? String == switchID,
+                $0["ok"] as? Bool == true,
+                $0["speech_backend"] as? String == "chatterbox_turbo",
+                let status = $0["status"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return status["stage"] as? String == "resident_model_ready"
+                && status["speech_backend"] as? String == "chatterbox_turbo"
+        }
+    })
+}
+
 @Test func `unload and reload models park resident generation until residency returns`() async throws {
     let output = OutputRecorder()
     let backendLoads = BackendLoadRecorder()

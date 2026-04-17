@@ -178,7 +178,7 @@ extension SpeakSwiftly.Runtime {
         switch backend {
             case .marvis:
                 2
-            case .qwen3:
+            case .qwen3, .chatterboxTurbo:
                 1
         }
     }

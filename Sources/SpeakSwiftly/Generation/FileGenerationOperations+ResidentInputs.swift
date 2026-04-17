@@ -15,6 +15,11 @@ extension SpeakSwiftly.Runtime {
             profile: StoredProfile,
             conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         )
+        case chatterboxTurbo(
+            model: AnySpeechModel,
+            profile: StoredProfile,
+            refAudio: MLXArray?,
+        )
         case marvis(
             model: AnySpeechModel,
             profile: StoredProfile,
@@ -86,6 +91,33 @@ extension SpeakSwiftly.Runtime {
                             conditioning: conditioning,
                         )
                 }
+
+            case .chatterboxTurbo:
+                let residentModel = try residentChatterboxModelOrThrow()
+                let materialization = try profile.qwenMaterialization()
+                let refAudioLoadStartedAt = dependencies.now()
+                let refAudio = try dependencies.loadAudioSamples(
+                    materialization.referenceAudioURL,
+                    residentModel.sampleRate,
+                )
+                await logRequestEvent(
+                    "reference_audio_loaded",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "speech_backend": .string(speechBackend.rawValue),
+                        "path": .string(materialization.referenceAudioURL.path),
+                        "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
+                        "sample_rate": .int(residentModel.sampleRate),
+                    ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
+                )
+                try Task.checkCancellation()
+                return .chatterboxTurbo(
+                    model: residentModel,
+                    profile: profile,
+                    refAudio: refAudio,
+                )
 
             case .marvis:
                 let (residentModel, voice) = try residentMarvisModelOrThrow(for: profile.manifest.vibe)
@@ -231,7 +263,10 @@ extension SpeakSwiftly.Runtime {
 extension SpeakSwiftly.Runtime.ResidentSpeechInputs {
     var model: AnySpeechModel {
         switch self {
-            case let .qwenRaw(model, _, _, _), let .qwenPrepared(model, _, _), let .marvis(model, _, _):
+            case let .qwenRaw(model, _, _, _),
+                 let .qwenPrepared(model, _, _),
+                 let .chatterboxTurbo(model, _, _),
+                 let .marvis(model, _, _):
                 model
         }
     }

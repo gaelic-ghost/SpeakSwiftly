@@ -138,6 +138,15 @@ extension SpeakSwiftly.Runtime {
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )
+            case let .chatterboxTurbo(model, _, refAudio):
+                chatterboxGenerationStream(
+                    requestID: requestID,
+                    model: model,
+                    text: text,
+                    refAudio: refAudio,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
             case let .marvis(model, _, voice):
                 marvisGenerationStream(
                     model: model,

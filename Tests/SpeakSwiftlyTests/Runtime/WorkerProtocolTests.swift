@@ -391,6 +391,13 @@ import TextForSpeech
     #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .marvis))
 }
 
+@Test func `decodes chatterbox turbo switch speech backend request`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-switch-chatterbox","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}"#,
+    )
+    #expect(request == .switchSpeechBackend(id: "req-switch-chatterbox", speechBackend: .chatterboxTurbo))
+}
+
 @Test func `decodes reload models request`() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-reload","op":"reload_models"}"#)
     #expect(request == .reloadModels(id: "req-reload"))
