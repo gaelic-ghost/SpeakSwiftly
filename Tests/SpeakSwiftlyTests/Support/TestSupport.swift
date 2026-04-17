@@ -571,7 +571,7 @@ func makeResidentModels(
     chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
     switch backend {
-        case .qwen3, .qwen3CustomVoice:
+        case .qwen3:
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .marvis:
             .marvis(
@@ -638,7 +638,7 @@ func makeRuntime(
     output: OutputRecorder,
     playback: PlaybackSpy,
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
-    qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
+    qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = nil,
     loadedCloneAudioSamples: [Float] = [],
@@ -667,7 +667,7 @@ func makeRuntime(
             }
             if let model = loaded as? AnySpeechModel {
                 switch backend {
-                    case .qwen3, .qwen3CustomVoice:
+                    case .qwen3:
                         return .qwen3(model)
                     case .marvis:
                         return .marvis(

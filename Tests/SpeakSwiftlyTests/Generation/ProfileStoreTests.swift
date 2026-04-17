@@ -420,13 +420,13 @@ import Testing
 
     let stored = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3CustomVoice,
-        modelRepo: ModelFactory.residentModelRepo(for: .qwen3CustomVoice),
+        backend: .qwen3,
+        modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
         conditioning: conditioning,
         createdAt: Date(timeIntervalSince1970: 1_712_800_000),
     )
 
-    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3CustomVoice))
+    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3))
     #expect(stored.manifest.qwenConditioningArtifacts.count == 1)
     #expect(fileManager.fileExists(atPath: artifact.artifactURL.path))
 
@@ -439,4 +439,63 @@ import Testing
     #expect(reloadedConditioning.referenceTextTokenIDs.asArray(Int32.self) == [101, 102, 103])
     #expect(reloadedConditioning.referenceTextTokenIDs.shape == [1, 3])
     #expect(reloadedConditioning.speakerEmbedding?.asArray(Float.self) == [0.25, 0.5])
+}
+
+@Test func `loads and normalizes legacy custom voice qwen artifact metadata`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let profileDirectory = store.profileDirectoryURL(for: "legacy-custom-voice")
+    try fileManager.createDirectory(at: profileDirectory, withIntermediateDirectories: true)
+    try Data([0x52, 0x49, 0x46, 0x46]).write(to: profileDirectory.appendingPathComponent(ProfileStore.audioFileName))
+    try Data("{}".utf8).write(
+        to: profileDirectory.appendingPathComponent("qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json"),
+    )
+
+    let legacyManifestJSON = """
+    {
+      "backendMaterializations" : [
+        {
+          "backend" : "qwen3_custom_voice",
+          "createdAt" : "2026-04-16T00:00:00Z",
+          "modelRepo" : "\(ModelFactory.legacyQwenCustomVoiceResidentModelRepo)",
+          "referenceAudioFile" : "\(ProfileStore.audioFileName)",
+          "referenceText" : "Legacy custom voice transcript",
+          "sampleRate" : 24000
+        }
+      ],
+      "createdAt" : "2026-04-16T00:00:00Z",
+      "modelRepo" : "test-model",
+      "profileName" : "legacy-custom-voice",
+      "qwenConditioningArtifacts" : [
+        {
+          "artifactFile" : "qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json",
+          "artifactVersion" : 1,
+          "backend" : "qwen3_custom_voice",
+          "createdAt" : "2026-04-16T00:00:00Z",
+          "modelRepo" : "\(ModelFactory.legacyQwenCustomVoiceResidentModelRepo)"
+        }
+      ],
+      "sampleRate" : 24000,
+      "sourceKind" : "generated",
+      "sourceText" : "Legacy custom voice transcript",
+      "version" : 5,
+      "vibe" : "femme",
+      "voiceDescription" : "Legacy custom voice profile."
+    }
+    """
+
+    try Data(legacyManifestJSON.utf8).write(to: store.manifestURL(for: profileDirectory))
+
+    let loaded = try store.loadProfile(named: "legacy-custom-voice")
+    let materialization = try loaded.qwenMaterialization(for: .qwen3)
+    let artifact = try #require(loaded.qwenConditioningArtifact(for: .qwen3))
+
+    #expect(materialization.manifest.backend == .qwen3)
+    #expect(materialization.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3))
+    #expect(artifact.manifest.backend == .qwen3)
+    #expect(artifact.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3))
+    #expect(artifact.artifactURL.lastPathComponent == "qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json")
 }

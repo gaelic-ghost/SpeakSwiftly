@@ -63,7 +63,7 @@ enum GenerationPolicy {
 
 enum ModelFactory {
     static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
-    static let qwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
+    static let legacyQwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
     static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
     static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
@@ -74,7 +74,7 @@ enum ModelFactory {
 
     static func loadResidentModels(for backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels {
         switch backend {
-            case .qwen3, .qwen3CustomVoice:
+            case .qwen3:
                 return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .marvis:
                 // Marvis keeps mutable generation caches on the model instance, so each

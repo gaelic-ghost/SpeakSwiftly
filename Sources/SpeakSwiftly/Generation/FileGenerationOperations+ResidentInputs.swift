@@ -45,7 +45,7 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         switch speechBackend {
-            case .qwen3, .qwen3CustomVoice:
+            case .qwen3:
                 let residentModel = try residentQwenModelOrThrow()
                 switch qwenConditioningStrategy {
                     case .legacyRaw:

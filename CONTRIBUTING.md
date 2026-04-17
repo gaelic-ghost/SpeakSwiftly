@@ -41,7 +41,7 @@ The current intended runtime shape is:
 
 - a long-lived executable owned by another process
 - newline-delimited JSON over `stdin` and `stdout`
-- resident backend selection between `qwen3`, `qwen3_custom_voice`, and `marvis`
+- resident backend selection between `qwen3` and `marvis`
 - stored voice profiles selected by name
 - text-normalization profiles that can be edited independently
 - persisted runtime configuration for the preferred resident backend
@@ -152,14 +152,18 @@ The same namespace split applies to the default profile store and `text-profiles
 Backend resolution precedence is:
 
 1. explicit `configuration.speechBackend` passed to `SpeakSwiftly.liftoff(...)`
-2. `SPEAKSWIFTLY_SPEECH_BACKEND`
-3. persisted `configuration.json`
+2. persisted `configuration.json`
+3. `SPEAKSWIFTLY_SPEECH_BACKEND`
 4. fallback `.qwen3`
+
+Legacy serialized or environment `qwen3_custom_voice` backend values are still accepted and normalized onto `.qwen3` so existing runtime config and stored profile manifests keep loading cleanly after the backend collapse.
 
 Qwen conditioning strategy values are:
 
 - `.legacyRaw`: keep passing raw `refAudio` and `refText` into the resident Qwen model on every request
 - `.preparedConditioning`: prepare Qwen reference conditioning once, persist it on the profile, cache it in memory after load, and reuse it on later requests
+
+The default runtime configuration now uses `.preparedConditioning`.
 
 The runtime currently reads `qwenConditioningStrategy` only from the explicit or persisted `SpeakSwiftly.Configuration` surface. There is no separate environment-variable override for that setting.
 
@@ -497,6 +501,13 @@ The eleventh Milestone 22 pass landed on `2026-04-15` as the first explicit over
 - Even with the cleaner rerun, the first audible request was still subjectively too rough to justify fixed follower slowdown as the main policy. The working read is now that the unstable part on Gale's machine is the transition into simultaneous overlap itself, not just the follower's steady-state cadence after overlap opens.
 - The next useful design should therefore stay dynamic rather than fixed. Keep the truthful overlap gate and the explicit follower-cadence role, but add a short-lived `fragile first playback` window for the first drained live Marvis request so the second lane stays parked or lighter until reserve has crossed and briefly held a healthier target, then backs off again if reserve starts collapsing.
 
+The twelfth Milestone 22 pass landed on `2026-04-16` as that first explicit fragile-overlap policy pass.
+
+- That pass kept the scheduler contract narrow and implemented the new behavior inside `PlaybackController` as a short-lived fragile overlap window for the first drained live Marvis request.
+- The first request now has to earn two healthy `buffer_scheduled` updates above a stronger hold target before playback reports `allowsConcurrentGeneration = true`, and that same guard re-engages if buffered reserve later drops back below the healthier hold target.
+- The important architecture result is that overlap control still stays playback-owned and truth-based. The runtime scheduler still sees one yes-or-no admission surface, but the first drained request can now back off from overlap pressure before a full rebuffer pause forms instead of only after crossing the ordinary reserve target once.
+- The focused regression coverage for this pass lives in `Tests/SpeakSwiftlyTests/Generation/ModelClientsTests.swift`, including the new pure admission-resolution checks for the fragile overlap window.
+
 ## Repository Layout
 
 The package source tree is organized by responsibility:
@@ -621,6 +632,7 @@ For the targeted first-request Marvis tuning lane, the current reliable rerun pa
 - direct `swift test` is still blocked by the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`
 - direct `xcodebuild test` does not currently carry `SPEAKSWIFTLY_E2E=1` through the Swift Testing suite gate on its own
 - the working path is `xcodebuild build-for-testing`, then an `.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building` against this exact test identifier:
+- on current Xcode manifests, that override lives under `TestConfigurations -> TestTargets -> EnvironmentVariables`
 
 ```text
 SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
@@ -652,7 +664,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter SpeakSw
 
 Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
 
-Run multiple comparison samples per backend:
+Run multiple comparison samples per Qwen conditioning strategy:
 
 ```bash
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite

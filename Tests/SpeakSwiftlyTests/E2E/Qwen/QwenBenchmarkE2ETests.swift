@@ -2,7 +2,7 @@ import Foundation
 @testable import SpeakSwiftly
 import Testing
 
-private let qwenBenchmarkSchemaVersion = 2
+private let qwenBenchmarkSchemaVersion = 3
 
 // MARK: - SpeakSwiftlyE2ETests.QwenBenchmarkSuite
 
@@ -15,7 +15,7 @@ extension SpeakSwiftlyE2ETests {
         ),
     )
     struct QwenBenchmarkSuite {
-        @Test func `compare resident backends`() async throws {
+        @Test func `compare qwen conditioning strategies`() async throws {
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
@@ -25,12 +25,12 @@ extension SpeakSwiftlyE2ETests {
             var samples = [QwenBenchmarkSample]()
             samples.reserveCapacity(iterations * 2)
 
-            for backend in [SpeakSwiftly.SpeechBackend.qwen3, .qwen3CustomVoice] {
+            for strategy in [SpeakSwiftly.QwenConditioningStrategy.legacyRaw, .preparedConditioning] {
                 for iteration in 1...iterations {
                     try await samples.append(
                         Self.runBenchmarkSample(
                             profileRootURL: sandbox.profileRootURL,
-                            backend: backend,
+                            strategy: strategy,
                             iteration: iteration,
                         ),
                     )
@@ -46,13 +46,13 @@ extension SpeakSwiftlyE2ETests {
                     benchmarkProfileName: Self.benchmarkProfileName,
                     playbackTextCharacterCount: SpeakSwiftlyE2ETests.testingPlaybackText.count,
                 ),
-                backends: QwenBackendBenchmarkReport.make(from: samples),
+                strategies: QwenConditioningStrategyBenchmarkReport.make(from: samples),
             )
             let summaryURL = try Self.writeBenchmarkSummary(summary)
 
             print("SpeakSwiftly qwen benchmark summary: \(summaryURL.path)")
-            for backend in summary.backends {
-                print(backend.prettyDescription)
+            for strategy in summary.strategies {
+                print(strategy.prettyDescription)
             }
         }
     }
@@ -62,7 +62,11 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static let benchmarkProfileName = "benchmark-profile"
 
     static func provisionBenchmarkProfile(in profileRootURL: URL) async throws {
-        try await withBenchmarkRuntime(profileRootURL: profileRootURL, backend: .qwen3) { runtime in
+        try await withBenchmarkRuntime(
+            profileRootURL: profileRootURL,
+            backend: .qwen3,
+            qwenConditioningStrategy: .preparedConditioning,
+        ) { runtime in
             _ = try await awaitResidentReady(on: runtime)
 
             let handle = await runtime.voices.create(
@@ -77,10 +81,14 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
 
     static func runBenchmarkSample(
         profileRootURL: URL,
-        backend: SpeakSwiftly.SpeechBackend,
+        strategy: SpeakSwiftly.QwenConditioningStrategy,
         iteration: Int,
     ) async throws -> QwenBenchmarkSample {
-        try await withBenchmarkRuntime(profileRootURL: profileRootURL, backend: backend) { runtime in
+        try await withBenchmarkRuntime(
+            profileRootURL: profileRootURL,
+            backend: .qwen3,
+            qwenConditioningStrategy: strategy,
+        ) { runtime in
             let preloadMS = try await awaitResidentReady(on: runtime)
             let generatedFile = try await runRequestBenchmark(
                 handle: runtime.generate.audio(
@@ -96,7 +104,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             )
 
             return QwenBenchmarkSample(
-                backend: backend,
+                strategy: strategy,
                 iteration: iteration,
                 residentPreloadMS: preloadMS,
                 generatedFile: generatedFile,
@@ -108,11 +116,13 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static func withBenchmarkRuntime<T>(
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
+        qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
         operation: @escaping @Sendable (SpeakSwiftly.Runtime) async throws -> T,
     ) async throws -> T {
         let runtime = try await makeBenchmarkRuntime(
             profileRootURL: profileRootURL,
             backend: backend,
+            qwenConditioningStrategy: qwenConditioningStrategy,
         )
 
         do {
@@ -128,6 +138,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
     static func makeBenchmarkRuntime(
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
+        qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
     ) async throws -> SpeakSwiftly.Runtime {
         _ = try SpeakSwiftly.SupportResources.mlxBundleURL()
         _ = try SpeakSwiftly.SupportResources.defaultMetallibURL()
@@ -172,6 +183,7 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
             speechBackend: backend,
+            qwenConditioningStrategy: qwenConditioningStrategy,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
@@ -396,7 +408,7 @@ private struct QwenBenchmarkSummary: Codable {
     let generatedAt: Date
     let host: QwenBenchmarkHost
     let settings: QwenBenchmarkSettings
-    let backends: [QwenBackendBenchmarkReport]
+    let strategies: [QwenConditioningStrategyBenchmarkReport]
 }
 
 // MARK: - QwenBenchmarkHost
@@ -438,7 +450,7 @@ private struct QwenBenchmarkSettings: Codable {
     let playbackTextCharacterCount: Int
     let timestampedSummaryPattern: String
     let latestSummaryFilename: String
-    let comparedBackends: [SpeakSwiftly.SpeechBackend]
+    let comparedStrategies: [SpeakSwiftly.QwenConditioningStrategy]
 
     static func current(
         iterations: Int,
@@ -451,15 +463,15 @@ private struct QwenBenchmarkSettings: Codable {
             playbackTextCharacterCount: playbackTextCharacterCount,
             timestampedSummaryPattern: "qwen-resident-benchmark-<ISO8601>.json",
             latestSummaryFilename: "qwen-resident-benchmark-latest.json",
-            comparedBackends: [.qwen3, .qwen3CustomVoice],
+            comparedStrategies: [.legacyRaw, .preparedConditioning],
         )
     }
 }
 
-// MARK: - QwenBackendBenchmarkReport
+// MARK: - QwenConditioningStrategyBenchmarkReport
 
-private struct QwenBackendBenchmarkReport: Codable {
-    let backend: SpeakSwiftly.SpeechBackend
+private struct QwenConditioningStrategyBenchmarkReport: Codable {
+    let strategy: SpeakSwiftly.QwenConditioningStrategy
     let sampleCount: Int
     let residentPreloadMS: QwenMetricSummary
     let generatedFile: QwenRequestBenchmarkAggregate
@@ -468,30 +480,30 @@ private struct QwenBackendBenchmarkReport: Codable {
 
     var prettyDescription: String {
         """
-        \(backend.rawValue): preload \(residentPreloadMS.prettyAverage) ms, file complete \(generatedFile.lifecycle.completedMS.prettyAverage) ms, file first audio \(generatedFile.generation.firstAudioChunkMS.prettyAverage) ms, live complete \(liveSpeech.lifecycle.completedMS.prettyAverage) ms, live first audio \(liveSpeech.generation.firstAudioChunkMS.prettyAverage) ms, live preroll \(liveSpeech.lifecycle.prerollReadyMS.prettyAverage) ms, tokens/s \(generatedFile.generation.tokensPerSecond.prettyAverage), peak memory \(generatedFile.generation.peakMemoryUsageGB.prettyAverage) GB
+        \(strategy.rawValue): preload \(residentPreloadMS.prettyAverage) ms, file complete \(generatedFile.lifecycle.completedMS.prettyAverage) ms, file first audio \(generatedFile.generation.firstAudioChunkMS.prettyAverage) ms, live complete \(liveSpeech.lifecycle.completedMS.prettyAverage) ms, live first audio \(liveSpeech.generation.firstAudioChunkMS.prettyAverage) ms, live preroll \(liveSpeech.lifecycle.prerollReadyMS.prettyAverage) ms, tokens/s \(generatedFile.generation.tokensPerSecond.prettyAverage), peak memory \(generatedFile.generation.peakMemoryUsageGB.prettyAverage) GB
         """
     }
 
     static func make(from samples: [QwenBenchmarkSample]) -> [Self] {
-        Dictionary(grouping: samples, by: \.backend)
-            .map { backend, backendSamples in
+        Dictionary(grouping: samples, by: \.strategy)
+            .map { strategy, strategySamples in
                 Self(
-                    backend: backend,
-                    sampleCount: backendSamples.count,
-                    residentPreloadMS: .make(from: backendSamples.map(\.residentPreloadMS)),
-                    generatedFile: .make(from: backendSamples.map(\.generatedFile)),
-                    liveSpeech: .make(from: backendSamples.map(\.liveSpeech)),
-                    samples: backendSamples.sorted { $0.iteration < $1.iteration },
+                    strategy: strategy,
+                    sampleCount: strategySamples.count,
+                    residentPreloadMS: .make(from: strategySamples.map(\.residentPreloadMS)),
+                    generatedFile: .make(from: strategySamples.map(\.generatedFile)),
+                    liveSpeech: .make(from: strategySamples.map(\.liveSpeech)),
+                    samples: strategySamples.sorted { $0.iteration < $1.iteration },
                 )
             }
-            .sorted { $0.backend.rawValue < $1.backend.rawValue }
+            .sorted { $0.strategy.rawValue < $1.strategy.rawValue }
     }
 }
 
 // MARK: - QwenBenchmarkSample
 
 private struct QwenBenchmarkSample: Codable {
-    let backend: SpeakSwiftly.SpeechBackend
+    let strategy: SpeakSwiftly.QwenConditioningStrategy
     let iteration: Int
     let residentPreloadMS: Double
     let generatedFile: QwenRequestBenchmark

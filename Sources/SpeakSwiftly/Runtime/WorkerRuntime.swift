@@ -364,7 +364,7 @@ public extension SpeakSwiftly {
         init(
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
-            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
+            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,

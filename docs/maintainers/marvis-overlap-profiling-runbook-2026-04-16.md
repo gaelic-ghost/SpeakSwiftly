@@ -98,7 +98,8 @@ xcodebuild build-for-testing -quiet \
 
 The `.xctestrun` file produced by `build-for-testing` does not carry the e2e
 gate and playback trace environment on its own. Patch it before each scenario
-session:
+session. On current Xcode manifests, the override lives under
+`TestConfigurations -> TestTargets -> EnvironmentVariables`:
 
 ```bash
 uv run python - <<'PY'
@@ -113,10 +114,11 @@ xctestrun_path = Path(
 with xctestrun_path.open("rb") as f:
     data = plistlib.load(f)
 
-for target in data.values():
-    env = target.setdefault("EnvironmentVariables", {})
-    env["SPEAKSWIFTLY_E2E"] = "1"
-    env["SPEAKSWIFTLY_PLAYBACK_TRACE"] = "1"
+for config in data.get("TestConfigurations", []):
+    for target in config.get("TestTargets", []):
+        env = target.setdefault("EnvironmentVariables", {})
+        env["SPEAKSWIFTLY_E2E"] = "1"
+        env["SPEAKSWIFTLY_PLAYBACK_TRACE"] = "1"
 
 with xctestrun_path.open("wb") as f:
     plistlib.dump(data, f)
@@ -320,7 +322,6 @@ So a backend such as:
 would fit naturally beside:
 
 - `qwen3`
-- `qwen3_custom_voice`
 - `marvis`
 
 The near-term use case it unlocks is simple:

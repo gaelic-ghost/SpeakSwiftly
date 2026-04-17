@@ -25,6 +25,13 @@ import TextForSpeech
     #expect(configuration.textNormalizer == nil)
 }
 
+@Test func `public configuration defaults qwen to prepared conditioning`() {
+    let configuration = SpeakSwiftly.Configuration()
+
+    #expect(configuration.speechBackend == .qwen3)
+    #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+}
+
 @Test func `public configuration round trips to disk`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -52,6 +59,28 @@ import TextForSpeech
     #expect(throws: SpeakSwiftly.Configuration.LoadError.self) {
         try SpeakSwiftly.Configuration.load(from: missingURL)
     }
+}
+
+@Test func `public configuration normalizes the legacy qwen custom voice backend`() throws {
+    let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let persistenceURL = rootURL.appendingPathComponent("configuration.json")
+    let legacyConfigurationJSON = """
+    {
+      "qwenConditioningStrategy" : "legacy_raw",
+      "speechBackend" : "qwen3_custom_voice"
+    }
+    """
+
+    try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+    try Data(legacyConfigurationJSON.utf8).write(to: persistenceURL, options: .atomic)
+
+    let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
+
+    #expect(loaded.speechBackend == .qwen3)
+    #expect(loaded.qwenConditioningStrategy == .legacyRaw)
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {

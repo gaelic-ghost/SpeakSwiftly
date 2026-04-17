@@ -50,7 +50,7 @@ public extension SpeakSwiftly {
         /// Creates a runtime configuration value.
         public init(
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
-            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .legacyRaw,
+            qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
@@ -64,7 +64,7 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy = try container.decodeIfPresent(
                 SpeakSwiftly.QwenConditioningStrategy.self,
                 forKey: .qwenConditioningStrategy,
-            ) ?? .legacyRaw
+            ) ?? .preparedConditioning
             textNormalizer = nil
         }
 

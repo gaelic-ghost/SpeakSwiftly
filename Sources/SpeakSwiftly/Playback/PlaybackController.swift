@@ -19,6 +19,23 @@ actor PlaybackController {
         let concurrentGenerationTargetMS: Int
     }
 
+    struct FragileOverlapWindowConfiguration: Equatable {
+        let holdBufferTargetMS: Int
+        let requiredStableBufferEventCount: Int
+    }
+
+    struct FragileOverlapWindowProgress: Equatable {
+        let configuration: FragileOverlapWindowConfiguration
+        var stableBufferEventCount: Int
+        var hasSatisfiedHold: Bool
+    }
+
+    struct ConcurrencyAdmissionResolution: Equatable {
+        let allowsConcurrentGeneration: Bool
+        let effectiveTargetMS: Int
+        let fragileOverlapWindowProgress: FragileOverlapWindowProgress?
+    }
+
     struct ActivePlayback {
         let requestID: String
         let task: Task<Void, Never>
@@ -44,6 +61,7 @@ actor PlaybackController {
     private var activePlaybackStableBufferedAudioMS: Int?
     private var activePlaybackStableBufferTargetMS: Int?
     private var activePlaybackConcurrentGenerationTargetMS: Int?
+    private var activePlaybackFragileOverlapWindowProgress: FragileOverlapWindowProgress?
     private var activePlaybackIsRebuffering = false
     private var jobs = [String: LiveSpeechPlaybackState]()
     private var queue = [String]()
@@ -76,6 +94,78 @@ actor PlaybackController {
         targetMS: Int,
     ) -> Bool {
         bufferedAudioMS >= targetMS
+    }
+
+    static func fragileOverlapWindowConfiguration(
+        tuningProfile: PlaybackTuningProfile,
+        concurrentGenerationTargetMS: Int,
+        lowWaterTargetMS: Int,
+    ) -> FragileOverlapWindowConfiguration? {
+        guard tuningProfile == .firstDrainedLiveMarvis else { return nil }
+
+        let additionalHoldReserveMS = min(320, max(240, lowWaterTargetMS / 3))
+        return FragileOverlapWindowConfiguration(
+            holdBufferTargetMS: concurrentGenerationTargetMS + additionalHoldReserveMS,
+            requiredStableBufferEventCount: 2,
+        )
+    }
+
+    static func resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: Int,
+        concurrentGenerationTargetMS: Int,
+        fragileOverlapWindowProgress: FragileOverlapWindowProgress?,
+    ) -> ConcurrencyAdmissionResolution {
+        guard var fragileOverlapWindowProgress else {
+            return ConcurrencyAdmissionResolution(
+                allowsConcurrentGeneration: allowsConcurrentGeneration(
+                    bufferedAudioMS: bufferedAudioMS,
+                    targetMS: concurrentGenerationTargetMS,
+                ),
+                effectiveTargetMS: concurrentGenerationTargetMS,
+                fragileOverlapWindowProgress: nil,
+            )
+        }
+
+        let fragileTargetMS = fragileOverlapWindowProgress.configuration.holdBufferTargetMS
+
+        if fragileOverlapWindowProgress.hasSatisfiedHold {
+            if bufferedAudioMS < fragileTargetMS {
+                fragileOverlapWindowProgress.hasSatisfiedHold = false
+                fragileOverlapWindowProgress.stableBufferEventCount = 0
+                return ConcurrencyAdmissionResolution(
+                    allowsConcurrentGeneration: false,
+                    effectiveTargetMS: fragileTargetMS,
+                    fragileOverlapWindowProgress: fragileOverlapWindowProgress,
+                )
+            }
+
+            return ConcurrencyAdmissionResolution(
+                allowsConcurrentGeneration: true,
+                effectiveTargetMS: concurrentGenerationTargetMS,
+                fragileOverlapWindowProgress: fragileOverlapWindowProgress,
+            )
+        }
+
+        if bufferedAudioMS >= fragileTargetMS {
+            fragileOverlapWindowProgress.stableBufferEventCount += 1
+        } else {
+            fragileOverlapWindowProgress.stableBufferEventCount = 0
+        }
+
+        if fragileOverlapWindowProgress.stableBufferEventCount >= fragileOverlapWindowProgress.configuration.requiredStableBufferEventCount {
+            fragileOverlapWindowProgress.hasSatisfiedHold = true
+            return ConcurrencyAdmissionResolution(
+                allowsConcurrentGeneration: true,
+                effectiveTargetMS: concurrentGenerationTargetMS,
+                fragileOverlapWindowProgress: fragileOverlapWindowProgress,
+            )
+        }
+
+        return ConcurrencyAdmissionResolution(
+            allowsConcurrentGeneration: false,
+            effectiveTargetMS: fragileTargetMS,
+            fragileOverlapWindowProgress: fragileOverlapWindowProgress,
+        )
     }
 
     // MARK: - Binding
@@ -257,6 +347,7 @@ actor PlaybackController {
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
         activePlaybackConcurrentGenerationTargetMS = nil
+        activePlaybackFragileOverlapWindowProgress = nil
         activePlaybackIsRebuffering = false
         playbackState.execution.playbackTask = task
     }
@@ -333,6 +424,7 @@ actor PlaybackController {
         activePlaybackStableBufferedAudioMS = nil
         activePlaybackStableBufferTargetMS = nil
         activePlaybackConcurrentGenerationTargetMS = nil
+        activePlaybackFragileOverlapWindowProgress = nil
         activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
@@ -359,27 +451,48 @@ actor PlaybackController {
                     lowWaterTargetMS: thresholds.lowWaterTargetMS,
                 )
                 activePlaybackConcurrentGenerationTargetMS = admissionThresholds.concurrentGenerationTargetMS
-                activePlaybackStableBufferedAudioMS = startupBufferedAudioMS
-                activePlaybackStableBufferTargetMS = admissionThresholds.concurrentGenerationTargetMS
-                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                if let fragileOverlapWindowConfiguration = Self.fragileOverlapWindowConfiguration(
+                    tuningProfile: requestTuningProfile,
+                    concurrentGenerationTargetMS: admissionThresholds.concurrentGenerationTargetMS,
+                    lowWaterTargetMS: thresholds.lowWaterTargetMS,
+                ) {
+                    activePlaybackFragileOverlapWindowProgress = FragileOverlapWindowProgress(
+                        configuration: fragileOverlapWindowConfiguration,
+                        stableBufferEventCount: 0,
+                        hasSatisfiedHold: false,
+                    )
+                } else {
+                    activePlaybackFragileOverlapWindowProgress = nil
+                }
+                applyConcurrentGenerationAdmission(
                     bufferedAudioMS: startupBufferedAudioMS,
-                    targetMS: admissionThresholds.concurrentGenerationTargetMS,
+                    concurrentGenerationTargetMS: admissionThresholds.concurrentGenerationTargetMS,
                 )
                 activePlaybackIsRebuffering = false
             case .rebufferStarted:
                 activePlaybackIsStableForConcurrentGeneration = false
+                if var fragileOverlapWindowProgress = activePlaybackFragileOverlapWindowProgress {
+                    fragileOverlapWindowProgress.hasSatisfiedHold = false
+                    fragileOverlapWindowProgress.stableBufferEventCount = 0
+                    activePlaybackFragileOverlapWindowProgress = fragileOverlapWindowProgress
+                    activePlaybackStableBufferTargetMS = fragileOverlapWindowProgress.configuration.holdBufferTargetMS
+                }
                 activePlaybackIsRebuffering = true
             case let .rebufferResumed(bufferedAudioMS, thresholds):
-                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
-                    bufferedAudioMS: bufferedAudioMS,
-                    targetMS: thresholds.resumeBufferTargetMS,
-                )
-                activePlaybackStableBufferedAudioMS = bufferedAudioMS
-                activePlaybackStableBufferTargetMS = thresholds.resumeBufferTargetMS
                 activePlaybackConcurrentGenerationTargetMS = thresholds.resumeBufferTargetMS
+                applyConcurrentGenerationAdmission(
+                    bufferedAudioMS: bufferedAudioMS,
+                    concurrentGenerationTargetMS: thresholds.resumeBufferTargetMS,
+                )
                 activePlaybackIsRebuffering = false
             case .starved:
                 activePlaybackIsStableForConcurrentGeneration = false
+                if var fragileOverlapWindowProgress = activePlaybackFragileOverlapWindowProgress {
+                    fragileOverlapWindowProgress.hasSatisfiedHold = false
+                    fragileOverlapWindowProgress.stableBufferEventCount = 0
+                    activePlaybackFragileOverlapWindowProgress = fragileOverlapWindowProgress
+                    activePlaybackStableBufferTargetMS = fragileOverlapWindowProgress.configuration.holdBufferTargetMS
+                }
                 activePlaybackIsRebuffering = true
             case let .trace(trace):
                 guard
@@ -389,14 +502,23 @@ actor PlaybackController {
                     let queuedAudioAfterMS = trace.queuedAudioAfterMS,
                     let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS
                 else {
+                    if
+                        trace.name == "buffer_scheduled",
+                        !activePlaybackIsRebuffering,
+                        let queuedAudioAfterMS = trace.queuedAudioAfterMS,
+                        let concurrentGenerationTargetMS = activePlaybackConcurrentGenerationTargetMS
+                    {
+                        applyConcurrentGenerationAdmission(
+                            bufferedAudioMS: queuedAudioAfterMS,
+                            concurrentGenerationTargetMS: concurrentGenerationTargetMS,
+                        )
+                    }
                     break
                 }
 
-                activePlaybackStableBufferedAudioMS = queuedAudioAfterMS
-                activePlaybackStableBufferTargetMS = concurrentGenerationTargetMS
-                activePlaybackIsStableForConcurrentGeneration = Self.allowsConcurrentGeneration(
+                applyConcurrentGenerationAdmission(
                     bufferedAudioMS: queuedAudioAfterMS,
-                    targetMS: concurrentGenerationTargetMS,
+                    concurrentGenerationTargetMS: concurrentGenerationTargetMS,
                 )
             case .firstChunk,
                  .queueDepthLow,
@@ -408,5 +530,20 @@ actor PlaybackController {
                  .bufferShapeSummary:
                 break
         }
+    }
+
+    private func applyConcurrentGenerationAdmission(
+        bufferedAudioMS: Int,
+        concurrentGenerationTargetMS: Int,
+    ) {
+        let resolution = Self.resolveConcurrentGenerationAdmission(
+            bufferedAudioMS: bufferedAudioMS,
+            concurrentGenerationTargetMS: concurrentGenerationTargetMS,
+            fragileOverlapWindowProgress: activePlaybackFragileOverlapWindowProgress,
+        )
+        activePlaybackStableBufferedAudioMS = bufferedAudioMS
+        activePlaybackStableBufferTargetMS = resolution.effectiveTargetMS
+        activePlaybackIsStableForConcurrentGeneration = resolution.allowsConcurrentGeneration
+        activePlaybackFragileOverlapWindowProgress = resolution.fragileOverlapWindowProgress
     }
 }
