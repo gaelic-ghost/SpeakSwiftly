@@ -729,7 +729,7 @@ final class WorkerProcess: @unchecked Sendable {
         }
 
         process.executableURL = executableURL
-        process.standardInput = stdinPipe
+        process.standardInput = stdinPipe.fileHandleForReading
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         process.currentDirectoryURL = executableURL.deletingLastPathComponent()

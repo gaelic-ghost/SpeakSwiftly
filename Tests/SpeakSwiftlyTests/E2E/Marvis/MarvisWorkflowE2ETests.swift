@@ -350,16 +350,18 @@ extension SpeakSwiftlyE2ETests {
                     let details = $0["details"] as? [String: Any],
                     let activeGenerationRequestIDs = details["active_generation_request_ids"] as? String,
                     let activeMarvisGenerationLanes = details["active_marvis_generation_lanes"] as? String,
+                    let queuedGenerationRequestIDs = details["queued_generation_request_ids"] as? String,
                     let parkedGenerationReasons = details["parked_generation_reasons"] as? String
                 else {
                     return false
                 }
 
                 return activeGenerationRequestIDs.contains(lanes[0].liveID)
-                    && activeGenerationRequestIDs.contains(lanes[1].liveID)
+                    && !activeGenerationRequestIDs.contains(lanes[1].liveID)
                     && activeMarvisGenerationLanes.contains("\(lanes[0].liveID):\(lanes[0].expectedVoice)")
-                    && activeMarvisGenerationLanes.contains("\(lanes[1].liveID):\(lanes[1].expectedVoice)")
-                    && parkedGenerationReasons.contains("\(lanes[2].liveID):waiting_for_marvis_generation_lane")
+                    && queuedGenerationRequestIDs.contains(lanes[1].liveID)
+                    && parkedGenerationReasons.contains("\(lanes[1].liveID):waiting_for_playback_stability")
+                    && queuedGenerationRequestIDs.contains(lanes[2].liveID)
             } != nil)
 
             for lane in lanes {
