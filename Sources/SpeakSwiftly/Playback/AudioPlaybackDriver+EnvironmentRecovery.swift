@@ -1,6 +1,4 @@
-@preconcurrency import AppKit
 @preconcurrency import AVFoundation
-import CoreAudio
 import Foundation
 import TextForSpeech
 
@@ -30,95 +28,8 @@ extension AudioPlaybackDriver {
         }
     }
 
-    func installWorkspaceObservers() {
-        let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
-
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.willSleepNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleSystemSleepStateChange(isSleeping: true)
-                }
-            },
-        )
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.didWakeNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleSystemSleepStateChange(isSleeping: false)
-                }
-            },
-        )
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.screensDidSleepNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleScreenSleepStateChange(isSleeping: true)
-                }
-            },
-        )
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.screensDidWakeNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleScreenSleepStateChange(isSleeping: false)
-                }
-            },
-        )
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.sessionDidResignActiveNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleSessionActivityChange(isActive: false)
-                }
-            },
-        )
-        workspaceObservers.append(
-            workspaceNotificationCenter.addObserver(
-                forName: NSWorkspace.sessionDidBecomeActiveNotification,
-                object: nil,
-                queue: nil,
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.handleSessionActivityChange(isActive: true)
-                }
-            },
-        )
-    }
-
-    func installDefaultOutputDeviceObserver() {
-        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            Task { @MainActor [weak self] in
-                self?.handleDefaultOutputDeviceChange()
-            }
-        }
-        defaultOutputDeviceListener = listener
-        AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject),
-            &defaultOutputDeviceAddress,
-            DispatchQueue.main,
-            listener,
-        )
-    }
-
-    func handleDefaultOutputDeviceChange() {
+    func handleObservedOutputDeviceChange(currentDevice: String?) {
         let previousDevice = lastObservedOutputDeviceDescription
-        let currentDevice = currentDefaultAudioPlaybackDeviceDescription()
         guard previousDevice != currentDevice else { return }
 
         lastObservedOutputDeviceDescription = currentDevice

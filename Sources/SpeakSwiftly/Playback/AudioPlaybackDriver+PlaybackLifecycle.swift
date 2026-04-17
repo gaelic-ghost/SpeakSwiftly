@@ -102,8 +102,8 @@ extension AudioPlaybackDriver {
     }
 
     func rebuildEngine(sampleRate: Double) async throws {
-        tearDownPlaybackHardware(leavingArbitration: true)
-        try await beginRoutingArbitration()
+        tearDownPlaybackHardware(leavingPlaybackEnvironment: true)
+        try await playbackEnvironment.prepareForPlaybackStart()
 
         let engine = AVAudioEngine()
         let node = AVAudioPlayerNode()
@@ -136,32 +136,15 @@ extension AudioPlaybackDriver {
         playerNode?.reset()
     }
 
-    func tearDownPlaybackHardware(leavingArbitration: Bool) {
+    func tearDownPlaybackHardware(leavingPlaybackEnvironment: Bool) {
         playerNode?.stop()
         audioEngine?.stop()
         playerNode = nil
         audioEngine = nil
         streamingFormat = nil
         engineSampleRate = nil
-        if leavingArbitration {
-            routingArbitration.leave()
-        }
-    }
-
-    func beginRoutingArbitration() async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            routingArbitration.begin(category: .playback) { _, error in
-                if let error {
-                    continuation.resume(
-                        throwing: WorkerError(
-                            code: .audioPlaybackFailed,
-                            message: "SpeakSwiftly could not begin macOS audio routing arbitration before starting local playback. \(error.localizedDescription)",
-                        ),
-                    )
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
+        if leavingPlaybackEnvironment {
+            playbackEnvironment.finishPlayback()
         }
     }
 
