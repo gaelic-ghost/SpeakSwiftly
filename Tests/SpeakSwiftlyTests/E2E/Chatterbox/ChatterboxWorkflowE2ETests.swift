@@ -28,9 +28,9 @@ extension SpeakSwiftlyE2ETests {
                     vibe: .masc,
                     voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
                 )
-                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                try await SpeakSwiftlyE2ETests.runLiveSpeechForCurrentE2EMode(
                     on: worker,
-                    id: "req-live-chatterbox-voice-design-silent",
+                    id: "req-live-chatterbox-voice-design",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
                     profileName: profileName,
                 )
@@ -92,9 +92,9 @@ extension SpeakSwiftlyE2ETests {
                 #expect(storedProfile.manifest.transcriptProvenance?.source == .provided)
                 #expect(storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
 
-                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                try await SpeakSwiftlyE2ETests.runLiveSpeechForCurrentE2EMode(
                     on: worker,
-                    id: "req-live-chatterbox-clone-provided-transcript-silent",
+                    id: "req-live-chatterbox-clone-provided-transcript",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
                     profileName: cloneProfileName,
                 )
@@ -154,9 +154,9 @@ extension SpeakSwiftlyE2ETests {
                 #expect(!inferredTranscript.isEmpty)
                 #expect(SpeakSwiftlyE2ETests.transcriptLooksCloseToCloneSource(inferredTranscript))
 
-                try await SpeakSwiftlyE2ETests.runSilentSpeech(
+                try await SpeakSwiftlyE2ETests.runLiveSpeechForCurrentE2EMode(
                     on: worker,
-                    id: "req-live-chatterbox-clone-inferred-transcript-silent",
+                    id: "req-live-chatterbox-clone-inferred-transcript",
                     text: SpeakSwiftlyE2ETests.testingPlaybackText,
                     profileName: cloneProfileName,
                 )

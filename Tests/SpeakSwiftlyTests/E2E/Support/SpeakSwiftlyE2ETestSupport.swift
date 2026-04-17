@@ -254,6 +254,29 @@ extension SpeakSwiftlyE2ETests {
         } != nil)
     }
 
+    static func runLiveSpeechForCurrentE2EMode(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String,
+    ) async throws {
+        if isAudibleE2EEnabled {
+            try await runAudibleSpeech(
+                on: worker,
+                id: id,
+                text: text,
+                profileName: profileName,
+            )
+        } else {
+            try await runSilentSpeech(
+                on: worker,
+                id: id,
+                text: text,
+                profileName: profileName,
+            )
+        }
+    }
+
     static func runAudibleSpeech(
         on worker: WorkerProcess,
         id: String,

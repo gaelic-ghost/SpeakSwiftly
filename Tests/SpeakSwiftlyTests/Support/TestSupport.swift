@@ -420,8 +420,13 @@ final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var prepareConditioningCallCount = 0
     private(set) var conditionedGenerationCallCount = 0
     private(set) var lastGenerationParameters: GenerateParameters?
+    private var recordedTextsStorage = [String]()
 
     private let lock = NSLock()
+
+    var recordedTexts: [String] {
+        lock.withLock { recordedTextsStorage }
+    }
 
     func record(
         text: String,
@@ -436,6 +441,7 @@ final class ResidentModelRecorder: @unchecked Sendable {
             lastRefAudioWasProvided = refAudioWasProvided
             lastRefText = refText
             lastGenerationParameters = generationParameters
+            recordedTextsStorage.append(text)
         }
     }
 
@@ -462,6 +468,7 @@ final class ResidentModelRecorder: @unchecked Sendable {
             lastRefAudioWasProvided = false
             lastRefText = nil
             lastGenerationParameters = generationParameters
+            recordedTextsStorage.append(text)
         }
     }
 }

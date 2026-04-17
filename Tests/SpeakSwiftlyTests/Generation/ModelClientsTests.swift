@@ -1287,6 +1287,104 @@ import TextForSpeech
     #expect(normalized.contains("sample Rate"))
 }
 
+@Test func `live speech chunk planner keeps the first chunk short and packs later chunks`() {
+    let text = """
+    Please read this first sentence slowly and clearly for testing.
+    Please read this second sentence slowly and clearly for testing.
+    Please read this third sentence slowly and clearly for testing.
+    Please read this fourth sentence slowly and clearly for testing.
+    """
+
+    let chunks = LiveSpeechChunkPlanner.chunks(for: text)
+
+    #expect(chunks.count == 3)
+    #expect(chunks.map(\.text) == [
+        "Please read this first sentence slowly and clearly for testing.",
+        "Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
+        "Please read this fourth sentence slowly and clearly for testing.",
+    ])
+    #expect(chunks[0].wordCount < chunks[1].wordCount)
+    #expect(chunks[1].wordCount > chunks[2].wordCount)
+}
+
+@Test func `live speech chunk planner splits oversized single sentences at clause boundaries`() {
+    let text = SpeakSwiftlyE2ETests.testingPlaybackText
+
+    let chunks = LiveSpeechChunkPlanner.chunks(for: text)
+
+    #expect(chunks.count == 3)
+    #expect(chunks.map(\.text) == [
+        "Hello from the real resident SpeakSwiftly playback path.",
+        "This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing,",
+        "and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.",
+    ])
+    #expect(chunks[0].wordCount < chunks[1].wordCount)
+    #expect(chunks[1].wordCount >= chunks[2].wordCount)
+}
+
+@Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let text = """
+    Please read this first sentence slowly and clearly for testing.
+    Please read this second sentence slowly and clearly for testing.
+    Please read this third sentence slowly and clearly for testing.
+    Please read this fourth sentence slowly and clearly for testing.
+    """
+    let expectedChunkTexts = LiveSpeechChunkPlanner.chunks(for: text).map(\.text)
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        speechBackend: .chatterboxTurbo,
+        audioLoadRecorder: residentRecorder,
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: residentRecorder, chunkCount: 1)
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-chatterbox","op":"generate_speech","text":"Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing.","profile_name":"default-femme","text_format":"plain_text"}
+        """#,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-chatterbox"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    #expect(residentRecorder.recordedTexts == expectedChunkTexts)
+    #expect(residentRecorder.recordedTexts.count == 3)
+    #expect(residentRecorder.lastRefAudioWasProvided == true)
+    #expect(residentRecorder.lastRefText == nil)
+}
+
 // MARK: - Sample Shaping
 
 @Test func `shape playback samples smooths boundary jumps and sanitizes invalid values`() {

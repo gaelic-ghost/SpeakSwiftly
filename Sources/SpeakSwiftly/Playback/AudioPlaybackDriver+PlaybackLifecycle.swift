@@ -46,6 +46,8 @@ extension AudioPlaybackDriver {
                         (
                             playedBackCallbackCount: state.playedBackCallbackCount,
                             queuedAudioMS: state.queuedAudioMS(sampleRate: sampleRate),
+                            queuedBufferCount: state.queuedBuffers.count,
+                            generationFinished: state.generationFinished,
                             isPausedManually: self.isPlaybackPausedManually,
                         )
                     }
@@ -63,6 +65,10 @@ extension AudioPlaybackDriver {
                     }
                     if snapshot.playedBackCallbackCount != lastPlayedBackCallbackCount {
                         lastPlayedBackCallbackCount = snapshot.playedBackCallbackCount
+                        lastProgressAt = Date()
+                        continue
+                    }
+                    if snapshot.generationFinished, snapshot.queuedBufferCount <= 1 {
                         lastProgressAt = Date()
                         continue
                     }

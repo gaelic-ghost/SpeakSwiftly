@@ -160,7 +160,7 @@ Legacy serialized or environment `qwen3_custom_voice` backend values are still a
 
 `chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, and uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact.
 
-The current Chatterbox end-to-end workflow coverage lives in `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks.
+The current Chatterbox end-to-end workflow coverage lives in `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
 Qwen conditioning strategy values are:
 
