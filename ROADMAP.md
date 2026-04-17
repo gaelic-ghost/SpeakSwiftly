@@ -126,6 +126,7 @@ Tickets:
 - [ ] Audit the `SpeakSwiftly` public API for the minimum supported downstream surface before advertising broader package distribution.
 - [ ] Document SwiftPM dependency examples for both the library product and the executable product in the README.
 - [ ] Add a package-consumer verification path that exercises dependency resolution from a clean external package instead of relying only on sibling-checkout integration.
+- [ ] Land the playback-platform seam described in `docs/maintainers/ios-portability-plan-2026-04-17.md` before widening supported platforms beyond macOS.
 - [ ] Decide whether package-registry publication is in scope or whether Git-based SwiftPM distribution is the intended first supported path.
 - [ ] Tighten release notes and release-checklist language so package consumers can tell when a change is semver-safe versus when migration work is required.
 - [ ] Document any remaining Xcode-built runtime caveats clearly so distributed package consumers understand where SwiftPM alone is sufficient and where it is not.
