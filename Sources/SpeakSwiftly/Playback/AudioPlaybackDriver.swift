@@ -314,8 +314,7 @@ final class AudioPlaybackDriver {
                     }
 
                     if state.generationFinished, currentQueuedAudioMS == 0 {
-                        state.drainContinuation?.resume()
-                        state.drainContinuation = nil
+                        state.resumeDrainContinuation()
                     }
                 }
             }

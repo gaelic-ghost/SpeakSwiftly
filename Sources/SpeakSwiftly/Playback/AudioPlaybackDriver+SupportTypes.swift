@@ -859,6 +859,28 @@ final class AudioPlaybackRequestState {
         queueDepthSampleCount += 1
     }
 
+    func installDrainContinuation(
+        _ continuation: CheckedContinuation<Void, Error>,
+        sampleRate: Double,
+    ) {
+        drainContinuation = continuation
+        if queuedAudioMS(sampleRate: sampleRate) == 0 {
+            resumeDrainContinuation()
+        }
+    }
+
+    func resumeDrainContinuation() {
+        guard let drainContinuation else { return }
+        self.drainContinuation = nil
+        drainContinuation.resume()
+    }
+
+    func resumeDrainContinuation(throwing error: any Error) {
+        guard let drainContinuation else { return }
+        self.drainContinuation = nil
+        drainContinuation.resume(throwing: error)
+    }
+
     func enqueueBuffer(
         _ pcmBuffer: AVAudioPCMBuffer,
         frameCount: Int,

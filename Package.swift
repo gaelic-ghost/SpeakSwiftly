@@ -62,4 +62,7 @@ let package = Package(
             dependencies: ["SpeakSwiftly"],
         ),
     ],
+    swiftLanguageModes: [
+        .v6,
+    ],
 )
