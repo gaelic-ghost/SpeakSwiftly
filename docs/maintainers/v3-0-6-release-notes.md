@@ -1,10 +1,4 @@
-# Release Candidate Notes
-
-Date: 2026-04-17
-
-These are the current branch-level release notes before the final tag is chosen.
-Rewrite the heading and any tag-specific wording when the real release version
-is selected.
+# v3.0.6 Release Notes
 
 ## What changed
 
@@ -25,7 +19,7 @@ is selected.
 
 - none
 
-## Migration Or Upgrade Notes
+## Migration or upgrade notes
 
 - `chatterbox_turbo` is currently English-only
 - Chatterbox uses stored profile reference audio directly; it does not yet
@@ -39,7 +33,11 @@ is selected.
   parser failure, switch to the documented repo-root Xcode-backed package lane
   instead of retrying the same SwiftPM command
 
-## Verification Performed
+## Verification performed
+
+```bash
+sh scripts/repo-maintenance/validate-all.sh
+```
 
 ```bash
 xcodebuild build-for-testing \
