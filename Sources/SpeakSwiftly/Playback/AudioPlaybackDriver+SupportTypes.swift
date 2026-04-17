@@ -871,12 +871,14 @@ final class AudioPlaybackRequestState {
 
     func resumeDrainContinuation() {
         guard let drainContinuation else { return }
+
         self.drainContinuation = nil
         drainContinuation.resume()
     }
 
     func resumeDrainContinuation(throwing error: any Error) {
         guard let drainContinuation else { return }
+
         self.drainContinuation = nil
         drainContinuation.resume(throwing: error)
     }
