@@ -395,6 +395,8 @@ private actor EnvironmentEventRecorder {
                 .screenSleepStateChanged(isSleeping: false),
                 .sessionActivityChanged(isActive: false),
                 .sessionActivityChanged(isActive: true),
+                .interruptionStateChanged(isInterrupted: true, shouldResume: nil),
+                .interruptionStateChanged(isInterrupted: false, shouldResume: true),
                 .recoveryStateChanged(
                     reason: "output_device_change",
                     stage: "recovered",
@@ -431,6 +433,23 @@ private actor EnvironmentEventRecorder {
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             $0["event"] as? String == "playback_session_resigned_active"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            $0["event"] as? String == "playback_interruption_began"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_interruption_ended",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["should_resume"] as? Bool == true
         }
     })
     #expect(await waitUntil {

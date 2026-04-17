@@ -44,6 +44,16 @@ SpeakSwiftly is a standard Swift package with two direct dependencies:
 - [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech)
 - [`mlx-audio-swift`](https://github.com/gaelic-ghost/mlx-audio-swift)
 
+The package manifest currently declares:
+
+- `macOS 15+`
+- `iOS 17+`
+
+That platform widening is library-first. The typed `SpeakSwiftly` library now
+enters the package graph for both platforms, while the long-lived worker and the
+release-grade MLX verification flow are still maintained as macOS-first
+surfaces.
+
 Library consumers can add the package from GitHub:
 
 ```swift

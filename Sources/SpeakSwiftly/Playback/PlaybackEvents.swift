@@ -29,6 +29,7 @@ enum PlaybackEnvironmentEvent {
     case outputDeviceObserved(currentDevice: String?)
     case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
     case engineConfigurationChanged(engineIsRunning: Bool)
+    case interruptionStateChanged(isInterrupted: Bool, shouldResume: Bool?)
     case systemSleepStateChanged(isSleeping: Bool)
     case screenSleepStateChanged(isSleeping: Bool)
     case sessionActivityChanged(isActive: Bool)

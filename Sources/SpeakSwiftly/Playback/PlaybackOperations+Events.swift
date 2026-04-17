@@ -213,6 +213,21 @@ extension SpeakSwiftly.Runtime {
                         "had_active_request": .bool(activeRequest != nil),
                     ],
                 )
+            case let .interruptionStateChanged(isInterrupted, shouldResume):
+                var details: [String: LogValue] = [
+                    "is_interrupted": .bool(isInterrupted),
+                    "had_active_request": .bool(activeRequest != nil),
+                ]
+                if let shouldResume {
+                    details["should_resume"] = .bool(shouldResume)
+                }
+                await logEvent(
+                    isInterrupted ? "playback_interruption_began" : "playback_interruption_ended",
+                    requestID: requestID,
+                    op: op,
+                    profileName: profileName,
+                    details: details,
+                )
             case let .systemSleepStateChanged(isSleeping):
                 await logEvent(
                     isSleeping ? "playback_system_sleep_started" : "playback_system_woke",

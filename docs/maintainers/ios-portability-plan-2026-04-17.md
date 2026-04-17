@@ -9,8 +9,24 @@ implementation order for making `SpeakSwiftly` a realistic iOS-capable Swift
 package.
 
 This is a portability plan, not a claim that the package is already close to
-shipping on iOS. The package is still explicitly macOS-only today, and the main
-reason is the playback runtime.
+shipping on iOS. The package now resolves for both macOS and iOS, but the
+remaining work is still concentrated in playback behavior, platform-aware
+validation, and honest operator guidance around which surfaces are library-first
+versus macOS worker-first.
+
+## Progress Update
+
+As of 2026-04-17, the first portability passes are now in place:
+
+- the playback runtime uses an explicit platform environment seam
+- macOS environment ownership lives in a dedicated adapter
+- the package now includes an initial iOS `AVAudioSession`-based environment
+  adapter
+- `Package.swift` now declares both `.macOS(.v15)` and `.iOS(.v17)`
+
+That means the plan has moved past "make the package graph admit iOS at all" and
+into "prove the iOS path honestly and keep the worker-facing macOS story
+explicit."
 
 ## Documented Apple Constraints
 
@@ -47,66 +63,53 @@ organization and playback-environment modeling, not in package-selection churn.
 
 ## Hard Blockers In The Current Source Tree
 
-### 1. The package manifest is macOS-only
+### 1. The package manifest was macOS-only
 
-`Package.swift` currently declares only:
+This blocker is now resolved. `Package.swift` declares:
 
 - `.macOS(.v15)`
+- `.iOS(.v17)`
 
-That is the first hard stop. iOS cannot enter the package graph until the
-manifest is widened.
+The remaining question is not whether SwiftPM can admit iOS consumers, but
+whether the iOS playback path is honest enough to keep that manifest widening
+accurate.
 
-### 2. Playback imports AppKit directly
+### 2. Playback used to import AppKit directly
 
-These files currently import AppKit:
+This blocker is also resolved. Shared playback files no longer import AppKit
+directly. AppKit and CoreAudio ownership now live in
+`Sources/SpeakSwiftly/Playback/MacOSPlaybackEnvironmentCoordinator.swift`.
 
-- `Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift`
-- `Sources/SpeakSwiftly/Playback/AudioPlaybackDriver+EnvironmentRecovery.swift`
+### 3. macOS recovery is modeled around `NSWorkspace`
 
-That means the playback target as written cannot compile for iOS.
+That is still true, but it is no longer a shared-target blocker. The
+`NSWorkspace` observer model now sits behind the macOS-specific playback
+environment adapter instead of leaking into the platform-neutral playback core.
 
-### 3. Playback recovery is modeled around `NSWorkspace`
+### 4. macOS output-device tracking is modeled around CoreAudio system objects
 
-`AudioPlaybackDriver+EnvironmentRecovery.swift` currently listens for:
+That is still the macOS story, and it is the right place for it. CoreAudio
+output-device inspection no longer lives in the shared playback files; it now
+belongs to the macOS playback-environment adapter.
 
-- system sleep and wake
-- screen sleep and wake
-- session resign-active and become-active
+### 5. Playback startup used to assume macOS routing arbitration
 
-Those are all driven through `NSWorkspace.shared.notificationCenter`, which is a
-desktop environment model. iOS does not offer the same lifecycle surface.
+That is now isolated as well. The shared playback lifecycle no longer owns
+`AVAudioRoutingArbiter` directly; the macOS adapter handles it, while the iOS
+adapter activates an `AVAudioSession` instead.
 
-### 4. Output-device tracking is modeled around macOS CoreAudio system objects
+### 6. The iOS audio-session model is now deliberately minimal
 
-These files use `AudioObject*` APIs and the default output-device system object:
+The package now contains an initial iOS playback environment adapter based on
+`AVAudioSession`, including:
 
-- `Sources/SpeakSwiftly/Playback/PlaybackConfiguration.swift`
-- `Sources/SpeakSwiftly/Playback/AudioPlaybackDriver.swift`
-- `Sources/SpeakSwiftly/Playback/AudioPlaybackDriver+EnvironmentRecovery.swift`
+- playback-category activation
+- route-change observation
+- interruption observation
+- interruption-driven playback recovery hints
 
-That device-inspection model is tied to macOS output-device ownership. It is
-not the iOS route and interruption model.
-
-### 5. Playback startup explicitly assumes macOS routing arbitration
-
-`AudioPlaybackDriver+PlaybackLifecycle.swift` currently begins playback through
-`AVAudioRoutingArbiter` and even emits a user-facing error that says:
-
-- `macOS audio routing arbitration`
-
-That path is not the right primitive for iOS playback startup.
-
-### 6. There is no iOS audio-session model in the package yet
-
-The current `Sources/SpeakSwiftly` tree does not contain:
-
-- `AVAudioSession`
-- route-change handling
-- interruption handling
-- iOS-style audio-session activation or category management
-
-So even after removing macOS-only imports, the package would still be missing
-the native playback-environment behavior iOS expects.
+That is enough to make the playback seam honest, but it is still an early iOS
+path rather than a claim of polished feature parity with the macOS worker flow.
 
 ## What Already Looks Portable
 

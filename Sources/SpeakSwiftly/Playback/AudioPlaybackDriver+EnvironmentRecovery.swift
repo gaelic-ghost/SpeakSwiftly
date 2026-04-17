@@ -81,6 +81,26 @@ extension AudioPlaybackDriver {
         emitEnvironmentEvent(.sessionActivityChanged(isActive: isActive))
     }
 
+    func handleInterruptionStateChange(isInterrupted: Bool, shouldResume: Bool?) {
+        markEnvironmentInstability()
+        emitEnvironmentEvent(
+            .interruptionStateChanged(
+                isInterrupted: isInterrupted,
+                shouldResume: shouldResume,
+            ),
+        )
+
+        guard activeRequestState != nil else { return }
+
+        if isInterrupted {
+            playerNode?.pause()
+            return
+        }
+
+        guard shouldResume != false else { return }
+        beginPlaybackRecovery(reason: .audioSessionInterruption)
+    }
+
     func emitEnvironmentEvent(_ event: PlaybackEnvironmentEvent) {
         guard let environmentEventSink else { return }
 
@@ -186,7 +206,7 @@ extension AudioPlaybackDriver {
         interruptActivePlayback(
             with: WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback could not recover after macOS reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(AudioPlaybackConfiguration.recoveryMaximumAttempts) times, but the output route never stabilized enough to resume the active request.",
+                message: "Live playback could not recover after the playback environment reported a \(reason.rawValue) event. SpeakSwiftly attempted to rebuild the audio engine \(AudioPlaybackConfiguration.recoveryMaximumAttempts) times, but the active route never stabilized enough to resume the request.",
             ),
         )
     }

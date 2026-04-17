@@ -57,4 +57,5 @@ enum AudioPlaybackRecoveryReason: String {
     case systemWake = "system_wake"
     case outputDeviceChange = "output_device_change"
     case engineConfigurationChange = "engine_configuration_change"
+    case audioSessionInterruption = "audio_session_interruption"
 }

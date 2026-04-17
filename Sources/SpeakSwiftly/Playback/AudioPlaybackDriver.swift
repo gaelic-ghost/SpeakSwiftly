@@ -47,9 +47,10 @@ final class AudioPlaybackDriver {
 
     init(
         traceEnabled: Bool = false,
-        playbackEnvironment: PlaybackEnvironmentCoordinator = MacOSPlaybackEnvironmentCoordinator(),
+        playbackEnvironment: PlaybackEnvironmentCoordinator? = nil,
     ) {
         self.traceEnabled = traceEnabled
+        let playbackEnvironment = playbackEnvironment ?? makeDefaultPlaybackEnvironmentCoordinator()
         self.playbackEnvironment = playbackEnvironment
         lastObservedOutputDeviceDescription = playbackEnvironment.currentOutputDeviceDescription
         installEngineConfigurationObserver()
@@ -65,6 +66,12 @@ final class AudioPlaybackDriver {
             },
             onOutputDeviceChange: { [weak self] currentDevice in
                 self?.handleObservedOutputDeviceChange(currentDevice: currentDevice)
+            },
+            onInterruptionStateChange: { [weak self] isInterrupted, shouldResume in
+                self?.handleInterruptionStateChange(
+                    isInterrupted: isInterrupted,
+                    shouldResume: shouldResume,
+                )
             },
         )
     }

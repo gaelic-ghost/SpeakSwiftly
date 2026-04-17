@@ -1,3 +1,4 @@
+#if os(macOS)
 @preconcurrency import AppKit
 @preconcurrency import AVFoundation
 import CoreAudio
@@ -26,6 +27,7 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
         onScreenSleepStateChange: @escaping @MainActor (Bool) -> Void,
         onSessionActivityChange: @escaping @MainActor (Bool) -> Void,
         onOutputDeviceChange: @escaping @MainActor (String?) -> Void,
+        onInterruptionStateChange: @escaping @MainActor (_ isInterrupted: Bool, _ shouldResume: Bool?) -> Void,
     ) {
         guard !observersInstalled else { return }
         observersInstalled = true
@@ -204,3 +206,4 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
         return "AudioObjectID \(deviceID)"
     }
 }
+#endif
