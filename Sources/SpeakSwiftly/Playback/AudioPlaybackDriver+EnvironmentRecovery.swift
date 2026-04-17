@@ -299,8 +299,7 @@ extension AudioPlaybackDriver {
                     state.playedBackCallbackCount += 1
                     state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24000)
                     if state.generationFinished, state.queuedSampleCount == 0 {
-                        state.drainContinuation?.resume()
-                        state.drainContinuation = nil
+                        state.resumeDrainContinuation()
                     }
                 }
             }

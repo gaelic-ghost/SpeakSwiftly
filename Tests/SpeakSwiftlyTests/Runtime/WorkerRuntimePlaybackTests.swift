@@ -31,6 +31,36 @@ private actor EnvironmentEventRecorder {
     #expect(samples.allSatisfy { $0.isFinite && abs($0) <= 0.14 })
 }
 
+@MainActor
+@Test func `playback drain waiter clears stored continuation when cancelled`() async throws {
+    let driver = AudioPlaybackDriver()
+    let state = AudioPlaybackRequestState(
+        requestID: 1,
+        text: "queued drain test",
+        tuningProfile: .standard,
+    )
+    state.queuedSampleCount = 2400
+
+    let waitTask = Task {
+        try await driver.awaitPlaybackDrainSignal(
+            state: state,
+            sampleRate: 24000,
+        )
+    }
+
+    await Task.yield()
+    #expect(state.drainContinuation != nil)
+
+    waitTask.cancel()
+    _ = try? await waitTask.value
+
+    for _ in 0..<20 where state.drainContinuation != nil {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(state.drainContinuation == nil)
+}
+
 // MARK: - Live Playback Queueing
 
 @Test func `speak live background acknowledges queue before playback starts and only succeeds once`() async throws {

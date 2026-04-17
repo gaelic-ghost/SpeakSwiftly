@@ -17,15 +17,10 @@ extension AudioPlaybackDriver {
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    Task { @MainActor in
-                        state.drainContinuation = continuation
-                        if state.queuedAudioMS(sampleRate: sampleRate) == 0 {
-                            state.drainContinuation?.resume()
-                            state.drainContinuation = nil
-                        }
-                    }
-                }
+                try await self.awaitPlaybackDrainSignal(
+                    state: state,
+                    sampleRate: sampleRate,
+                )
             }
             group.addTask {
                 try await Task.sleep(for: drainTimeout)
@@ -85,6 +80,24 @@ extension AudioPlaybackDriver {
 
             _ = try await group.next()
             group.cancelAll()
+        }
+    }
+
+    func awaitPlaybackDrainSignal(
+        state: AudioPlaybackRequestState,
+        sampleRate: Double,
+    ) async throws {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                state.installDrainContinuation(
+                    continuation,
+                    sampleRate: sampleRate,
+                )
+            }
+        } onCancel: {
+            Task { @MainActor in
+                state.resumeDrainContinuation(throwing: CancellationError())
+            }
         }
     }
 
@@ -159,8 +172,7 @@ extension AudioPlaybackDriver {
         activeRuntimeFailure = error
         shouldPlayInterJobBoop = false
         stop()
-        activeRequestState?.drainContinuation?.resume(throwing: error)
-        activeRequestState?.drainContinuation = nil
+        activeRequestState?.resumeDrainContinuation(throwing: error)
     }
 
     func throwIfActivePlaybackInterrupted() throws {
