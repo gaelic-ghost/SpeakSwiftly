@@ -1,25 +1,21 @@
-# Release Candidate Prep
+# v3.0.6 Release Prep
 
 Date: 2026-04-17
 
-This note replaces the stale unreleased `v3.1.0` branch notes and captures the
-current release-candidate scope on `release/chatterbox-turbo-e2e`.
-
-The final SemVer tag should be chosen at release time. This file is
-intentionally tag-neutral so the branch can stay honest while the last release
-decision is still pending.
+This note captures the intended scope and validation story for the `v3.0.6`
+patch release.
 
 ## Intended Scope
 
-The current branch should be framed as:
+The release should be framed as:
 
-- the Chatterbox backend landing
-- the immediate Chatterbox live-playback follow-up that makes non-streaming
-  synthesis behave like live playback through runtime-owned text chunking
+- the Chatterbox backend landing follow-up
+- the runtime-owned live-playback correction that makes non-streaming
+  Chatterbox synthesis behave like real live playback through text chunking
 - the docs and roadmap cleanup that brings package and maintainer surfaces back
   in sync with the actual implementation
 
-Included work on this branch:
+Included work on the merged branch:
 
 - add `chatterbox_turbo` as a first-class resident backend on the typed Swift
   API, JSONL worker surface, and resident model loader
@@ -47,9 +43,15 @@ Not included:
   roadmap follow-up
 - a claim that Chatterbox itself is a truly incremental streaming backend
 
-## Validation Already Run
+## Validation Performed
 
-The important green lane already completed for the new chunked live path:
+Repo gate:
+
+```bash
+sh scripts/repo-maintenance/validate-all.sh
+```
+
+Green Xcode-backed package and e2e lane:
 
 ```bash
 xcodebuild build-for-testing \
@@ -79,20 +81,15 @@ Known note:
   warnings during this lane, but the worker-backed suite still completes
   cleanly and those host logs are not treated as SpeakSwiftly runtime failure
 
-## Remaining Pre-Release Validation
+Post-merge CI on `main`:
 
-Before tagging, rerun the standard repo gate from the package root:
+- `Validate Repo Maintenance` passed
+- `Swift` passed with the Xcode-backed package lane and targeted package tests
 
-```bash
-sh scripts/repo-maintenance/validate-all.sh
-```
+## Release Checklist
 
-Then rerun the Xcode-backed package build or targeted package test lane if the
-current branch changes widen beyond doc-only edits.
-
-## Pre-PR Checklist
-
-- keep the PR body focused on the Chatterbox backend plus chunked-live follow-up
+- keep the GitHub release notes focused on the Chatterbox backend plus the
+  chunked-live follow-up
 - mention that Chatterbox is still English-only
 - mention that Chatterbox live playback is runtime-chunked rather than
   backend-native streaming
