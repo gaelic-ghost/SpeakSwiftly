@@ -993,8 +993,6 @@ import TextForSpeech
                 && $0["op"] as? String == "list_voice_profiles"
         }
     })
-
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:generate_speech", "req-3:list_voice_profiles"])
 }
-

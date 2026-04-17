@@ -1,4 +1,5 @@
 import Foundation
+
 // MARK: - PlaybackComplexityClass
 
 enum PlaybackComplexityClass: String {
