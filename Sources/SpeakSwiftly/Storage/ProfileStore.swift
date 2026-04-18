@@ -88,10 +88,10 @@ struct ProfileStore: @unchecked Sendable {
         let legacyBaseURL = overrideURL.deletingLastPathComponent()
         let hasLegacyAdjacentState =
             fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(configurationFileName).path)
-            || fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(textProfilesFileName).path)
+                || fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(textProfilesFileName).path)
         let hasDirectState =
             fileManager.fileExists(atPath: overrideURL.appendingPathComponent(configurationFileName).path)
-            || fileManager.fileExists(atPath: overrideURL.appendingPathComponent(textProfilesFileName).path)
+                || fileManager.fileExists(atPath: overrideURL.appendingPathComponent(textProfilesFileName).path)
 
         if hasLegacyAdjacentState, !hasDirectState {
             return overrideURL.deletingLastPathComponent()

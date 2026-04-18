@@ -37,7 +37,7 @@ public extension SpeakSwiftly {
             } else {
                 let defaultURL = ProfileStore.defaultTextProfilesURL(
                     profileRootOverride: ProcessInfo.processInfo.environment[
-                        ProfileStore.profileRootOverrideEnvironmentVariable
+                        ProfileStore.profileRootOverrideEnvironmentVariable,
                     ],
                 )
                 persistence = .file(defaultURL)
