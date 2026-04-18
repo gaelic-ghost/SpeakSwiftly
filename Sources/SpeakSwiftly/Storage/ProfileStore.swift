@@ -8,6 +8,7 @@ struct ProfileStore: @unchecked Sendable {
     static let profilesDirectoryName = "profiles"
     static let textProfilesFileName = "text-profiles.json"
     static let configurationFileName = "configuration.json"
+    static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
     static let manifestVersion = 5
@@ -63,12 +64,70 @@ struct ProfileStore: @unchecked Sendable {
         profileRootOverride: String? = nil,
     ) -> URL {
         if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
-                .deletingLastPathComponent()
+            return normalizedOverrideBaseURL(
+                profileRootOverride,
+                fileManager: fileManager,
+            )
         }
 
         return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(defaultDirectoryName, isDirectory: true)
+    }
+
+    private static func normalizedOverrideBaseURL(
+        _ profileRootOverride: String,
+        fileManager: FileManager,
+    ) -> URL {
+        let overrideURL = URL(fileURLWithPath: profileRootOverride, isDirectory: true)
+            .standardizedFileURL
+
+        guard overrideURL.lastPathComponent == profilesDirectoryName else {
+            return overrideURL
+        }
+
+        let legacyBaseURL = overrideURL.deletingLastPathComponent()
+        let hasLegacyAdjacentState =
+            fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(configurationFileName).path)
+                || fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(textProfilesFileName).path)
+                || legacyProfilesDirectoryLooksPopulated(
+                    overrideURL,
+                    fileManager: fileManager,
+                )
+        let hasDirectState =
+            fileManager.fileExists(atPath: overrideURL.appendingPathComponent(configurationFileName).path)
+                || fileManager.fileExists(atPath: overrideURL.appendingPathComponent(textProfilesFileName).path)
+
+        if hasLegacyAdjacentState, !hasDirectState {
+            return overrideURL.deletingLastPathComponent()
+        }
+
+        return overrideURL
+    }
+
+    private static func legacyProfilesDirectoryLooksPopulated(
+        _ profilesDirectoryURL: URL,
+        fileManager: FileManager,
+    ) -> Bool {
+        guard let childURLs = try? fileManager.contentsOfDirectory(
+            at: profilesDirectoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles],
+        ) else {
+            return false
+        }
+
+        return childURLs.contains { childURL in
+            guard
+                let resourceValues = try? childURL.resourceValues(forKeys: [.isDirectoryKey]),
+                resourceValues.isDirectory == true
+            else {
+                return false
+            }
+
+            return fileManager.fileExists(
+                atPath: childURL.appendingPathComponent(manifestFileName).path,
+            )
+        }
     }
 
     private static func makeEncoder() -> JSONEncoder {

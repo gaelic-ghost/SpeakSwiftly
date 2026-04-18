@@ -2,6 +2,9 @@ import Foundation
 @testable import SpeakSwiftly
 import Testing
 import TextForSpeech
+#if canImport(Darwin)
+import Darwin
+#endif
 
 // MARK: - Runtime Construction
 
@@ -113,6 +116,51 @@ import TextForSpeech
     #expect(configurationURL.path.contains("/SpeakSwiftly-Debug/configuration.json"))
     #expect(textProfilesURL.path.contains("/SpeakSwiftly-Debug/text-profiles.json"))
     #expect(await normalizer.persistence.url() == textProfilesURL)
+}
+
+@Test func `public normalizer default persistence honors profile root override`() async throws {
+    let overrideRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: overrideRoot) }
+
+    let environmentVariable = ProfileStore.profileRootOverrideEnvironmentVariable
+    let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
+    setenv(environmentVariable, overrideRoot.path, 1)
+    defer {
+        if let previousValue {
+            setenv(environmentVariable, previousValue, 1)
+        } else {
+            unsetenv(environmentVariable)
+        }
+    }
+
+    let normalizer = try SpeakSwiftly.Normalizer()
+    let expectedURL = overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false)
+
+    #expect(await normalizer.persistence.url() == expectedURL)
+}
+
+@Test func `liftoff normalizer persistence matches the default text profile path`() async throws {
+    let overrideRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: overrideRoot) }
+
+    let environmentVariable = ProfileStore.profileRootOverrideEnvironmentVariable
+    let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
+    setenv(environmentVariable, overrideRoot.path, 1)
+    defer {
+        if let previousValue {
+            setenv(environmentVariable, previousValue, 1)
+        } else {
+            unsetenv(environmentVariable)
+        }
+    }
+
+    let runtime = await SpeakSwiftly.liftoff()
+    let expectedURL = ProfileStore.defaultTextProfilesURL(
+        fileManager: .default,
+        profileRootOverride: overrideRoot.path,
+    )
+
+    #expect(await runtime.normalizer.persistence.url() == expectedURL)
 }
 
 // MARK: - Runtime Helpers

@@ -70,7 +70,7 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
-    func makeQueuedEvent(for job: GenerationController.Job) async -> WorkerQueuedEvent? {
+    func makeQueuedEvent(for job: SpeechGenerationController.Job) async -> WorkerQueuedEvent? {
         let activeJobs = await generationController.activeJobsOrdered()
         let queuedJobs = await generationController.queuedJobsOrdered()
         let playbackAdmission = await playbackController.generationAdmissionSnapshot()
@@ -95,7 +95,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func syncQueuedGenerationParkReasons(
-        queuedJobs: [GenerationController.Job],
+        queuedJobs: [SpeechGenerationController.Job],
         parkReasons: [UUID: GenerationParkReason],
     ) async {
         var queuedRequestIDs = Set<String>()

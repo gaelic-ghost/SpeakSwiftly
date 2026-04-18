@@ -35,7 +35,11 @@ public extension SpeakSwiftly {
                 persistence = .file(standardizedURL)
                 resolvedPersistenceURL = standardizedURL
             } else {
-                let defaultURL = ProfileStore.defaultTextProfilesURL()
+                let defaultURL = ProfileStore.defaultTextProfilesURL(
+                    profileRootOverride: ProcessInfo.processInfo.environment[
+                        ProfileStore.profileRootOverrideEnvironmentVariable,
+                    ],
+                )
                 persistence = .file(defaultURL)
                 resolvedPersistenceURL = defaultURL
             }

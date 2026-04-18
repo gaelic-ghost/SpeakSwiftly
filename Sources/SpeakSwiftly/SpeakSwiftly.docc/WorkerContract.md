@@ -35,7 +35,7 @@ Representative operations include:
 - `generate_speech` for live playback work.
 - `generate_audio_file` for retained file output.
 - `generate_batch` for grouped retained artifacts.
-- `create_voice_profile`, `list_voice_profiles`, and related voice-management operations.
+- `create_voice_profile_from_description`, `create_voice_profile_from_audio`, `list_voice_profiles`, and related voice-management operations.
 - `get_status`, `reload_models`, and `unload_models` for runtime control.
 
 ## Read Events And Results
@@ -44,11 +44,12 @@ The worker emits both status events and request-scoped events. For example:
 
 ```json
 {"event":"worker_status","stage":"warming_resident_model","resident_state":"warming","speech_backend":"qwen3"}
-{"id":"req-1","event":"queued","reason":"waiting_for_resident_models","queue_position":1}
+{"id":"req-1","event":"queued","reason":"waiting_for_resident_model","queue_position":1}
 {"id":"req-1","ok":true}
 ```
 
 Status events describe the shared runtime. Request-scoped events and terminal payloads describe one submitted operation.
+During startup warmup, queued work uses `waiting_for_resident_model`. After an explicit unload, parked work uses `waiting_for_resident_models`.
 
 ## Choose Between Swift And JSONL
 

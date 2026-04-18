@@ -39,6 +39,7 @@ let handle = await runtime.voices.create(
 ```
 
 This path is best when you want to author a reusable voice without recording reference audio first.
+If you pass `outputPath`, SpeakSwiftly uses that as an export-audio file path for the generated reference sample after the profile has been stored.
 
 ## Create A Cloned Voice
 

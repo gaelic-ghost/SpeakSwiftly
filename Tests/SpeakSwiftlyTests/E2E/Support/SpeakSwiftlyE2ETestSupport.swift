@@ -3,16 +3,7 @@ import Foundation
 @testable import SpeakSwiftly
 import Testing
 
-extension SpeakSwiftlyE2ETests {
-    static var isQwenBenchmarkE2EEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
-    }
-
-    static var qwenBenchmarkIterations: Int {
-        let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS"] ?? ""
-        return max(1, Int(rawValue) ?? 1)
-    }
-
+enum E2EHarness {
     static let testingProfileName = "testing-profile"
     static let testingProfileText = "Hello there from SpeakSwiftly end-to-end coverage."
     static let testingProfileVoiceDescription = "A generic, warm, masculine, slow speaking voice."
@@ -222,46 +213,13 @@ extension SpeakSwiftlyE2ETests {
         #expect(success["profile_name"] as? String == profileName)
     }
 
-    static func runSilentSpeech(
-        on worker: WorkerProcess,
-        id: String,
-        text: String,
-        profileName: String,
-    ) async throws {
-        try worker.sendJSON(
-            """
-            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
-            """,
-        )
-
-        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-            $0["id"] as? String == id
-                && $0["event"] as? String == "started"
-                && $0["op"] as? String == "generate_speech"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-            $0["id"] as? String == id
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "buffering_audio"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-            $0["id"] as? String == id
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "playback_finished"
-        } != nil)
-        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-            $0["id"] as? String == id
-                && $0["ok"] as? Bool == true
-        } != nil)
-    }
-
     static func runLiveSpeechForCurrentE2EMode(
         on worker: WorkerProcess,
         id: String,
         text: String,
         profileName: String,
     ) async throws {
-        if isAudibleE2EEnabled {
+        if speakSwiftlyAudibleE2ETestsEnabled() {
             try await runAudibleSpeech(
                 on: worker,
                 id: id,
@@ -277,6 +235,39 @@ extension SpeakSwiftlyE2ETests {
             )
         }
     }
+
+	static func runSilentSpeech(
+		on worker: WorkerProcess,
+		id: String,
+		text: String,
+		profileName: String,
+	) async throws {
+		try worker.sendJSON(
+			"""
+			{"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+			""",
+		)
+
+		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+			$0["id"] as? String == id
+			&& $0["event"] as? String == "started"
+			&& $0["op"] as? String == "generate_speech"
+		} != nil)
+		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+			$0["id"] as? String == id
+			&& $0["event"] as? String == "progress"
+			&& $0["stage"] as? String == "buffering_audio"
+		} != nil)
+		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+			$0["id"] as? String == id
+			&& $0["event"] as? String == "progress"
+			&& $0["stage"] as? String == "playback_finished"
+		} != nil)
+		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+			$0["id"] as? String == id
+			&& $0["ok"] as? Bool == true
+		} != nil)
+	}
 
     static func runAudibleSpeech(
         on worker: WorkerProcess,
@@ -565,22 +556,6 @@ extension SpeakSwiftlyE2ETests {
     static var e2eTimeout: Duration {
         .seconds(1200)
     }
-
-    static var isE2EEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_E2E"] == "1"
-    }
-
-    static var isPlaybackTraceEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_PLAYBACK_TRACE"] == "1"
-    }
-
-    static var isAudibleE2EEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_AUDIBLE_E2E"] == "1"
-    }
-
-    static var isDeepTraceE2EEnabled: Bool {
-        ProcessInfo.processInfo.environment["SPEAKSWIFTLY_DEEP_TRACE_E2E"] == "1"
-    }
 }
 
 // MARK: - E2ESandbox
@@ -720,6 +695,7 @@ final class WorkerProcess: @unchecked Sendable {
         let packageRootURL = try Self.packageRootURL()
         let buildConfiguration = "Debug"
         let runtimeConfiguration = configuration
+        let profileRootOverrideURL = Self.workerProfileRootOverrideURL(for: profileRootURL)
         try Self.publishWorkerRuntime(packageRootURL: packageRootURL, configuration: buildConfiguration)
 
         process = Process()
@@ -747,7 +723,7 @@ final class WorkerProcess: @unchecked Sendable {
             try runtimeConfiguration.save(
                 to: SpeakSwiftly.Configuration.defaultPersistenceURL(
                     fileManager: .default,
-                    profileRootOverride: profileRootURL.path,
+                    profileRootOverride: profileRootOverrideURL.path,
                 ),
             )
         }
@@ -760,8 +736,8 @@ final class WorkerProcess: @unchecked Sendable {
 
         var environment = ProcessInfo.processInfo.environment
         environment[Environment.dyldFrameworkPath] = executableURL.deletingLastPathComponent().path
-        environment[Environment.profileRoot] = profileRootURL.path
-        if silentPlayback, !SpeakSwiftlyE2ETests.isAudibleE2EEnabled {
+        environment[Environment.profileRoot] = profileRootOverrideURL.path
+        if silentPlayback, !speakSwiftlyAudibleE2ETestsEnabled() {
             environment[Environment.silentPlayback] = "1"
         }
         if playbackTrace {
@@ -790,6 +766,18 @@ final class WorkerProcess: @unchecked Sendable {
 
         try process.run()
         artifacts.recordProcessID(process.processIdentifier)
+    }
+
+    private static func workerProfileRootOverrideURL(for profileRootURL: URL) -> URL {
+        guard profileRootURL.lastPathComponent == ProfileStore.profilesDirectoryName else {
+            return profileRootURL
+        }
+
+        // The E2E sandbox hands WorkerProcess the actual profile-store root.
+        // The runtime override env var, however, expects the broader state root
+        // so it can derive profiles/, configuration.json, and text-profiles.json
+        // consistently without nesting profiles/profiles/.
+        return profileRootURL.deletingLastPathComponent()
     }
 
     deinit {
