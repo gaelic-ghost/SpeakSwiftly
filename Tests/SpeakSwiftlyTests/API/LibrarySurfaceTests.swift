@@ -139,7 +139,7 @@ import Darwin
     #expect(await normalizer.persistence.url() == expectedURL)
 }
 
-@Test func `liftoff normalizer persistence matches the default text profile path`() async throws {
+@Test func `liftoff normalizer persistence matches the default text profile path`() async {
     let overrideRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: overrideRoot) }
 

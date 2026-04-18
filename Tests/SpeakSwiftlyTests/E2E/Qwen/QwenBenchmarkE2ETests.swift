@@ -6,7 +6,6 @@ import Testing
 private let qwenBenchmarkSchemaVersion = 3
 
 @Suite(
-    "Qwen Benchmark E2E",
     .serialized,
     .tags(.e2e, .qwen, .benchmark),
     .enabled(

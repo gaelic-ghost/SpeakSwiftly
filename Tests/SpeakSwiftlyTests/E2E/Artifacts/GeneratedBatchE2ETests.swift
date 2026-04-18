@@ -4,7 +4,6 @@ import Foundation
 import Testing
 
 @Suite(
-    "Generated Batch E2E",
     .serialized,
     .tags(.e2e, .artifacts, .quick),
     .enabled(

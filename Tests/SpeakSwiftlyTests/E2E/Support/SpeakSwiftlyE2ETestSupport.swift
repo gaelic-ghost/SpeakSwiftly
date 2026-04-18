@@ -118,6 +118,10 @@ enum E2EHarness {
     Please read this opening section in a steady, friendly tone. We are checking how the worker sounds over a longer stretch of ordinary conversational prose, with enough breathing room and variety to make the trace useful instead of tiny and noisy.
     """
 
+    static var e2eTimeout: Duration {
+        .seconds(1200)
+    }
+
     static func awaitWorkerReady(
         _ worker: WorkerProcess,
     ) async throws {
@@ -236,38 +240,38 @@ enum E2EHarness {
         }
     }
 
-	static func runSilentSpeech(
-		on worker: WorkerProcess,
-		id: String,
-		text: String,
-		profileName: String,
-	) async throws {
-		try worker.sendJSON(
-			"""
-			{"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
-			""",
-		)
+    static func runSilentSpeech(
+        on worker: WorkerProcess,
+        id: String,
+        text: String,
+        profileName: String,
+    ) async throws {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            """,
+        )
 
-		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-			$0["id"] as? String == id
-			&& $0["event"] as? String == "started"
-			&& $0["op"] as? String == "generate_speech"
-		} != nil)
-		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-			$0["id"] as? String == id
-			&& $0["event"] as? String == "progress"
-			&& $0["stage"] as? String == "buffering_audio"
-		} != nil)
-		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-			$0["id"] as? String == id
-			&& $0["event"] as? String == "progress"
-			&& $0["stage"] as? String == "playback_finished"
-		} != nil)
-		#expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
-			$0["id"] as? String == id
-			&& $0["ok"] as? Bool == true
-		} != nil)
-	}
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "generate_speech"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "buffering_audio"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: e2eTimeout) {
+            $0["id"] as? String == id
+                && $0["ok"] as? Bool == true
+        } != nil)
+    }
 
     static func runAudibleSpeech(
         on worker: WorkerProcess,
@@ -552,10 +556,6 @@ enum E2EHarness {
                 .filter { !$0.isEmpty },
         )
     }
-
-    static var e2eTimeout: Duration {
-        .seconds(1200)
-    }
 }
 
 // MARK: - E2ESandbox
@@ -768,6 +768,12 @@ final class WorkerProcess: @unchecked Sendable {
         artifacts.recordProcessID(process.processIdentifier)
     }
 
+    deinit {
+        closeCapturedOutputs()
+        stdoutTask.cancel()
+        stderrTask.cancel()
+    }
+
     private static func workerProfileRootOverrideURL(for profileRootURL: URL) -> URL {
         guard profileRootURL.lastPathComponent == ProfileStore.profilesDirectoryName else {
             return profileRootURL
@@ -778,12 +784,6 @@ final class WorkerProcess: @unchecked Sendable {
         // so it can derive profiles/, configuration.json, and text-profiles.json
         // consistently without nesting profiles/profiles/.
         return profileRootURL.deletingLastPathComponent()
-    }
-
-    deinit {
-        closeCapturedOutputs()
-        stdoutTask.cancel()
-        stderrTask.cancel()
     }
 
     private static func captureLines(

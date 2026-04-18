@@ -4,7 +4,6 @@ import Foundation
 import Testing
 
 @Suite(
-    "Qwen E2E",
     .serialized,
     .tags(.e2e, .qwen),
     .enabled(
