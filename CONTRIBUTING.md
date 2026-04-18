@@ -148,7 +148,7 @@ Default persisted configuration path:
 - with `SPEAKSWIFTLY_PROFILE_ROOT=/custom`: `/custom/configuration.json`
 
 The same namespace split applies to the default profile store and `text-profiles.json`, so debug builds, local package tests, and production runs do not reuse the same local storage root unless you explicitly point them at one with `SPEAKSWIFTLY_PROFILE_ROOT`.
-For compatibility, SpeakSwiftly also accepts the older `.../profiles` form and normalizes it onto the same base directory.
+For compatibility, SpeakSwiftly still recognizes the older trailing `.../profiles` form when it detects an existing legacy layout with adjacent `configuration.json` or `text-profiles.json` state.
 
 Backend resolution precedence is:
 

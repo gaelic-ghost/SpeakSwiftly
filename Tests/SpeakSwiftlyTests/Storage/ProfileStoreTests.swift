@@ -178,13 +178,26 @@ import Testing
     #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
-@Test func `profile root override preserves compatibility with a profiles directory path`() {
-    let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root", isDirectory: true)
-    let legacyProfilesURL = overrideRoot.appendingPathComponent("profiles", isDirectory: true)
+@Test func `profile root override preserves a literal base directory named profiles`() {
+    let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root/profiles", isDirectory: true)
 
-    #expect(ProfileStore.defaultRootURL(overridePath: legacyProfilesURL.path) == legacyProfilesURL)
-    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
-    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+    #expect(ProfileStore.defaultRootURL(overridePath: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
+    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+}
+
+@Test func `profile root override preserves compatibility with an existing legacy profiles directory path`() throws {
+    let fileManager = FileManager.default
+    let overrideRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: overrideRoot) }
+
+    let legacyProfilesURL = overrideRoot.appendingPathComponent("profiles", isDirectory: true)
+    try fileManager.createDirectory(at: legacyProfilesURL, withIntermediateDirectories: true)
+    try Data("{}".utf8).write(to: overrideRoot.appendingPathComponent(ProfileStore.configurationFileName))
+
+    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, overridePath: legacyProfilesURL.path) == legacyProfilesURL)
+    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
 // MARK: - Listing and Validation
