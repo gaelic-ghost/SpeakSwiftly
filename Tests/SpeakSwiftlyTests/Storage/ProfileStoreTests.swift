@@ -200,6 +200,28 @@ import Testing
     #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
+@Test func `profile root override preserves compatibility with a profiles-only legacy store`() throws {
+    let fileManager = FileManager.default
+    let overrideRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: overrideRoot) }
+
+    let legacyProfilesURL = overrideRoot.appendingPathComponent("profiles", isDirectory: true)
+    let legacyStore = ProfileStore(rootURL: legacyProfilesURL, fileManager: fileManager)
+    _ = try legacyStore.createProfile(
+        profileName: "default-femme",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, overridePath: legacyProfilesURL.path) == legacyProfilesURL)
+    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+}
+
 // MARK: - Listing and Validation
 
 @Test func `lists profiles in sorted order`() throws {

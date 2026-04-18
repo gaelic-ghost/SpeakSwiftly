@@ -89,6 +89,10 @@ struct ProfileStore: @unchecked Sendable {
         let hasLegacyAdjacentState =
             fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(configurationFileName).path)
                 || fileManager.fileExists(atPath: legacyBaseURL.appendingPathComponent(textProfilesFileName).path)
+                || legacyProfilesDirectoryLooksPopulated(
+                    overrideURL,
+                    fileManager: fileManager,
+                )
         let hasDirectState =
             fileManager.fileExists(atPath: overrideURL.appendingPathComponent(configurationFileName).path)
                 || fileManager.fileExists(atPath: overrideURL.appendingPathComponent(textProfilesFileName).path)
@@ -98,6 +102,32 @@ struct ProfileStore: @unchecked Sendable {
         }
 
         return overrideURL
+    }
+
+    private static func legacyProfilesDirectoryLooksPopulated(
+        _ profilesDirectoryURL: URL,
+        fileManager: FileManager,
+    ) -> Bool {
+        guard let childURLs = try? fileManager.contentsOfDirectory(
+            at: profilesDirectoryURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles],
+        ) else {
+            return false
+        }
+
+        return childURLs.contains { childURL in
+            guard
+                let resourceValues = try? childURL.resourceValues(forKeys: [.isDirectoryKey]),
+                resourceValues.isDirectory == true
+            else {
+                return false
+            }
+
+            return fileManager.fileExists(
+                atPath: childURL.appendingPathComponent(manifestFileName).path,
+            )
+        }
     }
 
     private static func makeEncoder() -> JSONEncoder {
