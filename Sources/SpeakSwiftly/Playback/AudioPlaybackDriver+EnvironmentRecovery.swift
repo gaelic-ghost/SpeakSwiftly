@@ -97,7 +97,15 @@ extension AudioPlaybackDriver {
             return
         }
 
-        guard shouldResume != false else { return }
+        guard shouldResume != false else {
+            interruptActivePlayback(
+                with: WorkerError(
+                    code: .audioPlaybackFailed,
+                    message: "Live playback was interrupted and the active audio session reported that this request must not resume automatically.",
+                ),
+            )
+            return
+        }
 
         beginPlaybackRecovery(reason: .audioSessionInterruption)
     }

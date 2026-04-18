@@ -369,6 +369,42 @@ private actor EnvironmentEventRecorder {
     #expect(await recorder.events().isEmpty)
 }
 
+@MainActor
+@Test func `non resumable interruption immediately fails the active playback request`() async throws {
+    let driver = AudioPlaybackDriver()
+    let state = AudioPlaybackRequestState(
+        requestID: 7,
+        text: "interruption test",
+        tuningProfile: .standard,
+    )
+    state.queuedSampleCount = 2400
+    driver.activeRequestState = state
+
+    let waitTask = Task {
+        try await driver.awaitPlaybackDrainSignal(
+            state: state,
+            sampleRate: 24000,
+        )
+    }
+
+    await Task.yield()
+    #expect(state.drainContinuation != nil)
+
+    driver.handleInterruptionStateChange(
+        isInterrupted: false,
+        shouldResume: false,
+    )
+
+    await #expect(throws: WorkerError.self) {
+        try await waitTask.value
+    }
+
+    let failure = try #require(driver.activeRuntimeFailure)
+    #expect(failure.code == .audioPlaybackFailed)
+    #expect(failure.message == "Live playback was interrupted and the active audio session reported that this request must not resume automatically.")
+    #expect(driver.playbackRecoveryReason == nil)
+}
+
 @Test func `playback environment events are logged for power session and recovery changes`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

@@ -107,7 +107,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          simulator_id="$(xcrun simctl list devices available | awk -F '[()]' '/^[[:space:]]*iPhone/ { print $2; exit }')"
+          simulator_id="$(
+            xcrun simctl list devices available \
+              | sed -nE '/^[[:space:]]*iPhone/ s/.*\(([0-9A-F-]{36})\)[[:space:]]+\([^)]*\)[[:space:]]*$/\1/p' \
+              | head -n 1
+          )"
           if [[ -z "$simulator_id" ]]; then
             printf 'SpeakSwiftly CI could not find an available iPhone simulator destination on this runner.\n' >&2
             xcrun simctl list devices available >&2
