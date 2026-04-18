@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 @testable import SpeakSwiftly
 import Testing
@@ -1369,3 +1370,4 @@ extension String {
         return String(encoded.dropFirst(2).dropLast(2))
     }
 }
+#endif

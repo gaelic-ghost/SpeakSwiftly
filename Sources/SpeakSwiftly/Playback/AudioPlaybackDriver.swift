@@ -26,9 +26,10 @@ final class AudioPlaybackDriver {
     var environmentEventSink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
     var shouldPlayInterJobBoop = false
 
+    let playbackEnvironment: PlaybackEnvironmentCoordinator
+
     private var nextRequestID: UInt64 = 0
     private let traceEnabled: Bool
-    let playbackEnvironment: PlaybackEnvironmentCoordinator
     private var playbackState: PlaybackState = .idle
 
     var shouldSuppressDrainProgressTimeout: Bool {

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 @testable import SpeakSwiftly
 import Testing
@@ -110,3 +111,4 @@ extension SpeakSwiftlyE2ETests {
         }
     }
 }
+#endif

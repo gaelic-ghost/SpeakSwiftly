@@ -23,6 +23,10 @@ As of 2026-04-17, the first portability passes are now in place:
 - the package now includes an initial iOS `AVAudioSession`-based environment
   adapter
 - `Package.swift` now declares both `.macOS(.v15)` and `.iOS(.v17)`
+- the Xcode-backed package lane now builds for iOS Simulator and runs a small
+  library-first smoke suite
+- the worker-driven e2e sources are now fenced as macOS-only so the shared test
+  target can compile honestly for iOS
 
 That means the plan has moved past "make the package graph admit iOS at all" and
 into "prove the iOS path honestly and keep the worker-facing macOS story
@@ -243,6 +247,21 @@ Exit goal:
   - playback-environment compile coverage
 - Do not block early iOS architecture work on full real-model simulator or
   device automation until the playback seam is in place.
+
+Current status:
+
+- this lane now exists in local validation and CI as an iOS Simulator
+  build-for-testing pass plus a targeted smoke subset:
+  - `SpeakSwiftlyTests/LibrarySurfaceTests`
+  - `SpeakSwiftlyTests/SupportResourcesTests`
+  - `SpeakSwiftlyTests/ProfileStoreTests`
+- the lane is intentionally library-first rather than worker-first, because the
+  current e2e harness launches the published CLI worker process and therefore
+  remains a macOS concern
+- one source-level portability cleanup was needed for this lane:
+  `WorkerDependencies.currentRuntimeMemorySnapshot()` now treats
+  `proc_pid_rusage` as macOS-only instead of pretending that process-rusage API
+  exists on iOS
 
 Exit goal:
 

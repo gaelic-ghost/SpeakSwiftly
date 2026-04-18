@@ -302,6 +302,26 @@ use the Xcode-backed validation fallback documented in
 [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
 
+The current Xcode-backed simulator smoke lane for iOS is:
+
+```bash
+xcodebuild build-for-testing \
+  -scheme SpeakSwiftly-Package \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -derivedDataPath .local/xcode/derived-data/ios-smoke \
+  -clonedSourcePackagesDirPath .local/xcode/source-packages
+
+xcodebuild test-without-building \
+  -xctestrun "$(find .local/xcode/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
+  -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
+  -only-testing:'SpeakSwiftlyTests/ProfileStoreTests'
+```
+
+That lane is intentionally library-first. The published worker executable and
+real-model end-to-end coverage are still macOS-first validation surfaces.
+
 Real MLX-backed runtime verification starts by publishing the Xcode-backed runtime:
 
 ```bash

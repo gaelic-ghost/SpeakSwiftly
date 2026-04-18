@@ -5,6 +5,10 @@ import MLXAudioTTS
 import Testing
 import TextForSpeech
 
+private let longPlaybackPlannerFixtureText = """
+Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
+"""
+
 // MARK: - Adaptive Playback Thresholds
 
 @Test func `resident backend repos include chatterbox turbo 8bit`() {
@@ -1308,7 +1312,7 @@ import TextForSpeech
 }
 
 @Test func `live speech chunk planner splits oversized single sentences at clause boundaries`() {
-    let text = SpeakSwiftlyE2ETests.testingPlaybackText
+    let text = longPlaybackPlannerFixtureText
 
     let chunks = LiveSpeechChunkPlanner.chunks(for: text)
 

@@ -98,6 +98,7 @@ extension AudioPlaybackDriver {
         }
 
         guard shouldResume != false else { return }
+
         beginPlaybackRecovery(reason: .audioSessionInterruption)
     }
 

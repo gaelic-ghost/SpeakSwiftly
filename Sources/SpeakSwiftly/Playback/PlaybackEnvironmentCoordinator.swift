@@ -23,11 +23,11 @@ protocol PlaybackEnvironmentCoordinator: AnyObject, Sendable {
 
 @MainActor
 func makeDefaultPlaybackEnvironmentCoordinator() -> PlaybackEnvironmentCoordinator {
-    #if os(macOS)
-        MacOSPlaybackEnvironmentCoordinator()
-    #elseif os(iOS)
-        IOSPlaybackEnvironmentCoordinator()
-    #else
-        fatalError("SpeakSwiftly does not support local playback environment coordination on this platform.")
-    #endif
+#if os(macOS)
+    MacOSPlaybackEnvironmentCoordinator()
+#elseif os(iOS)
+    IOSPlaybackEnvironmentCoordinator()
+#else
+    fatalError("SpeakSwiftly does not support local playback environment coordination on this platform.")
+#endif
 }

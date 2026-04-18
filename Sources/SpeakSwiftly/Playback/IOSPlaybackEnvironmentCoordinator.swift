@@ -14,6 +14,38 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
         Self.currentOutputRouteDescription(audioSession.currentRoute)
     }
 
+    private static func parseInterruption(_ notification: Notification) -> (Bool, Bool?) {
+        guard
+            let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+            let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+        else {
+            return (true, nil)
+        }
+
+        switch type {
+            case .began:
+                return (true, nil)
+            case .ended:
+                guard let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else {
+                    return (false, nil)
+                }
+
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                return (false, options.contains(.shouldResume))
+            @unknown default:
+                return (false, nil)
+        }
+    }
+
+    private static func currentOutputRouteDescription(_ route: AVAudioSessionRouteDescription) -> String? {
+        let outputs = route.outputs.map { output in
+            "\(output.portName) [\(output.portType.rawValue)]"
+        }
+        guard !outputs.isEmpty else { return nil }
+
+        return outputs.joined(separator: ", ")
+    }
+
     func installObservers(
         onSystemSleepStateChange: @escaping @MainActor (Bool) -> Void,
         onScreenSleepStateChange: @escaping @MainActor (Bool) -> Void,
@@ -22,6 +54,7 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
         onInterruptionStateChange: @escaping @MainActor (_ isInterrupted: Bool, _ shouldResume: Bool?) -> Void,
     ) {
         guard !observersInstalled else { return }
+
         observersInstalled = true
 
         observerTasks.append(
@@ -76,37 +109,6 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
         observerTasks.removeAll()
         observersInstalled = false
         finishPlayback()
-    }
-
-    private static func parseInterruption(_ notification: Notification) -> (Bool, Bool?) {
-        guard
-            let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-            let type = AVAudioSession.InterruptionType(rawValue: typeValue)
-        else {
-            return (true, nil)
-        }
-
-        switch type {
-            case .began:
-                return (true, nil)
-            case .ended:
-                guard let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else {
-                    return (false, nil)
-                }
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                return (false, options.contains(.shouldResume))
-            @unknown default:
-                return (false, nil)
-        }
-    }
-
-    private static func currentOutputRouteDescription(_ route: AVAudioSessionRouteDescription) -> String? {
-        let outputs = route.outputs.map { output in
-            "\(output.portName) [\(output.portType.rawValue)]"
-        }
-        guard !outputs.isEmpty else { return nil }
-
-        return outputs.joined(separator: ", ")
     }
 }
 #endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 @testable import SpeakSwiftly
 import Testing
@@ -660,3 +661,4 @@ private struct BenchmarkError: Error, CustomStringConvertible {
         self.description = description
     }
 }
+#endif

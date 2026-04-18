@@ -22,6 +22,55 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
         Self.currentDefaultAudioPlaybackDeviceDescription()
     }
 
+    private static func currentDefaultAudioPlaybackDeviceDescription() -> String? {
+        var deviceID = AudioObjectID(kAudioObjectUnknown)
+        var dataSize = UInt32(MemoryLayout<AudioObjectID>.size)
+        var deviceAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+        let deviceStatus = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &deviceAddress,
+            0,
+            nil,
+            &dataSize,
+            &deviceID,
+        )
+
+        guard deviceStatus == noErr, deviceID != AudioObjectID(kAudioObjectUnknown) else {
+            return nil
+        }
+
+        var deviceName: CFString = "" as CFString
+        var nameSize = UInt32(MemoryLayout<CFString>.stride)
+        var nameAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceNameCFString,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain,
+        )
+        let nameStatus = withUnsafeMutablePointer(to: &deviceName) { pointer in
+            AudioObjectGetPropertyData(
+                deviceID,
+                &nameAddress,
+                0,
+                nil,
+                &nameSize,
+                UnsafeMutableRawPointer(pointer),
+            )
+        }
+
+        if nameStatus == noErr {
+            let name = "\(deviceName)"
+            if !name.isEmpty {
+                return "\(name) [\(deviceID)]"
+            }
+        }
+
+        return "AudioObjectID \(deviceID)"
+    }
+
     func installObservers(
         onSystemSleepStateChange: @escaping @MainActor (Bool) -> Void,
         onScreenSleepStateChange: @escaping @MainActor (Bool) -> Void,
@@ -30,6 +79,7 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
         onInterruptionStateChange: @escaping @MainActor (_ isInterrupted: Bool, _ shouldResume: Bool?) -> Void,
     ) {
         guard !observersInstalled else { return }
+
         observersInstalled = true
 
         let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
@@ -155,55 +205,6 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
 
         routingArbitration.leave()
         observersInstalled = false
-    }
-
-    private static func currentDefaultAudioPlaybackDeviceDescription() -> String? {
-        var deviceID = AudioObjectID(kAudioObjectUnknown)
-        var dataSize = UInt32(MemoryLayout<AudioObjectID>.size)
-        var deviceAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain,
-        )
-        let deviceStatus = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &deviceAddress,
-            0,
-            nil,
-            &dataSize,
-            &deviceID,
-        )
-
-        guard deviceStatus == noErr, deviceID != AudioObjectID(kAudioObjectUnknown) else {
-            return nil
-        }
-
-        var deviceName: CFString = "" as CFString
-        var nameSize = UInt32(MemoryLayout<CFString>.stride)
-        var nameAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceNameCFString,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain,
-        )
-        let nameStatus = withUnsafeMutablePointer(to: &deviceName) { pointer in
-            AudioObjectGetPropertyData(
-                deviceID,
-                &nameAddress,
-                0,
-                nil,
-                &nameSize,
-                UnsafeMutableRawPointer(pointer),
-            )
-        }
-
-        if nameStatus == noErr {
-            let name = "\(deviceName)"
-            if !name.isEmpty {
-                return "\(name) [\(deviceID)]"
-            }
-        }
-
-        return "AudioObjectID \(deviceID)"
     }
 }
 #endif
