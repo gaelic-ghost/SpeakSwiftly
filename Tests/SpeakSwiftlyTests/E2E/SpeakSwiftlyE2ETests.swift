@@ -1,3 +1,4 @@
+#if os(macOS)
 import Testing
 
 @Suite(
@@ -8,3 +9,4 @@ import Testing
     ),
 )
 enum SpeakSwiftlyE2ETests {}
+#endif

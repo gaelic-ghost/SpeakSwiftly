@@ -133,6 +133,9 @@ private func loadFloatAudioSamples(from url: URL, sampleRate: Int) throws -> [Fl
 }
 
 private func currentRuntimeMemorySnapshot() -> RuntimeMemorySnapshot? {
+    let snapshot = Memory.snapshot()
+
+#if os(macOS)
     var usage = rusage_info_current()
     let usageResult = withUnsafeMutablePointer(to: &usage) { pointer in
         pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rebound in
@@ -140,12 +143,22 @@ private func currentRuntimeMemorySnapshot() -> RuntimeMemorySnapshot? {
         }
     }
 
-    let snapshot = Memory.snapshot()
+    let processResidentBytes = usageResult == 0 ? Int(usage.ri_resident_size) : nil
+    let processPhysFootprintBytes = usageResult == 0 ? Int(usage.ri_phys_footprint) : nil
+    let processUserCPUTimeNS = usageResult == 0 ? Int(usage.ri_user_time) : nil
+    let processSystemCPUTimeNS = usageResult == 0 ? Int(usage.ri_system_time) : nil
+#else
+    let processResidentBytes: Int? = nil
+    let processPhysFootprintBytes: Int? = nil
+    let processUserCPUTimeNS: Int? = nil
+    let processSystemCPUTimeNS: Int? = nil
+#endif
+
     return RuntimeMemorySnapshot(
-        processResidentBytes: usageResult == 0 ? Int(usage.ri_resident_size) : nil,
-        processPhysFootprintBytes: usageResult == 0 ? Int(usage.ri_phys_footprint) : nil,
-        processUserCPUTimeNS: usageResult == 0 ? Int(usage.ri_user_time) : nil,
-        processSystemCPUTimeNS: usageResult == 0 ? Int(usage.ri_system_time) : nil,
+        processResidentBytes: processResidentBytes,
+        processPhysFootprintBytes: processPhysFootprintBytes,
+        processUserCPUTimeNS: processUserCPUTimeNS,
+        processSystemCPUTimeNS: processSystemCPUTimeNS,
         mlxActiveMemoryBytes: snapshot.activeMemory,
         mlxCacheMemoryBytes: snapshot.cacheMemory,
         mlxPeakMemoryBytes: snapshot.peakMemory,

@@ -7,6 +7,7 @@ let package = Package(
     name: "SpeakSwiftly",
     platforms: [
         .macOS(.v15),
+        .iOS(.v17),
     ],
     products: [
         .library(
@@ -25,7 +26,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.17.1"),
+            .upToNextMajor(from: "0.17.2"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",

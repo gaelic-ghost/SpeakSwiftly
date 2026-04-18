@@ -1,6 +1,4 @@
-@preconcurrency import AppKit
 @preconcurrency import AVFoundation
-import CoreAudio
 import Foundation
 import TextForSpeech
 
@@ -13,13 +11,6 @@ final class AudioPlaybackDriver {
     var streamingFormat: AVAudioFormat?
     var engineSampleRate: Double?
     var engineConfigurationObserver: NSObjectProtocol?
-    var workspaceObservers = [NSObjectProtocol]()
-    var defaultOutputDeviceAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain,
-    )
-    var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
     var lastEnvironmentInstabilityAt: Date?
     var recoveryTask: Task<Void, Never>?
     var isSystemSleeping = false
@@ -27,7 +18,6 @@ final class AudioPlaybackDriver {
     var isSessionActive = true
     var playbackRecoveryReason: AudioPlaybackRecoveryReason?
     var playbackRecoveryAttempt = 0
-    var routingArbitration = AVAudioRoutingArbiter.shared
     var activeRequestState: AudioPlaybackRequestState?
     var activeEventSink: (@Sendable (PlaybackEvent) async -> Void)?
     var activeRuntimeFailure: WorkerError?
@@ -35,6 +25,8 @@ final class AudioPlaybackDriver {
     var isPlaybackPausedManually = false
     var environmentEventSink: (@Sendable (PlaybackEnvironmentEvent) async -> Void)?
     var shouldPlayInterJobBoop = false
+
+    let playbackEnvironment: PlaybackEnvironmentCoordinator
 
     private var nextRequestID: UInt64 = 0
     private let traceEnabled: Bool
@@ -54,12 +46,42 @@ final class AudioPlaybackDriver {
         playbackRecoveryReason != nil || isSystemSleeping
     }
 
-    init(traceEnabled: Bool = false) {
+    init(
+        traceEnabled: Bool = false,
+        playbackEnvironment: PlaybackEnvironmentCoordinator? = nil,
+    ) {
         self.traceEnabled = traceEnabled
-        lastObservedOutputDeviceDescription = currentDefaultAudioPlaybackDeviceDescription()
+        let playbackEnvironment = playbackEnvironment ?? makeDefaultPlaybackEnvironmentCoordinator()
+        self.playbackEnvironment = playbackEnvironment
+        lastObservedOutputDeviceDescription = playbackEnvironment.currentOutputDeviceDescription
         installEngineConfigurationObserver()
-        installWorkspaceObservers()
-        installDefaultOutputDeviceObserver()
+        playbackEnvironment.installObservers(
+            onSystemSleepStateChange: { [weak self] isSleeping in
+                self?.handleSystemSleepStateChange(isSleeping: isSleeping)
+            },
+            onScreenSleepStateChange: { [weak self] isSleeping in
+                self?.handleScreenSleepStateChange(isSleeping: isSleeping)
+            },
+            onSessionActivityChange: { [weak self] isActive in
+                self?.handleSessionActivityChange(isActive: isActive)
+            },
+            onOutputDeviceChange: { [weak self] currentDevice in
+                self?.handleObservedOutputDeviceChange(currentDevice: currentDevice)
+            },
+            onInterruptionStateChange: { [weak self] isInterrupted, shouldResume in
+                self?.handleInterruptionStateChange(
+                    isInterrupted: isInterrupted,
+                    shouldResume: shouldResume,
+                )
+            },
+        )
+    }
+
+    deinit {
+        let playbackEnvironment = playbackEnvironment
+        Task { @MainActor in
+            playbackEnvironment.invalidate()
+        }
     }
 
     func setEnvironmentEventSink(
@@ -547,14 +569,13 @@ final class AudioPlaybackDriver {
     func stop() {
         recoveryTask?.cancel()
         recoveryTask = nil
-        tearDownPlaybackHardware(leavingArbitration: true)
+        tearDownPlaybackHardware(leavingPlaybackEnvironment: true)
         playbackRecoveryReason = nil
         playbackRecoveryAttempt = 0
         lastEnvironmentInstabilityAt = nil
         playbackState = .idle
         isPlaybackPausedManually = false
         shouldPlayInterJobBoop = false
-        routingArbitration.leave()
     }
 
     func pause() -> PlaybackState {

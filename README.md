@@ -44,6 +44,16 @@ SpeakSwiftly is a standard Swift package with two direct dependencies:
 - [`TextForSpeech`](https://github.com/gaelic-ghost/TextForSpeech)
 - [`mlx-audio-swift`](https://github.com/gaelic-ghost/mlx-audio-swift)
 
+The package manifest currently declares:
+
+- `macOS 15+`
+- `iOS 17+`
+
+That platform widening is library-first. The typed `SpeakSwiftly` library now
+enters the package graph for both platforms, while the long-lived worker and the
+release-grade MLX verification flow are still maintained as macOS-first
+surfaces.
+
 Library consumers can add the package from GitHub:
 
 ```swift
@@ -291,6 +301,26 @@ If the current vendored `mlx-audio-swift` parser issue blocks that SwiftPM lane,
 use the Xcode-backed validation fallback documented in
 [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
+
+The current Xcode-backed simulator smoke lane for iOS is:
+
+```bash
+xcodebuild build-for-testing \
+  -scheme SpeakSwiftly-Package \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -derivedDataPath .local/xcode/derived-data/ios-smoke \
+  -clonedSourcePackagesDirPath .local/xcode/source-packages
+
+xcodebuild test-without-building \
+  -xctestrun "$(find .local/xcode/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
+  -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
+  -only-testing:'SpeakSwiftlyTests/ProfileStoreTests'
+```
+
+That lane is intentionally library-first. The published worker executable and
+real-model end-to-end coverage are still macOS-first validation surfaces.
 
 Real MLX-backed runtime verification starts by publishing the Xcode-backed runtime:
 

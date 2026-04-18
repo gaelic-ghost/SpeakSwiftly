@@ -1,12 +1,18 @@
+#if os(macOS)
 import Foundation
 @testable import SpeakSwiftly
 import Testing
 
 extension SpeakSwiftlyE2ETests {
+    @Suite(
+        .enabled(
+            if: SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled,
+            "This deep-trace suite is opt-in and requires SPEAKSWIFTLY_DEEP_TRACE_E2E=1.",
+        ),
+    )
     struct DeepTraceSuite {
         @Test func `long code heavy`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -79,7 +85,6 @@ extension SpeakSwiftlyE2ETests {
 
         @Test func `segmented weird text`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -162,7 +167,6 @@ extension SpeakSwiftlyE2ETests {
 
         @Test func `reversed segmented weird text`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -245,7 +249,6 @@ extension SpeakSwiftlyE2ETests {
 
         @Test func `segmented conversational prose`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -327,7 +330,6 @@ extension SpeakSwiftlyE2ETests {
 
         @Test func `reversed segmented conversational prose`() async throws {
             #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-            #expect(SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled)
 
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
@@ -408,3 +410,4 @@ extension SpeakSwiftlyE2ETests {
         }
     }
 }
+#endif

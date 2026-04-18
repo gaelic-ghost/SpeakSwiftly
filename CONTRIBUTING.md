@@ -654,6 +654,21 @@ tests. Keep `swift package dump-package` as the manifest sanity check, but use
 the repo-root Xcode-backed package lane for CI build-and-test coverage until
 the vendored parser failure is gone.
 
+The current CI split is:
+
+- macOS Xcode-backed package validation:
+  - `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
+  - `SpeakSwiftlyTests/LibrarySurfaceTests`
+  - `SpeakSwiftlyTests/ModelClientsTests`
+- iOS Simulator compile-and-smoke validation:
+  - `SpeakSwiftlyTests/LibrarySurfaceTests`
+  - `SpeakSwiftlyTests/SupportResourcesTests`
+  - `SpeakSwiftlyTests/ProfileStoreTests`
+
+Keep the iOS lane library-first. The worker-driven e2e harness under
+`Tests/SpeakSwiftlyTests/E2E/` is macOS-only because it launches the published
+CLI worker process and does not model an app-hosted iOS runtime.
+
 Long deep-trace playback probe:
 
 ```bash
