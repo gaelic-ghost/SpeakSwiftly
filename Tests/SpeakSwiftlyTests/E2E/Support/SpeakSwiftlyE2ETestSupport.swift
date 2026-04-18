@@ -695,6 +695,7 @@ final class WorkerProcess: @unchecked Sendable {
         let packageRootURL = try Self.packageRootURL()
         let buildConfiguration = "Debug"
         let runtimeConfiguration = configuration
+        let profileRootOverrideURL = Self.workerProfileRootOverrideURL(for: profileRootURL)
         try Self.publishWorkerRuntime(packageRootURL: packageRootURL, configuration: buildConfiguration)
 
         process = Process()
@@ -722,7 +723,7 @@ final class WorkerProcess: @unchecked Sendable {
             try runtimeConfiguration.save(
                 to: SpeakSwiftly.Configuration.defaultPersistenceURL(
                     fileManager: .default,
-                    profileRootOverride: profileRootURL.path,
+                    profileRootOverride: profileRootOverrideURL.path,
                 ),
             )
         }
@@ -735,7 +736,7 @@ final class WorkerProcess: @unchecked Sendable {
 
         var environment = ProcessInfo.processInfo.environment
         environment[Environment.dyldFrameworkPath] = executableURL.deletingLastPathComponent().path
-        environment[Environment.profileRoot] = profileRootURL.path
+        environment[Environment.profileRoot] = profileRootOverrideURL.path
         if silentPlayback, !speakSwiftlyAudibleE2ETestsEnabled() {
             environment[Environment.silentPlayback] = "1"
         }
@@ -765,6 +766,18 @@ final class WorkerProcess: @unchecked Sendable {
 
         try process.run()
         artifacts.recordProcessID(process.processIdentifier)
+    }
+
+    private static func workerProfileRootOverrideURL(for profileRootURL: URL) -> URL {
+        guard profileRootURL.lastPathComponent == ProfileStore.profilesDirectoryName else {
+            return profileRootURL
+        }
+
+        // The E2E sandbox hands WorkerProcess the actual profile-store root.
+        // The runtime override env var, however, expects the broader state root
+        // so it can derive profiles/, configuration.json, and text-profiles.json
+        // consistently without nesting profiles/profiles/.
+        return profileRootURL.deletingLastPathComponent()
     }
 
     deinit {
