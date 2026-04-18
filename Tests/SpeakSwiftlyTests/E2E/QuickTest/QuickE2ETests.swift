@@ -4,7 +4,6 @@ import Foundation
 import Testing
 
 @Suite(
-    "Quick E2E",
     .serialized,
     .tags(.e2e, .quick),
     .enabled(

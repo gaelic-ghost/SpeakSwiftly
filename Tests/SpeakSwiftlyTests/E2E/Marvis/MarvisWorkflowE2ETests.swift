@@ -3,7 +3,7 @@ import Foundation
 @testable import SpeakSwiftly
 import Testing
 
-enum MarvisRouteCase: String, CaseIterable, Sendable {
+enum MarvisRouteCase: String, CaseIterable {
     case femme
     case mascClone
     case androgenous
@@ -77,7 +77,7 @@ enum MarvisRouteCase: String, CaseIterable, Sendable {
     }
 }
 
-private struct MarvisProfileLane: Sendable {
+private struct MarvisProfileLane {
     let createID: String
     let liveID: String
     let profileName: String
@@ -114,7 +114,6 @@ private struct MarvisProfileLane: Sendable {
 }
 
 @Suite(
-    "Marvis E2E",
     .serialized,
     .tags(.e2e, .marvis),
     .enabled(
@@ -123,8 +122,8 @@ private struct MarvisProfileLane: Sendable {
     ),
 )
 struct MarvisE2ETests {
-    @Test("routes expected conversational voice", arguments: MarvisRouteCase.allCases)
-    func routesExpectedConversationalVoice(testCase: MarvisRouteCase) async throws {
+    @Test(arguments: MarvisRouteCase.allCases)
+    func `routes expected conversational voice`(testCase: MarvisRouteCase) async throws {
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
 

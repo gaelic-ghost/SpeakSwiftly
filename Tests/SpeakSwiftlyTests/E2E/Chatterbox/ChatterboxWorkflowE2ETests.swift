@@ -4,7 +4,6 @@ import Foundation
 import Testing
 
 @Suite(
-    "Chatterbox E2E",
     .serialized,
     .tags(.e2e, .chatterbox),
     .enabled(
