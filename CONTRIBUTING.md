@@ -573,11 +573,15 @@ swift build
 swift test
 ```
 
-When that plain SwiftPM lane fails in the current vendored `mlx-audio-swift`
-checkout with the `EnglishG2P.swift` parser error, treat that as a known
-validation-lane snag instead of a fresh local mystery. Do not keep retrying the
-same `swift build` / `swift test` commands. Switch to the Xcode-backed package
-workspace lane documented below and in
+The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
+lane for this repository, including the worker-backed `QuickE2ETests` path.
+Treat plain `swift build` and `swift test` as the default verification story
+again.
+
+If a future toolchain regression brings back the old `EnglishG2P.swift` parser
+failure, treat that as a fallback-lane trigger instead of a fresh local
+mystery. Do not keep retrying the same `swift build` / `swift test` commands.
+Switch to the Xcode-backed package workspace lane documented below and in
 [`docs/maintainers/validation-lanes.md`](docs/maintainers/validation-lanes.md).
 
 Publish and verify a real Xcode-backed runtime:
@@ -597,25 +601,31 @@ sh scripts/repo-maintenance/update-vendored-mlx-bundle.sh
 
 Opt-in real-model e2e coverage. The e2e surface is split into top-level domain suites such as `QwenE2ETests`, `MarvisE2ETests`, and `DeepTraceE2ETests`, and each suite carries its own Swift Testing traits directly at the suite declaration.
 
+Use the repo-maintenance wrappers first so the runner shape stays consistent and the machine never launches multiple top-level worker-backed suites at once:
+
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter E2ETests
+sh scripts/repo-maintenance/run-e2e.sh --suite quick
+sh scripts/repo-maintenance/run-e2e-full.sh
 ```
+
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `QuickE2ETests`, `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter QuickE2ETests
+sh scripts/repo-maintenance/run-e2e.sh --suite quick
 ```
 
 One-shot qwen resident `generate_speech` verification:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter QwenE2ETests/voiceDesignSilentThenAudible
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen
 ```
 
 Prepared-conditioning qwen verification. This boots the worker in `prepared_conditioning` mode, confirms the first request persists a stored Qwen conditioning artifact on the profile, then restarts the worker and confirms the second request reloads that stored artifact instead of rebuilding it from raw reference inputs:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen
 SPEAKSWIFTLY_E2E=1 swift test --filter QwenE2ETests/preparedConditioningPersistsAndReloadsAcrossWorkerRestart
 ```
 
@@ -628,7 +638,7 @@ SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter preparedQwenConditionin
 Force audible playback in the e2e suite:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_AUDIBLE_E2E=1 swift test --filter E2ETests
+sh scripts/repo-maintenance/run-e2e-full.sh --audible
 ```
 
 Retained real-model run artifacts live under `.local/e2e-runs`.
@@ -636,17 +646,24 @@ Retained real-model run artifacts live under `.local/e2e-runs`.
 Chunk-level trace during e2e:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter E2ETests
+sh scripts/repo-maintenance/run-e2e-full.sh --playback-trace
 ```
 
 Without `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, the trace-capture suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
 
-For the targeted first-request Marvis tuning lane, the current reliable rerun path is the Xcode-backed runtime:
+For the targeted first-request Marvis tuning lane, prefer the plain SwiftPM
+wrapper first:
 
-- direct `swift test` is still blocked by the vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`
-- direct `xcodebuild test` does not currently carry `SPEAKSWIFTLY_E2E=1` through the Swift Testing suite gate on its own
-- the working path is `xcodebuild build-for-testing`, then an `.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building` against this exact test identifier:
-- on current Xcode manifests, that override lives under `TestConfigurations -> TestTargets -> EnvironmentVariables`
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite marvis --playback-trace
+```
+
+If a future toolchain regression blocks that ordinary path again, the older
+Xcode-backed fallback still works: `xcodebuild build-for-testing`, then an
+`.xctestrun` override that injects `SPEAKSWIFTLY_E2E=1` and
+`SPEAKSWIFTLY_PLAYBACK_TRACE=1`, then `xcodebuild test-without-building`
+against this exact test identifier. On current Xcode manifests, that override
+lives under `TestConfigurations -> TestTargets -> EnvironmentVariables`.
 
 ```text
 SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()
@@ -660,9 +677,9 @@ validation when SwiftPM is blocked:
 3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
 
 GitHub Actions should follow that same fallback lane for package compilation and
-tests. Keep `swift package dump-package` as the manifest sanity check, but use
-the repo-root Xcode-backed package lane for CI build-and-test coverage until
-the vendored parser failure is gone.
+tests only when the ordinary SwiftPM lane regresses again. Keep
+`swift package dump-package` as the manifest sanity check. The normal CI story
+should stay SwiftPM-first unless the parser failure returns.
 
 The current CI split is:
 
@@ -682,12 +699,14 @@ CLI worker process and does not model an app-hosted iOS runtime.
 Long deep-trace playback probe:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter DeepTraceE2ETests/longCodeHeavy
 ```
 
 Opt-in qwen resident benchmark comparison:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen-benchmark --benchmark
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter QwenBenchmarkE2ETests
 ```
 
@@ -696,6 +715,7 @@ Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped duri
 Run multiple comparison samples per Qwen conditioning strategy:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen-benchmark --benchmark --benchmark-iterations 3
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter QwenBenchmarkE2ETests
 ```
 
@@ -704,6 +724,7 @@ Each benchmark run persists a timestamped JSON summary under `.local/benchmarks`
 Section-aware weird-text deep-trace probes:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace --playback-trace
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/segmentedWeirdText
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/reversedSegmentedWeirdText
 ```
@@ -711,6 +732,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 s
 Section-aware conversational prose deep-trace probes:
 
 ```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace --playback-trace
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/segmentedConversationalProse
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/reversedSegmentedConversationalProse
 ```

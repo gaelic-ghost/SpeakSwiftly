@@ -69,8 +69,9 @@ For package-local validation:
 swift build
 ```
 
-If that SwiftPM lane hits the current vendored `mlx-audio-swift` parser failure in
-`EnglishG2P.swift`, switch to the Xcode-backed validation path in
+The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
+build and test path. If a future toolchain regression brings back the old
+`EnglishG2P.swift` parser failure, use the documented fallback lane in
 [CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same
 plain `swift build` / `swift test` commands.
 
@@ -251,7 +252,17 @@ swift build
 swift test
 ```
 
-If the current vendored `mlx-audio-swift` parser issue blocks that SwiftPM lane, or if you need the Xcode-backed package, simulator, or real-runtime lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
+For worker-backed end-to-end verification, prefer the repo-maintenance wrappers:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite quick
+sh scripts/repo-maintenance/run-e2e-full.sh
+```
+
+If a future toolchain regression blocks the ordinary SwiftPM lane again, or if
+you specifically need the Xcode-backed package, simulator, or real-runtime
+lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
 
 ## License
 

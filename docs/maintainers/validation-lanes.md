@@ -13,11 +13,13 @@ swift test
 
 That is still the right default for quick compile and unit-coverage feedback.
 
-## Known SwiftPM Snag
+## Historical SwiftPM Snag
 
-The current vendored `mlx-audio-swift` checkout can fail under plain SwiftPM
-with parser errors in `EnglishG2P.swift`. When that happens, treat it as a
-known lane limitation, not as a fresh repository mystery.
+The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
+lane for this repository. The notes below are retained because earlier pins
+could fail under plain SwiftPM with parser errors in `EnglishG2P.swift`, and we
+may need the same fallback again if a future toolchain regression reintroduces
+that behavior.
 
 Typical symptom:
 
@@ -25,7 +27,7 @@ Typical symptom:
 .../EnglishG2P.swift: error: new Swift parser generated errors for code that C++ parser accepted
 ```
 
-When that happens:
+If that failure returns:
 
 1. Stop retrying the same `swift build` or `swift test` command.
 2. Switch to the Xcode-backed package workspace lane.
@@ -33,7 +35,7 @@ When that happens:
 
 ## Xcode-Backed Fallback Lane
 
-Use this for:
+Use this fallback for:
 
 - release hardening
 - MLX-backed real-model coverage
@@ -67,8 +69,8 @@ For GitHub Actions, keep the manifest sanity check as:
 swift package dump-package
 ```
 
-Then use the same Xcode-backed package lane for build-and-test coverage instead
-of plain `swift build` / `swift test` until the vendored parser snag is gone.
+Then use the same Xcode-backed package lane for build-and-test coverage only
+while the SwiftPM parser regression is actually present.
 The current macOS CI target set is:
 
 - `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
@@ -111,9 +113,80 @@ app-hosted iOS e2e story later.
 
 ## E2E and Real-Model Notes
 
-Plain `swift test` remains the default opt-in path for many e2e commands in
-this repository, but the Xcode-backed lane is the current reliable fallback
-whenever the SwiftPM parser issue blocks progress.
+Now that the plain SwiftPM parser failure in `EnglishG2P.swift` has been fixed
+in the current `mlx-audio-swift` fork pin, prefer the repo-maintenance shell
+wrappers instead of the older Xcode `.xctestrun` dance for ordinary E2E work:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite quick
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen
+sh scripts/repo-maintenance/run-e2e-full.sh
+```
+
+The wrappers intentionally run one top-level worker-backed suite per process so
+Xcode or Swift Testing cannot freeze Gale's machine by launching multiple model
+loading suites at once.
+
+Plain `swift test` remains the execution engine under those wrappers. Keep the
+Xcode-backed lane as a fallback only if a future toolchain regression breaks the
+ordinary SwiftPM path again.
+
+For the default full macOS e2e slice, prefer the repo-maintenance wrappers:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite quick
+sh scripts/repo-maintenance/run-e2e-full.sh
+```
+
+Keep the older Xcode lane below as a fallback only if the SwiftPM parser
+regression returns. In that fallback, build once, patch the generated
+`.xctestrun` file to inject `SPEAKSWIFTLY_E2E=1`, then run the current
+top-level suite set explicitly:
+
+```bash
+xcodebuild build-for-testing -quiet \
+  -scheme SpeakSwiftly-Package \
+  -destination 'platform=macOS' \
+  -derivedDataPath .local/xcode/derived-data/e2e-full \
+  -clonedSourcePackagesDirPath .local/xcode/source-packages
+```
+
+```bash
+uv run python - <<'PY'
+from pathlib import Path
+import plistlib
+
+xctestrun_path = next(
+    Path(".local/xcode/derived-data/e2e-full/Build/Products").glob("*.xctestrun")
+)
+
+with xctestrun_path.open("rb") as f:
+    data = plistlib.load(f)
+
+for config in data.get("TestConfigurations", []):
+    for target in config.get("TestTargets", []):
+        env = target.setdefault("EnvironmentVariables", {})
+        env["SPEAKSWIFTLY_E2E"] = "1"
+
+with xctestrun_path.open("wb") as f:
+    plistlib.dump(data, f)
+PY
+```
+
+```bash
+xcodebuild test-without-building -quiet \
+  -xctestrun "$(find .local/xcode/derived-data/e2e-full/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -destination 'platform=macOS' \
+  -only-testing:'SpeakSwiftlyTests/QuickE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/QwenE2ETests'
+```
+
+That lane excludes the opt-in `DeepTraceE2ETests` and `QwenBenchmarkE2ETests`
+families unless you deliberately inject their extra environment flags too.
 
 For Marvis overlap and trace work, prefer the dedicated runbook:
 
@@ -124,4 +197,4 @@ For Marvis overlap and trace work, prefer the dedicated runbook:
 - Never run multiple heavy validation commands at the same time.
 - Never run multiple SwiftPM or Xcode build or test processes concurrently.
 - Prefer one clean targeted rerun over broad shotgun retries.
-- If the failure is clearly the vendored parser snag, document that lane choice in your notes instead of treating it as an unexplained flake.
+- If the failure is clearly the older vendored parser snag, document that lane choice in your notes instead of treating it as an unexplained flake.

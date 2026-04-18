@@ -30,7 +30,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            from: "69.1.5",
+            from: "69.2.0",
         ),
     ],
     targets: [

@@ -55,11 +55,17 @@ The current retained run artifacts live under:
 
 ## Important Workflow Constraint
 
-Use the Xcode-backed e2e path for this work.
+For ordinary reruns of the Marvis suite, prefer the plain SwiftPM wrapper:
 
-Plain `swift test` is still not the reliable path for this exact Marvis lane
-because the vendored `mlx-audio-swift` checkout can hit the parser issue in
-`EnglishG2P.swift`. The current stable maintainer workflow is:
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite marvis --playback-trace
+```
+
+For this specific Instruments-driven profiling workflow, keep using the
+Xcode-backed path below so one build-for-testing pass can feed repeated,
+targeted `test-without-building` capture sessions. The Xcode workflow here is
+about repeatable profiling mechanics, not about the older `EnglishG2P.swift`
+parser failure. The current stable profiling workflow is:
 
 1. one `xcodebuild build-for-testing` pass
 2. one `.xctestrun` environment override

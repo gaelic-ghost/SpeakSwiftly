@@ -440,6 +440,58 @@ Exit criteria:
 
 ## History
 
+### 2026-04-18 release-history consolidation
+
+These older release-prep and release-note docs were archived and removed as
+standalone files because their durable roadmap-relevant outcomes are better
+captured here than in a growing patch-by-patch document pile.
+
+- `docs/releases/v3-0-5-release-prep.md`
+  Result: the durable outcome was startup-playback cleanup plus a temporary
+  Xcode-backed validation fallback while the vendored `EnglishG2P.swift`
+  parser snag was still active.
+- `docs/releases/v3-0-5-release-notes.md`
+  Result: the durable outcome was playback-startup hardening and the
+  `TextForSpeech` `0.17.0` uptake rather than a release-note surface worth
+  preserving on its own.
+- `docs/releases/v3-0-6-release-prep.md`
+  Result: the durable outcome was the Chatterbox backend landing, runtime-owned
+  chunked live playback for non-streaming synthesis, and the first cleanup pass
+  that moved stale planning details into roadmap history.
+- `docs/releases/v3-0-6-release-notes.md`
+  Result: the durable outcome was one stable Chatterbox story in the package
+  docs and active milestones, not a branch-specific release summary.
+- `docs/releases/v3-0-7-release-prep.md`
+  Result: the durable outcome was playback-drain waiter hardening for queued
+  live playback and the explicit Swift 6 language-mode declaration in
+  `Package.swift`.
+- `docs/releases/v3-0-7-release-notes.md`
+  Result: the durable outcome was playback cancellation safety and release-doc
+  relocation completion, now reflected by the remaining docs layout rather than
+  by keeping this note around.
+- `docs/releases/v3-0-8-release-prep.md`
+  Result: the durable outcome was `TextForSpeech` `0.17.1` uptake plus source
+  and test layout cleanup that mirrors the feature-oriented package structure.
+- `docs/releases/v3-0-8-release-notes.md`
+  Result: the durable outcome was maintainability cleanup and dependency
+  uptake, not a release-note surface that still needs to live separately.
+
+Release-train summary that remains historically important:
+
+- `v3.0.5` hardened startup playback behavior, stopped noisy pre-request
+  playback environment observation, and picked up `TextForSpeech` `0.17.0`.
+- `v3.0.6` landed Chatterbox as a first-class backend with runtime-owned
+  chunked live playback over a non-streaming backend path.
+- `v3.0.7` hardened playback-drain waiter cancellation and pinned the package
+  explicitly to Swift 6 language mode.
+- `v3.0.8` picked up `TextForSpeech` `0.17.1` and finished a feature-oriented
+  playback and test-tree cleanup.
+- The old temporary Xcode-backed e2e and package-test fallback belongs to this
+  historical era, not the current default workflow. The current branch has
+  since moved back to ordinary SwiftPM validation after the
+  `mlx-audio-swift` parser fix and now uses one-suite-at-a-time wrapper scripts
+  for worker-backed e2e coverage.
+
 ### 2026-04-15 playback architecture cleanup
 
 - `Milestone 23` landed by flattening live playback request ownership around one runtime-owned `LiveSpeechRequestState` that survives from acceptance through terminal playback completion.
