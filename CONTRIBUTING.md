@@ -15,6 +15,7 @@ Keep the doc split clean:
 
 - [README.md](README.md) should stay focused on setup, usage, public API names, and baseline verification
 - this document should hold architecture notes, repository workflow, operator behavior, full wire examples, and extended verification paths
+- the package-facing worker protocol article lives in [Sources/SpeakSwiftly/SpeakSwiftly.docc/WorkerContract.md](Sources/SpeakSwiftly/SpeakSwiftly.docc/WorkerContract.md), while this file keeps the deeper maintainer context behind it
 
 ## Formatting
 

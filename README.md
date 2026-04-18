@@ -8,7 +8,6 @@ Local text-to-speech for Swift apps and local toolchains, with a typed Swift API
 - [Setup](#setup)
 - [Usage](#usage)
 - [API Notes](#api-notes)
-- [Command Reference](#command-reference)
 - [Development](#development)
 - [Verification](#verification)
 - [License](#license)
@@ -216,15 +215,6 @@ Key typed runtime entry points include:
 - `runtime.reloadModels()`
 - `runtime.unloadModels()`
 
-The typed Swift API and the JSONL worker deliberately use different naming styles:
-
-- Swift keeps Cocoa-style method names that read naturally at the call site.
-- JSONL keeps snake_case, verb-first operation names.
-- JSONL read-one operations use `get_*`.
-- JSONL collection and queue reads use `list_*`.
-- JSONL CRUD-style writes use `create_*`, `replace_*`, `update_*`, and `delete_*` where those verbs fit the real semantics.
-- JSONL lifecycle and control operations keep literal verbs like `generate_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
-
 Resident runtime controls currently map like this:
 
 | Typed Swift API | JSONL `op` | Notes |
@@ -234,43 +224,10 @@ Resident runtime controls currently map like this:
 | `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
 | `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
 
-## Command Reference
+For the full JSONL worker contract, request and event examples, naming rules, and queue semantics, see:
 
-The worker protocol is newline-delimited JSON over standard input and output.
-
-Representative request shapes:
-
-```json
-{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
-{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
-{"id":"req-rename","op":"update_voice_profile_name","profile_name":"default-femme","new_profile_name":"guide-femme"}
-{"id":"req-reroll","op":"reroll_voice_profile","profile_name":"guide-femme"}
-{"id":"req-text-style","op":"get_text_profile_style"}
-{"id":"req-set-text-style","op":"set_text_profile_style","text_profile_style":"compact"}
-{"id":"req-status","op":"get_status"}
-{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
-{"id":"req-generated-files","op":"list_generated_files"}
-{"id":"req-switch","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}
-{"id":"req-reload","op":"reload_models"}
-{"id":"req-unload","op":"unload_models"}
-```
-
-Representative response and event shapes:
-
-```json
-{"event":"worker_status","stage":"warming_resident_model","resident_state":"warming","speech_backend":"qwen3"}
-{"event":"worker_status","stage":"resident_model_ready","resident_state":"ready","speech_backend":"qwen3"}
-{"id":"req-unload","ok":true,"status":{"event":"worker_status","stage":"resident_models_unloaded","resident_state":"unloaded","speech_backend":"qwen3"},"speech_backend":"qwen3"}
-{"id":"req-after-unload","event":"queued","reason":"waiting_for_resident_models","queue_position":1}
-{"id":"req-reload","ok":true,"status":{"event":"worker_status","stage":"resident_model_ready","resident_state":"ready","speech_backend":"qwen3"},"speech_backend":"qwen3"}
-```
-
-Queued work uses `waiting_for_resident_model` during initial resident warmup and `waiting_for_resident_models` only after an explicit model unload parks resident-dependent work.
-
-Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. The typed Swift helpers populate caller working-directory context automatically.
-
-For fuller wire examples, queueing behavior, and operator-facing runtime notes, see [CONTRIBUTING.md](CONTRIBUTING.md).
+- [WorkerContract DocC article](Sources/SpeakSwiftly/SpeakSwiftly.docc/WorkerContract.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Development
 
@@ -279,16 +236,11 @@ Use this repository as the source-of-truth development home for SpeakSwiftly. Ke
 For package-focused development, prefer:
 
 ```bash
-sh scripts/repo-maintenance/validate-all.sh
 swift build
 swift test
-swiftformat --lint --config .swiftformat .
-swiftlint lint --config .swiftlint.yml
 ```
 
-`validate-all.sh` is the shared formatting-and-guidance gate. The sample pre-commit hook runs it locally, the release script runs it before tagging work by default, and CI now calls the same script before package build and test steps.
-
-For real runtime verification and published local worker workflows, use the scripts under `scripts/repo-maintenance/` as described in [CONTRIBUTING.md](CONTRIBUTING.md).
+For formatter, lint, maintainer workflow, published runtime, and deeper operator guidance, use [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Verification
 
@@ -299,41 +251,7 @@ swift build
 swift test
 ```
 
-If the current vendored `mlx-audio-swift` parser issue blocks that SwiftPM lane,
-use the Xcode-backed validation fallback documented in
-[CONTRIBUTING.md](CONTRIBUTING.md) and
-[docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
-
-The current Xcode-backed simulator smoke lane for iOS is:
-
-```bash
-xcodebuild build-for-testing \
-  -scheme SpeakSwiftly-Package \
-  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
-  -derivedDataPath .local/xcode/derived-data/ios-smoke \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
-
-xcodebuild test-without-building \
-  -xctestrun "$(find .local/xcode/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
-  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
-  -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
-  -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
-  -only-testing:'SpeakSwiftlyTests/ProfileStoreTests'
-```
-
-That lane is intentionally library-first. The published worker executable and
-real-model end-to-end coverage are still macOS-first validation surfaces.
-
-Real MLX-backed runtime verification starts by publishing the Xcode-backed runtime:
-
-```bash
-sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
-sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
-```
-
-Extended e2e, trace-capture, and deep-trace workflows are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-The serialized `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite` is the current end-to-end Chatterbox lane. It runs silently by default so the release lane stays safe on Gale's machine, and it switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
+If the current vendored `mlx-audio-swift` parser issue blocks that SwiftPM lane, or if you need the Xcode-backed package, simulator, or real-runtime lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
 
 ## License
 
