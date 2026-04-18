@@ -219,10 +219,10 @@ Resident runtime controls currently map like this:
 
 | Typed Swift API | JSONL `op` | Notes |
 | --- | --- | --- |
-| `status(id:)` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
-| `switchSpeechBackend(to:id:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
-| `reloadModels(id:)` | `"reload_models"` | Re-warms the currently selected resident backend. |
-| `unloadModels(id:)` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
+| `status()` | `"get_status"` | Returns the current `stage`, `resident_state`, and `speech_backend`. |
+| `switchSpeechBackend(to:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
+| `reloadModels()` | `"reload_models"` | Re-warms the currently selected resident backend. |
+| `unloadModels()` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
 
 For the full JSONL worker contract, request and event examples, naming rules, and queue semantics, see:
 

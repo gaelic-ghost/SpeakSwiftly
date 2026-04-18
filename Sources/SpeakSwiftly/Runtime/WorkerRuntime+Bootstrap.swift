@@ -81,7 +81,10 @@ extension SpeakSwiftly.Runtime {
         let generationJobStore = GenerationJobStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GenerationJobStore.directoryName, isDirectory: true),
         )
-        let textProfilesURL = profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName)
+        let textProfilesURL = ProfileStore.defaultTextProfilesURL(
+            fileManager: dependencies.fileManager,
+            profileRootOverride: environment[Environment.profileRootOverride],
+        )
         let normalizer = configuration?.textNormalizer
             ?? makeDefaultNormalizer(
                 persistenceURL: textProfilesURL,

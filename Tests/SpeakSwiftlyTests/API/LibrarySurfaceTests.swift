@@ -139,6 +139,30 @@ import Darwin
     #expect(await normalizer.persistence.url() == expectedURL)
 }
 
+@Test func `liftoff normalizer persistence matches the default text profile path`() async throws {
+    let overrideRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: overrideRoot) }
+
+    let environmentVariable = ProfileStore.profileRootOverrideEnvironmentVariable
+    let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
+    setenv(environmentVariable, overrideRoot.path, 1)
+    defer {
+        if let previousValue {
+            setenv(environmentVariable, previousValue, 1)
+        } else {
+            unsetenv(environmentVariable)
+        }
+    }
+
+    let runtime = await SpeakSwiftly.liftoff()
+    let expectedURL = ProfileStore.defaultTextProfilesURL(
+        fileManager: .default,
+        profileRootOverride: overrideRoot.path,
+    )
+
+    #expect(await runtime.normalizer.persistence.url() == expectedURL)
+}
+
 // MARK: - Runtime Helpers
 
 @Test func `public library surface exposes queueing helpers`() {

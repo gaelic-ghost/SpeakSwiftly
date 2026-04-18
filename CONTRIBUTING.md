@@ -84,7 +84,7 @@ Current typed-surface conventions:
 - live playback and file rendering are separate generation calls, with `Generate.speech(...)` and `Generate.audio(...)`
 - generation-queue inspection lives under `Jobs`
 - playback-queue inspection lives under `Player.list(...)`
-- resident runtime controls use `status(id:)`, `switchSpeechBackend(to:id:)`, `reloadModels(id:)`, and `unloadModels(id:)`
+- resident runtime controls use `status()`, `switchSpeechBackend(to:)`, `reloadModels()`, and `unloadModels()`
 - decode/result model memberwise initializers should stay internal unless callers have a concrete need to construct those values themselves
 - `BatchItem` remains public only because batch submission is still intentionally caller-authored at that layer
 

@@ -178,7 +178,7 @@ public extension SpeakSwiftly {
         }
 
         struct GenerationScheduleDecision {
-            let runnableJobs: [GenerationController.Job]
+            let runnableJobs: [SpeechGenerationController.Job]
             let parkReasons: [UUID: GenerationParkReason]
         }
 
@@ -343,7 +343,7 @@ public extension SpeakSwiftly {
         let generationJobStore: GenerationJobStore
         let normalizerRef: SpeakSwiftly.Normalizer
         let playbackController: PlaybackController
-        let generationController = GenerationController()
+        let generationController = SpeechGenerationController()
         let logTimestampFormatter = ISO8601DateFormatter()
         let maxAcceptedSpeechJobs = 8
 

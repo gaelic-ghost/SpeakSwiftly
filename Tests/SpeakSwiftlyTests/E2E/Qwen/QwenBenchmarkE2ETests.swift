@@ -177,7 +177,10 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             fileManager: dependencies.fileManager,
         )
         let normalizer = try SpeakSwiftly.Normalizer(
-            persistenceURL: profileStore.rootURL.appending(path: ProfileStore.textProfilesFileName),
+            persistenceURL: ProfileStore.defaultTextProfilesURL(
+                fileManager: dependencies.fileManager,
+                profileRootOverride: profileRootURL.path,
+            ),
         )
         let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
 

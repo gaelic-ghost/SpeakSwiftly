@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Generation Queue
 
-actor GenerationController {
+actor SpeechGenerationController {
     struct Job: Equatable {
         let token: UUID
         let request: WorkerRequest

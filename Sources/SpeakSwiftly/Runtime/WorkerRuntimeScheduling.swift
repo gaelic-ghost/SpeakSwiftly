@@ -70,18 +70,18 @@ extension SpeakSwiftly.Runtime {
     }
 
     func evaluateGenerationSchedule(
-        activeJobs: [GenerationController.Job],
-        queuedJobs: [GenerationController.Job],
+        activeJobs: [SpeechGenerationController.Job],
+        queuedJobs: [SpeechGenerationController.Job],
         playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) throws -> GenerationScheduleDecision {
         guard !queuedJobs.isEmpty else {
             return GenerationScheduleDecision(runnableJobs: [], parkReasons: [:])
         }
 
-        var runnableJobs = [GenerationController.Job]()
+        var runnableJobs = [SpeechGenerationController.Job]()
         var parkReasons = [UUID: GenerationParkReason]()
         var sawParkedResidentDependentWork = false
-        var selectedJobs = [GenerationController.Job]()
+        var selectedJobs = [SpeechGenerationController.Job]()
 
         for job in queuedJobs where !isBlockedByProfileCreation(job, activeJobs: activeJobs, queuedJobs: queuedJobs) {
             if sawParkedResidentDependentWork, !job.request.canBypassParkedResidentWork {
@@ -121,8 +121,8 @@ extension SpeakSwiftly.Runtime {
     }
 
     func generationDisposition(
-        for job: GenerationController.Job,
-        activeJobs: [GenerationController.Job],
+        for job: SpeechGenerationController.Job,
+        activeJobs: [SpeechGenerationController.Job],
         playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) throws -> GenerationJobDisposition {
         let request = job.request
@@ -199,9 +199,9 @@ extension SpeakSwiftly.Runtime {
     }
 
     func isBlockedByProfileCreation(
-        _ job: GenerationController.Job,
-        activeJobs: [GenerationController.Job],
-        queuedJobs: [GenerationController.Job],
+        _ job: SpeechGenerationController.Job,
+        activeJobs: [SpeechGenerationController.Job],
+        queuedJobs: [SpeechGenerationController.Job],
     ) -> Bool {
         guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _) = job.request else {
             return false
@@ -240,9 +240,9 @@ extension SpeakSwiftly.Runtime {
     }
 
     func logMarvisSchedulerSnapshotIfNeeded(
-        activeJobs: [GenerationController.Job],
-        queuedJobs: [GenerationController.Job],
-        runnableJobs: [GenerationController.Job],
+        activeJobs: [SpeechGenerationController.Job],
+        queuedJobs: [SpeechGenerationController.Job],
+        runnableJobs: [SpeechGenerationController.Job],
         parkReasons: [UUID: GenerationParkReason],
         playbackTelemetry: PlaybackController.ConcurrencySnapshot,
     ) async {
@@ -310,7 +310,7 @@ extension SpeakSwiftly.Runtime {
 
     func logMarvisGenerationLaneReservedIfNeeded(
         for request: WorkerRequest,
-        activeJobs: [GenerationController.Job],
+        activeJobs: [SpeechGenerationController.Job],
         playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) async {
         guard let lane = try? marvisGenerationLane(for: request) else { return }
@@ -333,7 +333,7 @@ extension SpeakSwiftly.Runtime {
 
     func logMarvisGenerationLaneReleasedIfNeeded(
         for request: WorkerRequest,
-        activeJobs: [GenerationController.Job],
+        activeJobs: [SpeechGenerationController.Job],
         disposition: GenerationCompletionDisposition,
     ) async {
         guard let lane = try? marvisGenerationLane(for: request) else { return }
