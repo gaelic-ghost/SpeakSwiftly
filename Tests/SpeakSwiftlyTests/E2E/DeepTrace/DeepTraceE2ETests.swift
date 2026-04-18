@@ -3,56 +3,60 @@ import Foundation
 @testable import SpeakSwiftly
 import Testing
 
-extension SpeakSwiftlyE2ETests {
-    @Suite(
-        .enabled(
-            if: SpeakSwiftlyE2ETests.isDeepTraceE2EEnabled,
-            "This deep-trace suite is opt-in and requires SPEAKSWIFTLY_DEEP_TRACE_E2E=1.",
-        ),
-    )
-    struct DeepTraceSuite {
+@Suite(
+    "Deep Trace E2E",
+    .serialized,
+    .tags(.e2e, .deepTrace, .trace),
+    .enabled(
+        if: speakSwiftlyE2ETestsEnabled(),
+        "These end-to-end worker tests are opt-in and require SPEAKSWIFTLY_E2E=1.",
+    ),
+    .enabled(
+        if: speakSwiftlyDeepTraceE2ETestsEnabled(),
+        "This deep-trace suite is opt-in and requires SPEAKSWIFTLY_DEEP_TRACE_E2E=1.",
+    ),
+)
+struct DeepTraceE2ETests {
         @Test func `long code heavy`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
-            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+            try await E2EHarness.awaitWorkerReady(worker)
+            try await E2EHarness.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-deep-trace",
-                profileName: SpeakSwiftlyE2ETests.testingProfileName,
-                text: SpeakSwiftlyE2ETests.testingProfileText,
+                profileName: E2EHarness.testingProfileName,
+                text: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-deep-trace","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.deepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-deep-trace","op":"generate_speech","text":"\(E2EHarness.deepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
                 """,
             )
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-deep-trace"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "buffering_audio"
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-deep-trace"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
 
             let playbackFinished = try #require(
-                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
                         $0["request_id"] as? String == "req-live-deep-trace",
@@ -74,7 +78,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["chunk_count"] as? Int ?? 0) > 1)
             #expect((playbackDetails["sample_count"] as? Int ?? 0) > 0)
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-deep-trace"
                     && $0["ok"] as? Bool == true
             } != nil)
@@ -84,42 +88,40 @@ extension SpeakSwiftlyE2ETests {
         }
 
         @Test func `segmented weird text`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
-            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+            try await E2EHarness.awaitWorkerReady(worker)
+            try await E2EHarness.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-segmented",
-                profileName: SpeakSwiftlyE2ETests.testingProfileName,
-                text: SpeakSwiftlyE2ETests.testingProfileText,
+                profileName: E2EHarness.testingProfileName,
+                text: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-segmented","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-segmented","op":"generate_speech","text":"\(E2EHarness.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
                 """,
             )
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-segmented"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
 
             let playbackFinished = try #require(
-                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
                         $0["request_id"] as? String == "req-live-segmented",
@@ -143,7 +145,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
             #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
             #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                 guard
                     $0["event"] as? String == "playback_section_window",
                     $0["request_id"] as? String == "req-live-segmented",
@@ -156,7 +158,7 @@ extension SpeakSwiftlyE2ETests {
                     && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
                     && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-segmented"
                     && $0["ok"] as? Bool == true
             } != nil)
@@ -166,42 +168,40 @@ extension SpeakSwiftlyE2ETests {
         }
 
         @Test func `reversed segmented weird text`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
-            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+            try await E2EHarness.awaitWorkerReady(worker)
+            try await E2EHarness.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-reversed-segmented",
-                profileName: SpeakSwiftlyE2ETests.testingProfileName,
-                text: SpeakSwiftlyE2ETests.testingProfileText,
+                profileName: E2EHarness.testingProfileName,
+                text: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-reversed-segmented","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-reversed-segmented","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
                 """,
             )
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-reversed-segmented"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
 
             let playbackFinished = try #require(
-                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
                         $0["request_id"] as? String == "req-live-reversed-segmented",
@@ -225,7 +225,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
             #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
             #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                 guard
                     $0["event"] as? String == "playback_section_window",
                     $0["request_id"] as? String == "req-live-reversed-segmented",
@@ -238,7 +238,7 @@ extension SpeakSwiftlyE2ETests {
                     && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
                     && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-reversed-segmented"
                     && $0["ok"] as? Bool == true
             } != nil)
@@ -248,42 +248,40 @@ extension SpeakSwiftlyE2ETests {
         }
 
         @Test func `segmented conversational prose`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
-            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+            try await E2EHarness.awaitWorkerReady(worker)
+            try await E2EHarness.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-conversational",
-                profileName: SpeakSwiftlyE2ETests.testingProfileName,
-                text: SpeakSwiftlyE2ETests.testingProfileText,
+                profileName: E2EHarness.testingProfileName,
+                text: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-conversational","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-conversational","op":"generate_speech","text":"\(E2EHarness.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
                 """,
             )
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-conversational"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
 
             let playbackFinished = try #require(
-                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
                         $0["request_id"] as? String == "req-live-conversational",
@@ -306,7 +304,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
             #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
             #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                 guard
                     $0["event"] as? String == "playback_section_window",
                     $0["request_id"] as? String == "req-live-conversational",
@@ -319,7 +317,7 @@ extension SpeakSwiftlyE2ETests {
                     && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
                     && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-conversational"
                     && $0["ok"] as? Bool == true
             } != nil)
@@ -329,42 +327,40 @@ extension SpeakSwiftlyE2ETests {
         }
 
         @Test func `reversed segmented conversational prose`() async throws {
-            #expect(SpeakSwiftlyE2ETests.isE2EEnabled)
-
             let sandbox = try E2ESandbox()
             defer { sandbox.cleanup() }
 
             let worker = try WorkerProcess(
                 profileRootURL: sandbox.profileRootURL,
                 silentPlayback: false,
-                playbackTrace: SpeakSwiftlyE2ETests.isPlaybackTraceEnabled,
+                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
             )
             defer { Task { await worker.stop() } }
 
-            try await SpeakSwiftlyE2ETests.awaitWorkerReady(worker)
-            try await SpeakSwiftlyE2ETests.createVoiceDesignProfile(
+            try await E2EHarness.awaitWorkerReady(worker)
+            try await E2EHarness.createVoiceDesignProfile(
                 on: worker,
                 id: "req-create-reversed-conversational",
-                profileName: SpeakSwiftlyE2ETests.testingProfileName,
-                text: SpeakSwiftlyE2ETests.testingProfileText,
+                profileName: E2EHarness.testingProfileName,
+                text: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voiceDescription: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
 
             try worker.sendJSON(
                 """
-                {"id":"req-live-reversed-conversational","op":"generate_speech","text":"\(SpeakSwiftlyE2ETests.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(SpeakSwiftlyE2ETests.testingProfileName)"}
+                {"id":"req-live-reversed-conversational","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
                 """,
             )
 
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-reversed-conversational"
                     && $0["event"] as? String == "progress"
                     && $0["stage"] as? String == "preroll_ready"
             } != nil)
 
             let playbackFinished = try #require(
-                try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+                try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                     guard
                         $0["event"] as? String == "playback_finished",
                         $0["request_id"] as? String == "req-live-reversed-conversational",
@@ -387,7 +383,7 @@ extension SpeakSwiftlyE2ETests {
             #expect((playbackDetails["rebuffer_event_count"] as? Int ?? 0) >= 0)
             #expect((playbackDetails["normalized_character_count"] as? Int ?? 0) > 0)
             #expect((playbackDetails["section_count"] as? Int ?? 0) >= 5)
-            #expect(try await worker.waitForStderrJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
                 guard
                     $0["event"] as? String == "playback_section_window",
                     $0["request_id"] as? String == "req-live-reversed-conversational",
@@ -400,7 +396,7 @@ extension SpeakSwiftlyE2ETests {
                     && (details["estimated_end_ms"] as? Int ?? 0) > (details["estimated_start_ms"] as? Int ?? 0)
                     && (details["estimated_end_chunk"] as? Int ?? 0) > (details["estimated_start_chunk"] as? Int ?? 0)
             } != nil)
-            #expect(try await worker.waitForJSONObject(timeout: SpeakSwiftlyE2ETests.e2eTimeout) {
+            #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
                 $0["id"] as? String == "req-live-reversed-conversational"
                     && $0["ok"] as? Bool == true
             } != nil)
@@ -408,6 +404,5 @@ extension SpeakSwiftlyE2ETests {
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
-    }
 }
 #endif

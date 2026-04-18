@@ -130,10 +130,10 @@ PY
 Use this exact command for the current dual-lane Marvis overlap baseline:
 
 ```bash
-xcodebuild test-without-building -quiet \
+  xcodebuild test-without-building -quiet \
   -xctestrun .local/xcode/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
-  -only-testing:'SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()' \
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
   -resultBundlePath .local/xcode/results/Instruments-MarvisProfile-dual-lane.xcresult
 ```
 
@@ -152,10 +152,10 @@ If there is an in-branch overlap experiment to compare, rerun the same command
 and change only the result bundle path:
 
 ```bash
-xcodebuild test-without-building -quiet \
+  xcodebuild test-without-building -quiet \
   -xctestrun .local/xcode/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
-  -only-testing:'SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()' \
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
   -resultBundlePath .local/xcode/results/Instruments-MarvisProfile-candidate-policy.xcresult
 ```
 

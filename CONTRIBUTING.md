@@ -162,7 +162,7 @@ Legacy serialized or environment `qwen3_custom_voice` backend values are still a
 
 `chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact, and relies on runtime-owned text chunking for live playback because upstream Chatterbox synthesis is still one waveform per chunk rather than truly incremental.
 
-The current Chatterbox end-to-end workflow coverage lives in `SpeakSwiftlyE2ETests/ChatterboxWorkflowSuite`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
+The current Chatterbox end-to-end workflow coverage lives in `ChatterboxE2ETests`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
 Qwen conditioning strategy values are:
 
@@ -537,7 +537,9 @@ The test suite mirrors the source tree:
 - `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimePlaybackTests.swift`
 - `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeControlSurfaceTests.swift`
 - `Tests/SpeakSwiftlyTests/Runtime/WorkerRuntimeShutdownTests.swift`
-- `Tests/SpeakSwiftlyTests/E2E/SpeakSwiftlyE2ETests.swift`
+- `Tests/SpeakSwiftlyTests/E2E/Support/SpeakSwiftlyE2EPolicy.swift`
+- `Tests/SpeakSwiftlyTests/E2E/Support/SpeakSwiftlyE2ETags.swift`
+- `Tests/SpeakSwiftlyTests/E2E/Support/SpeakSwiftlyE2ETestSupport.swift`
 
 ## Repository Workflow
 
@@ -593,22 +595,28 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Release
 sh scripts/repo-maintenance/update-vendored-mlx-bundle.sh
 ```
 
-Opt-in real-model e2e coverage. The root `SpeakSwiftlyE2ETests` suite is serialized on purpose, so the full e2e surface always runs one request flow at a time.
+Opt-in real-model e2e coverage. The e2e surface is split into top-level domain suites such as `QwenE2ETests`, `MarvisE2ETests`, and `DeepTraceE2ETests`, and each suite carries its own Swift Testing traits directly at the suite declaration.
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests
+SPEAKSWIFTLY_E2E=1 swift test --filter E2ETests
+```
+
+For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
+
+```bash
+SPEAKSWIFTLY_E2E=1 swift test --filter QuickE2ETests
 ```
 
 One-shot qwen resident `generate_speech` verification:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/voiceDesignSilentThenAudible
+SPEAKSWIFTLY_E2E=1 swift test --filter QwenE2ETests/voiceDesignSilentThenAudible
 ```
 
 Prepared-conditioning qwen verification. This boots the worker in `prepared_conditioning` mode, confirms the first request persists a stored Qwen conditioning artifact on the profile, then restarts the worker and confirms the second request reloads that stored artifact instead of rebuilding it from raw reference inputs:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenWorkflowSuite/preparedConditioningPersistsAndReloadsAcrossWorkerRestart
+SPEAKSWIFTLY_E2E=1 swift test --filter QwenE2ETests/preparedConditioningPersistsAndReloadsAcrossWorkerRestart
 ```
 
 Opt-in MLX-backed persistence unit coverage. These tests are marked with a Swift Testing conditional-execution trait, so the default `swift test` lane skips them unless you explicitly enable `SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1` for the narrow MLX persistence round-trip coverage:
@@ -620,7 +628,7 @@ SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter preparedQwenConditionin
 Force audible playback in the e2e suite:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_AUDIBLE_E2E=1 swift test --filter SpeakSwiftlyE2ETests
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_AUDIBLE_E2E=1 swift test --filter E2ETests
 ```
 
 Retained real-model run artifacts live under `.local/e2e-runs`.
@@ -628,7 +636,7 @@ Retained real-model run artifacts live under `.local/e2e-runs`.
 Chunk-level trace during e2e:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter E2ETests
 ```
 
 Without `SPEAKSWIFTLY_PLAYBACK_TRACE=1`, the trace-capture suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
@@ -641,7 +649,7 @@ For the targeted first-request Marvis tuning lane, the current reliable rerun pa
 - on current Xcode manifests, that override lives under `TestConfigurations -> TestTargets -> EnvironmentVariables`
 
 ```text
-SpeakSwiftlyTests/SpeakSwiftlyE2ETests/MarvisWorkflowSuite/`prequeued jobs drain in order`()
+SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()
 ```
 
 The same fallback principle applies to release hardening and narrow package
@@ -674,13 +682,13 @@ CLI worker process and does not model an app-hosted iOS runtime.
 Long deep-trace playback probe:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter SpeakSwiftlyE2ETests/longCodeHeavy
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter DeepTraceE2ETests/longCodeHeavy
 ```
 
 Opt-in qwen resident benchmark comparison:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter QwenBenchmarkE2ETests
 ```
 
 Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped during ordinary `SPEAKSWIFTLY_E2E=1` runs so the default full e2e lane stays release-safe.
@@ -688,7 +696,7 @@ Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped duri
 Run multiple comparison samples per Qwen conditioning strategy:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter SpeakSwiftlyE2ETests/QwenBenchmarkSuite
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter QwenBenchmarkE2ETests
 ```
 
 Each benchmark run persists a timestamped JSON summary under `.local/benchmarks` and refreshes `.local/benchmarks/qwen-resident-benchmark-latest.json` for quick inspection.
@@ -696,15 +704,15 @@ Each benchmark run persists a timestamped JSON summary under `.local/benchmarks`
 Section-aware weird-text deep-trace probes:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/segmentedWeirdText
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/reversedSegmentedWeirdText
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/segmentedWeirdText
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/reversedSegmentedWeirdText
 ```
 
 Section-aware conversational prose deep-trace probes:
 
 ```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/segmentedConversationalProse
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter SpeakSwiftlyE2ETests/reversedSegmentedConversationalProse
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/segmentedConversationalProse
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/reversedSegmentedConversationalProse
 ```
 
 If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, the runtime was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime and launch through the published `run-speakswiftly` script or stable alias.

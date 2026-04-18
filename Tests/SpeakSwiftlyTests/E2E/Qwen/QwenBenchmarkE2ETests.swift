@@ -5,61 +5,63 @@ import Testing
 
 private let qwenBenchmarkSchemaVersion = 3
 
-// MARK: - SpeakSwiftlyE2ETests.QwenBenchmarkSuite
+@Suite(
+    "Qwen Benchmark E2E",
+    .serialized,
+    .tags(.e2e, .qwen, .benchmark),
+    .enabled(
+        if: speakSwiftlyE2ETestsEnabled(),
+        "These end-to-end worker tests are opt-in and require SPEAKSWIFTLY_E2E=1.",
+    ),
+    .enabled(
+        if: speakSwiftlyQwenBenchmarkE2ETestsEnabled(),
+        "This Qwen resident benchmark suite is opt-in and requires SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1.",
+    ),
+)
+struct QwenBenchmarkE2ETests {
+    @Test func `compare qwen conditioning strategies`() async throws {
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
 
-extension SpeakSwiftlyE2ETests {
-    @Suite(
-        .serialized,
-        .enabled(
-            if: SpeakSwiftlyE2ETests.isQwenBenchmarkE2EEnabled,
-            "This Qwen resident benchmark suite is opt-in and requires SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1.",
-        ),
-    )
-    struct QwenBenchmarkSuite {
-        @Test func `compare qwen conditioning strategies`() async throws {
-            let sandbox = try E2ESandbox()
-            defer { sandbox.cleanup() }
+        try await Self.provisionBenchmarkProfile(in: sandbox.profileRootURL)
 
-            try await Self.provisionBenchmarkProfile(in: sandbox.profileRootURL)
+        let iterations = speakSwiftlyQwenBenchmarkIterations()
+        var samples = [QwenBenchmarkSample]()
+        samples.reserveCapacity(iterations * 2)
 
-            let iterations = SpeakSwiftlyE2ETests.qwenBenchmarkIterations
-            var samples = [QwenBenchmarkSample]()
-            samples.reserveCapacity(iterations * 2)
-
-            for strategy in [SpeakSwiftly.QwenConditioningStrategy.legacyRaw, .preparedConditioning] {
-                for iteration in 1...iterations {
-                    try await samples.append(
-                        Self.runBenchmarkSample(
-                            profileRootURL: sandbox.profileRootURL,
-                            strategy: strategy,
-                            iteration: iteration,
-                        ),
-                    )
-                }
+        for strategy in [SpeakSwiftly.QwenConditioningStrategy.legacyRaw, .preparedConditioning] {
+            for iteration in 1...iterations {
+                try await samples.append(
+                    Self.runBenchmarkSample(
+                        profileRootURL: sandbox.profileRootURL,
+                        strategy: strategy,
+                        iteration: iteration,
+                    ),
+                )
             }
+        }
 
-            let summary = QwenBenchmarkSummary(
-                schemaVersion: qwenBenchmarkSchemaVersion,
-                generatedAt: Date(),
-                host: .localMachine(),
-                settings: .current(
-                    iterations: iterations,
-                    benchmarkProfileName: Self.benchmarkProfileName,
-                    playbackTextCharacterCount: SpeakSwiftlyE2ETests.testingPlaybackText.count,
-                ),
-                strategies: QwenConditioningStrategyBenchmarkReport.make(from: samples),
-            )
-            let summaryURL = try Self.writeBenchmarkSummary(summary)
+        let summary = QwenBenchmarkSummary(
+            schemaVersion: qwenBenchmarkSchemaVersion,
+            generatedAt: Date(),
+            host: .localMachine(),
+            settings: .current(
+                iterations: iterations,
+                benchmarkProfileName: Self.benchmarkProfileName,
+                playbackTextCharacterCount: E2EHarness.testingPlaybackText.count,
+            ),
+            strategies: QwenConditioningStrategyBenchmarkReport.make(from: samples),
+        )
+        let summaryURL = try Self.writeBenchmarkSummary(summary)
 
-            print("SpeakSwiftly qwen benchmark summary: \(summaryURL.path)")
-            for strategy in summary.strategies {
-                print(strategy.prettyDescription)
-            }
+        print("SpeakSwiftly qwen benchmark summary: \(summaryURL.path)")
+        for strategy in summary.strategies {
+            print(strategy.prettyDescription)
         }
     }
 }
 
-private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
+private extension QwenBenchmarkE2ETests {
     static let benchmarkProfileName = "benchmark-profile"
 
     static func provisionBenchmarkProfile(in profileRootURL: URL) async throws {
@@ -72,9 +74,9 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
 
             let handle = await runtime.voices.create(
                 design: benchmarkProfileName,
-                from: SpeakSwiftlyE2ETests.testingProfileText,
+                from: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voice: SpeakSwiftlyE2ETests.testingProfileVoiceDescription,
+                voice: E2EHarness.testingProfileVoiceDescription,
             )
             _ = try await awaitSuccess(from: handle)
         }
@@ -93,13 +95,13 @@ private extension SpeakSwiftlyE2ETests.QwenBenchmarkSuite {
             let preloadMS = try await awaitResidentReady(on: runtime)
             let generatedFile = try await runRequestBenchmark(
                 handle: runtime.generate.audio(
-                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    text: E2EHarness.testingPlaybackText,
                     with: benchmarkProfileName,
                 ),
             )
             let liveSpeech = try await runRequestBenchmark(
                 handle: runtime.generate.speech(
-                    text: SpeakSwiftlyE2ETests.testingPlaybackText,
+                    text: E2EHarness.testingPlaybackText,
                     with: benchmarkProfileName,
                 ),
             )
