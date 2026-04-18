@@ -63,12 +63,22 @@ struct ProfileStore: @unchecked Sendable {
         profileRootOverride: String? = nil,
     ) -> URL {
         if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
-                .deletingLastPathComponent()
+            return normalizedOverrideBaseURL(profileRootOverride)
         }
 
         return fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(defaultDirectoryName, isDirectory: true)
+    }
+
+    private static func normalizedOverrideBaseURL(_ profileRootOverride: String) -> URL {
+        let overrideURL = URL(fileURLWithPath: profileRootOverride, isDirectory: true)
+            .standardizedFileURL
+
+        if overrideURL.lastPathComponent == profilesDirectoryName {
+            return overrideURL.deletingLastPathComponent()
+        }
+
+        return overrideURL
     }
 
     private static func makeEncoder() -> JSONEncoder {

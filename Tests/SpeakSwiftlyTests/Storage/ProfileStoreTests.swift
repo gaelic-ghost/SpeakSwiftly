@@ -170,6 +170,23 @@ import Testing
     }
 }
 
+@Test func `profile root override accepts a base directory path`() {
+    let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root", isDirectory: true)
+
+    #expect(ProfileStore.defaultRootURL(overridePath: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
+    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+}
+
+@Test func `profile root override preserves compatibility with a profiles directory path`() {
+    let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root", isDirectory: true)
+    let legacyProfilesURL = overrideRoot.appendingPathComponent("profiles", isDirectory: true)
+
+    #expect(ProfileStore.defaultRootURL(overridePath: legacyProfilesURL.path) == legacyProfilesURL)
+    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+}
+
 // MARK: - Listing and Validation
 
 @Test func `lists profiles in sorted order`() throws {

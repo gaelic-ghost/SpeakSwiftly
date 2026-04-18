@@ -266,6 +266,8 @@ Representative response and event shapes:
 {"id":"req-reload","ok":true,"status":{"event":"worker_status","stage":"resident_model_ready","resident_state":"ready","speech_backend":"qwen3"},"speech_backend":"qwen3"}
 ```
 
+Queued work uses `waiting_for_resident_model` during initial resident warmup and `waiting_for_resident_models` only after an explicit model unload parks resident-dependent work.
+
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. The typed Swift helpers populate caller working-directory context automatically.
 
 For fuller wire examples, queueing behavior, and operator-facing runtime notes, see [CONTRIBUTING.md](CONTRIBUTING.md).

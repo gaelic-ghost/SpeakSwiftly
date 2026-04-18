@@ -30,7 +30,8 @@ public extension SpeakSwiftly.Voices {
     ///   - text: The source text used to condition the design request.
     ///   - vibe: The broad vocal presentation to request.
     ///   - voiceDescription: The descriptive prompt that shapes the generated voice.
-    ///   - outputPath: An optional root path for profile storage.
+    ///   - outputPath: An optional file path where SpeakSwiftly should export the
+    ///     generated reference audio after storing the profile.
     /// - Returns: A request handle for the queued creation request.
     func create(
         design named: SpeakSwiftly.Name,
