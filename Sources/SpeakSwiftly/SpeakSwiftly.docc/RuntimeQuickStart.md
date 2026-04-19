@@ -40,7 +40,7 @@ let runtime = try await SpeakSwiftly.liftoff(
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:with:textProfileName:textContext:sourceFormat:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:with:textProfileID:textContext:sourceFormat:)`` when you want audio to enter the live playback queue:
 
 ```swift
 let handle = try await runtime.generate.speech(
@@ -49,7 +49,7 @@ let handle = try await runtime.generate.speech(
 )
 ```
 
-Use ``SpeakSwiftly/Generate/audio(text:with:textProfileName:textContext:sourceFormat:)`` when you want retained file output instead:
+Use ``SpeakSwiftly/Generate/audio(text:with:textProfileID:textContext:sourceFormat:)`` when you want retained file output instead:
 
 ```swift
 let handle = try await runtime.generate.audio(

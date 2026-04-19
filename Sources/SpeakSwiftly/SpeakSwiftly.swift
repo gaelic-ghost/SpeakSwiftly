@@ -1,8 +1,6 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - SpeakSwiftly
-
 /// The top-level namespace and startup entrypoint for the SpeakSwiftly library.
 ///
 /// Use ``liftoff(configuration:)`` to create a shared ``Runtime`` and then work

@@ -19,7 +19,7 @@ public extension SpeakSwiftly {
             case profiles
             case textProfile = "text_profile"
             case textProfiles = "text_profiles"
-            case replacements
+            case textProfileStyleOptions = "text_profile_style_options"
             case textProfileStyle = "text_profile_style"
             case textProfilePath = "text_profile_path"
             case activeRequest = "active_request"
@@ -44,9 +44,9 @@ public extension SpeakSwiftly {
         public let profileName: String?
         public let profilePath: String?
         public let profiles: [ProfileSummary]?
-        public let textProfile: TextForSpeech.Profile?
-        public let textProfiles: [TextForSpeech.Profile]?
-        public let replacements: [TextForSpeech.Replacement]?
+        public let textProfile: SpeakSwiftly.TextProfileDetails?
+        public let textProfiles: [SpeakSwiftly.TextProfileSummary]?
+        public let textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]?
         public let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
         public let textProfilePath: String?
         public let activeRequest: ActiveRequest?
@@ -70,9 +70,9 @@ public extension SpeakSwiftly {
             profileName: String? = nil,
             profilePath: String? = nil,
             profiles: [ProfileSummary]? = nil,
-            textProfile: TextForSpeech.Profile? = nil,
-            textProfiles: [TextForSpeech.Profile]? = nil,
-            replacements: [TextForSpeech.Replacement]? = nil,
+            textProfile: SpeakSwiftly.TextProfileDetails? = nil,
+            textProfiles: [SpeakSwiftly.TextProfileSummary]? = nil,
+            textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]? = nil,
             textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveRequest? = nil,
@@ -97,7 +97,7 @@ public extension SpeakSwiftly {
             self.profiles = profiles
             self.textProfile = textProfile
             self.textProfiles = textProfiles
-            self.replacements = replacements
+            self.textProfileStyleOptions = textProfileStyleOptions
             self.textProfileStyle = textProfileStyle
             self.textProfilePath = textProfilePath
             self.activeRequest = activeRequest

@@ -13,12 +13,12 @@ import Testing
     let queued = try store.createFileJob(
         jobID: "job-file-1",
         profileName: "default-femme",
-        textProfileName: "logs",
+        textProfileID: "logs",
         speechBackend: .marvis,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-1",
             text: "Hello from a file job.",
-            textProfileName: "logs",
+            textProfileID: "logs",
             textContext: nil,
             sourceFormat: nil,
         ),
@@ -29,7 +29,7 @@ import Testing
     #expect(queued.jobKind == .file)
     #expect(queued.state == .queued)
     #expect(queued.profileName == "default-femme")
-    #expect(queued.textProfileName == "logs")
+    #expect(queued.textProfileID == "logs")
     #expect(queued.speechBackend == .marvis)
     #expect(queued.items.count == 1)
     #expect(queued.items[0].artifactID == "artifact-1")
@@ -48,7 +48,7 @@ import Testing
                 filePath: "/tmp/generated.wav",
                 sampleRate: 24000,
                 profileName: "default-femme",
-                textProfileName: "logs",
+                textProfileID: "logs",
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 1237),
@@ -83,20 +83,20 @@ import Testing
     let queued = try store.createBatchJob(
         jobID: "job-batch-1",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .marvis,
         items: [
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-batch-1-artifact-1",
                 text: "First file",
-                textProfileName: nil,
+                textProfileID: nil,
                 textContext: nil,
                 sourceFormat: nil,
             ),
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-batch-1-artifact-2",
                 text: "Second file",
-                textProfileName: "logs",
+                textProfileID: "logs",
                 textContext: nil,
                 sourceFormat: .swift,
             ),
@@ -121,12 +121,12 @@ import Testing
     _ = try store.createFileJob(
         jobID: "job-file-2",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .marvis,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-2",
             text: "Hello from a completed file job.",
-            textProfileName: nil,
+            textProfileID: nil,
             textContext: nil,
             sourceFormat: nil,
         ),
@@ -143,7 +143,7 @@ import Testing
                 filePath: "/tmp/artifact-2.wav",
                 sampleRate: 24000,
                 profileName: "default-femme",
-                textProfileName: nil,
+                textProfileID: nil,
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 2102),
@@ -169,12 +169,12 @@ import Testing
     _ = try store.createFileJob(
         jobID: "job-file-queued",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .marvis,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-queued",
             text: "Queued",
-            textProfileName: nil,
+            textProfileID: nil,
             textContext: nil,
             sourceFormat: nil,
         ),

@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - SpeakSwiftly.DeepTrace
-
 public extension SpeakSwiftly {
     enum DeepTrace {}
 }

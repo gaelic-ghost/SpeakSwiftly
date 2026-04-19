@@ -2,8 +2,6 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioTTS
 
-// MARK: - QwenConditioningArtifactManifest
-
 struct QwenConditioningArtifactManifest: Codable, Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
@@ -12,14 +10,10 @@ struct QwenConditioningArtifactManifest: Codable, Equatable {
     let artifactFile: String
 }
 
-// MARK: - StoredQwenConditioningArtifact
-
 struct StoredQwenConditioningArtifact: Equatable {
     let manifest: QwenConditioningArtifactManifest
     let artifactURL: URL
 }
-
-// MARK: - QwenConditioningFloatTensor
 
 struct QwenConditioningFloatTensor: Codable, Equatable {
     let values: [Float]
@@ -35,8 +29,6 @@ struct QwenConditioningFloatTensor: Codable, Equatable {
     }
 }
 
-// MARK: - QwenConditioningInt32Tensor
-
 struct QwenConditioningInt32Tensor: Codable, Equatable {
     let values: [Int32]
     let shape: [Int]
@@ -50,8 +42,6 @@ struct QwenConditioningInt32Tensor: Codable, Equatable {
         MLXArray(values).reshaped(shape)
     }
 }
-
-// MARK: - PersistedQwenConditioningArtifact
 
 struct PersistedQwenConditioningArtifact: Codable, Equatable {
     static let currentVersion = 1

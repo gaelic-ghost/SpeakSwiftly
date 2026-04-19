@@ -29,7 +29,7 @@ extension WorkerRequest {
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileName: raw.textProfileName,
+                    textProfileID: raw.textProfileID,
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
                     textFormat: raw.textFormat,
@@ -40,7 +40,7 @@ extension WorkerRequest {
                     id: id,
                     text: resolved.text,
                     profileName: profileName,
-                    textProfileName: resolved.textProfileName,
+                    textProfileID: resolved.textProfileID,
                     jobType: .live,
                     textContext: resolved.textContext,
                     sourceFormat: resolved.sourceFormat,
@@ -51,7 +51,7 @@ extension WorkerRequest {
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileName: raw.textProfileName,
+                    textProfileID: raw.textProfileID,
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
                     textFormat: raw.textFormat,
@@ -62,7 +62,7 @@ extension WorkerRequest {
                     id: id,
                     text: resolved.text,
                     profileName: profileName,
-                    textProfileName: resolved.textProfileName,
+                    textProfileID: resolved.textProfileID,
                     jobType: .file,
                     textContext: resolved.textContext,
                     sourceFormat: resolved.sourceFormat,
@@ -148,18 +148,20 @@ extension WorkerRequest {
                 return .textProfileActive(id: id)
 
             case "get_text_profile":
-                let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
-                return .textProfile(id: id, name: textProfileName)
+                let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+                return .textProfile(id: id, profileID: textProfileID)
 
             case "list_text_profiles":
                 return .textProfiles(id: id)
 
-            case "get_text_profile_style":
-                return .textProfileStyle(id: id)
+            case "get_active_text_profile_style":
+                return .activeTextProfileStyle(id: id)
+
+            case "list_text_profile_styles":
+                return .textProfileStyleOptions(id: id)
 
             case "get_effective_text_profile":
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .textProfileEffective(id: id, name: textProfileName)
+                return .textProfileEffective(id: id)
 
             case "get_text_profile_persistence":
                 return .textProfilePersistence(id: id)
@@ -170,54 +172,33 @@ extension WorkerRequest {
             case "save_text_profiles":
                 return .saveTextProfiles(id: id)
 
-            case "set_text_profile_style":
+            case "set_active_text_profile_style":
                 let style = try require(raw.textProfileStyle, field: "text_profile_style", id: id)
-                return .setTextProfileStyle(id: id, style: style)
+                return .setActiveTextProfileStyle(id: id, style: style)
 
             case "create_text_profile":
+                let textProfileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                return .createTextProfile(id: id, profileName: textProfileName)
+
+            case "update_text_profile_name":
                 let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
-                let textProfileDisplayName = try requireNonEmpty(
-                    raw.textProfileDisplayName,
-                    field: "text_profile_display_name",
-                    id: id,
-                )
-                return .createTextProfile(
-                    id: id,
-                    profileID: textProfileID,
-                    profileName: textProfileDisplayName,
-                    replacements: raw.replacements ?? [],
-                )
+                let textProfileName = try requireNonEmpty(raw.newProfileName, field: "new_profile_name", id: id)
+                return .renameTextProfile(id: id, profileID: textProfileID, profileName: textProfileName)
 
-            case "replace_text_profile":
-                guard let textProfile = raw.textProfile else {
-                    throw WorkerError(
-                        code: .invalidRequest,
-                        message: "Request '\(id)' is missing a 'text_profile' object.",
-                    )
-                }
-
-                return .storeTextProfile(id: id, profile: textProfile)
-
-            case "replace_active_text_profile":
-                guard let textProfile = raw.textProfile else {
-                    throw WorkerError(
-                        code: .invalidRequest,
-                        message: "Request '\(id)' is missing a 'text_profile' object.",
-                    )
-                }
-
-                return .useTextProfile(id: id, profile: textProfile)
+            case "set_active_text_profile":
+                let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+                return .setActiveTextProfile(id: id, profileID: textProfileID)
 
             case "delete_text_profile":
-                let textProfileName = try requireNonEmpty(raw.textProfileName, field: "text_profile_name", id: id)
-                return .removeTextProfile(id: id, profileName: textProfileName)
+                let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+                return .deleteTextProfile(id: id, profileID: textProfileID)
+
+            case "factory_reset_text_profiles":
+                return .factoryResetTextProfiles(id: id)
 
             case "reset_text_profile":
-                return .resetTextProfile(id: id)
-
-            case "list_text_replacements":
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .textReplacements(id: id, profileName: textProfileName)
+                let textProfileID = try requireNonEmpty(raw.textProfileID, field: "text_profile_id", id: id)
+                return .resetTextProfile(id: id, profileID: textProfileID)
 
             case "create_text_replacement":
                 guard let replacement = raw.replacement else {
@@ -227,8 +208,8 @@ extension WorkerRequest {
                     )
                 }
 
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .addTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .addTextReplacement(id: id, replacement: replacement, profileID: textProfileID)
 
             case "replace_text_replacement":
                 guard let replacement = raw.replacement else {
@@ -238,17 +219,13 @@ extension WorkerRequest {
                     )
                 }
 
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .replaceTextReplacement(id: id, replacement: replacement, profileName: textProfileName)
+                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .replaceTextReplacement(id: id, replacement: replacement, profileID: textProfileID)
 
             case "delete_text_replacement":
                 let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .removeTextReplacement(id: id, replacementID: replacementID, profileName: textProfileName)
-
-            case "clear_text_replacements":
-                let textProfileName = raw.textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-                return .clearTextReplacements(id: id, profileName: textProfileName)
+                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                return .removeTextReplacement(id: id, replacementID: replacementID, profileID: textProfileID)
 
             case "list_generation_queue":
                 return .listQueue(id: id, queueType: .generation)

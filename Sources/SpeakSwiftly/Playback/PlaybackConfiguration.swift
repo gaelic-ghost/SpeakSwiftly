@@ -1,8 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-// MARK: - AudioPlaybackConfiguration
-
 enum AudioPlaybackConfiguration {
     static let minimumDrainTimeout: Duration = .seconds(5)
     static let drainTimeoutPaddingMS = 3000

@@ -63,10 +63,17 @@ Then add `SpeakSwiftly` to the target that will own the runtime.
 
 `SpeakSwiftly` also carries a vendored `mlx-swift_Cmlx.bundle` resource so linked consumers can resolve the packaged MLX shader bundle and bundled `default.metallib` without digging through DerivedData.
 
+The package test target also carries a bundled `default.metallib` resource and
+stages it into the direct MLX probe path inside the SwiftPM test product before
+the first MLX-backed test model is created. In this repository, that means the
+plain `swift test` lane can exercise MLX-backed package tests without falling
+back to Xcode just to find the metallib.
+
 For package-local validation:
 
 ```bash
 swift build
+swift test
 ```
 
 The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
@@ -75,13 +82,17 @@ build and test path. If a future toolchain regression brings back the old
 [CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same
 plain `swift build` / `swift test` commands.
 
-For real MLX-backed worker runs, publish the Xcode-backed runtime first:
+Use the Xcode-backed deterministic runtime only for standalone worker runs or
+for fallback validation when a future SwiftPM parser regression actually blocks
+the ordinary package lane:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
-That publishes stable runtime launchers under `.local/xcode/current-debug` and `.local/xcode/current-release`.
+That builds the worker into `.local/derived-data/runtime-debug` or
+`.local/derived-data/runtime-release` and writes a matching
+`run-speakswiftly` launcher at that runtime root.
 
 ## Usage
 
@@ -154,11 +165,11 @@ let defaultMetallibURL = try SpeakSwiftly.SupportResources.defaultMetallibURL()
 
 ### Worker Executable
 
-Launch the published runtime through the stable launcher:
+Launch the deterministic Xcode runtime through its launcher:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
-"$PWD/.local/xcode/current-debug/run-speakswiftly"
+"$PWD/.local/derived-data/runtime-debug/run-speakswiftly"
 ```
 
 At startup the worker begins warming the resident backend and emits JSONL status events on `stdout`.
@@ -185,8 +196,8 @@ The package publishes:
 
 Key typed runtime entry points include:
 
-- `runtime.generate.speech(text:with:textProfileName:textContext:sourceFormat:)`
-- `runtime.generate.audio(text:with:textProfileName:textContext:sourceFormat:)`
+- `runtime.generate.speech(text:with:textProfileID:textContext:sourceFormat:)`
+- `runtime.generate.audio(text:with:textProfileID:textContext:sourceFormat:)`
 - `runtime.generate.batch(_:with:)`
 - `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
@@ -241,7 +252,7 @@ swift build
 swift test
 ```
 
-For formatter, lint, maintainer workflow, published runtime, and deeper operator guidance, use [CONTRIBUTING.md](CONTRIBUTING.md).
+For formatter, lint, maintainer workflow, deterministic Xcode runtime guidance, and deeper operator guidance, use [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Verification
 

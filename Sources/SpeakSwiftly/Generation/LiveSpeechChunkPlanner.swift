@@ -1,15 +1,11 @@
 import Foundation
 import NaturalLanguage
 
-// MARK: - LiveSpeechTextChunk
-
 struct LiveSpeechTextChunk: Equatable {
     let index: Int
     let text: String
     let wordCount: Int
 }
-
-// MARK: - LiveSpeechChunkPlanner
 
 enum LiveSpeechChunkPlanner {
     private static let firstChunkTargetWords = 16

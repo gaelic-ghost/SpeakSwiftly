@@ -11,7 +11,19 @@ swift build
 swift test
 ```
 
-That is still the right default for quick compile and unit-coverage feedback.
+That is still the right default for quick compile, unit-coverage, and ordinary
+MLX-backed package-test feedback in this repository.
+
+The current package test lane works with MLX because:
+
+- `SpeakSwiftlyTests` bundles `default.metallib` as a test resource
+- the shared test bootstrap copies that metallib into the exact direct MLX
+  probe paths under `.build/...` before the first MLX-backed test model is
+  created
+
+If a plain `swift test` failure now mentions `default.metallib`, treat that as
+a real regression in the test bootstrap or test-product layout, not as a known
+reason to jump straight to `xcodebuild`.
 
 ## Historical SwiftPM Snag
 
@@ -38,7 +50,7 @@ If that failure returns:
 Use this fallback for:
 
 - release hardening
-- MLX-backed real-model coverage
+- standalone-worker validation
 - Marvis overlap investigation
 - any validation pass blocked by the SwiftPM parser failure
 
@@ -48,8 +60,8 @@ Build once:
 xcodebuild build-for-testing -quiet \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
-  -derivedDataPath .local/xcode/derived-data/validation \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/validation \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 Then run one targeted test lane at a time with `test-without-building`.
@@ -58,7 +70,7 @@ Example targeted package test rerun:
 
 ```bash
 xcodebuild test-without-building -quiet \
-  -xctestrun "$(find .local/xcode/derived-data/validation/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -xctestrun "$(find .local/derived-data/validation/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/WorkerRuntimePlaybackTests'
 ```
@@ -92,15 +104,15 @@ Build once:
 xcodebuild build-for-testing -quiet \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=iOS Simulator,id=<simulator-udid>' \
-  -derivedDataPath .local/xcode/derived-data/ios-smoke \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/ios-smoke \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 Then run the current smoke slice:
 
 ```bash
 xcodebuild test-without-building -quiet \
-  -xctestrun "$(find .local/xcode/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -xctestrun "$(find .local/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
   -destination 'platform=iOS Simulator,id=<simulator-udid>' \
   -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
   -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
@@ -147,8 +159,8 @@ top-level suite set explicitly:
 xcodebuild build-for-testing -quiet \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
-  -derivedDataPath .local/xcode/derived-data/e2e-full \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/e2e-full \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 ```bash
@@ -157,7 +169,7 @@ from pathlib import Path
 import plistlib
 
 xctestrun_path = next(
-    Path(".local/xcode/derived-data/e2e-full/Build/Products").glob("*.xctestrun")
+    Path(".local/derived-data/e2e-full/Build/Products").glob("*.xctestrun")
 )
 
 with xctestrun_path.open("rb") as f:
@@ -175,7 +187,7 @@ PY
 
 ```bash
 xcodebuild test-without-building -quiet \
-  -xctestrun "$(find .local/xcode/derived-data/e2e-full/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -xctestrun "$(find .local/derived-data/e2e-full/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/QuickE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \

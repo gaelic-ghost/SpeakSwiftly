@@ -1,13 +1,9 @@
 import Foundation
 
-// MARK: - PlaybackMetricsConfiguration
-
 enum PlaybackMetricsConfiguration {
     static let rebufferThrashWarningCount = 3
     static let rebufferThrashWindowMS = 2000
 }
-
-// MARK: - PlaybackSummary
 
 struct PlaybackSummary {
     let thresholds: PlaybackAdaptiveThresholds
@@ -37,8 +33,6 @@ struct PlaybackSummary {
     let fadeInChunkCount: Int
 }
 
-// MARK: - RuntimeMemorySnapshot
-
 struct RuntimeMemorySnapshot {
     let processResidentBytes: Int?
     let processPhysFootprintBytes: Int?
@@ -50,8 +44,6 @@ struct RuntimeMemorySnapshot {
     let mlxCacheLimitBytes: Int?
     let mlxMemoryLimitBytes: Int?
 }
-
-// MARK: - AudioPlaybackRecoveryReason
 
 enum AudioPlaybackRecoveryReason: String {
     case systemWake = "system_wake"

@@ -3,8 +3,6 @@ import Foundation
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
-// MARK: - UnsafeSpeechGenerationModelBox
-
 private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
     let model: any SpeechGenerationModel
 
@@ -12,8 +10,6 @@ private final class UnsafeSpeechGenerationModelBox: @unchecked Sendable {
         self.model = model
     }
 }
-
-// MARK: - ModelGenerationEvent
 
 enum ModelGenerationEvent: Equatable {
     struct Info: Equatable {
@@ -29,8 +25,6 @@ enum ModelGenerationEvent: Equatable {
     case info(Info)
     case audio([Float])
 }
-
-// MARK: - AnySpeechModel
 
 final class AnySpeechModel: @unchecked Sendable {
     typealias GenerateSamplesStreamClosure = @Sendable (

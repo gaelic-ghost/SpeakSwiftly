@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - SpeakSwiftly.Artifacts
-
 public extension SpeakSwiftly {
     /// Accesses retained generated-audio artifacts.
     ///

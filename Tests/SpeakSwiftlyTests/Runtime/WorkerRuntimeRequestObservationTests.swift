@@ -39,6 +39,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
         residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
     )
 
@@ -59,18 +60,18 @@ import TextForSpeech
     var runtimeIterator = runtimeEvents.makeAsyncIterator()
 
     if case let .token(token)? = try await runtimeIterator.next()?.event {
-        #expect(token == 101)
+        #expect(token == 202)
     } else {
         Issue.record("Expected the first replayed generation event to be a qwen token.")
     }
 
     if case let .info(info)? = try await runtimeIterator.next()?.event {
-        #expect(info.promptTokenCount == 12)
+        #expect(info.promptTokenCount == 8)
         #expect(info.generationTokenCount == 8)
-        #expect(info.prefillTime == 0.12)
-        #expect(info.generateTime == 0.34)
-        #expect(info.tokensPerSecond == 56.7)
-        #expect(info.peakMemoryUsage == 1.23)
+        #expect(info.prefillTime == 0.08)
+        #expect(info.generateTime == 0.21)
+        #expect(info.tokensPerSecond == 73.2)
+        #expect(info.peakMemoryUsage == 0.92)
     } else {
         Issue.record("Expected the second replayed generation event to carry qwen generation info.")
     }
@@ -91,12 +92,12 @@ import TextForSpeech
 
     var handleIterator = handle.generationEvents.makeAsyncIterator()
     if case let .token(token)? = try await handleIterator.next()?.event {
-        #expect(token == 101)
+        #expect(token == 202)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the qwen token event.")
     }
     if case let .info(info)? = try await handleIterator.next()?.event {
-        #expect(info.promptTokenCount == 12)
+        #expect(info.promptTokenCount == 8)
     } else {
         Issue.record("Expected the original RequestHandle generation stream to retain the qwen info event.")
     }
@@ -513,7 +514,7 @@ import TextForSpeech
             id: "req-stream-bg",
             text: "Hi there",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: nil,

@@ -123,15 +123,18 @@ Current examples of the broader convention are:
 - `get_generated_file`
 - `list_generated_files`
 - `get_active_text_profile`
-- `get_text_profile_style`
+- `get_active_text_profile_style`
+- `list_text_profile_styles`
 - `list_text_profiles`
-- `list_text_replacements`
-- `set_text_profile_style`
+- `get_text_profile`
+- `set_active_text_profile_style`
+- `set_active_text_profile`
+- `factory_reset_text_profiles`
 - `create_text_replacement`
-- `clear_text_replacements`
+- `replace_text_replacement`
 - `update_voice_profile_name`
 - `reroll_voice_profile`
-- `replace_text_profile`
+- `update_text_profile_name`
 - `delete_voice_profile`
 
 The wire shape is intentionally more literal and transport-oriented than the Swift surface, and it should stay mechanically consistent enough that a caller can often guess an operation name correctly before looking it up.
@@ -211,11 +214,11 @@ Representative request shapes:
 
 ```json
 {"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_name":"logs","cwd":"./","repo_root":"./","text_format":"cli_output"}
+{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_id":"logs","cwd":"./","repo_root":"./","text_format":"cli_output"}
 {"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
 {"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
 {"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
-{"id":"req-1g","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_name":"logs"}]}
+{"id":"req-1g","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_id":"logs"}]}
 {"id":"req-1h","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
 {"id":"req-1i","op":"list_generated_files"}
 {"id":"req-1j","op":"get_generated_batch","batch_id":"req-1g"}
@@ -227,14 +230,22 @@ Representative request shapes:
 {"id":"req-3","op":"list_voice_profiles"}
 {"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}
 {"id":"req-5","op":"get_active_text_profile"}
-{"id":"req-6","op":"get_text_profile_style"}
-{"id":"req-7","op":"set_text_profile_style","text_profile_style":"compact"}
+{"id":"req-6","op":"get_active_text_profile_style"}
+{"id":"req-6a","op":"list_text_profile_styles"}
+{"id":"req-7","op":"set_active_text_profile_style","text_profile_style":"compact"}
 {"id":"req-8","op":"list_text_profiles"}
-{"id":"req-8a","op":"list_text_replacements","text_profile_name":"logs"}
-{"id":"req-9","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}
-{"id":"req-10","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
-{"id":"req-10a","op":"clear_text_replacements","text_profile_name":"logs"}
-{"id":"req-11","op":"replace_active_text_profile","text_profile":{"id":"ops","name":"Ops","replacements":[{"id":"ops-rule","text":"stdout","replacement":"standard output","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}]}}
+{"id":"req-8a","op":"get_text_profile","text_profile_id":"logs"}
+{"id":"req-8b","op":"get_effective_text_profile"}
+{"id":"req-8c","op":"get_text_profile_persistence"}
+{"id":"req-9","op":"create_text_profile","profile_name":"Logs"}
+{"id":"req-10","op":"create_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-10a","op":"replace_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"formats":[],"priority":0}}
+{"id":"req-10b","op":"delete_text_replacement","text_profile_id":"logs","replacement_id":"logs-rule"}
+{"id":"req-11","op":"set_active_text_profile","text_profile_id":"ops"}
+{"id":"req-11a","op":"update_text_profile_name","text_profile_id":"ops","new_profile_name":"Operations"}
+{"id":"req-11b","op":"reset_text_profile","text_profile_id":"ops"}
+{"id":"req-11c","op":"delete_text_profile","text_profile_id":"ops"}
+{"id":"req-11d","op":"factory_reset_text_profiles"}
 {"id":"req-status","op":"get_status"}
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}
 {"id":"req-reload","op":"reload_models"}
@@ -256,7 +267,7 @@ Representative response and event shapes:
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
-{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","profile_name":"default-femme","text_profile_name":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile_name":null,"text_context":null,"source_format":null}]}}
+{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","profile_name":"default-femme","text_profile_id":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile_id":null,"text_context":null,"source_format":null}]}}
 ```
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. SpeakSwiftly resolves those paths against caller-provided context, not the worker launch directory.
@@ -268,7 +279,7 @@ When JSONL naming changes, update this file and `README.md` in the same pass so 
 Current live-playback behavior:
 
 - `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
-- The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_text_profile_style` and update it with `set_text_profile_style`.
+- The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_active_text_profile_style`, inspect the available choices with `list_text_profile_styles`, and update it with `set_active_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
 - `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
 - Marvis resident warmup keeps both `conversational_a` and `conversational_b` loaded at once because the model is small enough that preset switching does not need another preload cycle.
@@ -551,7 +562,7 @@ The intended ownership model is:
 - the larger [`speak-to-user`](https://github.com/gaelic-ghost/speak-to-user) repository consumes SpeakSwiftly as a Git submodule under `packages/SpeakSwiftly`
 - feature work lands here first, and the consuming repository updates its submodule pointer when it is ready to adopt a newer revision
 
-Older adjacent consumers such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should point at one shared published runtime directory instead of relying on copy hooks or raw DerivedData guesses.
+Older adjacent hosts such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should launch one deterministic Xcode build root instead of relying on copy hooks or ad hoc raw DerivedData guesses. Linked Swift package consumers should resolve the vendored `mlx-swift_Cmlx.bundle` through the package resource bundle.
 
 ## Development Guidance
 
@@ -578,13 +589,19 @@ lane for this repository, including the worker-backed `QuickE2ETests` path.
 Treat plain `swift build` and `swift test` as the default verification story
 again.
 
+For MLX-backed package tests, the plain `swift test` lane now works because the
+`SpeakSwiftlyTests` target carries a bundled `default.metallib` resource and
+the shared test bootstrap stages that file into the exact SwiftPM runtime probe
+paths MLX checks under `.build/...` before the first `MLXArray` is created.
+Do not escalate to Xcode just because a package test uses MLX.
+
 If a future toolchain regression brings back the old `EnglishG2P.swift` parser
 failure, treat that as a fallback-lane trigger instead of a fresh local
 mystery. Do not keep retrying the same `swift build` / `swift test` commands.
 Switch to the Xcode-backed package workspace lane documented below and in
 [`docs/maintainers/validation-lanes.md`](docs/maintainers/validation-lanes.md).
 
-Publish and verify a real Xcode-backed runtime:
+Build and verify a real Xcode-backed standalone worker runtime:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
@@ -737,6 +754,10 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 s
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 SPEAKSWIFTLY_PLAYBACK_TRACE=1 swift test --filter DeepTraceE2ETests/reversedSegmentedConversationalProse
 ```
 
-If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, the runtime was almost certainly launched from a plain SwiftPM build instead of a published Xcode-backed runtime directory. Re-publish the runtime and launch through the published `run-speakswiftly` script or stable alias.
+If a real standalone worker run fails with `default.metallib` or
+`mlx-swift_Cmlx.bundle` errors, the runtime was almost certainly launched from
+a plain SwiftPM build instead of the deterministic Xcode-backed worker
+directory. Rebuild the runtime and launch through
+`.local/derived-data/runtime-<configuration>/run-speakswiftly`.
 
-The library target also vendors one copy of `mlx-swift_Cmlx.bundle` under `Sources/SpeakSwiftly/Resources` so linked consumers can resolve the packaged MLX bundle and metallib through `SpeakSwiftly.SupportResources`. Keep that vendored bundle in sync with the pinned MLX dependency by refreshing it from the published Release runtime whenever the MLX stack changes.
+The library target also vendors one copy of `mlx-swift_Cmlx.bundle` under `Sources/SpeakSwiftly/Resources` so linked package consumers resolve the packaged MLX bundle and metallib through `SpeakSwiftly.SupportResources`. Keep the vendored bundle in sync with the pinned MLX dependency by refreshing it from the deterministic Release runtime whenever the MLX stack changes.

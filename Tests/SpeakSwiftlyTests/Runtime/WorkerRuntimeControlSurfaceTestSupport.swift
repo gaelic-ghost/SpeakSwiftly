@@ -1,13 +1,9 @@
 import Foundation
 @testable import SpeakSwiftly
 
-// MARK: - WeakRuntimeBox
-
 final class WeakRuntimeBox: @unchecked Sendable {
     weak var value: WorkerRuntime?
 }
-
-// MARK: - BackendLoadRecorder
 
 actor BackendLoadRecorder {
     private var backends = [SpeakSwiftly.SpeechBackend]()

@@ -193,9 +193,9 @@ public extension SpeakSwiftly {
             let profileName: String?
             let profilePath: String?
             let profiles: [ProfileSummary]?
-            let textProfile: TextForSpeech.Profile?
-            let textProfiles: [TextForSpeech.Profile]?
-            let replacements: [TextForSpeech.Replacement]?
+            let textProfile: SpeakSwiftly.TextProfileDetails?
+            let textProfiles: [SpeakSwiftly.TextProfileSummary]?
+            let textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]?
             let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
             let textProfilePath: String?
             let activeRequest: ActiveWorkerRequestSummary?
@@ -219,9 +219,9 @@ public extension SpeakSwiftly {
                 profileName: String? = nil,
                 profilePath: String? = nil,
                 profiles: [ProfileSummary]? = nil,
-                textProfile: TextForSpeech.Profile? = nil,
-                textProfiles: [TextForSpeech.Profile]? = nil,
-                replacements: [TextForSpeech.Replacement]? = nil,
+                textProfile: SpeakSwiftly.TextProfileDetails? = nil,
+                textProfiles: [SpeakSwiftly.TextProfileSummary]? = nil,
+                textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]? = nil,
                 textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
                 textProfilePath: String? = nil,
                 activeRequest: ActiveWorkerRequestSummary? = nil,
@@ -246,7 +246,7 @@ public extension SpeakSwiftly {
                 self.profiles = profiles
                 self.textProfile = textProfile
                 self.textProfiles = textProfiles
-                self.replacements = replacements
+                self.textProfileStyleOptions = textProfileStyleOptions
                 self.textProfileStyle = textProfileStyle
                 self.textProfilePath = textProfilePath
                 self.activeRequest = activeRequest
@@ -277,12 +277,8 @@ public extension SpeakSwiftly {
                 case text
                 case profileName = "profile_name"
                 case newProfileName = "new_profile_name"
-                case textProfileName = "text_profile_name"
                 case textProfileID = "text_profile_id"
-                case textProfileDisplayName = "text_profile_display_name"
-                case textProfile = "text_profile"
                 case textProfileStyle = "text_profile_style"
-                case replacements
                 case replacement
                 case replacementID = "replacement_id"
                 case cwd
@@ -308,12 +304,8 @@ public extension SpeakSwiftly {
             let text: String?
             let profileName: String?
             let newProfileName: String?
-            let textProfileName: String?
             let textProfileID: String?
-            let textProfileDisplayName: String?
-            let textProfile: TextForSpeech.Profile?
             let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-            let replacements: [TextForSpeech.Replacement]?
             let replacement: TextForSpeech.Replacement?
             let replacementID: String?
             let cwd: String?

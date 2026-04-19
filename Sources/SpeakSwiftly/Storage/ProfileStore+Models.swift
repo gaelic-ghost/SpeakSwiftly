@@ -1,13 +1,9 @@
 import Foundation
 
-// MARK: - ProfileSourceKind
-
 enum ProfileSourceKind: String, Codable, Equatable {
     case generated
     case importedClone = "imported_clone"
 }
-
-// MARK: - TranscriptProvenance
 
 struct TranscriptProvenance: Codable, Equatable {
     enum Source: String, Codable, Equatable {
@@ -20,8 +16,6 @@ struct TranscriptProvenance: Codable, Equatable {
     let transcriptionModelRepo: String?
 }
 
-// MARK: - ProfileMaterializationManifest
-
 struct ProfileMaterializationManifest: Codable, Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
@@ -30,8 +24,6 @@ struct ProfileMaterializationManifest: Codable, Equatable {
     let referenceText: String
     let sampleRate: Int
 }
-
-// MARK: - ProfileManifest
 
 struct ProfileManifest: Codable, Equatable {
     enum CodingKeys: String, CodingKey {
@@ -116,8 +108,6 @@ struct ProfileManifest: Codable, Equatable {
     }
 }
 
-// MARK: - LegacyProfileManifest
-
 struct LegacyProfileManifest: Codable, Equatable {
     let version: Int
     let profileName: String
@@ -128,8 +118,6 @@ struct LegacyProfileManifest: Codable, Equatable {
     let referenceAudioFile: String
     let sampleRate: Int
 }
-
-// MARK: - LegacyMultiBackendProfileManifest
 
 struct LegacyMultiBackendProfileManifest: Codable, Equatable {
     let version: Int
@@ -142,8 +130,6 @@ struct LegacyMultiBackendProfileManifest: Codable, Equatable {
     let sampleRate: Int
     let backendMaterializations: [ProfileMaterializationManifest]
 }
-
-// MARK: - SpeakSwiftly.ProfileSummary
 
 public extension SpeakSwiftly {
     /// Summary metadata for one stored voice profile.
@@ -196,8 +182,6 @@ public extension SpeakSwiftly {
     }
 }
 
-// MARK: - ProfileMaterializationDraft
-
 struct ProfileMaterializationDraft: Equatable {
     let backend: SpeakSwiftly.SpeechBackend
     let modelRepo: String
@@ -207,14 +191,10 @@ struct ProfileMaterializationDraft: Equatable {
     let audioData: Data
 }
 
-// MARK: - StoredProfileMaterialization
-
 struct StoredProfileMaterialization: Equatable {
     let manifest: ProfileMaterializationManifest
     let referenceAudioURL: URL
 }
-
-// MARK: - StoredProfile
 
 struct StoredProfile: Equatable {
     let manifest: ProfileManifest

@@ -1,14 +1,12 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - WorkerRequest
-
 enum WorkerRequest: Equatable {
     case queueSpeech(
         id: String,
         text: String,
         profileName: String,
-        textProfileName: String?,
+        textProfileID: String?,
         jobType: SpeechJobType,
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?,
@@ -47,24 +45,24 @@ enum WorkerRequest: Equatable {
     case rerollProfile(id: String, profileName: String)
     case removeProfile(id: String, profileName: String)
     case textProfileActive(id: String)
-    case textProfile(id: String, name: String)
+    case textProfile(id: String, profileID: String)
     case textProfiles(id: String)
-    case textProfileStyle(id: String)
-    case textProfileEffective(id: String, name: String?)
+    case activeTextProfileStyle(id: String)
+    case textProfileStyleOptions(id: String)
+    case textProfileEffective(id: String)
     case textProfilePersistence(id: String)
     case loadTextProfiles(id: String)
     case saveTextProfiles(id: String)
-    case setTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
-    case createTextProfile(id: String, profileID: String, profileName: String, replacements: [TextForSpeech.Replacement])
-    case storeTextProfile(id: String, profile: TextForSpeech.Profile)
-    case useTextProfile(id: String, profile: TextForSpeech.Profile)
-    case removeTextProfile(id: String, profileName: String)
-    case resetTextProfile(id: String)
-    case textReplacements(id: String, profileName: String?)
-    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
-    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileName: String?)
-    case removeTextReplacement(id: String, replacementID: String, profileName: String?)
-    case clearTextReplacements(id: String, profileName: String?)
+    case setActiveTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
+    case createTextProfile(id: String, profileName: String)
+    case renameTextProfile(id: String, profileID: String, profileName: String)
+    case setActiveTextProfile(id: String, profileID: String)
+    case deleteTextProfile(id: String, profileID: String)
+    case factoryResetTextProfiles(id: String)
+    case resetTextProfile(id: String, profileID: String)
+    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
+    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
+    case removeTextReplacement(id: String, replacementID: String, profileID: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)
     case overview(id: String)
@@ -77,7 +75,7 @@ enum WorkerRequest: Equatable {
 
     var id: String {
         switch self {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, textContext: _, sourceFormat: _),
                  .queueBatch(id: let id, profileName: _, items: _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
@@ -95,22 +93,22 @@ enum WorkerRequest: Equatable {
                  let .textProfileActive(id),
                  let .textProfile(id, _),
                  let .textProfiles(id),
-                 let .textProfileStyle(id),
-                 let .textProfileEffective(id, _),
+                 let .activeTextProfileStyle(id),
+                 let .textProfileStyleOptions(id),
+                 let .textProfileEffective(id),
                  let .textProfilePersistence(id),
                  let .loadTextProfiles(id),
                  let .saveTextProfiles(id),
-                 let .setTextProfileStyle(id, _),
-                 let .createTextProfile(id, _, _, _),
-                 let .storeTextProfile(id, _),
-                 let .useTextProfile(id, _),
-                 let .removeTextProfile(id, _),
-                 let .resetTextProfile(id),
-                 let .textReplacements(id, _),
+                 let .setActiveTextProfileStyle(id, _),
+                 let .createTextProfile(id, _),
+                 let .renameTextProfile(id, _, _),
+                 let .setActiveTextProfile(id, _),
+                 let .deleteTextProfile(id, _),
+                 let .factoryResetTextProfiles(id),
+                 let .resetTextProfile(id, _),
                  let .addTextReplacement(id, _, _),
                  let .replaceTextReplacement(id, _, _),
                  let .removeTextReplacement(id, _, _),
-                 let .clearTextReplacements(id, _),
                  let .listQueue(id, _),
                  let .status(id),
                  let .overview(id),
@@ -126,9 +124,9 @@ enum WorkerRequest: Equatable {
 
     var opName: String {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
                 "generate_speech"
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, textContext: _, sourceFormat: _):
                 "generate_audio_file"
             case .queueBatch:
                 "generate_batch"
@@ -164,8 +162,10 @@ enum WorkerRequest: Equatable {
                 "get_text_profile"
             case .textProfiles:
                 "list_text_profiles"
-            case .textProfileStyle:
-                "get_text_profile_style"
+            case .activeTextProfileStyle:
+                "get_active_text_profile_style"
+            case .textProfileStyleOptions:
+                "list_text_profile_styles"
             case .textProfileEffective:
                 "get_effective_text_profile"
             case .textProfilePersistence:
@@ -174,28 +174,26 @@ enum WorkerRequest: Equatable {
                 "load_text_profiles"
             case .saveTextProfiles:
                 "save_text_profiles"
-            case .setTextProfileStyle:
-                "set_text_profile_style"
+            case .setActiveTextProfileStyle:
+                "set_active_text_profile_style"
             case .createTextProfile:
                 "create_text_profile"
-            case .storeTextProfile:
-                "replace_text_profile"
-            case .useTextProfile:
-                "replace_active_text_profile"
-            case .removeTextProfile:
+            case .renameTextProfile:
+                "update_text_profile_name"
+            case .setActiveTextProfile:
+                "set_active_text_profile"
+            case .deleteTextProfile:
                 "delete_text_profile"
+            case .factoryResetTextProfiles:
+                "factory_reset_text_profiles"
             case .resetTextProfile:
                 "reset_text_profile"
-            case .textReplacements:
-                "list_text_replacements"
             case .addTextReplacement:
                 "create_text_replacement"
             case .replaceTextReplacement:
                 "replace_text_replacement"
             case .removeTextReplacement:
                 "delete_text_replacement"
-            case .clearTextReplacements:
-                "clear_text_replacements"
             case .listQueue(_, .generation):
                 "list_generation_queue"
             case .listQueue(_, .playback):
@@ -252,7 +250,7 @@ enum WorkerRequest: Equatable {
 
     var requiresPlayback: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
                 true
             default:
                 false
@@ -270,7 +268,7 @@ enum WorkerRequest: Equatable {
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, textContext: _, sourceFormat: _),
                  .queueBatch,
                  .switchSpeechBackend,
                  .reloadModels,
@@ -293,22 +291,22 @@ enum WorkerRequest: Equatable {
                  .textProfileActive,
                  .textProfile,
                  .textProfiles,
-                 .textProfileStyle,
+                 .activeTextProfileStyle,
+                 .textProfileStyleOptions,
                  .textProfileEffective,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
-                 .setTextProfileStyle,
+                 .setActiveTextProfileStyle,
                  .createTextProfile,
-                 .storeTextProfile,
-                 .useTextProfile,
-                 .removeTextProfile,
+                 .renameTextProfile,
+                 .setActiveTextProfile,
+                 .deleteTextProfile,
+                 .factoryResetTextProfiles,
                  .resetTextProfile,
-                 .textReplacements,
                  .addTextReplacement,
                  .replaceTextReplacement,
                  .removeTextReplacement,
-                 .clearTextReplacements,
                  .listQueue,
                  .status,
                  .overview,
@@ -340,7 +338,7 @@ enum WorkerRequest: Equatable {
 
     var profileName: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileName: _, jobType: _, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, textContext: _, sourceFormat: _),
                  .queueBatch(id: _, profileName: let profileName, items: _),
                  let .createProfile(_, profileName, _, _, _, _, _),
                  let .createClone(_, profileName, _, _, _, _),
@@ -357,14 +355,14 @@ enum WorkerRequest: Equatable {
                  .generationJobs,
                  .textProfileActive,
                  .textProfiles,
-                 .textProfileStyle,
+                 .activeTextProfileStyle,
+                 .textProfileStyleOptions,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
-                 .setTextProfileStyle,
-                 .storeTextProfile,
-                 .useTextProfile,
-                 .resetTextProfile,
+                 .setActiveTextProfileStyle,
+                 .createTextProfile,
+                 .factoryResetTextProfiles,
                  .listProfiles,
                  .listQueue,
                  .status,
@@ -376,28 +374,27 @@ enum WorkerRequest: Equatable {
                  .clearQueue,
                  .cancelRequest:
                 nil
-            case let .textProfile(_, name),
-                 let .removeTextProfile(_, name):
-                name
-            case let .textProfileEffective(_, name),
-                 let .textReplacements(_, name),
-                 let .addTextReplacement(_, _, name),
-                 let .replaceTextReplacement(_, _, name),
-                 let .removeTextReplacement(_, _, name),
-                 let .clearTextReplacements(_, name):
-                name
-            case let .createTextProfile(_, profileID, _, _):
-                profileID
+            case let .renameTextProfile(_, _, profileName):
+                profileName
+            case .textProfile,
+                 .textProfileEffective,
+                 .setActiveTextProfile,
+                 .deleteTextProfile,
+                 .resetTextProfile,
+                 .addTextReplacement,
+                 .replaceTextReplacement,
+                 .removeTextReplacement:
+                nil
         }
     }
 
-    var textProfileName: String? {
+    var textProfileID: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: let textProfileName, jobType: _, textContext: _, sourceFormat: _):
-                return textProfileName
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: let textProfileID, jobType: _, textContext: _, sourceFormat: _):
+                return textProfileID
             case .queueBatch(id: _, profileName: _, items: let items):
-                let names = Set(items.compactMap(\.textProfileName))
-                return names.count == 1 ? names.first : nil
+                let ids = Set(items.compactMap(\.textProfileID))
+                return ids.count == 1 ? ids.first : nil
             case .generatedFile,
                  .generatedFiles,
                  .generatedBatch,
@@ -412,24 +409,15 @@ enum WorkerRequest: Equatable {
                  .rerollProfile,
                  .removeProfile,
                  .textProfileActive,
-                 .textProfile,
                  .textProfiles,
-                 .textProfileStyle,
-                 .textProfileEffective,
+                 .activeTextProfileStyle,
+                 .textProfileStyleOptions,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
-                 .setTextProfileStyle,
+                 .setActiveTextProfileStyle,
                  .createTextProfile,
-                 .storeTextProfile,
-                 .useTextProfile,
-                 .removeTextProfile,
-                 .resetTextProfile,
-                 .textReplacements,
-                 .addTextReplacement,
-                 .replaceTextReplacement,
-                 .removeTextReplacement,
-                 .clearTextReplacements,
+                 .factoryResetTextProfiles,
                  .listQueue,
                  .status,
                  .overview,
@@ -440,12 +428,24 @@ enum WorkerRequest: Equatable {
                  .clearQueue,
                  .cancelRequest:
                 return nil
+            case let .textProfile(_, profileID),
+                 let .renameTextProfile(_, profileID, _),
+                 let .setActiveTextProfile(_, profileID),
+                 let .deleteTextProfile(_, profileID),
+                 let .resetTextProfile(_, profileID):
+                return profileID
+            case let .addTextReplacement(_, _, profileID),
+                 let .replaceTextReplacement(_, _, profileID),
+                 let .removeTextReplacement(_, _, profileID):
+                return profileID
+            case .textProfileEffective:
+                return nil
         }
     }
 
     var textContext: TextForSpeech.Context? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: let textContext, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, textContext: let textContext, sourceFormat: _):
                 textContext
             case .queueBatch:
                 nil
@@ -465,22 +465,22 @@ enum WorkerRequest: Equatable {
                  .textProfileActive,
                  .textProfile,
                  .textProfiles,
-                 .textProfileStyle,
+                 .activeTextProfileStyle,
+                 .textProfileStyleOptions,
                  .textProfileEffective,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
-                 .setTextProfileStyle,
+                 .setActiveTextProfileStyle,
                  .createTextProfile,
-                 .storeTextProfile,
-                 .useTextProfile,
-                 .removeTextProfile,
-                 .resetTextProfile,
-                 .textReplacements,
                  .addTextReplacement,
                  .replaceTextReplacement,
                  .removeTextReplacement,
-                 .clearTextReplacements,
+                 .renameTextProfile,
+                 .setActiveTextProfile,
+                 .deleteTextProfile,
+                 .factoryResetTextProfiles,
+                 .resetTextProfile,
                  .listQueue,
                  .status,
                  .overview,
@@ -496,7 +496,7 @@ enum WorkerRequest: Equatable {
 
     var sourceFormat: TextForSpeech.SourceFormat? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
                 sourceFormat
             case .queueBatch:
                 nil
@@ -516,22 +516,22 @@ enum WorkerRequest: Equatable {
                  .textProfileActive,
                  .textProfile,
                  .textProfiles,
-                 .textProfileStyle,
+                 .activeTextProfileStyle,
+                 .textProfileStyleOptions,
                  .textProfileEffective,
                  .textProfilePersistence,
                  .loadTextProfiles,
                  .saveTextProfiles,
-                 .setTextProfileStyle,
+                 .setActiveTextProfileStyle,
                  .createTextProfile,
-                 .storeTextProfile,
-                 .useTextProfile,
-                 .removeTextProfile,
-                 .resetTextProfile,
-                 .textReplacements,
                  .addTextReplacement,
                  .replaceTextReplacement,
                  .removeTextReplacement,
-                 .clearTextReplacements,
+                 .renameTextProfile,
+                 .setActiveTextProfile,
+                 .deleteTextProfile,
+                 .factoryResetTextProfiles,
+                 .resetTextProfile,
                  .listQueue,
                  .status,
                  .overview,

@@ -1,12 +1,10 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - RawBatchItem
-
 struct RawBatchItem: Decodable {
     let artifactID: String?
     let text: String?
-    let textProfileName: String?
+    let textProfileID: String?
     let cwd: String?
     let repoRoot: String?
     let textFormat: TextForSpeech.TextFormat?
@@ -16,7 +14,7 @@ struct RawBatchItem: Decodable {
     enum CodingKeys: String, CodingKey {
         case artifactID = "artifact_id"
         case text
-        case textProfileName = "text_profile_name"
+        case textProfileID = "text_profile_id"
         case cwd
         case repoRoot = "repo_root"
         case textFormat = "text_format"
@@ -24,8 +22,6 @@ struct RawBatchItem: Decodable {
         case sourceFormat = "source_format"
     }
 }
-
-// MARK: - RawWorkerRequest
 
 struct RawWorkerRequest: Decodable {
     enum CodingKeys: String, CodingKey {
@@ -38,12 +34,8 @@ struct RawWorkerRequest: Decodable {
         case text
         case profileName = "profile_name"
         case newProfileName = "new_profile_name"
-        case textProfileName = "text_profile_name"
         case textProfileID = "text_profile_id"
-        case textProfileDisplayName = "text_profile_display_name"
-        case textProfile = "text_profile"
         case textProfileStyle = "text_profile_style"
-        case replacements
         case replacement
         case replacementID = "replacement_id"
         case cwd
@@ -205,12 +197,8 @@ struct RawWorkerRequest: Decodable {
     let text: String?
     let profileName: String?
     let newProfileName: String?
-    let textProfileName: String?
     let textProfileID: String?
-    let textProfileDisplayName: String?
-    let textProfile: TextForSpeech.Profile?
     let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-    let replacements: [TextForSpeech.Replacement]?
     let replacement: TextForSpeech.Replacement?
     let replacementID: String?
     let cwd: String?
@@ -238,15 +226,11 @@ struct RawWorkerRequest: Decodable {
         text = try container.decodeIfPresent(String.self, forKey: .text)
         profileName = try container.decodeIfPresent(String.self, forKey: .profileName)
         newProfileName = try container.decodeIfPresent(String.self, forKey: .newProfileName)
-        textProfileName = try container.decodeIfPresent(String.self, forKey: .textProfileName)
         textProfileID = try container.decodeIfPresent(String.self, forKey: .textProfileID)
-        textProfileDisplayName = try container.decodeIfPresent(String.self, forKey: .textProfileDisplayName)
-        textProfile = try container.decodeIfPresent(TextForSpeech.Profile.self, forKey: .textProfile)
         textProfileStyle = try container.decodeIfPresent(
             TextForSpeech.BuiltInProfileStyle.self,
             forKey: .textProfileStyle,
         )
-        replacements = try Self.decodeReplacementsIfPresent(in: container, forKey: .replacements)
         replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
         replacementID = try container.decodeIfPresent(String.self, forKey: .replacementID)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
@@ -294,7 +278,7 @@ struct RawWorkerRequest: Decodable {
     static func resolveSpeechTextInput(
         id: String,
         text: String?,
-        textProfileName: String?,
+        textProfileID: String?,
         cwd: String?,
         repoRoot: String?,
         textFormat: TextForSpeech.TextFormat?,
@@ -302,12 +286,12 @@ struct RawWorkerRequest: Decodable {
         sourceFormat: TextForSpeech.SourceFormat?,
     ) throws -> (
         text: String,
-        textProfileName: String?,
+        textProfileID: String?,
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?,
     ) {
         let resolvedText = try WorkerRequest.requireNonEmpty(text, field: "text", id: id)
-        let resolvedTextProfileName = textProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let resolvedTextProfileID = textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         if sourceFormat != nil, textFormat != nil || nestedSourceFormat != nil {
             throw WorkerError(
                 code: .invalidRequest,
@@ -324,7 +308,7 @@ struct RawWorkerRequest: Decodable {
 
         return (
             text: resolvedText,
-            textProfileName: resolvedTextProfileName,
+            textProfileID: resolvedTextProfileID,
             textContext: textContext,
             sourceFormat: sourceFormat,
         )
@@ -347,7 +331,7 @@ struct RawWorkerRequest: Decodable {
             let resolved = try resolveSpeechTextInput(
                 id: itemID,
                 text: rawItem.text,
-                textProfileName: rawItem.textProfileName,
+                textProfileID: rawItem.textProfileID,
                 cwd: rawItem.cwd,
                 repoRoot: rawItem.repoRoot,
                 textFormat: rawItem.textFormat,
@@ -366,7 +350,7 @@ struct RawWorkerRequest: Decodable {
             return SpeakSwiftly.GenerationJobItem(
                 artifactID: artifactID,
                 text: resolved.text,
-                textProfileName: resolved.textProfileName,
+                textProfileID: resolved.textProfileID,
                 textContext: resolved.textContext,
                 sourceFormat: resolved.sourceFormat,
             )
@@ -439,8 +423,6 @@ struct RawWorkerRequest: Decodable {
         }
     }
 }
-
-// MARK: - Helpers
 
 extension String {
     var nilIfEmpty: String? {

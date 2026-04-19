@@ -1,8 +1,6 @@
 import Foundation
 import SpeakSwiftly
 
-// MARK: - SpeakSwiftlyTestingMain
-
 @main
 struct SpeakSwiftlyTestingMain {
     enum Command: String {
@@ -95,8 +93,6 @@ struct SpeakSwiftlyTestingMain {
         return "stage=\(status.stage.rawValue) resident_state=\(status.residentState.rawValue) speech_backend=\(status.speechBackend.rawValue)"
     }
 }
-
-// MARK: SpeakSwiftlyTestingMain.UsageError
 
 extension SpeakSwiftlyTestingMain {
     enum UsageError: LocalizedError {

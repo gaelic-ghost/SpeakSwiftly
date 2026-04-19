@@ -1,8 +1,6 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - SpeakSwiftly.Generate
-
 public extension SpeakSwiftly {
     // MARK: Generate Handle
 
@@ -29,14 +27,14 @@ public extension SpeakSwiftly.Generate {
     /// - Parameters:
     ///   - text: The text to synthesize.
     ///   - profileName: The stored voice profile to use.
-    ///   - textProfileName: An optional text-normalization profile override.
+    ///   - textProfileID: An optional text-normalization profile override.
     ///   - textContext: Optional normalization context metadata.
     ///   - sourceFormat: Optional format hint for the source text.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
         with profileName: SpeakSwiftly.Name,
-        textProfileName: String? = nil,
+        textProfileID: String? = nil,
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
@@ -45,7 +43,7 @@ public extension SpeakSwiftly.Generate {
                 id: UUID().uuidString,
                 text: text,
                 profileName: profileName,
-                textProfileName: textProfileName,
+                textProfileID: textProfileID,
                 jobType: .live,
                 textContext: textContext,
                 sourceFormat: sourceFormat,
@@ -60,7 +58,7 @@ public extension SpeakSwiftly.Generate {
     func audio(
         text: String,
         with profileName: SpeakSwiftly.Name,
-        textProfileName: String? = nil,
+        textProfileID: String? = nil,
         textContext: TextForSpeech.Context? = nil,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
@@ -69,7 +67,7 @@ public extension SpeakSwiftly.Generate {
                 id: UUID().uuidString,
                 text: text,
                 profileName: profileName,
-                textProfileName: textProfileName,
+                textProfileID: textProfileID,
                 jobType: .file,
                 textContext: textContext,
                 sourceFormat: sourceFormat,

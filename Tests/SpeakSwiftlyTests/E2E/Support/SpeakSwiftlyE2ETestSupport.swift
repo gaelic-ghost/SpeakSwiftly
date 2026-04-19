@@ -558,8 +558,6 @@ enum E2EHarness {
     }
 }
 
-// MARK: - E2ESandbox
-
 struct E2ESandbox {
     let rootURL: URL
     let profileRootURL: URL
@@ -576,8 +574,6 @@ struct E2ESandbox {
         try? FileManager.default.removeItem(at: rootURL)
     }
 }
-
-// MARK: - JSONLineRecorder
 
 final class JSONLineRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -660,8 +656,6 @@ final class JSONLineRecorder: @unchecked Sendable {
         }
     }
 }
-
-// MARK: - WorkerProcess
 
 final class WorkerProcess: @unchecked Sendable {
     private enum Environment {
@@ -831,53 +825,48 @@ final class WorkerProcess: @unchecked Sendable {
         packageRootURL: URL,
         configuration: String,
     ) throws -> URL {
-        let runtime = try loadPublishedRuntime(
+        let runtime = runtimePaths(
             packageRootURL: packageRootURL,
             configuration: configuration,
         )
 
         guard FileManager.default.isExecutableFile(atPath: runtime.executableURL.path) else {
             throw WorkerProcessError(
-                "The published SpeakSwiftly worker executable recorded in '\(runtime.metadataURL.path)' was expected at '\(runtime.executableURL.path)', but no executable was found there.",
+                "The deterministic SpeakSwiftly worker executable was expected at '\(runtime.executableURL.path)', but no executable was found there. Run 'sh scripts/repo-maintenance/publish-runtime.sh --configuration \(configuration)' first.",
             )
         }
         guard FileManager.default.fileExists(atPath: runtime.metallibURL.path) else {
             throw WorkerProcessError(
-                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its MLX Metal shader bundle at '\(runtime.metallibURL.path)'. The worker cannot run real MLX-backed e2e tests without `default.metallib`.",
+                "The deterministic SpeakSwiftly runtime is missing its MLX Metal shader bundle at '\(runtime.metallibURL.path)'. The worker cannot run real MLX-backed e2e tests without `default.metallib`.",
             )
         }
         guard FileManager.default.isExecutableFile(atPath: runtime.launcherURL.path) else {
             throw WorkerProcessError(
-                "The published SpeakSwiftly runtime recorded in '\(runtime.metadataURL.path)' is missing its launcher script at '\(runtime.launcherURL.path)'.",
+                "The deterministic SpeakSwiftly runtime is missing its launcher script at '\(runtime.launcherURL.path)'.",
             )
         }
 
         return runtime.launcherURL
     }
 
-    private static func loadPublishedRuntime(
+    private static func runtimePaths(
         packageRootURL: URL,
         configuration: String,
-    ) throws -> PublishedRuntime {
-        let metadataURL = packageRootURL
-            .appendingPathComponent(".local/xcode/SpeakSwiftly.\(configuration.lowercased()).json", isDirectory: false)
-
-        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
-            throw WorkerProcessError(
-                "The published SpeakSwiftly runtime metadata manifest was expected at '\(metadataURL.path)', but no manifest was found there.",
-            )
-        }
-
-        let data = try Data(contentsOf: metadataURL)
-        let manifest = try JSONDecoder().decode(PublishedRuntimeManifest.self, from: data)
-
-        return PublishedRuntime(
-            metadataURL: metadataURL,
-            productsURL: URL(fileURLWithPath: manifest.productsPath),
-            executableURL: URL(fileURLWithPath: manifest.executablePath),
-            launcherURL: URL(fileURLWithPath: manifest.launcherPath),
-            metallibURL: URL(fileURLWithPath: manifest.metallibPath),
-            aliasURL: URL(fileURLWithPath: manifest.aliasPath),
+    ) -> RuntimePaths {
+        let lowerConfiguration = configuration.lowercased()
+        let runtimeRootURL = packageRootURL
+            .appendingPathComponent(".local/derived-data/runtime-\(lowerConfiguration)", isDirectory: true)
+        let productsURL = runtimeRootURL
+            .appendingPathComponent("Build/Products/\(configuration)", isDirectory: true)
+        return RuntimePaths(
+            runtimeRootURL: runtimeRootURL,
+            productsURL: productsURL,
+            executableURL: productsURL.appendingPathComponent("SpeakSwiftlyTool", isDirectory: false),
+            launcherURL: runtimeRootURL.appendingPathComponent("run-speakswiftly", isDirectory: false),
+            metallibURL: productsURL.appendingPathComponent(
+                "mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib",
+                isDirectory: false,
+            ),
         )
     }
 
@@ -908,9 +897,9 @@ final class WorkerProcess: @unchecked Sendable {
     ) throws {
         let process = Process()
         let logURL = packageRootURL
-            .appendingPathComponent(".local/xcode/SpeakSwiftly-e2e-publish-\(configuration.lowercased()).log", isDirectory: false)
+            .appendingPathComponent(".local/logs/SpeakSwiftly-e2e-build-\(configuration.lowercased()).log", isDirectory: false)
         try FileManager.default.createDirectory(
-            at: packageRootURL.appendingPathComponent(".local/xcode", isDirectory: true),
+            at: packageRootURL.appendingPathComponent(".local/logs", isDirectory: true),
             withIntermediateDirectories: true,
         )
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
@@ -1098,36 +1087,13 @@ final class WorkerProcess: @unchecked Sendable {
     }
 }
 
-// MARK: - PublishedRuntimeManifest
-
-private struct PublishedRuntimeManifest: Decodable {
-    let productsPath: String
-    let executablePath: String
-    let launcherPath: String
-    let metallibPath: String
-    let aliasPath: String
-
-    private enum CodingKeys: String, CodingKey {
-        case productsPath = "products_path"
-        case executablePath = "executable_path"
-        case launcherPath = "launcher_path"
-        case metallibPath = "metallib_path"
-        case aliasPath = "alias_path"
-    }
-}
-
-// MARK: - PublishedRuntime
-
-private struct PublishedRuntime {
-    let metadataURL: URL
+private struct RuntimePaths {
+    let runtimeRootURL: URL
     let productsURL: URL
     let executableURL: URL
     let launcherURL: URL
     let metallibURL: URL
-    let aliasURL: URL
 }
-
-// MARK: - WorkerProcessError
 
 struct WorkerProcessError: Error, CustomStringConvertible {
     let description: String
@@ -1136,8 +1102,6 @@ struct WorkerProcessError: Error, CustomStringConvertible {
         self.description = description
     }
 }
-
-// MARK: - E2EWorkerArtifacts
 
 private final class E2EWorkerArtifacts: @unchecked Sendable {
     private let lock = NSLock()
@@ -1153,7 +1117,7 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
     private let configuration: String
     private let executableURL: URL
     private let profileRootURL: URL
-    private let runtimeMetadataURL: URL
+    private let runtimeRootURL: URL
     private var processID: Int32?
 
     init(
@@ -1182,8 +1146,8 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
         stdoutURL = artifactsRootURL.appendingPathComponent("stdout.jsonl", isDirectory: false)
         stderrURL = artifactsRootURL.appendingPathComponent("stderr.jsonl", isDirectory: false)
         summaryURL = artifactsRootURL.appendingPathComponent("summary.json", isDirectory: false)
-        runtimeMetadataURL = packageRootURL
-            .appendingPathComponent(".local/xcode/SpeakSwiftly.\(configuration.lowercased()).json", isDirectory: false)
+        runtimeRootURL = packageRootURL
+            .appendingPathComponent(".local/derived-data/runtime-\(configuration.lowercased())", isDirectory: true)
 
         try FileManager.default.createDirectory(at: artifactsRootURL, withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
@@ -1236,7 +1200,7 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
                 configuration: configuration,
                 executablePath: executableURL.path,
                 profileRootPath: profileRootURL.path,
-                runtimeMetadataPath: runtimeMetadataURL.path,
+                runtimeRootPath: runtimeRootURL.path,
                 processID: processID.map(Int.init),
                 terminationStatus: terminationStatus,
                 terminationReason: terminationReason == .exit ? "exit" : "uncaught_signal",
@@ -1304,8 +1268,6 @@ private final class E2EWorkerArtifacts: @unchecked Sendable {
     }
 }
 
-// MARK: - E2ERunSummary
-
 private struct E2ERunSummary: Codable {
     let runID: String
     let caller: String
@@ -1315,7 +1277,7 @@ private struct E2ERunSummary: Codable {
     let configuration: String
     let executablePath: String
     let profileRootPath: String
-    let runtimeMetadataPath: String
+    let runtimeRootPath: String
     let processID: Int?
     let terminationStatus: Int
     let terminationReason: String
@@ -1325,8 +1287,6 @@ private struct E2ERunSummary: Codable {
     let stderrEventCount: Int
     let lastRuntimeMetrics: E2ERuntimeMetrics?
 }
-
-// MARK: - E2ERuntimeMetrics
 
 private struct E2ERuntimeMetrics: Codable {
     let event: String?

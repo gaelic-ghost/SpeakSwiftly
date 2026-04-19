@@ -13,7 +13,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
             case text
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
             case textContext = "text_context"
             case sourceFormat = "source_format"
         }
@@ -22,7 +22,7 @@ public extension SpeakSwiftly {
 
         public let artifactID: String?
         public let text: String
-        public let textProfileName: String?
+        public let textProfileID: String?
         public let textContext: TextForSpeech.Context?
         public let sourceFormat: TextForSpeech.SourceFormat?
 
@@ -31,13 +31,13 @@ public extension SpeakSwiftly {
         public init(
             artifactID: String? = nil,
             text: String,
-            textProfileName: String? = nil,
+            textProfileID: String? = nil,
             textContext: TextForSpeech.Context? = nil,
             sourceFormat: TextForSpeech.SourceFormat? = nil,
         ) {
             self.artifactID = artifactID
             self.text = text
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
             self.textContext = textContext
             self.sourceFormat = sourceFormat
         }
@@ -50,7 +50,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case batchID = "batch_id"
             case profileName = "profile_name"
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
             case speechBackend = "speech_backend"
             case state
             case items
@@ -67,7 +67,7 @@ public extension SpeakSwiftly {
 
         public let batchID: String
         public let profileName: String
-        public let textProfileName: String?
+        public let textProfileID: String?
         public let speechBackend: SpeechBackend
         public let state: GenerationJobState
         public let items: [GenerationJobItem]
@@ -84,7 +84,7 @@ public extension SpeakSwiftly {
         init(
             batchID: String,
             profileName: String,
-            textProfileName: String?,
+            textProfileID: String?,
             speechBackend: SpeechBackend,
             state: GenerationJobState,
             items: [GenerationJobItem],
@@ -100,7 +100,7 @@ public extension SpeakSwiftly {
         ) {
             self.batchID = batchID
             self.profileName = profileName
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
             self.speechBackend = speechBackend
             self.state = state
             self.items = items
@@ -143,7 +143,7 @@ public extension SpeakSwiftly.Runtime {
             SpeakSwiftly.GenerationJobItem(
                 artifactID: item.artifactID ?? "\(batchID)-artifact-\(index + 1)",
                 text: item.text,
-                textProfileName: item.textProfileName,
+                textProfileID: item.textProfileID,
                 textContext: item.textContext,
                 sourceFormat: item.sourceFormat,
             )

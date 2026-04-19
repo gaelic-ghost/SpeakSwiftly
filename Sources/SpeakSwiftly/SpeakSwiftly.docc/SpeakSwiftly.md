@@ -30,8 +30,8 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 ### Generating Speech
 
 - ``SpeakSwiftly/Generate``
-- ``SpeakSwiftly/Generate/speech(text:with:textProfileName:textContext:sourceFormat:)``
-- ``SpeakSwiftly/Generate/audio(text:with:textProfileName:textContext:sourceFormat:)``
+- ``SpeakSwiftly/Generate/speech(text:with:textProfileID:textContext:sourceFormat:)``
+- ``SpeakSwiftly/Generate/audio(text:with:textProfileID:textContext:sourceFormat:)``
 - ``SpeakSwiftly/Generate/batch(_:with:)``
 - ``SpeakSwiftly/RequestHandle``
 

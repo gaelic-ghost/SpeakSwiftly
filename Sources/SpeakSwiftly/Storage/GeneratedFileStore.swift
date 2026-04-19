@@ -1,18 +1,14 @@
 import Foundation
 
-// MARK: - GeneratedFileManifest
-
 struct GeneratedFileManifest: Codable, Equatable {
     let version: Int
     let artifactID: String
     let createdAt: Date
     let profileName: String
-    let textProfileName: String?
+    let textProfileID: String?
     let sampleRate: Int
     let audioFile: String
 }
-
-// MARK: - SpeakSwiftly.GeneratedFile
 
 public extension SpeakSwiftly {
     /// Metadata for one retained generated audio file.
@@ -20,7 +16,7 @@ public extension SpeakSwiftly {
         public let artifactID: String
         public let createdAt: Date
         public let profileName: String
-        public let textProfileName: String?
+        public let textProfileID: String?
         public let sampleRate: Int
         public let filePath: String
 
@@ -28,7 +24,7 @@ public extension SpeakSwiftly {
             case artifactID = "artifact_id"
             case createdAt = "created_at"
             case profileName = "profile_name"
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
             case sampleRate = "sample_rate"
             case filePath = "file_path"
         }
@@ -37,21 +33,19 @@ public extension SpeakSwiftly {
             artifactID: String,
             createdAt: Date,
             profileName: String,
-            textProfileName: String?,
+            textProfileID: String?,
             sampleRate: Int,
             filePath: String,
         ) {
             self.artifactID = artifactID
             self.createdAt = createdAt
             self.profileName = profileName
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
             self.sampleRate = sampleRate
             self.filePath = filePath
         }
     }
 }
-
-// MARK: - StoredGeneratedFile
 
 struct StoredGeneratedFile: Equatable {
     let manifest: GeneratedFileManifest
@@ -63,14 +57,12 @@ struct StoredGeneratedFile: Equatable {
             artifactID: manifest.artifactID,
             createdAt: manifest.createdAt,
             profileName: manifest.profileName,
-            textProfileName: manifest.textProfileName,
+            textProfileID: manifest.textProfileID,
             sampleRate: manifest.sampleRate,
             filePath: audioURL.standardizedFileURL.path,
         )
     }
 }
-
-// MARK: - GeneratedFileStore
 
 struct GeneratedFileStore {
     static let directoryName = "generated-files"
@@ -114,7 +106,7 @@ struct GeneratedFileStore {
     func createGeneratedFile(
         artifactID: String,
         profileName: String,
-        textProfileName: String?,
+        textProfileID: String?,
         sampleRate: Int,
         audioData: Data,
     ) throws -> StoredGeneratedFile {
@@ -135,7 +127,7 @@ struct GeneratedFileStore {
             artifactID: artifactID,
             createdAt: Date(),
             profileName: profileName,
-            textProfileName: textProfileName,
+            textProfileID: textProfileID,
             sampleRate: sampleRate,
             audioFile: Self.audioFileName,
         )

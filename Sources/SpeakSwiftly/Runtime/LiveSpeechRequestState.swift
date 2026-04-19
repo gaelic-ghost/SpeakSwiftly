@@ -5,7 +5,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let request: WorkerRequest
     let text: String
     let profileName: String
-    let textProfileName: String?
+    let textProfileID: String?
     let textContext: TextForSpeech.Context?
     let sourceFormat: TextForSpeech.SourceFormat?
     let normalizedText: String
@@ -36,7 +36,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
             id: _,
             text: text,
             profileName: profileName,
-            textProfileName: textProfileName,
+            textProfileID: textProfileID,
             jobType: .live,
             textContext: textContext,
             sourceFormat: sourceFormat,
@@ -49,7 +49,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.request = request
         self.text = text
         self.profileName = profileName
-        self.textProfileName = textProfileName
+        self.textProfileID = textProfileID
         self.textContext = textContext
         self.sourceFormat = sourceFormat
         self.normalizedText = normalizedText

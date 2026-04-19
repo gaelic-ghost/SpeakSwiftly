@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - SpeakSwiftly.Voices
-
 public extension SpeakSwiftly {
     // MARK: Voices Handle
 

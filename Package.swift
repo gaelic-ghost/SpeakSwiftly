@@ -26,7 +26,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.17.2"),
+            .upToNextMajor(from: "0.18.0"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
@@ -56,6 +56,9 @@ let package = Package(
             dependencies: [
                 "SpeakSwiftly",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
+            ],
+            resources: [
+                .copy("Resources/default.metallib"),
             ],
         ),
         .executableTarget(

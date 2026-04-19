@@ -193,7 +193,7 @@ extension SpeakSwiftly.Runtime {
             id: _,
             text: _,
             profileName: let profileName,
-            textProfileName: _,
+            textProfileID: _,
             jobType: _,
             textContext: _,
             sourceFormat: _,

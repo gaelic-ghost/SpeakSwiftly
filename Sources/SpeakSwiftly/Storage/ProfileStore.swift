@@ -1,8 +1,6 @@
 import Foundation
 import MLXAudioTTS
 
-// MARK: - ProfileStore
-
 struct ProfileStore: @unchecked Sendable {
     static let directoryName = "SpeakSwiftly"
     static let profilesDirectoryName = "profiles"

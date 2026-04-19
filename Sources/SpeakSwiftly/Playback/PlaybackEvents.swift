@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - PlaybackEvent
-
 enum PlaybackEvent {
     case firstChunk
     case prerollReady(startupBufferedAudioMS: Int, thresholds: PlaybackAdaptiveThresholds)
@@ -23,8 +21,6 @@ enum PlaybackEvent {
     case starved
 }
 
-// MARK: - PlaybackEnvironmentEvent
-
 enum PlaybackEnvironmentEvent {
     case outputDeviceObserved(currentDevice: String?)
     case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
@@ -36,8 +32,6 @@ enum PlaybackEnvironmentEvent {
     case recoveryStateChanged(reason: String, stage: String, attempt: Int?, currentDevice: String?)
     case interJobBoopPlayed(durationMS: Int, frequencyHz: Double, sampleRate: Double)
 }
-
-// MARK: - PlaybackTraceEvent
 
 struct PlaybackTraceEvent {
     let name: String

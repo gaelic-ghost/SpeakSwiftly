@@ -4,8 +4,6 @@ import MLXAudioSTT
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
-// MARK: - GenerationPolicy
-
 enum GenerationPolicy {
     private static let residentTemperature: Float = 0.9
     private static let residentTopP: Float = 1.0
@@ -58,8 +56,6 @@ enum GenerationPolicy {
         return min(3072, max(96, wordCount * 10))
     }
 }
-
-// MARK: - ModelFactory
 
 enum ModelFactory {
     static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"

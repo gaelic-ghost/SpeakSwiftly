@@ -83,7 +83,7 @@ extension SpeakSwiftly.Runtime {
             id: let id,
             text: let text,
             profileName: let profileName,
-            textProfileName: let textProfileName,
+            textProfileID: let textProfileID,
             jobType: .file,
             textContext: let textContext,
             sourceFormat: let sourceFormat,
@@ -91,12 +91,12 @@ extension SpeakSwiftly.Runtime {
                 try generationJobStore.createFileJob(
                     jobID: id,
                     profileName: profileName,
-                    textProfileName: textProfileName,
+                    textProfileID: textProfileID,
                     speechBackend: speechBackend,
                     item: SpeakSwiftly.GenerationJobItem(
                         artifactID: fileArtifactID(for: request),
                         text: text,
-                        textProfileName: textProfileName,
+                        textProfileID: textProfileID,
                         textContext: textContext,
                         sourceFormat: sourceFormat,
                     ),
@@ -106,7 +106,7 @@ extension SpeakSwiftly.Runtime {
                 try generationJobStore.createBatchJob(
                     jobID: id,
                     profileName: profileName,
-                    textProfileName: request.textProfileName,
+                    textProfileID: request.textProfileID,
                     speechBackend: speechBackend,
                     items: items,
                     createdAt: dependencies.now(),
@@ -122,7 +122,7 @@ extension SpeakSwiftly.Runtime {
             id: let id,
             text: _,
             profileName: _,
-            textProfileName: _,
+            textProfileID: _,
             jobType: .file,
             textContext: _,
             sourceFormat: _,
@@ -147,7 +147,7 @@ extension SpeakSwiftly.Runtime {
             id: let id,
             text: _,
             profileName: _,
-            textProfileName: _,
+            textProfileID: _,
             jobType: .file,
             textContext: _,
             sourceFormat: _,
@@ -165,19 +165,30 @@ extension SpeakSwiftly.Runtime {
 
     func makeSpeechJobState(for request: WorkerRequest) async -> LiveSpeechRequestState {
         let text = switch request {
-            case .queueSpeech(id: _, text: let text, profileName: _, textProfileName: _, jobType: _, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, textContext: _, sourceFormat: _):
                 text
             default:
                 ""
         }
-        let textProfileName = request.textProfileName
+        let textProfileID = request.textProfileID
         let textContext = request.textContext
         let sourceFormat = request.sourceFormat
-        let textProfileStyle = await normalizerRef.profiles.builtInStyle()
-        let textProfile = if let textProfileName {
-            await normalizerRef.profiles.stored(id: textProfileName) ?? .default
+        let textProfileStyle = await normalizerRef.style.getActive()
+        let textProfile: TextForSpeech.Profile
+        if let textProfileID,
+           let details = try? await normalizerRef.profiles.get(id: textProfileID) {
+            textProfile = TextForSpeech.Profile(
+                id: details.profileID,
+                name: details.summary.name,
+                replacements: details.replacements,
+            )
         } else {
-            await normalizerRef.profiles.active() ?? .default
+            let details = await normalizerRef.profiles.getActive()
+            textProfile = TextForSpeech.Profile(
+                id: details.profileID,
+                name: details.summary.name,
+                replacements: details.replacements,
+            )
         }
         let normalizedText = if let sourceFormat {
             TextForSpeech.Normalize.source(
@@ -227,7 +238,7 @@ extension SpeakSwiftly.Runtime {
 
     func fileArtifactID(for request: WorkerRequest) -> String {
         switch request {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileName: _, jobType: .file, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, textContext: _, sourceFormat: _):
                 "\(id)-artifact-1"
             default:
                 request.id
@@ -294,7 +305,7 @@ extension SpeakSwiftly.Runtime {
         return SpeakSwiftly.GeneratedBatch(
             batchID: job.jobID,
             profileName: job.profileName,
-            textProfileName: job.textProfileName,
+            textProfileID: job.textProfileID,
             speechBackend: job.speechBackend,
             state: job.state,
             items: job.items,
@@ -323,7 +334,7 @@ extension SpeakSwiftly.Runtime {
                     id: let id,
                     text: _,
                     profileName: _,
-                    textProfileName: _,
+                    textProfileID: _,
                     jobType: .file,
                     textContext: _,
                     sourceFormat: _,
@@ -339,7 +350,7 @@ extension SpeakSwiftly.Runtime {
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
                                 profileName: generatedFile.profileName,
-                                textProfileName: generatedFile.textProfileName,
+                                textProfileID: generatedFile.textProfileID,
                             )
                             _ = try? generationJobStore.markCompleted(
                                 id: id,
@@ -360,7 +371,7 @@ extension SpeakSwiftly.Runtime {
                                     filePath: generatedFile.filePath,
                                     sampleRate: generatedFile.sampleRate,
                                     profileName: generatedFile.profileName,
-                                    textProfileName: generatedFile.textProfileName,
+                                    textProfileID: generatedFile.textProfileID,
                                 )
                             }
                             _ = try? generationJobStore.markCompleted(
