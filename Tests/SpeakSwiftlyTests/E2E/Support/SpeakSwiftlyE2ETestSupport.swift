@@ -865,7 +865,7 @@ final class WorkerProcess: @unchecked Sendable {
             launcherURL: runtimeRootURL.appendingPathComponent("run-speakswiftly", isDirectory: false),
             metallibURL: productsURL.appendingPathComponent(
                 "mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib",
-                isDirectory: false
+                isDirectory: false,
             ),
         )
     }

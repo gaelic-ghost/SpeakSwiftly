@@ -47,6 +47,7 @@ private final class MLXSwiftTestMetallibInstaller: @unchecked Sendable {
                         "The SpeakSwiftly test target could not find its bundled default.metallib resource through Bundle.module.",
                     )
                 }
+
                 let packageRootURL = try findPackageRootURL()
                 let destinationMetallibURLs = try metallibDestinationURLs(
                     packageRootURL: packageRootURL,
@@ -90,6 +91,7 @@ private final class MLXSwiftTestMetallibInstaller: @unchecked Sendable {
                     "The SpeakSwiftly test bootstrap could not find the package root while walking upward from '\(#filePath)'.",
                 )
             }
+
             candidateURL = parentURL
         }
     }
@@ -114,20 +116,20 @@ private final class MLXSwiftTestMetallibInstaller: @unchecked Sendable {
         ) {
             for case let candidateURL as URL in enumerator {
                 switch candidateURL.lastPathComponent {
-                case "SpeakSwiftlyPackageTests.xctest":
-                    destinationURLs.insert(
-                        candidateURL
-                            .appendingPathComponent("Contents/MacOS/Resources/default.metallib", isDirectory: false)
-                    )
-                    enumerator.skipDescendants()
-                case "SpeakSwiftlyTool":
-                    destinationURLs.insert(
-                        candidateURL
-                            .deletingLastPathComponent()
-                            .appendingPathComponent("Resources/default.metallib", isDirectory: false)
-                    )
-                default:
-                    break
+                    case "SpeakSwiftlyPackageTests.xctest":
+                        destinationURLs.insert(
+                            candidateURL
+                                .appendingPathComponent("Contents/MacOS/Resources/default.metallib", isDirectory: false),
+                        )
+                        enumerator.skipDescendants()
+                    case "SpeakSwiftlyTool":
+                        destinationURLs.insert(
+                            candidateURL
+                                .deletingLastPathComponent()
+                                .appendingPathComponent("Resources/default.metallib", isDirectory: false),
+                        )
+                    default:
+                        break
                 }
             }
         }

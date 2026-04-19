@@ -479,7 +479,7 @@ import TextForSpeech
         TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule"),
     )
     #expect(replaced.replacements.first?.replacement == "standard out")
-    #expect((await runtime.normalizer.profiles.getActive()).replacements.map(\.id) == ["stdout-rule"])
+    #expect(await (runtime.normalizer.profiles.getActive()).replacements.map(\.id) == ["stdout-rule"])
 
     let emptied = try await runtime.normalizer.profiles.removeReplacement(id: "stdout-rule")
     #expect(emptied.replacements.isEmpty)
@@ -490,7 +490,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    #expect((await reloaded.normalizer.profiles.getActive()).replacements.isEmpty == true)
+    #expect(await (reloaded.normalizer.profiles.getActive()).replacements.isEmpty == true)
 }
 
 @Test func `text profile protocol operations mutate and expose normalizer state`() async throws {

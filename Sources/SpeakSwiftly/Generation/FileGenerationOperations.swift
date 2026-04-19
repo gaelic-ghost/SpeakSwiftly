@@ -27,8 +27,7 @@ extension SpeakSwiftly.Runtime {
         let textProfileStyle = await normalizerRef.style.getActive()
         let textProfile: TextForSpeech.Profile
         if let textProfileID,
-           let details = try? await normalizerRef.profiles.get(id: textProfileID)
-        {
+           let details = try? await normalizerRef.profiles.get(id: textProfileID) {
             textProfile = TextForSpeech.Profile(
                 id: details.profileID,
                 name: details.summary.name,

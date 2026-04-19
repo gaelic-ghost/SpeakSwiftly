@@ -115,7 +115,7 @@ import Darwin
     #expect(rootURL.path.contains("/SpeakSwiftly-Debug/profiles"))
     #expect(configurationURL.path.contains("/SpeakSwiftly-Debug/configuration.json"))
     #expect(textProfilesURL.path.contains("/SpeakSwiftly-Debug/text-profiles.json"))
-    #expect((await normalizer.persistence.url())?.lastPathComponent == "text-profiles.json")
+    #expect(await (normalizer.persistence.url())?.lastPathComponent == "text-profiles.json")
 }
 
 @Test func `public normalizer default persistence honors profile root override`() async throws {
@@ -160,7 +160,7 @@ import Darwin
         profileRootOverride: overrideRoot.path,
     )
 
-    #expect((await runtime.normalizer.persistence.url())?.lastPathComponent == expectedURL.lastPathComponent)
+    #expect(await (runtime.normalizer.persistence.url())?.lastPathComponent == expectedURL.lastPathComponent)
 }
 
 // MARK: - Runtime Helpers

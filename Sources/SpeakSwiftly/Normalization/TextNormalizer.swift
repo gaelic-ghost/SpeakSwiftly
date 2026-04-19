@@ -33,7 +33,7 @@ private extension SpeakSwiftly.Normalizer {
     }
 
     func storedTextProfile(id: String) throws -> TextForSpeech.Profile {
-        profile(from: try textProfileDetails(id: id))
+        try profile(from: textProfileDetails(id: id))
     }
 
     func effectiveTextProfile() -> TextForSpeech.Profile {
