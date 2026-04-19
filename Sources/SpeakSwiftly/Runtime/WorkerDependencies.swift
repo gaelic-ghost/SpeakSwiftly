@@ -4,8 +4,6 @@ import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
 
-// MARK: - WorkerDependencies
-
 struct WorkerDependencies: @unchecked Sendable {
     private enum Environment {
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"

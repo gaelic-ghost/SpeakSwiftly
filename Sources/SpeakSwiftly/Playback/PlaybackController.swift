@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - PlaybackHooks
-
 struct PlaybackHooks {
     let handleEvent: @Sendable (PlaybackEvent, LiveSpeechRequestState) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
@@ -10,8 +8,6 @@ struct PlaybackHooks {
     let completeJob: @Sendable (LiveSpeechRequestState, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
     let resumeQueue: @Sendable () async -> Void
 }
-
-// MARK: - PlaybackController
 
 actor PlaybackController {
     struct ConcurrencyAdmissionThresholds {

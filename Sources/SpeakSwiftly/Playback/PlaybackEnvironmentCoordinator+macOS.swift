@@ -4,8 +4,6 @@
 import CoreAudio
 import Foundation
 
-// MARK: - MacOSPlaybackEnvironmentCoordinator
-
 @MainActor
 final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
     private var workspaceObservers = [NSObjectProtocol]()

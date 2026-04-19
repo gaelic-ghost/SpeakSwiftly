@@ -39,7 +39,7 @@ struct GeneratedBatchE2ETests {
             itemsJSON: """
             [
               {"text":"\(E2EHarness.testingPlaybackText.jsonEscaped)"},
-              {"artifact_id":"custom-generated-batch-artifact","text":"\(E2EHarness.testingProfileText.jsonEscaped)","text_profile_name":"logs"}
+              {"artifact_id":"custom-generated-batch-artifact","text":"\(E2EHarness.testingProfileText.jsonEscaped)","text_profile_id":"logs"}
             ]
             """,
         )

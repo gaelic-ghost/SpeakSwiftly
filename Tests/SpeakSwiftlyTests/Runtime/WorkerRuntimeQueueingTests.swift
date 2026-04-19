@@ -92,6 +92,8 @@ import TextForSpeech
             generateSamplesStream: { _, _, _, _, _, _, _ in
                 AsyncThrowingStream { continuation in
                     continuation.yield(Array(repeating: 0.1, count: 24000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
                     Task {
                         await gate.wait()
                         continuation.finish()
@@ -385,24 +387,17 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    try await firstRuntime.normalizer.profiles.store(
-        TextForSpeech.Profile(
-            id: "logs",
-            name: "Logs",
-            replacements: [
-                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
-            ],
-        ),
+    let logs = try await firstRuntime.normalizer.profiles.create(name: "Logs")
+    _ = try await firstRuntime.normalizer.profiles.addReplacement(
+        TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
+        toProfile: logs.profileID,
     )
-    try await firstRuntime.normalizer.profiles.use(
-        TextForSpeech.Profile(
-            id: "ops",
-            name: "Ops",
-            replacements: [
-                TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule"),
-            ],
-        ),
+    let ops = try await firstRuntime.normalizer.profiles.create(name: "Ops")
+    _ = try await firstRuntime.normalizer.profiles.addReplacement(
+        TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule"),
+        toProfile: ops.profileID,
     )
+    try await firstRuntime.normalizer.profiles.setActive(id: ops.profileID)
 
     let secondRuntime = try await makeRuntime(
         rootURL: rootURL,
@@ -411,12 +406,15 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() },
     )
 
-    #expect(await secondRuntime.normalizer.profiles.stored(id: "logs")?.replacements.map(\.id) == ["logs-rule"])
-    #expect(await secondRuntime.normalizer.profiles.active()?.id == "ops")
-    #expect(await secondRuntime.normalizer.profiles.active()?.replacements.map(\.id) == ["ops-rule"])
-    let effectiveLogsReplacementIDs = await secondRuntime.normalizer.profiles.effective(id: "logs")?.replacements.map(\.id) ?? []
-    #expect(effectiveLogsReplacementIDs.contains("logs-rule"))
-    #expect(effectiveLogsReplacementIDs.contains("base-url"))
+    let storedLogs = try await secondRuntime.normalizer.profiles.get(id: logs.profileID)
+    let activeProfile = await secondRuntime.normalizer.profiles.getActive()
+    let effectiveProfile = await secondRuntime.normalizer.profiles.getEffective()
+
+    #expect(storedLogs.replacements.map(\.id) == ["logs-rule"])
+    #expect(activeProfile.profileID == ops.profileID)
+    #expect(activeProfile.replacements.map(\.id) == ["ops-rule"])
+    #expect(effectiveProfile.replacements.map(\.id).contains("ops-rule"))
+    #expect(effectiveProfile.replacements.map(\.id).contains("base-url"))
 }
 
 @Test func `text profile editing helpers mutate and persist stored profiles`() async throws {
@@ -430,24 +428,25 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() },
     )
 
-    let created = try await runtime.normalizer.profiles.create(id: "logs", name: "Logs")
+    let created = try await runtime.normalizer.profiles.create(name: "Logs")
     #expect(created.replacements.isEmpty)
 
-    let added = try await runtime.normalizer.profiles.add(
+    let added = try await runtime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
-        toStoredProfileID: "logs",
+        toProfile: created.profileID,
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
-    let replaced = try await runtime.normalizer.profiles.replace(
+    let replaced = try await runtime.normalizer.profiles.patchReplacement(
         TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
-        inStoredProfileID: "logs",
+        inProfile: created.profileID,
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
-    #expect(await runtime.normalizer.profiles.replacements(inStoredProfileID: "logs")?.map(\.id) == ["stderr-rule"])
+    #expect(try await runtime.normalizer.profiles.get(id: created.profileID).replacements.map(\.id) == ["stderr-rule"])
 
-    let emptied = try await runtime.normalizer.profiles.clearReplacements(
-        fromStoredProfileID: "logs",
+    let emptied = try await runtime.normalizer.profiles.removeReplacement(
+        id: "stderr-rule",
+        fromProfile: created.profileID,
     )
     #expect(emptied.replacements.isEmpty)
 
@@ -457,7 +456,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    #expect(await reloaded.normalizer.profiles.stored(id: "logs")?.replacements.isEmpty == true)
+    #expect(try await reloaded.normalizer.profiles.get(id: created.profileID).replacements.isEmpty == true)
 }
 
 @Test func `active text profile editing helpers mutate and persist custom profile`() async throws {
@@ -471,18 +470,18 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() },
     )
 
-    let added = try await runtime.normalizer.profiles.add(
+    let added = try await runtime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stdout", with: "standard output", id: "stdout-rule"),
     )
     #expect(added.replacements.map(\.id) == ["stdout-rule"])
 
-    let replaced = try await runtime.normalizer.profiles.replace(
+    let replaced = try await runtime.normalizer.profiles.patchReplacement(
         TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule"),
     )
     #expect(replaced.replacements.first?.replacement == "standard out")
-    #expect(await runtime.normalizer.profiles.replacements().map(\.id) == ["stdout-rule"])
+    #expect((await runtime.normalizer.profiles.getActive()).replacements.map(\.id) == ["stdout-rule"])
 
-    let emptied = try await runtime.normalizer.profiles.clearReplacements()
+    let emptied = try await runtime.normalizer.profiles.removeReplacement(id: "stdout-rule")
     #expect(emptied.replacements.isEmpty)
 
     let reloaded = try await makeRuntime(
@@ -491,7 +490,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    #expect(await reloaded.normalizer.profiles.active()?.replacements.isEmpty == true)
+    #expect((await reloaded.normalizer.profiles.getActive()).replacements.isEmpty == true)
 }
 
 @Test func `text profile protocol operations mutate and expose normalizer state`() async throws {
@@ -507,18 +506,18 @@ import TextForSpeech
     )
 
     await runtime.accept(
-        line: #"{"id":"req-create-text","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs"}"#,
+        line: #"{"id":"req-create-text","op":"create_text_profile","profile_name":"Logs"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-create-text"
                 && $0["ok"] as? Bool == true
-                && ($0["text_profile"] as? [String: Any])?["id"] as? String == "logs"
+                && ($0["text_profile"] as? [String: Any])?["profile_id"] as? String == "logs"
         }
     })
 
     await runtime.accept(
-        line: #"{"id":"req-add-text","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
+        line: #"{"id":"req-add-text","op":"create_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -527,46 +526,53 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-list-replacements","op":"list_text_replacements","text_profile_name":"logs"}"#)
+    await runtime.accept(line: #"{"id":"req-text-one","op":"get_text_profile","text_profile_id":"logs"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-list-replacements"
-                && (($0["replacements"] as? [[String: Any]])?.count ?? 0) == 1
-                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "logs"
+            $0["id"] as? String == "req-text-one"
+                && (($0["text_profile"] as? [String: Any])?["profile_id"] as? String) == "logs"
+                && ((($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.count ?? 0) == 1
         }
     })
 
-    let activeProfile = TextForSpeech.Profile(
-        id: "ops",
-        name: "Ops",
-        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")],
-    )
-    let activeProfileJSON = try String(decoding: JSONEncoder().encode(activeProfile), as: UTF8.self)
     await runtime.accept(
-        line: #"{"id":"req-use-text","op":"replace_active_text_profile","text_profile":"# + activeProfileJSON + #"}"#,
+        line: #"{"id":"req-create-ops","op":"create_text_profile","profile_name":"Ops"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-use-text"
-                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "ops"
+            $0["id"] as? String == "req-create-ops"
+                && ($0["ok"] as? Bool == true)
+                && (($0["text_profile"] as? [String: Any])?["profile_id"] as? String) == "ops"
         }
     })
 
+    await runtime.accept(
+        line: #"{"id":"req-set-active","op":"set_active_text_profile","text_profile_id":"ops"}"#,
+    )
     await runtime.accept(line: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-text-active"
-                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "ops"
+                && (($0["text_profile"] as? [String: Any])?["profile_id"] as? String) == "ops"
                 && ($0["text_profile_style"] as? String) == "balanced"
         }
     })
 
     await runtime.accept(
-        line: #"{"id":"req-text-style","op":"set_text_profile_style","text_profile_style":"explicit"}"#,
+        line: #"{"id":"req-text-style","op":"set_active_text_profile_style","text_profile_style":"explicit"}"#,
     )
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-text-style"
+                && ($0["text_profile_style"] as? String) == "explicit"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-text-styles","op":"list_text_profile_styles"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-text-styles"
+                && $0["ok"] as? Bool == true
                 && ($0["text_profile_style"] as? String) == "explicit"
         }
     })
@@ -581,21 +587,29 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-reset-text","op":"reset_text_profile"}"#)
+    await runtime.accept(line: #"{"id":"req-reset-text","op":"reset_text_profile","text_profile_id":"ops"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-reset-text"
-                && (($0["text_profile"] as? [String: Any])?["id"] as? String) == "default"
+                && (($0["text_profile"] as? [String: Any])?["profile_id"] as? String) == "ops"
+                && (((($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.isEmpty) == true)
                 && ($0["text_profile_style"] as? String) == "explicit"
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-clear-replacements","op":"clear_text_replacements"}"#)
+    await runtime.accept(line: #"{"id":"req-delete-text","op":"delete_text_profile","text_profile_id":"logs"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
-            $0["id"] as? String == "req-clear-replacements"
-                && (($0["text_profile"] as? [String: Any])?["replacements"] as? [[String: Any]])?.isEmpty == true
-                && (($0["replacements"] as? [[String: Any]])?.isEmpty) == true
+            $0["id"] as? String == "req-delete-text"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-factory-reset","op":"factory_reset_text_profiles"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-factory-reset"
+                && (($0["text_profile"] as? [String: Any])?["profile_id"] as? String) == "default"
         }
     })
 }

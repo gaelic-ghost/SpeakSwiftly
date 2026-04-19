@@ -2,8 +2,6 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - AudioPlaybackDriver
-
 @MainActor
 final class AudioPlaybackDriver {
     var audioEngine: AVAudioEngine?

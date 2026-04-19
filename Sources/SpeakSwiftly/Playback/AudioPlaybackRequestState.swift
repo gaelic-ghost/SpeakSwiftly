@@ -1,8 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-// MARK: - AudioPlaybackRequestState
-
 @MainActor
 final class AudioPlaybackRequestState {
     struct QueuedBuffer {

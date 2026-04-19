@@ -1,293 +1,241 @@
-# TextForSpeech Profiles, Replacements, and Slices
+# Text Profiles, Replacements, and Slices
 
 ## Why this exists
 
-This note explains the current `TextForSpeech` model in maintainer terms, with special attention to three ideas that are easy to conflate:
+This note explains the current post-`TextForSpeech 0.18.0` model in maintainer terms.
 
-- normalization profiles
-- text replacements
-- slices
+The three concepts that most often get conflated are:
 
-The first two are now first-class public API in the extracted `TextForSpeech` package and are wired through `SpeakSwiftly.Runtime`. The third is still only partially formalized, but it now lives squarely in SpeakSwiftly's own `DeepTrace` surface instead of pretending to be a public `TextForSpeech` responsibility.
+- built-in style
+- custom text profiles
+- deep-trace slices
 
-## Normalization profile
+Those now live in three different places on purpose.
 
-A normalization profile is the reusable custom rule set that rides on top of the always-on base normalizer.
+## The current model
 
-Today that type is `TextForSpeech.Profile`. It stays intentionally small:
+`SpeakSwiftly` now treats text normalization as one shared `TextForSpeech.Runtime` with three public handles exposed through `SpeakSwiftly.Normalizer`:
 
-- `id`
-- `name`
-- `replacements`
-
-The important design choice is that a profile is not the whole normalization engine. It does not carry request-local path context, detected format, or runtime-owned persistence state. It answers a narrower question:
-
-> "What custom rewrite rules should run around the built-in speech-safe normalizer?"
-
-That keeps the responsibilities clean:
-
-- `TextForSpeech.Context` carries request-local environment like `cwd`, `repoRoot`, and optional `format`.
-- `TextForSpeech.Profile` carries the reusable custom replacement policy.
-- `TextForSpeechRuntime` owns the active custom profile, stored named profiles, and persistence.
-- the built-in normalizer remains always on through the base profile and the concrete normalization passes.
-
-So when a normalization job starts, the mental model is:
-
-1. choose or detect the input format
-2. snapshot the effective profile for that job
-3. run the built-in normalizer plus the selected custom replacements
-
-## Text replacements
-
-Text replacements are the custom rules inside a profile.
-
-Today that type is `TextForSpeech.Replacement`. Each replacement describes:
-
-- what text to match
-- what spoken text to substitute
-- how to match it
-- when to run it
-- which formats it applies to
-- how strongly it should win against other rules
-
-The important fields are:
-
-- `text`
-  The source text to look for.
-- `replacement`
-  The spoken form you want after the rule runs.
-- `match`
-  Exact phrase matching or whole-token matching.
-- `phase`
-  Either `beforeNormalization` or `afterNormalization`.
-- `formats`
-  A format filter for rules that should only apply to some input families.
-- `priority`
-  Higher priority wins first within the same phase.
-- `isCaseSensitive`
-  Whether matching should stay strict.
-
-The simplest way to think about a replacement is:
-
-> "If this source text shows up in this kind of input, rewrite it to this more speakable form at this point in the pipeline."
-
-Good replacement use cases include:
-
-- project-specific proper nouns
-- acronyms the built-in normalizer says badly
-- identifiers or symbols that need a preferred spoken form
-- repeated annoying phrases in logs or CLI output
-- downstream app terminology that should sound natural when read aloud
-
-## Replacement phases
-
-The phase split is still the part that matters most architecturally.
-
-`beforeNormalization` means:
-
-- run this rule before the built-in normalizer rewrites paths, identifiers, links, and code-ish text
-- use this when you need to protect or rename hard-to-speak source text before the built-ins touch it
-
-`afterNormalization` means:
-
-- run this rule after the built-in normalizer has already made the text more speakable
-- use this when you want final-pass polish on the spoken output
-
-That is why the runtime executes phase-aware selections instead of treating replacements as one flat bag of rules.
-
-## Input formats
-
-Formats are the coarse input taxonomy.
-
-Today that type is `TextForSpeech.Format`, with cases such as:
-
-- `plain`
-- `markdown`
-- `html`
-- `source`
-- `swift`
-- `python`
-- `rust`
-- `log`
-- `cli`
-- `list`
-
-The important behavior is that formats can match hierarchically. For example, `.source` matches `.swift`, `.python`, and `.rust`.
-
-The second important behavior is that format is now optional in `TextForSpeech.Context`. Callers can provide it when they know better, but the package can also detect a likely format when it is omitted.
-
-So the model gives us a useful middle ground:
-
-- one rule can target all source code
-- another rule can target only Swift source
-- a caller can skip format selection entirely and let `TextForSpeech` infer it
-
-## Runtime ownership
-
-The runtime-owned profile holder is `TextForSpeechRuntime`.
-
-It now owns:
-
-- `baseProfile`
-  The always-on built-in normalization layer.
-- `customProfile`
-  The active custom profile layered on top of the base profile.
+- `style`
+  The built-in narration style such as `balanced`, `compact`, or `explicit`.
 - `profiles`
-  Stored named custom profiles.
-- `persistenceURL`
-  The configured persistence location, when persistence is enabled.
+  The stored custom profile library plus the active custom profile.
+- `persistence`
+  The persisted runtime state on disk or in memory.
 
-The core runtime operations are:
+That split is the whole simplification.
 
-- `snapshot(named:)`
-- `profile(named:)`
-- `storedProfiles()`
-- `use(_:)`
-- `store(_:)`
-- `createProfile(id:named:replacements:)`
-- `removeProfile(named:)`
-- `addReplacement(_:)`
-- `addReplacement(_:toStoredProfileNamed:)`
-- `replaceReplacement(_:)`
-- `replaceReplacement(_:inStoredProfileNamed:)`
-- `removeReplacement(id:)`
-- `removeReplacement(id:fromStoredProfileNamed:)`
-- `load()`
-- `save()`
-- `restore(_:)`
+We no longer expose a mixed bag of “style plus active profile plus stored profiles plus raw replacement list” helpers on one surface, and we no longer support whole-profile replace/store/use workflows through `SpeakSwiftly`.
 
-The concurrency model is still snapshot-per-job:
+## Built-In Style
 
-- UI or config reload can change the active profile immediately
-- already-started jobs keep the snapshot they began with
-- later jobs see the updated effective profile
+Built-in style is the broad normalization posture provided by `TextForSpeech`.
 
-## What a package consumer can do today
+It answers:
 
-Today a `SpeakSwiftly` consumer can use the text-profile system end to end.
+> “How verbose should the built-in code-and-text narration be before any custom profile rules are layered on top?”
 
-At the `TextForSpeech` layer, a consumer can:
+That setting is:
 
-- construct `TextForSpeech.Profile` values
-- construct `TextForSpeech.Replacement` values
-- normalize text directly through `TextForSpeech.normalize`
-- manage active and stored profiles through `TextForSpeechRuntime`
-- persist or reload text-profile state through `TextForSpeechRuntime`
+- runtime-owned
+- persisted
+- separate from the active custom profile
 
-At the `SpeakSwiftly` layer, a consumer can now:
+The maintainer-facing operations are now:
 
-- inspect `activeTextProfile()`
-- inspect `baseTextProfile()`
-- inspect `textProfile(named:)`
-- inspect `textProfiles()`
-- inspect `effectiveTextProfile(named:)`
-- create and store named text profiles
-- select an active text profile
-- add, replace, and remove text replacements on both the active profile and stored named profiles
-- pass `textProfileName` and `textContext` into `speak(...)`
+- `normalizer.style.getActive()`
+- `normalizer.style.list()`
+- `normalizer.style.setActive(to:)`
 
-So the earlier “public model exists, but the speech runtime does not actually use it” gap is closed now.
+The JSONL transport mirrors that split:
 
-## How profiles and replacements are added today
+- `get_active_text_profile_style`
+- `list_text_profile_styles`
+- `set_active_text_profile_style`
 
-Profiles can still be built as plain value types, but the runtime editing workflow is now first-class.
+## Custom Text Profiles
 
-Value-style setup still works:
+Custom text profiles are the stored reusable rule sets layered on top of the built-in style.
 
-1. build a `TextForSpeech.Profile`
-2. put `TextForSpeech.Replacement` values into its `replacements` array
-3. hand that profile to `TextForSpeechRuntime` through `use(_:)` or `store(_:)`
+The important point is that stored profiles are now addressed by stable identifier, not by mutable display name.
 
-But the runtime-owned editing path is now available too:
+Each stored profile has:
 
-- `createProfile(id:named:replacements:)`
-- `addReplacement(_:)`
-- `addReplacement(_:toStoredProfileNamed:)`
-- `replaceReplacement(_:)`
-- `replaceReplacement(_:inStoredProfileNamed:)`
-- `removeReplacement(id:)`
-- `removeReplacement(id:fromStoredProfileNamed:)`
+- a stable `profileID`
+- a mutable human-facing `name`
+- a `replacements` array
 
-That means callers no longer have to rebuild whole profile values for every small persisted edit.
+The transport models on the SpeakSwiftly side are:
 
-## Default profile behavior
+- `SpeakSwiftly.TextProfileSummary`
+- `SpeakSwiftly.TextProfileDetails`
 
-There are now three profile concepts that matter:
+Those are transport wrappers around the underlying `TextForSpeech.Runtime.Profiles.Summary` and `.Details` shapes.
 
-- `TextForSpeech.Profile.base`
-  The always-on built-in base behavior.
-- `TextForSpeech.Profile.default`
-  The default empty custom profile.
-- `TextForSpeechRuntime.customProfile`
-  The currently active custom profile for that runtime.
+## Profile Lifecycle
 
-The effective profile for a job is:
+The profile library is now intentionally small and explicit.
 
-1. `baseProfile`
-2. merged with the selected stored profile, if one was requested
-3. otherwise merged with `customProfile`
+At the Swift surface:
 
-So the system is intentionally hybrid:
+- `normalizer.profiles.getActive()`
+- `normalizer.profiles.get(id:)`
+- `normalizer.profiles.list()`
+- `normalizer.profiles.getEffective()`
+- `normalizer.profiles.create(name:)`
+- `normalizer.profiles.rename(profile:to:)`
+- `normalizer.profiles.setActive(id:)`
+- `normalizer.profiles.delete(id:)`
+- `normalizer.profiles.reset(id:)`
+- `normalizer.profiles.factoryReset()`
 
-- the built-in normalization behavior is never accidentally disabled
-- custom profiles extend or override that base behavior
-- the active custom profile still behaves like the editable default layer for a runtime
+At the JSONL surface:
+
+- `get_active_text_profile`
+- `get_text_profile`
+- `list_text_profiles`
+- `get_effective_text_profile`
+- `create_text_profile`
+- `update_text_profile_name`
+- `set_active_text_profile`
+- `delete_text_profile`
+- `reset_text_profile`
+- `factory_reset_text_profiles`
+
+Important consequences:
+
+- profile creation is name-only
+- the runtime derives the stable profile ID
+- names are labels, not lookup keys
+- “clear all replacements” is no longer a separate operation
+- “store this whole profile object” is no longer a supported mutation path
+- “replace the active profile with this raw profile payload” is no longer supported
+
+If a caller wants an empty profile again, the supported operation is `reset`, not “clear replacements.”
+
+## Replacements
+
+Replacements are still `TextForSpeech.Replacement`.
+
+They are still the custom rules inside a profile, but the allowed mutation path is now narrower:
+
+- add one replacement
+- patch one replacement
+- remove one replacement
+
+At the Swift surface:
+
+- `normalizer.profiles.addReplacement(_:)`
+- `normalizer.profiles.addReplacement(_:toProfile:)`
+- `normalizer.profiles.patchReplacement(_:)`
+- `normalizer.profiles.patchReplacement(_:inProfile:)`
+- `normalizer.profiles.removeReplacement(id:)`
+- `normalizer.profiles.removeReplacement(id:fromProfile:)`
+
+At the JSONL surface:
+
+- `create_text_replacement`
+- `replace_text_replacement`
+- `delete_text_replacement`
+
+The optional `text_profile_id` on those JSONL operations means:
+
+- omitted: mutate the active custom profile
+- present: mutate that stored profile directly
+
+## Effective Normalization
+
+For any single generation request, the mental model is:
+
+1. pick the built-in style
+2. pick the active custom profile
+3. compute the effective merged profile for that job
+4. normalize the input text with request-local context
+
+That is why the generation APIs now carry `textProfileID` rather than `textProfileName`.
+
+The generation request is selecting a stored profile by stable identifier, not by mutable label.
 
 ## Persistence
 
-Yes, `TextForSpeech` profiles are now persisted by the package when a runtime is configured with a `persistenceURL`.
+Persistence now belongs to the runtime state as a whole, not to ad hoc profile blobs.
 
-Persistence is JSON-backed today through:
+At the Swift surface:
 
-- `TextForSpeech.PersistedState`
-- `TextForSpeech.PersistenceError`
-- `TextForSpeechRuntime.load()`
-- `TextForSpeechRuntime.save()`
-- `TextForSpeechRuntime.restore(_:)`
+- `normalizer.persistence.url()`
+- `normalizer.persistence.state()`
+- `normalizer.persistence.restore(_:)`
+- `normalizer.persistence.load()`
+- `normalizer.persistence.load(from:)`
+- `normalizer.persistence.save()`
+- `normalizer.persistence.save(to:)`
 
-In `SpeakSwiftly`, the live runtime wires that persistence into the speech-facing text-profile helpers. The adjacent `TextForSpeech` runtime state is loaded on startup and saved after text-profile edits.
+At the JSONL surface:
 
-YAML and hot reload are still future work; the persisted model today is intentionally smaller and package-owned.
+- `get_text_profile_persistence`
+- `load_text_profiles`
+- `save_text_profiles`
 
-## What “slices” means today
+The persisted shape is `TextForSpeech.PersistedState`.
 
-There is still not a first-class public type literally named `Slice`.
+## Wire Shapes
 
-But the slice-like structure is no longer private implementation detail either. The public `TextForSpeech` surface now exposes:
+The worker success payload no longer exposes top-level replacement lists for text-profile reads.
 
-- `TextForSpeech.ForensicFeatures`
-- `TextForSpeech.Section`
-- `TextForSpeech.SectionWindow`
-- `TextForSpeech.sections(originalText:)`
-- `TextForSpeech.sectionWindows(originalText:totalDurationMS:totalChunkCount:)`
+The current text-profile response fields are:
 
-Those sectioning APIs still behave like the first real draft of a slice system:
+- `text_profile`
+- `text_profiles`
+- `text_profile_style`
+- `text_profile_style_options`
+- `text_profile_path`
 
-1. split by Markdown headers if present
-2. otherwise split by paragraphs
-3. otherwise fall back to one full-request section
+Inside those payloads, the important keys are:
 
-So “slice” is still best understood as a maintainer concept rather than a public product name. But the structural data behind that idea now lives in `TextForSpeech`, not in a private `SpeakSwiftly`-only normalizer.
+- `text_profile.profile_id`
+- `text_profile.summary`
+- `text_profile.summary.replacement_count`
+- `text_profiles[].id`
+- `text_profiles[].replacement_count`
 
-## Practical mental model
+This keeps the JSONL surface aligned with the simplified runtime model instead of leaking older compatibility fields.
 
-If you only need one concise model in your head, it should be this:
+## Slices
 
-- `Context`
-  Request-local environment and optional format hint.
-- `Format`
-  The broad input family, either caller-specified or detected.
-- `Profile.base`
-  The always-on built-in normalization layer.
-- `customProfile`
-  The active editable custom layer for a runtime.
-- `profiles`
-  Stored named custom layers.
-- `Replacement`
-  One custom rewrite rule inside a profile.
-- `snapshot(named:)`
-  The effective profile captured for one job.
-- `Section` and `SectionWindow`
-  Public forensic structure that already behaves like the first draft of slices.
+“Slices” are not part of the text-profile model.
 
-The thing to avoid conceptually is blurring “always-on base normalization,” “active custom edits,” and “stored named custom profiles” into one flat bucket. The current system is cleaner than that on purpose.
+They belong to SpeakSwiftly’s deep-trace analysis of already-normalized content.
+
+That work lives on the `SpeakSwiftly.DeepTrace` side and is still about:
+
+- sections
+- section windows
+- forensic features
+- chunk-to-text analysis
+
+So maintainers should keep the boundary clear:
+
+- `TextForSpeech` owns style, profiles, replacements, normalization, and persisted normalization state
+- `SpeakSwiftly` owns generation, playback, runtime orchestration, and deep-trace slicing
+
+## What changed from the old model
+
+The old mental model mixed together:
+
+- whole-profile store/use flows
+- name-based profile targeting
+- separate replacement-list reads
+- broad “clear replacements” cleanup operations
+- text-style operations phrased as generic profile-style reads and writes
+
+That model is gone.
+
+The new one is intentionally tighter:
+
+- style is its own handle
+- stored profiles are ID-addressed
+- creation is name-only
+- names are editable labels
+- replacements are edited incrementally
+- reset and factory-reset are the supported coarse cleanup actions
+- transport names stay verb-first snake_case and mirror the real resource ownership

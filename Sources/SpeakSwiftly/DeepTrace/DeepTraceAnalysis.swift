@@ -1,8 +1,6 @@
 import Foundation
 import NaturalLanguage
 
-// MARK: - DeepTraceAnalysis
-
 enum DeepTraceAnalysis {
     struct SectionCandidate {
         let title: String

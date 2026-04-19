@@ -21,7 +21,7 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:with:textProfileName:textContext:sourceFormat:)``:
+The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:with:textProfileID:textContext:sourceFormat:)``:
 
 ```swift
 let handle = try await runtime.generate.audio(

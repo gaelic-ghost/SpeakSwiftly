@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - PlaybackEnvironmentCoordinator
-
 @MainActor
 protocol PlaybackEnvironmentCoordinator: AnyObject, Sendable {
     var currentOutputDeviceDescription: String? { get }

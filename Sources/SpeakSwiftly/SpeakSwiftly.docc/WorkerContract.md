@@ -13,12 +13,14 @@ The worker exists for hosts that want a simple process boundary instead of linki
 
 ## Start The Worker
 
-Use the published runtime launcher when running the real worker locally:
+Use the deterministic Xcode runtime launcher when running the standalone worker locally:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
-"$PWD/.local/xcode/current-debug/run-speakswiftly"
+"$PWD/.local/derived-data/runtime-debug/run-speakswiftly"
 ```
+
+This Xcode-backed runtime is only for the standalone executable lane. Linked Swift package consumers use the package's bundled `mlx-swift_Cmlx.bundle` resource instead.
 
 At startup the worker may emit status events while the resident backend warms.
 

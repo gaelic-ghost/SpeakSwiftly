@@ -150,6 +150,8 @@ import TextForSpeech
             generateSamplesStream: { _, _, _, _, _, _, _ in
                 AsyncThrowingStream { continuation in
                     continuation.yield(Array(repeating: 0.1, count: 24000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
+                    continuation.yield(Array(repeating: 0.1, count: 24000))
                     Task {
                         await gate.wait()
                         continuation.finish()
@@ -731,7 +733,7 @@ import TextForSpeech
             id: "req-active",
             text: "Hello there",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: nil,

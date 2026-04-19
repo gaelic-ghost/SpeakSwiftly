@@ -40,36 +40,22 @@ esac
 
 ensure_git_repo
 
-runtime_root="$REPO_ROOT/.local/xcode"
-derived_data_path="$runtime_root/derived-data/$configuration"
-source_packages_path="$runtime_root/source-packages"
-published_products_path="$runtime_root/$configuration"
-temporary_products_path="$runtime_root/.publish-$configuration.$$"
 lower_configuration=$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')
-metadata_path="$runtime_root/SpeakSwiftly.$lower_configuration.json"
-alias_path="$runtime_root/current-$lower_configuration"
-products_path="$derived_data_path/Build/Products/$configuration"
+runtime_root="$REPO_ROOT/.local/derived-data/runtime-$lower_configuration"
+source_packages_path="$REPO_ROOT/.local/source-packages"
+products_path="$runtime_root/Build/Products/$configuration"
+launcher_path="$runtime_root/run-speakswiftly"
 binary_path="$products_path/SpeakSwiftlyTool"
 metallib_path="$products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
-published_binary_path="$published_products_path/SpeakSwiftlyTool"
-published_metallib_path="$published_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
-published_bundle_path="$published_products_path/mlx-swift_Cmlx.bundle"
-published_launcher_path="$published_products_path/run-speakswiftly"
-source_commit=$(git -C "$REPO_ROOT" rev-parse HEAD)
-exact_tag=$(git -C "$REPO_ROOT" describe --tags --exact-match HEAD 2>/dev/null || true)
-source_dirty="false"
-status_output=$(git -C "$REPO_ROOT" status --porcelain)
-[ -z "$status_output" ] || source_dirty="true"
-built_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 if ! command -v xcodebuild >/dev/null 2>&1; then
-  die "xcodebuild is required to publish a local SpeakSwiftly runtime."
+  die "xcodebuild is required to build a local SpeakSwiftly runtime."
 fi
 
-log "Publishing SpeakSwiftly $configuration runtime into $published_products_path"
+log "Building SpeakSwiftly $configuration runtime into $runtime_root"
 
 if [ "$dry_run" = "true" ]; then
-  log "Would build with xcodebuild into $derived_data_path and publish products into $published_products_path."
+  log "Would build with xcodebuild into $runtime_root."
   exit 0
 fi
 
@@ -79,55 +65,29 @@ xcodebuild build \
   -scheme SpeakSwiftlyTool \
   -destination "platform=macOS" \
   -configuration "$configuration" \
-  -derivedDataPath "$derived_data_path" \
+  -derivedDataPath "$runtime_root" \
   -clonedSourcePackagesDirPath "$source_packages_path"
 
 [ -x "$binary_path" ] || die "The Xcode build finished, but no executable was found at $binary_path."
 [ -f "$metallib_path" ] || die "The Xcode build finished, but the MLX Metal shader bundle was not found at $metallib_path."
 
-rm -rf "$temporary_products_path"
-mkdir -p "$temporary_products_path"
-cp -R "$products_path"/. "$temporary_products_path"/
-
-cat > "$temporary_products_path/run-speakswiftly" <<'EOF'
+cat > "$launcher_path" <<'EOF'
 #!/usr/bin/env sh
 set -eu
 
-SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec env DYLD_FRAMEWORK_PATH="$SELF_DIR" "$SELF_DIR/SpeakSwiftlyTool" "$@"
+RUNTIME_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+CONFIGURATION="__CONFIGURATION__"
+PRODUCTS_DIR="$RUNTIME_ROOT/Build/Products/$CONFIGURATION"
+exec env DYLD_FRAMEWORK_PATH="$PRODUCTS_DIR" "$PRODUCTS_DIR/SpeakSwiftlyTool" "$@"
 EOF
-chmod +x "$temporary_products_path/run-speakswiftly"
+sed -i '' "s/__CONFIGURATION__/$configuration/" "$launcher_path"
+chmod +x "$launcher_path"
 
-[ -x "$temporary_products_path/SpeakSwiftlyTool" ] || die "The published runtime staging directory does not contain an executable SpeakSwiftlyTool binary."
-[ -f "$temporary_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" ] || die "The published runtime staging directory does not contain default.metallib."
-[ -x "$temporary_products_path/run-speakswiftly" ] || die "The published runtime staging directory does not contain the runtime launcher script."
+[ -x "$launcher_path" ] || die "The runtime launcher script was not created at $launcher_path."
 
-rm -rf "$published_products_path"
-mv "$temporary_products_path" "$published_products_path"
-rm -f "$alias_path"
-ln -s "$published_products_path" "$alias_path"
-
-cat > "$metadata_path" <<EOF
-{
-  "build_configuration": "$configuration",
-  "products_path": "$published_products_path",
-  "bundle_path": "$published_bundle_path",
-  "executable_path": "$published_binary_path",
-  "launcher_path": "$published_launcher_path",
-  "metallib_path": "$published_metallib_path",
-  "alias_path": "$alias_path",
-  "source_root": "$REPO_ROOT",
-  "source_commit": "$source_commit",
-  "source_dirty": $source_dirty,
-  "release_tag": "$(printf '%s' "$exact_tag")",
-  "built_at": "$built_at"
-}
-EOF
-
-log "Published SpeakSwiftly $configuration runtime:"
-log "  products: $published_products_path"
-log "  alias:    $alias_path"
-log "  binary:   $published_binary_path"
-log "  launcher: $published_launcher_path"
-log "  metallib: $published_metallib_path"
-log "  metadata: $metadata_path"
+log "Built SpeakSwiftly $configuration runtime:"
+log "  runtime:  $runtime_root"
+log "  products: $products_path"
+log "  binary:   $binary_path"
+log "  launcher: $launcher_path"
+log "  metallib: $metallib_path"

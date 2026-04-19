@@ -3,8 +3,6 @@ import Foundation
 import Testing
 import TextForSpeech
 
-// MARK: - BlockingFilesystemCoordinator
-
 final class BlockingFilesystemCoordinator: @unchecked Sendable {
     private let enteredSemaphore = DispatchSemaphore(value: 0)
     private let releaseSemaphore = DispatchSemaphore(value: 0)
@@ -27,8 +25,6 @@ final class BlockingFilesystemCoordinator: @unchecked Sendable {
     }
 }
 
-// MARK: - CopyBlockingFileManager
-
 final class CopyBlockingFileManager: FileManager, @unchecked Sendable {
     let blockedDestinationPath: String
     let coordinator: BlockingFilesystemCoordinator
@@ -48,8 +44,6 @@ final class CopyBlockingFileManager: FileManager, @unchecked Sendable {
         try super.copyItem(at: srcURL, to: dstURL)
     }
 }
-
-// MARK: - LockedFlag
 
 final class LockedFlag: @unchecked Sendable {
     private let lock = NSLock()
@@ -243,7 +237,7 @@ final class LockedFlag: @unchecked Sendable {
             id: "req-active-shutdown-stream",
             text: "Hello there",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: nil,

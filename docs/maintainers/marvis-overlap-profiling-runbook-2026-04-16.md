@@ -96,8 +96,8 @@ Run this once before opening Instruments:
 xcodebuild build-for-testing -quiet \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
-  -derivedDataPath .local/xcode/derived-data/Instruments-MarvisProfile \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/Instruments-MarvisProfile \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 ## Test Environment Injection
@@ -113,7 +113,7 @@ from pathlib import Path
 import plistlib
 
 xctestrun_path = Path(
-    ".local/xcode/derived-data/Instruments-MarvisProfile/Build/Products/"
+    ".local/derived-data/Instruments-MarvisProfile/Build/Products/"
     "SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun"
 )
 
@@ -137,10 +137,10 @@ Use this exact command for the current dual-lane Marvis overlap baseline:
 
 ```bash
   xcodebuild test-without-building -quiet \
-  -xctestrun .local/xcode/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
+  -xctestrun .local/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
-  -resultBundlePath .local/xcode/results/Instruments-MarvisProfile-dual-lane.xcresult
+  -resultBundlePath .local/results/Instruments-MarvisProfile-dual-lane.xcresult
 ```
 
 ## Scenario Matrix
@@ -159,10 +159,10 @@ and change only the result bundle path:
 
 ```bash
   xcodebuild test-without-building -quiet \
-  -xctestrun .local/xcode/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
+  -xctestrun .local/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
-  -resultBundlePath .local/xcode/results/Instruments-MarvisProfile-candidate-policy.xcresult
+  -resultBundlePath .local/results/Instruments-MarvisProfile-candidate-policy.xcresult
 ```
 
 ### Scenario C: Single-Lane Marvis Baseline
@@ -284,7 +284,7 @@ After each run:
 
 If needed, also keep the corresponding result bundle:
 
-- `.local/xcode/results/Instruments-MarvisProfile-*.xcresult`
+- `.local/results/Instruments-MarvisProfile-*.xcresult`
 
 ## What Good Evidence Looks Like
 

@@ -2,8 +2,6 @@
 @preconcurrency import AVFoundation
 import Foundation
 
-// MARK: - IOSPlaybackEnvironmentCoordinator
-
 @MainActor
 final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
     private let audioSession = AVAudioSession.sharedInstance()

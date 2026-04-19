@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - SpeakSwiftly.SpeechBackend
-
 public extension SpeakSwiftly {
     // MARK: Backend Enumeration
 

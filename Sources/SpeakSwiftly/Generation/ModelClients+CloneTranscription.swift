@@ -1,8 +1,6 @@
 @preconcurrency import MLX
 import MLXAudioSTT
 
-// MARK: - UnsafeCloneTranscriptionModelBox
-
 private final class UnsafeCloneTranscriptionModelBox: @unchecked Sendable {
     let model: GLMASRModel
 
@@ -10,8 +8,6 @@ private final class UnsafeCloneTranscriptionModelBox: @unchecked Sendable {
         self.model = model
     }
 }
-
-// MARK: - AnyCloneTranscriptionModel
 
 final class AnyCloneTranscriptionModel: @unchecked Sendable {
     private let sampleRateValue: Int

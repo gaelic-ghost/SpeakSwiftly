@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - SpeakSwiftly.Player
-
 public extension SpeakSwiftly {
     // MARK: Player Handle
 

@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileName: _, jobType: .live, textContext: _, sourceFormat: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -17,7 +17,7 @@ extension SpeakSwiftly.Runtime {
                 id: let id,
                 text: let text,
                 profileName: let profileName,
-                textProfileName: let textProfileName,
+                textProfileID: let textProfileID,
                 jobType: .file,
                 textContext: let textContext,
                 sourceFormat: let sourceFormat,
@@ -28,7 +28,7 @@ extension SpeakSwiftly.Runtime {
                         artifactID: fileArtifactID(for: request),
                         text: text,
                         profileName: profileName,
-                        textProfileName: textProfileName,
+                        textProfileID: textProfileID,
                         textContext: textContext,
                         sourceFormat: sourceFormat,
                     )
@@ -42,7 +42,7 @@ extension SpeakSwiftly.Runtime {
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
                                 profileName: generatedFile.profileName,
-                                textProfileName: generatedFile.textProfileName,
+                                textProfileID: generatedFile.textProfileID,
                             ),
                         ],
                         completedAt: dependencies.now(),
@@ -76,7 +76,7 @@ extension SpeakSwiftly.Runtime {
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
                                 profileName: generatedFile.profileName,
-                                textProfileName: generatedFile.textProfileName,
+                                textProfileID: generatedFile.textProfileID,
                             )
                         },
                         completedAt: dependencies.now(),
@@ -234,22 +234,22 @@ extension SpeakSwiftly.Runtime {
                      .textProfileActive,
                      .textProfile,
                      .textProfiles,
-                     .textProfileStyle,
+                     .activeTextProfileStyle,
+                     .textProfileStyleOptions,
                      .textProfileEffective,
                      .textProfilePersistence,
                      .loadTextProfiles,
                      .saveTextProfiles,
-                     .setTextProfileStyle,
+                     .setActiveTextProfileStyle,
                      .createTextProfile,
-                     .storeTextProfile,
-                     .useTextProfile,
-                     .removeTextProfile,
+                     .renameTextProfile,
+                     .setActiveTextProfile,
+                     .deleteTextProfile,
+                     .factoryResetTextProfiles,
                      .resetTextProfile,
-                     .textReplacements,
                      .addTextReplacement,
                      .replaceTextReplacement,
                      .removeTextReplacement,
-                     .clearTextReplacements,
                      .listQueue,
                      .status,
                      .overview,
@@ -343,7 +343,7 @@ extension SpeakSwiftly.Runtime {
                     artifactID: item.artifactID,
                     text: item.text,
                     profileName: profileName,
-                    textProfileName: item.textProfileName,
+                    textProfileID: item.textProfileID,
                     textContext: item.textContext,
                     sourceFormat: item.sourceFormat,
                 ),

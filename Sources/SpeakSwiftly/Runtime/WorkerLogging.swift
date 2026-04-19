@@ -1,13 +1,9 @@
 import Foundation
 
-// MARK: - WorkerLogLevel
-
 package enum WorkerLogLevel: String, Encodable {
     case info
     case error
 }
-
-// MARK: - WorkerLogValue
 
 package enum WorkerLogValue: Encodable {
     case string(String)
@@ -29,8 +25,6 @@ package enum WorkerLogValue: Encodable {
         }
     }
 }
-
-// MARK: - WorkerLogEvent
 
 package struct WorkerLogEvent: Encodable {
     package enum CodingKeys: String, CodingKey {
@@ -77,8 +71,6 @@ package struct WorkerLogEvent: Encodable {
         self.details = details
     }
 }
-
-// MARK: - WorkerStructuredLogSupport
 
 package enum WorkerStructuredLogSupport {
     package static func encode(_ event: WorkerLogEvent) throws -> String {

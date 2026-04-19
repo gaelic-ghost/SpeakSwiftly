@@ -13,7 +13,7 @@ extension SpeakSwiftly.Runtime {
         artifactID: String,
         text: String,
         profileName: String,
-        textProfileName: String?,
+        textProfileID: String?,
         textContext: TextForSpeech.Context?,
         sourceFormat: TextForSpeech.SourceFormat?,
     ) async throws -> SpeakSwiftly.GeneratedFile {
@@ -24,11 +24,23 @@ extension SpeakSwiftly.Runtime {
         )
         let residentModel = residentInputs.model
 
-        let textProfileStyle = await normalizerRef.profiles.builtInStyle()
-        let textProfile = if let textProfileName {
-            await normalizerRef.profiles.stored(id: textProfileName) ?? .default
+        let textProfileStyle = await normalizerRef.style.getActive()
+        let textProfile: TextForSpeech.Profile
+        if let textProfileID,
+           let details = try? await normalizerRef.profiles.get(id: textProfileID)
+        {
+            textProfile = TextForSpeech.Profile(
+                id: details.profileID,
+                name: details.summary.name,
+                replacements: details.replacements,
+            )
         } else {
-            await normalizerRef.profiles.active() ?? .default
+            let details = await normalizerRef.profiles.getActive()
+            textProfile = TextForSpeech.Profile(
+                id: details.profileID,
+                name: details.summary.name,
+                replacements: details.replacements,
+            )
         }
         let normalizedText = if let sourceFormat {
             TextForSpeech.Normalize.source(
@@ -91,7 +103,7 @@ extension SpeakSwiftly.Runtime {
         let generatedFile = try generatedFileStore.createGeneratedFile(
             artifactID: artifactID,
             profileName: profileName,
-            textProfileName: textProfileName,
+            textProfileID: textProfileID,
             sampleRate: residentModel.sampleRate,
             audioData: audioData,
         )

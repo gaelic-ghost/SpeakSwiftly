@@ -3,8 +3,6 @@ import Foundation
 import Testing
 import TextForSpeech
 
-// MARK: - LoadedBackendRecorder
-
 actor LoadedBackendRecorder {
     private(set) var backends = [SpeakSwiftly.SpeechBackend]()
 

@@ -1,9 +1,87 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - SpeakSwiftly.Normalizer
-
 public extension SpeakSwiftly {
+    // MARK: Text Profile Transport
+
+    struct TextProfileSummary: Codable, Sendable, Equatable, Identifiable {
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case replacementCount = "replacement_count"
+        }
+
+        public let id: String
+        public let name: String
+        public let replacementCount: Int
+
+        init(_ summary: TextForSpeech.Runtime.Profiles.Summary) {
+            id = summary.id
+            name = summary.name
+            replacementCount = summary.replacementCount
+        }
+
+        init(
+            id: String,
+            name: String,
+            replacementCount: Int,
+        ) {
+            self.id = id
+            self.name = name
+            self.replacementCount = replacementCount
+        }
+    }
+
+    struct TextProfileDetails: Codable, Sendable, Equatable, Identifiable {
+        enum CodingKeys: String, CodingKey {
+            case profileID = "profile_id"
+            case summary
+            case replacements
+        }
+
+        public let profileID: String
+        public let summary: TextProfileSummary
+        public let replacements: [TextForSpeech.Replacement]
+
+        public var id: String { profileID }
+
+        init(_ details: TextForSpeech.Runtime.Profiles.Details) {
+            profileID = details.profileID
+            summary = TextProfileSummary(details.summary)
+            replacements = details.replacements
+        }
+
+        init(
+            profileID: String,
+            summary: TextProfileSummary,
+            replacements: [TextForSpeech.Replacement],
+        ) {
+            self.profileID = profileID
+            self.summary = summary
+            self.replacements = replacements
+        }
+    }
+
+    struct TextProfileStyleOption: Codable, Sendable, Equatable, Identifiable {
+        public let style: TextForSpeech.BuiltInProfileStyle
+        public let summary: String
+
+        public var id: TextForSpeech.BuiltInProfileStyle { style }
+
+        init(_ option: TextForSpeech.Runtime.Style.Option) {
+            style = option.style
+            summary = option.summary
+        }
+
+        init(
+            style: TextForSpeech.BuiltInProfileStyle,
+            summary: String,
+        ) {
+            self.style = style
+            self.summary = summary
+        }
+    }
+
     // MARK: Normalizer Handle
 
     /// Wraps the shared TextForSpeech normalizer runtime used by SpeakSwiftly.
@@ -11,7 +89,12 @@ public extension SpeakSwiftly {
         let textRuntime: TextForSpeech.Runtime
         let configuredPersistenceURL: URL
 
-        /// Accesses text-profile operations for this normalizer.
+        /// Accesses built-in text-style operations for this normalizer.
+        public nonisolated var style: Style {
+            Style(normalizer: self)
+        }
+
+        /// Accesses stored custom-profile operations for this normalizer.
         public nonisolated var profiles: Profiles {
             Profiles(normalizer: self)
         }
@@ -24,9 +107,8 @@ public extension SpeakSwiftly {
         /// Creates a text normalizer that can be shared into a SpeakSwiftly runtime.
         public init(
             builtInStyle: TextForSpeech.BuiltInProfileStyle = .balanced,
-            activeProfile: TextForSpeech.Profile = .default,
-            profiles: [String: TextForSpeech.Profile] = [:],
             persistenceURL: URL? = nil,
+            state: TextForSpeech.PersistedState? = nil,
         ) throws {
             let persistence: TextForSpeech.Runtime.PersistenceConfiguration
             let resolvedPersistenceURL: URL
@@ -37,7 +119,7 @@ public extension SpeakSwiftly {
             } else {
                 let defaultURL = ProfileStore.defaultTextProfilesURL(
                     profileRootOverride: ProcessInfo.processInfo.environment[
-                        ProfileStore.profileRootOverrideEnvironmentVariable,
+                        ProfileStore.profileRootOverrideEnvironmentVariable
                     ],
                 )
                 persistence = .file(defaultURL)
@@ -48,13 +130,8 @@ public extension SpeakSwiftly {
                 builtInStyle: builtInStyle,
                 persistence: persistence,
             )
-            if builtInStyle != .balanced || !profiles.isEmpty || activeProfile != .default {
-                try Self.seed(
-                    runtime: runtime,
-                    builtInStyle: builtInStyle,
-                    activeProfile: activeProfile,
-                    profiles: profiles,
-                )
+            if let state {
+                try runtime.persistence.restore(state)
             }
             textRuntime = runtime
             configuredPersistenceURL = resolvedPersistenceURL
@@ -63,7 +140,12 @@ public extension SpeakSwiftly {
 }
 
 public extension SpeakSwiftly.Normalizer {
-    /// Accesses text-profile operations on a ``SpeakSwiftly/Normalizer``.
+    /// Accesses built-in style operations on a ``SpeakSwiftly/Normalizer``.
+    struct Style: Sendable {
+        let normalizer: SpeakSwiftly.Normalizer
+    }
+
+    /// Accesses stored custom-profile operations on a ``SpeakSwiftly/Normalizer``.
     struct Profiles: Sendable {
         let normalizer: SpeakSwiftly.Normalizer
     }
@@ -71,27 +153,6 @@ public extension SpeakSwiftly.Normalizer {
     /// Accesses persistence operations on a ``SpeakSwiftly/Normalizer``.
     struct Persistence: Sendable {
         let normalizer: SpeakSwiftly.Normalizer
-    }
-}
-
-private extension SpeakSwiftly.Normalizer {
-    static func seed(
-        runtime: TextForSpeech.Runtime,
-        builtInStyle: TextForSpeech.BuiltInProfileStyle,
-        activeProfile: TextForSpeech.Profile,
-        profiles: [String: TextForSpeech.Profile],
-    ) throws {
-        var storedProfiles = profiles
-        storedProfiles[activeProfile.id] = activeProfile
-
-        try runtime.persistence.restore(
-            TextForSpeech.PersistedState(
-                version: runtime.persistence.state.version,
-                builtInStyle: builtInStyle,
-                activeCustomProfileID: activeProfile.id,
-                profiles: storedProfiles,
-            ),
-        )
     }
 }
 

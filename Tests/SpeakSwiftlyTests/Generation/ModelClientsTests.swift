@@ -172,9 +172,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     controller.recordRebuffer()
     let afterFirstRebuffer = controller.thresholds
 
-    #expect(afterFirstRebuffer.startupBufferTargetMS > adapted.startupBufferTargetMS)
-    #expect(afterFirstRebuffer.lowWaterTargetMS > adapted.lowWaterTargetMS)
-    #expect(afterFirstRebuffer.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(afterFirstRebuffer == adapted)
 }
 
 @Test func `adaptive playback thresholds keep escalated rebuffer targets across later chunks`() {
@@ -496,7 +494,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         rootURL: storeRoot,
         output: output,
         playback: playback,
+        qwenConditioningStrategy: .legacyRaw,
         audioLoadRecorder: residentRecorder,
+        loadedAudioSamples: nil,
         residentModelLoader: { _ in
             makeResidentModel(recorder: residentRecorder)
         },
@@ -545,7 +545,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
-                && $0["ok"] as? Bool == true
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
 
@@ -650,7 +651,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let normalized = TextForSpeech.Normalize.text(original)
 
-    #expect(normalized.contains("gale wumbo slash Workspace slash Speak Swiftly"))
+    #expect(normalized.contains("gale wumbo Workspace Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
     #expect(normalized.contains("camel Case Stuff"))
     #expect(normalized.contains("snake case stuff"))
@@ -963,6 +964,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
         audioLoadRecorder: residentRecorder,
         loadedAudioSamples: .mlxNone,
         residentModelLoader: { _ in
@@ -1224,25 +1226,24 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         canonicalAudioData: Data([0x01, 0x02]),
     )
 
-    try await runtime.normalizer.profiles.store(
-        TextForSpeech.Profile(
-            id: "logs",
-            name: "Logs",
-            replacements: [
-                TextForSpeech.Replacement("stderr", with: "standard error"),
-                TextForSpeech.Replacement(
-                    "snake case stuff",
-                    with: "settings token",
-                    during: .afterBuiltIns,
-                ),
-            ],
+    let logs = try await runtime.normalizer.profiles.create(name: "Logs")
+    _ = try await runtime.normalizer.profiles.addReplacement(
+        TextForSpeech.Replacement("stderr", with: "standard error"),
+        toProfile: logs.profileID,
+    )
+    _ = try await runtime.normalizer.profiles.addReplacement(
+        TextForSpeech.Replacement(
+            "snake case stuff",
+            with: "settings token",
+            during: .afterBuiltIns,
         ),
+        toProfile: logs.profileID,
     )
     await runtime.start()
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_name":"logs","text_format":"plain_text"}
+        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_id":"logs","text_format":"plain_text"}
         """#,
     )
 
@@ -1379,9 +1380,11 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-chatterbox"
-                && $0["ok"] as? Bool == true
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
         }
     })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedChunkTexts.count })
 
     #expect(residentRecorder.recordedTexts == expectedChunkTexts)
     #expect(residentRecorder.recordedTexts.count == 3)

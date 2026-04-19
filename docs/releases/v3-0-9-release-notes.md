@@ -32,13 +32,13 @@ sh scripts/repo-maintenance/validate-all.sh
 xcodebuild build-for-testing \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=macOS' \
-  -derivedDataPath .local/xcode/derived-data/release-v3-0-9-macos \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/release-v3-0-9-macos \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 ```bash
 xcodebuild test-without-building \
-  -xctestrun .local/xcode/derived-data/release-v3-0-9-macos/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
+  -xctestrun .local/derived-data/release-v3-0-9-macos/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/WorkerRuntimePlaybackTests' \
   -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests'
@@ -46,7 +46,7 @@ xcodebuild test-without-building \
 
 ```bash
 xcodebuild test-without-building \
-  -xctestrun .local/xcode/derived-data/release-v3-0-9-macos/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
+  -xctestrun .local/derived-data/release-v3-0-9-macos/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/ModelClientsTests'
 ```
@@ -55,13 +55,13 @@ xcodebuild test-without-building \
 xcodebuild build-for-testing \
   -scheme SpeakSwiftly-Package \
   -destination 'platform=iOS Simulator,id=4343A7EF-1074-44EB-8FD6-7972330DD08E' \
-  -derivedDataPath .local/xcode/derived-data/ios-smoke \
-  -clonedSourcePackagesDirPath .local/xcode/source-packages
+  -derivedDataPath .local/derived-data/ios-smoke \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
 ```bash
 xcodebuild test-without-building \
-  -xctestrun .local/xcode/derived-data/ios-smoke/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_iphonesimulator26.4-arm64.xctestrun \
+  -xctestrun .local/derived-data/ios-smoke/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_iphonesimulator26.4-arm64.xctestrun \
   -destination 'platform=iOS Simulator,id=4343A7EF-1074-44EB-8FD6-7972330DD08E' \
   -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
   -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \

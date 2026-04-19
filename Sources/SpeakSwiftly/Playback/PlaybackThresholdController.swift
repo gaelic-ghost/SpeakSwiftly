@@ -1,21 +1,15 @@
 import Foundation
 
-// MARK: - PlaybackComplexityClass
-
 enum PlaybackComplexityClass: String {
     case compact
     case balanced
     case extended
 }
 
-// MARK: - PlaybackTuningProfile
-
 enum PlaybackTuningProfile: Equatable {
     case standard
     case firstDrainedLiveMarvis
 }
-
-// MARK: - PlaybackAdaptiveThresholds
 
 struct PlaybackAdaptiveThresholds: Equatable {
     let complexityClass: PlaybackComplexityClass
@@ -26,15 +20,11 @@ struct PlaybackAdaptiveThresholds: Equatable {
     let scheduleGapWarningMS: Int
 }
 
-// MARK: - PlaybackPhase
-
 enum PlaybackPhase: String {
     case warmup
     case steady
     case recovery
 }
-
-// MARK: - PlaybackThresholdController
 
 struct PlaybackThresholdController {
     private static let codecTokenRateHz = 12.5

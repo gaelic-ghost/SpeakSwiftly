@@ -80,11 +80,12 @@
 - Never run multiple build toolchains, package managers, test runners, or other heavy validation commands at the same time on Gale's machine.
 - Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
+- For MLX-backed package tests, stay in the plain `swift test` lane by default. The test target bundles `default.metallib` and the shared test bootstrap stages it into the direct SwiftPM probe path under `.build/...` before the first MLX-backed test model is created.
 - If `swift build` or `swift test` hit the current vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`, stop retrying the same SwiftPM lane and switch to the Xcode-backed validation path documented in `CONTRIBUTING.md` and `docs/maintainers/validation-lanes.md`.
 - Treat the GitHub Actions package lane the same way: keep `swift package dump-package`, but use the Xcode-backed `build-for-testing` plus targeted `test-without-building` path until the vendored parser snag is gone.
 - Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
-- For release-grade real-model coverage, Marvis overlap investigation, or any validation pass that needs the current reliable MLX-backed lane, prefer running `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`, then follow it with targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
+- For release-grade standalone-worker validation, Marvis overlap investigation, or any validation pass that is actually blocked by a renewed SwiftPM parser regression, prefer running `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`, then follow it with targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`
   - `voice_description`: `A generic, warm, masculine, slow speaking voice.`
@@ -96,7 +97,7 @@
 ## Runtime Publishing and Deep-Trace Guidance
 
 - For this repository, use an Xcode-built worker product for real MLX-backed command-line runs and real-model e2e coverage. Upstream `mlx-swift` does not make the Metal shader bundle available to the plain SwiftPM command-line build.
-- When launching the real worker from the shell, prefer the published runtime launcher and stable aliases under `.local/xcode/current-debug/run-speakswiftly` or `.local/xcode/current-release/run-speakswiftly`, or read the published runtime manifest first, instead of reconstructing `DYLD_FRAMEWORK_PATH` and `default.metallib` paths by hand.
+- When launching the real worker from the shell, prefer the deterministic Xcode runtime launcher under `.local/derived-data/runtime-debug/run-speakswiftly` or `.local/derived-data/runtime-release/run-speakswiftly` instead of reconstructing `DYLD_FRAMEWORK_PATH` and `default.metallib` paths by hand.
 - If a real worker run fails with `default.metallib` or `mlx-swift_Cmlx.bundle` errors, treat that as a build-and-launch-path problem first, not as evidence that the worker runtime itself is broken.
 - For direct deep-trace worker captures, prefer the held-open stdin pattern instead of sending one JSONL file and allowing stdin to close immediately.
 - The current known worker behavior is that if stdin closes before queued work drains, the worker can cancel queued requests that are still waiting behind resident-model warmup. Treat that as a current shutdown-and-queue quirk to be fixed, not as normal playback failure.

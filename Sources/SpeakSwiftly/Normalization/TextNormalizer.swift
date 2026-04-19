@@ -4,307 +4,264 @@ import TextForSpeech
 // MARK: - Text Normalization Logic
 
 private extension SpeakSwiftly.Normalizer {
-    func builtInStyle() -> TextForSpeech.BuiltInProfileStyle {
-        textRuntime.profiles.builtInStyle
+    func profile(from details: TextForSpeech.Runtime.Profiles.Details) -> TextForSpeech.Profile {
+        TextForSpeech.Profile(
+            id: details.profileID,
+            name: details.summary.name,
+            replacements: details.replacements,
+        )
     }
 
-    func activeProfile() -> TextForSpeech.Profile {
-        textRuntime.profiles.active()
+    func activeTextProfileDetails() -> TextForSpeech.Runtime.Profiles.Details {
+        textRuntime.profiles.getActive()
     }
 
-    func storedProfile(id: String) -> TextForSpeech.Profile? {
-        textRuntime.profiles.stored(id: id)
+    func effectiveTextProfileDetails() -> TextForSpeech.Runtime.Profiles.Details {
+        textRuntime.profiles.getEffective()
     }
 
-    func storedProfiles() -> [TextForSpeech.Profile] {
+    func textProfileDetails(id: String) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.get(id: id)
+    }
+
+    func textProfileSummaries() -> [TextForSpeech.Runtime.Profiles.Summary] {
         textRuntime.profiles.list()
     }
 
-    func effectiveProfile(id: String? = nil) -> TextForSpeech.Profile? {
-        if let id {
-            return textRuntime.profiles.effective(id: id)
-        }
-
-        return textRuntime.profiles.effective()
+    func activeTextProfile() -> TextForSpeech.Profile {
+        profile(from: activeTextProfileDetails())
     }
 
-    func activeReplacements() -> [TextForSpeech.Replacement] {
-        textRuntime.profiles.active().replacements
+    func storedTextProfile(id: String) throws -> TextForSpeech.Profile {
+        profile(from: try textProfileDetails(id: id))
     }
 
-    func storedReplacements(id: String) -> [TextForSpeech.Replacement]? {
-        textRuntime.profiles.stored(id: id)?.replacements
+    func effectiveTextProfile() -> TextForSpeech.Profile {
+        profile(from: effectiveTextProfileDetails())
     }
 
-    func setBuiltInStyle(
-        _ style: TextForSpeech.BuiltInProfileStyle,
+    func activeTextProfileStyle() -> TextForSpeech.BuiltInProfileStyle {
+        textRuntime.style.getActive()
+    }
+
+    func textProfileStyleOptions() -> [TextForSpeech.Runtime.Style.Option] {
+        textRuntime.style.list()
+    }
+
+    func setActiveTextProfileStyle(
+        to style: TextForSpeech.BuiltInProfileStyle,
     ) throws {
-        try textRuntime.profiles.setBuiltInStyle(style)
+        try textRuntime.style.setActive(to: style)
     }
 
-    func storeProfile(_ profile: TextForSpeech.Profile) throws {
-        try textRuntime.profiles.store(profile)
-    }
-
-    func useProfile(_ profile: TextForSpeech.Profile) throws {
-        try textRuntime.profiles.store(profile)
-        try textRuntime.profiles.activate(id: profile.id)
-    }
-
-    func createProfile(
-        id: String,
+    func createTextProfile(
         name: String,
-        replacements: [TextForSpeech.Replacement] = [],
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.create(
-            id: id,
-            name: name,
-            replacements: replacements,
-        )
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.create(name: name)
     }
 
-    func deleteProfile(id: String) throws {
+    func renameTextProfile(
+        id: String,
+        to name: String,
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.rename(profile: id, to: name)
+    }
+
+    func setActiveTextProfile(
+        id: String,
+    ) throws {
+        try textRuntime.profiles.setActive(id: id)
+    }
+
+    func deleteTextProfile(
+        id: String,
+    ) throws {
         try textRuntime.profiles.delete(id: id)
     }
 
-    func resetProfiles() throws {
-        try textRuntime.profiles.reset()
+    func factoryResetTextProfiles() throws {
+        try textRuntime.profiles.factoryReset()
     }
 
-    func addReplacement(
+    func resetTextProfile(
+        id: String,
+    ) throws {
+        try textRuntime.profiles.reset(id: id)
+    }
+
+    func addTextReplacement(
         _ replacement: TextForSpeech.Replacement,
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.add(replacement)
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.addReplacement(replacement)
     }
 
-    func addReplacement(
+    func addTextReplacement(
         _ replacement: TextForSpeech.Replacement,
-        toStoredProfileID id: String,
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.add(replacement, toProfileID: id)
+        toProfile id: String,
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.addReplacement(replacement, toProfile: id)
     }
 
-    func replaceReplacement(
+    func patchTextReplacement(
         _ replacement: TextForSpeech.Replacement,
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.replace(replacement)
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.patchReplacement(replacement)
     }
 
-    func replaceReplacement(
+    func patchTextReplacement(
         _ replacement: TextForSpeech.Replacement,
-        inStoredProfileID id: String,
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.replace(replacement, inProfileID: id)
+        inProfile id: String,
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.patchReplacement(replacement, inProfile: id)
     }
 
-    func removeReplacement(
+    func removeTextReplacement(
         id replacementID: String,
-    ) throws -> TextForSpeech.Profile {
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
         try textRuntime.profiles.removeReplacement(id: replacementID)
     }
 
-    func removeReplacement(
+    func removeTextReplacement(
         id replacementID: String,
-        fromStoredProfileID profileID: String,
-    ) throws -> TextForSpeech.Profile {
-        try textRuntime.profiles.removeReplacement(
-            id: replacementID,
-            fromProfileID: profileID,
-        )
+        fromProfile profileID: String,
+    ) throws -> TextForSpeech.Runtime.Profiles.Details {
+        try textRuntime.profiles.removeReplacement(id: replacementID, fromProfile: profileID)
+    }
+}
+
+public extension SpeakSwiftly.Normalizer.Style {
+    /// Returns the active built-in text style.
+    func getActive() async -> TextForSpeech.BuiltInProfileStyle {
+        await normalizer.activeTextProfileStyle()
     }
 
-    func clearReplacements() throws -> TextForSpeech.Profile {
-        var profile = textRuntime.profiles.active()
-        for replacement in profile.replacements {
-            profile = try textRuntime.profiles.removeReplacement(id: replacement.id)
-        }
-        return profile
+    /// Lists the built-in text styles available for activation.
+    func list() async -> [TextForSpeech.Runtime.Style.Option] {
+        await normalizer.textProfileStyleOptions()
     }
 
-    func clearReplacements(
-        fromStoredProfileID profileID: String,
-    ) throws -> TextForSpeech.Profile {
-        guard var profile = textRuntime.profiles.stored(id: profileID) else {
-            throw TextForSpeech.RuntimeError.profileNotFound(profileID)
-        }
-
-        for replacement in profile.replacements {
-            profile = try textRuntime.profiles.removeReplacement(
-                id: replacement.id,
-                fromProfileID: profileID,
-            )
-        }
-        return profile
+    /// Activates one built-in text style.
+    func setActive(
+        to style: TextForSpeech.BuiltInProfileStyle,
+    ) async throws {
+        try await normalizer.setActiveTextProfileStyle(to: style)
     }
 }
 
 public extension SpeakSwiftly.Normalizer.Profiles {
-    /// Returns the built-in profile style currently applied before custom replacements.
-    func builtInStyle() async -> TextForSpeech.BuiltInProfileStyle {
-        await normalizer.builtInStyle()
+    /// Returns the active custom text profile details.
+    func getActive() async -> TextForSpeech.Runtime.Profiles.Details {
+        await normalizer.activeTextProfileDetails()
     }
 
-    /// Returns the active custom profile, or one stored profile by identifier.
-    ///
-    /// - Parameter id: An optional stored profile identifier to fetch directly.
-    /// - Returns: The active profile when `id` is `nil`, otherwise the matching stored profile.
-    func active(id: String? = nil) async -> TextForSpeech.Profile? {
-        if let id {
-            return await normalizer.storedProfile(id: id)
-        }
-
-        return await normalizer.activeProfile()
+    /// Returns one stored custom text profile by stable identifier.
+    func get(
+        id: String,
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.textProfileDetails(id: id)
     }
 
-    /// Returns one stored text profile by identifier.
-    func stored(id: String) async -> TextForSpeech.Profile? {
-        await normalizer.storedProfile(id: id)
+    /// Lists the stored custom text profiles.
+    func list() async -> [TextForSpeech.Runtime.Profiles.Summary] {
+        await normalizer.textProfileSummaries()
     }
 
-    /// Lists all stored text profiles known to the normalizer.
-    func list() async -> [TextForSpeech.Profile] {
-        await normalizer.storedProfiles()
+    /// Returns the effective text profile after the built-in style and active custom profile are merged.
+    func getEffective() async -> TextForSpeech.Runtime.Profiles.Details {
+        await normalizer.effectiveTextProfileDetails()
     }
 
-    /// Returns the effective profile after the built-in style and custom profile are merged.
-    ///
-    /// - Parameter id: An optional stored profile identifier to resolve instead of the active profile.
-    func effective(id: String? = nil) async -> TextForSpeech.Profile? {
-        await normalizer.effectiveProfile(id: id)
-    }
-
-    /// Returns the replacement rules on the active text profile.
-    func replacements() async -> [TextForSpeech.Replacement] {
-        await normalizer.activeReplacements()
-    }
-
-    /// Returns the replacement rules on one stored text profile.
-    func replacements(
-        inStoredProfileID id: String,
-    ) async -> [TextForSpeech.Replacement]? {
-        await normalizer.storedReplacements(id: id)
-    }
-
-    /// Changes the built-in style that shapes effective normalization output.
-    func setBuiltInStyle(
-        _ style: TextForSpeech.BuiltInProfileStyle,
-    ) async throws {
-        try await normalizer.setBuiltInStyle(style)
-    }
-
-    /// Creates one stored text profile.
-    ///
-    /// - Parameters:
-    ///   - id: The stable profile identifier.
-    ///   - name: The human-readable profile name.
-    ///   - replacements: Optional initial replacement rules.
-    /// - Returns: The created profile.
+    /// Creates one stored custom text profile from a display name.
     @discardableResult
     func create(
-        id: String,
         name: String,
-        replacements: [TextForSpeech.Replacement] = [],
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.createProfile(
-            id: id,
-            name: name,
-            replacements: replacements,
-        )
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.createTextProfile(name: name)
     }
 
-    /// Stores a complete text profile without activating it.
-    func store(_ profile: TextForSpeech.Profile) async throws {
-        try await normalizer.storeProfile(profile)
-    }
-
-    /// Stores a complete text profile and makes it the active custom profile.
-    func use(_ profile: TextForSpeech.Profile) async throws {
-        try await normalizer.useProfile(profile)
-    }
-
-    /// Deletes one stored text profile.
-    func delete(id: String) async throws {
-        try await normalizer.deleteProfile(id: id)
-    }
-
-    /// Resets all text-profile state back to the runtime defaults.
-    func reset() async throws {
-        try await normalizer.resetProfiles()
-    }
-
-    /// Adds one replacement rule to the active text profile.
+    /// Renames one stored custom text profile without changing its stable identifier.
     @discardableResult
-    func add(
-        _ replacement: TextForSpeech.Replacement,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.addReplacement(replacement)
+    func rename(
+        profile id: String,
+        to name: String,
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.renameTextProfile(id: id, to: name)
     }
 
-    /// Adds one replacement rule to a stored text profile.
+    /// Makes one stored custom text profile active.
+    func setActive(
+        id: String,
+    ) async throws {
+        try await normalizer.setActiveTextProfile(id: id)
+    }
+
+    /// Deletes one stored custom text profile.
+    func delete(
+        id: String,
+    ) async throws {
+        try await normalizer.deleteTextProfile(id: id)
+    }
+
+    /// Resets the whole text-profile store to the package defaults.
+    func factoryReset() async throws {
+        try await normalizer.factoryResetTextProfiles()
+    }
+
+    /// Resets one stored custom text profile back to an empty custom profile with the same identifier and name.
+    func reset(
+        id: String,
+    ) async throws {
+        try await normalizer.resetTextProfile(id: id)
+    }
+
+    /// Adds one replacement rule to the active custom text profile.
     @discardableResult
-    func add(
+    func addReplacement(
         _ replacement: TextForSpeech.Replacement,
-        toStoredProfileID id: String,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.addReplacement(
-            replacement,
-            toStoredProfileID: id,
-        )
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.addTextReplacement(replacement)
     }
 
-    /// Replaces one existing replacement rule on the active text profile.
+    /// Adds one replacement rule to one stored custom text profile.
     @discardableResult
-    func replace(
+    func addReplacement(
         _ replacement: TextForSpeech.Replacement,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.replaceReplacement(replacement)
+        toProfile id: String,
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.addTextReplacement(replacement, toProfile: id)
     }
 
-    /// Replaces one existing replacement rule on a stored text profile.
+    /// Replaces one existing replacement rule on the active custom text profile.
     @discardableResult
-    func replace(
+    func patchReplacement(
         _ replacement: TextForSpeech.Replacement,
-        inStoredProfileID id: String,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.replaceReplacement(
-            replacement,
-            inStoredProfileID: id,
-        )
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.patchTextReplacement(replacement)
     }
 
-    /// Removes one replacement rule from the active text profile.
+    /// Replaces one existing replacement rule on one stored custom text profile.
+    @discardableResult
+    func patchReplacement(
+        _ replacement: TextForSpeech.Replacement,
+        inProfile id: String,
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.patchTextReplacement(replacement, inProfile: id)
+    }
+
+    /// Removes one replacement rule from the active custom text profile.
     @discardableResult
     func removeReplacement(
         id replacementID: String,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.removeReplacement(id: replacementID)
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.removeTextReplacement(id: replacementID)
     }
 
-    /// Removes one replacement rule from a stored text profile.
+    /// Removes one replacement rule from one stored custom text profile.
     @discardableResult
     func removeReplacement(
         id replacementID: String,
-        fromStoredProfileID profileID: String,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.removeReplacement(
-            id: replacementID,
-            fromStoredProfileID: profileID,
-        )
-    }
-
-    /// Removes every replacement rule from the active text profile.
-    @discardableResult
-    func clearReplacements() async throws -> TextForSpeech.Profile {
-        try await normalizer.clearReplacements()
-    }
-
-    /// Removes every replacement rule from a stored text profile.
-    @discardableResult
-    func clearReplacements(
-        fromStoredProfileID profileID: String,
-    ) async throws -> TextForSpeech.Profile {
-        try await normalizer.clearReplacements(
-            fromStoredProfileID: profileID,
-        )
+        fromProfile profileID: String,
+    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
+        try await normalizer.removeTextReplacement(id: replacementID, fromProfile: profileID)
     }
 }

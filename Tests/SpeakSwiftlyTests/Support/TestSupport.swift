@@ -12,6 +12,12 @@ func mlxConditioningPersistenceTestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS"] == "1"
 }
 
+private let mlxSwiftTestMetallibInstaller = MLXSwiftTestMetallibInstaller()
+
+private func ensureMLXSwiftTestMetallibInstalled() throws {
+    try mlxSwiftTestMetallibInstaller.ensureInstalled()
+}
+
 // MARK: - Locking Helpers
 
 private extension NSLock {
@@ -22,7 +28,127 @@ private extension NSLock {
     }
 }
 
-// MARK: - OutputRecorder
+private final class MLXSwiftTestMetallibInstaller: @unchecked Sendable {
+    private let lock = NSLock()
+    private var installResult: Result<Void, Error>?
+
+    func ensureInstalled() throws {
+        try lock.withLock {
+            if let installResult {
+                return try installResult.get()
+            }
+
+            let result = Result {
+                let fileManager = FileManager.default
+                guard
+                    let bundledMetallibURL = Bundle.module.url(forResource: "default", withExtension: "metallib")
+                else {
+                    throw MetallibInstallError(
+                        "The SpeakSwiftly test target could not find its bundled default.metallib resource through Bundle.module.",
+                    )
+                }
+                let packageRootURL = try findPackageRootURL()
+                let destinationMetallibURLs = try metallibDestinationURLs(
+                    packageRootURL: packageRootURL,
+                    fileManager: fileManager,
+                )
+
+                for destinationMetallibURL in destinationMetallibURLs {
+                    let destinationDirectoryURL = destinationMetallibURL.deletingLastPathComponent()
+                    if !fileManager.fileExists(atPath: destinationMetallibURL.path) {
+                        try fileManager.createDirectory(at: destinationDirectoryURL, withIntermediateDirectories: true)
+                        try? fileManager.removeItem(at: destinationMetallibURL)
+                        try fileManager.copyItem(at: bundledMetallibURL, to: destinationMetallibURL)
+                    }
+                }
+
+                guard destinationMetallibURLs.allSatisfy({ fileManager.fileExists(atPath: $0.path) }) else {
+                    throw MetallibInstallError(
+                        "The SpeakSwiftly test bootstrap expected MLX default.metallib at every known SwiftPM runtime probe path, but at least one copy destination is still missing.",
+                    )
+                }
+            }
+
+            installResult = result
+            return try result.get()
+        }
+    }
+
+    private func findPackageRootURL() throws -> URL {
+        let fileManager = FileManager.default
+        var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+        while true {
+            let manifestURL = candidateURL.appendingPathComponent("Package.swift", isDirectory: false)
+            if fileManager.fileExists(atPath: manifestURL.path) {
+                return candidateURL
+            }
+
+            let parentURL = candidateURL.deletingLastPathComponent()
+            guard parentURL != candidateURL else {
+                throw MetallibInstallError(
+                    "The SpeakSwiftly test bootstrap could not find the package root while walking upward from '\(#filePath)'.",
+                )
+            }
+            candidateURL = parentURL
+        }
+    }
+
+    private func metallibDestinationURLs(
+        packageRootURL: URL,
+        fileManager: FileManager,
+    ) throws -> [URL] {
+        let buildRootURL = packageRootURL.appendingPathComponent(".build", isDirectory: true)
+        guard fileManager.fileExists(atPath: buildRootURL.path) else {
+            throw MetallibInstallError(
+                "The SpeakSwiftly test bootstrap expected a SwiftPM build directory at '\(buildRootURL.path)', but it does not exist yet.",
+            )
+        }
+
+        var destinationURLs = Set<URL>()
+
+        if let enumerator = fileManager.enumerator(
+            at: buildRootURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles],
+        ) {
+            for case let candidateURL as URL in enumerator {
+                switch candidateURL.lastPathComponent {
+                case "SpeakSwiftlyPackageTests.xctest":
+                    destinationURLs.insert(
+                        candidateURL
+                            .appendingPathComponent("Contents/MacOS/Resources/default.metallib", isDirectory: false)
+                    )
+                    enumerator.skipDescendants()
+                case "SpeakSwiftlyTool":
+                    destinationURLs.insert(
+                        candidateURL
+                            .deletingLastPathComponent()
+                            .appendingPathComponent("Resources/default.metallib", isDirectory: false)
+                    )
+                default:
+                    break
+                }
+            }
+        }
+
+        guard !destinationURLs.isEmpty else {
+            throw MetallibInstallError(
+                "The SpeakSwiftly test bootstrap could not find any SwiftPM runtime destinations for default.metallib under '\(buildRootURL.path)'.",
+            )
+        }
+
+        return Array(destinationURLs)
+    }
+}
+
+private struct MetallibInstallError: Error, CustomStringConvertible {
+    let description: String
+
+    init(_ description: String) {
+        self.description = description
+    }
+}
 
 final class OutputRecorder: @unchecked Sendable {
     private let lock = NSLock()
@@ -137,8 +263,6 @@ final class OutputRecorder: @unchecked Sendable {
     }
 }
 
-// MARK: - AsyncGate
-
 actor AsyncGate {
     private var continuation: CheckedContinuation<Void, Never>?
     private var isOpen = false
@@ -157,8 +281,6 @@ actor AsyncGate {
         continuation = nil
     }
 }
-
-// MARK: - PlaybackSpy
 
 final class PlaybackSpy: @unchecked Sendable {
     enum Behavior {
@@ -236,12 +358,15 @@ final class PlaybackSpy: @unchecked Sendable {
                 for try await (chunkIndex, chunk) in [Float].asyncEnumerated(stream) {
                     guard !chunk.isEmpty else { continue }
 
+                    let queuedAudioBeforeMS = bufferedAudioMS()
                     chunkCount += 1
                     sampleCount += chunk.count
                     pendingSampleCount += chunk.count
                     scheduleCallbackCount += 1
                     playedBackCallbackCount += 1
                     recordQueueDepth()
+                    let queuedAudioAfterMS = bufferedAudioMS()
+                    let chunkDurationMS = Int((Double(chunk.count) / 24000.0 * 1000).rounded())
 
                     if let firstSample = chunk.first, let lastSample = chunk.last {
                         let leadingAbs = Double(abs(firstSample))
@@ -259,6 +384,23 @@ final class PlaybackSpy: @unchecked Sendable {
                         fadeInChunkCount = 1
                         await onEvent(.firstChunk)
                     }
+
+                    await onEvent(
+                        .trace(
+                            PlaybackTraceEvent(
+                                name: "buffer_scheduled",
+                                chunkIndex: chunkIndex + 1,
+                                bufferIndex: chunkIndex + 1,
+                                sampleCount: chunk.count,
+                                durationMS: chunkDurationMS,
+                                queuedAudioBeforeMS: queuedAudioBeforeMS,
+                                queuedAudioAfterMS: queuedAudioAfterMS,
+                                gapMS: nil,
+                                isRebuffering: false,
+                                fadeInApplied: chunkIndex == 0,
+                            ),
+                        ),
+                    )
 
                     if !emittedPrerollReady, bufferedAudioMS() >= thresholds.startupBufferTargetMS {
                         emittedPrerollReady = true
@@ -405,8 +547,6 @@ final class PlaybackSpy: @unchecked Sendable {
     }
 }
 
-// MARK: - ResidentModelRecorder
-
 final class ResidentModelRecorder: @unchecked Sendable {
     private(set) var lastText: String?
     private(set) var lastVoice: String?
@@ -473,6 +613,12 @@ final class ResidentModelRecorder: @unchecked Sendable {
 // MARK: - Test Model and Runtime Factories
 
 func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
+    do {
+        try ensureMLXSwiftTestMetallibInstalled()
+    } catch {
+        Issue.record("Failed to stage default.metallib for the Swift test process: \(error)")
+    }
+
     let conditionedReferenceAudio = MLXArray([Int32(11), 12, 13, 14]).reshaped([1, 2, 2])
     let conditionedReferenceText = MLXArray([Int32(101), 102, 103]).reshaped([1, 3])
     let conditionedSpeakerEmbedding = MLXArray([Float(0.25), 0.5]).reshaped([1, 2])
@@ -646,7 +792,7 @@ func makeRuntime(
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
     audioLoadRecorder: ResidentModelRecorder? = nil,
-    loadedAudioSamples: MLXArray? = nil,
+    loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
     loadedCloneAudioSamples: [Float] = [],
     residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> some Any,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {

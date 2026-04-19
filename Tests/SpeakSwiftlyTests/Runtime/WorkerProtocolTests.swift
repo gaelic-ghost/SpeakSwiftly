@@ -13,7 +13,7 @@ import TextForSpeech
             id: "req-1",
             text: "Hello",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: nil,
@@ -31,7 +31,7 @@ import TextForSpeech
             id: "req-file",
             text: "Hello",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .file,
             textContext: nil,
             sourceFormat: nil,
@@ -41,7 +41,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch request`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_name":"logs","source_format":"swift_source"}]}"#,
+        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_id":"logs","source_format":"swift_source"}]}"#,
     )
 
     #expect(
@@ -52,14 +52,14 @@ import TextForSpeech
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "req-batch-artifact-1",
                     text: "First file",
-                    textProfileName: nil,
+                    textProfileID: nil,
                     textContext: nil,
                     sourceFormat: nil,
                 ),
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "custom-artifact",
                     text: "Second file",
-                    textProfileName: "logs",
+                    textProfileID: "logs",
                     textContext: nil,
                     sourceFormat: .swift,
                 ),
@@ -70,7 +70,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with text context and profile`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_name":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#,
+        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#,
     )
 
     #expect(
@@ -78,7 +78,7 @@ import TextForSpeech
             id: "req-1",
             text: "Hello",
             profileName: "default-femme",
-            textProfileName: "logs",
+            textProfileID: "logs",
             jobType: .live,
             textContext: TextForSpeech.Context(
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
@@ -100,7 +100,7 @@ import TextForSpeech
             id: "req-embedded",
             text: "```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: TextForSpeech.Context(
                 textFormat: .markdown,
@@ -121,7 +121,7 @@ import TextForSpeech
             id: "req-source",
             text: "struct WorkerRuntime { let sampleRate: Int }",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: .swift,
@@ -139,7 +139,7 @@ import TextForSpeech
             id: "req-legacy-source",
             text: "struct WorkerRuntime { let sampleRate: Int }",
             profileName: "default-femme",
-            textProfileName: nil,
+            textProfileID: nil,
             jobType: .live,
             textContext: nil,
             sourceFormat: .swift,
@@ -278,93 +278,98 @@ import TextForSpeech
     let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(active == .textProfileActive(id: "req-text-active"))
 
-    let style = try WorkerRequest.decode(from: #"{"id":"req-text-style","op":"get_text_profile_style"}"#)
-    #expect(style == .textProfileStyle(id: "req-text-style"))
+    let style = try WorkerRequest.decode(from: #"{"id":"req-text-style","op":"get_active_text_profile_style"}"#)
+    #expect(style == .activeTextProfileStyle(id: "req-text-style"))
+
+    let styles = try WorkerRequest.decode(from: #"{"id":"req-text-styles","op":"list_text_profile_styles"}"#)
+    #expect(styles == .textProfileStyleOptions(id: "req-text-styles"))
 
     let named = try WorkerRequest.decode(
-        from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_name":"logs"}"#,
+        from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_id":"logs"}"#,
     )
-    #expect(named == .textProfile(id: "req-text-one", name: "logs"))
+    #expect(named == .textProfile(id: "req-text-one", profileID: "logs"))
 
     let list = try WorkerRequest.decode(from: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
     #expect(list == .textProfiles(id: "req-text-list"))
 
-    let effective = try WorkerRequest.decode(
-        from: #"{"id":"req-text-effective","op":"get_effective_text_profile","text_profile_name":"logs"}"#,
-    )
-    #expect(effective == .textProfileEffective(id: "req-text-effective", name: "logs"))
+    let effective = try WorkerRequest.decode(from: #"{"id":"req-text-effective","op":"get_effective_text_profile"}"#)
+    #expect(effective == .textProfileEffective(id: "req-text-effective"))
 
-    let replacements = try WorkerRequest.decode(
-        from: #"{"id":"req-text-replacements","op":"list_text_replacements","text_profile_name":"logs"}"#,
-    )
-    #expect(replacements == .textReplacements(id: "req-text-replacements", profileName: "logs"))
+    let persistence = try WorkerRequest.decode(from: #"{"id":"req-text-persistence","op":"get_text_profile_persistence"}"#)
+    #expect(persistence == .textProfilePersistence(id: "req-text-persistence"))
 }
 
 @Test func `decodes text profile mutation requests`() throws {
     let setStyle = try WorkerRequest.decode(
-        from: #"{"id":"req-text-style-set","op":"set_text_profile_style","text_profile_style":"compact"}"#,
+        from: #"{"id":"req-text-style-set","op":"set_active_text_profile_style","text_profile_style":"compact"}"#,
     )
     #expect(
-        setStyle == .setTextProfileStyle(
+        setStyle == .setActiveTextProfileStyle(
             id: "req-text-style-set",
             style: .compact,
         ),
     )
 
     let create = try WorkerRequest.decode(
-        from: #"{"id":"req-text-create","op":"create_text_profile","text_profile_id":"logs","text_profile_display_name":"Logs","replacements":[{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}]}"#,
+        from: #"{"id":"req-text-create","op":"create_text_profile","profile_name":"Logs"}"#,
     )
-    #expect(
-        create == .createTextProfile(
-            id: "req-text-create",
-            profileID: "logs",
-            profileName: "Logs",
-            replacements: [
-                TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
-            ],
-        ),
-    )
+    #expect(create == .createTextProfile(id: "req-text-create", profileName: "Logs"))
 
-    let profile = TextForSpeech.Profile(
-        id: "ops",
-        name: "Ops",
-        replacements: [TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule")],
+    let rename = try WorkerRequest.decode(
+        from: #"{"id":"req-text-rename","op":"update_text_profile_name","text_profile_id":"logs","new_profile_name":"Ops Logs"}"#,
     )
-    let storePayload = try String(decoding: JSONEncoder().encode(profile), as: UTF8.self)
-    let store = try WorkerRequest.decode(
-        from: #"{"id":"req-text-store","op":"replace_text_profile","text_profile":"# + storePayload + #"}"#,
+    #expect(rename == .renameTextProfile(id: "req-text-rename", profileID: "logs", profileName: "Ops Logs"))
+
+    let setActive = try WorkerRequest.decode(
+        from: #"{"id":"req-text-set-active","op":"set_active_text_profile","text_profile_id":"logs"}"#,
     )
-    #expect(store == .storeTextProfile(id: "req-text-store", profile: profile))
+    #expect(setActive == .setActiveTextProfile(id: "req-text-set-active", profileID: "logs"))
+
+    let delete = try WorkerRequest.decode(
+        from: #"{"id":"req-text-delete","op":"delete_text_profile","text_profile_id":"logs"}"#,
+    )
+    #expect(delete == .deleteTextProfile(id: "req-text-delete", profileID: "logs"))
+
+    let factoryReset = try WorkerRequest.decode(
+        from: #"{"id":"req-text-factory-reset","op":"factory_reset_text_profiles"}"#,
+    )
+    #expect(factoryReset == .factoryResetTextProfiles(id: "req-text-factory-reset"))
+
+    let reset = try WorkerRequest.decode(
+        from: #"{"id":"req-text-reset","op":"reset_text_profile","text_profile_id":"logs"}"#,
+    )
+    #expect(reset == .resetTextProfile(id: "req-text-reset", profileID: "logs"))
 
     let add = try WorkerRequest.decode(
-        from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_name":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
+        from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
     )
     #expect(
         add == .addTextReplacement(
             id: "req-text-add",
             replacement: TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
-            profileName: "logs",
+            profileID: "logs",
+        ),
+    )
+
+    let replace = try WorkerRequest.decode(
+        from: #"{"id":"req-text-replace","op":"replace_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
+    )
+    #expect(
+        replace == .replaceTextReplacement(
+            id: "req-text-replace",
+            replacement: TextForSpeech.Replacement("stderr", with: "standard standard error", id: "logs-rule"),
+            profileID: "logs",
         ),
     )
 
     let remove = try WorkerRequest.decode(
-        from: #"{"id":"req-text-remove-replacement","op":"delete_text_replacement","replacement_id":"logs-rule","text_profile_name":"logs"}"#,
+        from: #"{"id":"req-text-remove-replacement","op":"delete_text_replacement","replacement_id":"logs-rule","text_profile_id":"logs"}"#,
     )
     #expect(
         remove == .removeTextReplacement(
             id: "req-text-remove-replacement",
             replacementID: "logs-rule",
-            profileName: "logs",
-        ),
-    )
-
-    let clear = try WorkerRequest.decode(
-        from: #"{"id":"req-text-clear","op":"clear_text_replacements","text_profile_name":"logs"}"#,
-    )
-    #expect(
-        clear == .clearTextReplacements(
-            id: "req-text-clear",
-            profileName: "logs",
+            profileID: "logs",
         ),
     )
 }
@@ -568,19 +573,35 @@ import TextForSpeech
     let textSuccess = try jsonObject(
         SpeakSwiftly.Success(
             id: "req-text-1",
-            textProfile: TextForSpeech.Profile(
-                id: "logs",
-                name: "Logs",
+            textProfile: SpeakSwiftly.TextProfileDetails(
+                profileID: "logs",
+                summary: SpeakSwiftly.TextProfileSummary(
+                    id: "logs",
+                    name: "Logs",
+                    replacementCount: 1,
+                ),
                 replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")],
             ),
-            textProfiles: [TextForSpeech.Profile(id: "logs", name: "Logs")],
-            replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")],
+            textProfiles: [
+                SpeakSwiftly.TextProfileSummary(
+                    id: "logs",
+                    name: "Logs",
+                    replacementCount: 1,
+                ),
+            ],
+            textProfileStyleOptions: [
+                SpeakSwiftly.TextProfileStyleOption(style: .compact, summary: "Compact"),
+            ],
+            textProfileStyle: .compact,
             textProfilePath: "/tmp/text-profiles.json",
         ),
     )
-    #expect((textSuccess["text_profile"] as? [String: Any])?["id"] as? String == "logs")
+    #expect((textSuccess["text_profile"] as? [String: Any])?["profile_id"] as? String == "logs")
+    #expect((((textSuccess["text_profile"] as? [String: Any])?["summary"] as? [String: Any])?["replacement_count"] as? Int) == 1)
     #expect((textSuccess["text_profiles"] as? [[String: Any]])?.count == 1)
-    #expect((textSuccess["replacements"] as? [[String: Any]])?.count == 1)
+    #expect((((textSuccess["text_profiles"] as? [[String: Any]])?.first)?["replacement_count"] as? Int) == 1)
+    #expect((textSuccess["text_profile_style_options"] as? [[String: Any]])?.count == 1)
+    #expect(textSuccess["text_profile_style"] as? String == "compact")
     #expect(textSuccess["text_profile_path"] as? String == "/tmp/text-profiles.json")
 
     let failure = try jsonObject(

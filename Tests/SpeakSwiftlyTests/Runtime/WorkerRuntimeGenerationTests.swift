@@ -112,7 +112,7 @@ import TextForSpeech
     _ = try generatedFileStore.createGeneratedFile(
         artifactID: "req-file-lookup",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
@@ -180,12 +180,12 @@ import TextForSpeech
     _ = try generationJobStore.createFileJob(
         jobID: "job-file-lookup",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .qwen3,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-file-lookup-artifact-1",
             text: "Hello from a persisted file job.",
-            textProfileName: nil,
+            textProfileID: nil,
             textContext: nil,
             sourceFormat: nil,
         ),
@@ -257,7 +257,7 @@ import TextForSpeech
     let storedFile = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-file-artifact-1",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
@@ -265,12 +265,12 @@ import TextForSpeech
     _ = try generationJobStore.createFileJob(
         jobID: "job-expire-file",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .qwen3,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-expire-file-artifact-1",
             text: "Persisted file job",
-            textProfileName: nil,
+            textProfileID: nil,
             textContext: nil,
             sourceFormat: nil,
         ),
@@ -286,7 +286,7 @@ import TextForSpeech
                 filePath: storedFile.summary.filePath,
                 sampleRate: storedFile.summary.sampleRate,
                 profileName: storedFile.summary.profileName,
-                textProfileName: storedFile.summary.textProfileName,
+                textProfileID: storedFile.summary.textProfileID,
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 3001),
@@ -349,14 +349,14 @@ import TextForSpeech
     let first = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-batch-artifact-1",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         sampleRate: 24000,
         audioData: Data([0x01]),
     )
     let second = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-batch-artifact-2",
         profileName: "default-femme",
-        textProfileName: "logs",
+        textProfileID: "logs",
         sampleRate: 24000,
         audioData: Data([0x02]),
     )
@@ -364,20 +364,20 @@ import TextForSpeech
     _ = try generationJobStore.createBatchJob(
         jobID: "job-expire-batch",
         profileName: "default-femme",
-        textProfileName: nil,
+        textProfileID: nil,
         speechBackend: .qwen3,
         items: [
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-1",
                 text: "First",
-                textProfileName: nil,
+                textProfileID: nil,
                 textContext: nil,
                 sourceFormat: nil,
             ),
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-2",
                 text: "Second",
-                textProfileName: "logs",
+                textProfileID: "logs",
                 textContext: nil,
                 sourceFormat: nil,
             ),
@@ -394,7 +394,7 @@ import TextForSpeech
                 filePath: first.summary.filePath,
                 sampleRate: first.summary.sampleRate,
                 profileName: first.summary.profileName,
-                textProfileName: first.summary.textProfileName,
+                textProfileID: first.summary.textProfileID,
             ),
             SpeakSwiftly.GenerationArtifact(
                 artifactID: second.summary.artifactID,
@@ -403,7 +403,7 @@ import TextForSpeech
                 filePath: second.summary.filePath,
                 sampleRate: second.summary.sampleRate,
                 profileName: second.summary.profileName,
-                textProfileName: second.summary.textProfileName,
+                textProfileID: second.summary.textProfileID,
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 3101),

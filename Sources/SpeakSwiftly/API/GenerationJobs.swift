@@ -13,7 +13,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
             case text
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
             case textContext = "text_context"
             case sourceFormat = "source_format"
         }
@@ -22,7 +22,7 @@ public extension SpeakSwiftly {
 
         public let artifactID: String
         public let text: String
-        public let textProfileName: String?
+        public let textProfileID: String?
         public let textContext: TextForSpeech.Context?
         public let sourceFormat: TextForSpeech.SourceFormat?
 
@@ -31,13 +31,13 @@ public extension SpeakSwiftly {
         init(
             artifactID: String,
             text: String,
-            textProfileName: String?,
+            textProfileID: String?,
             textContext: TextForSpeech.Context?,
             sourceFormat: TextForSpeech.SourceFormat?,
         ) {
             self.artifactID = artifactID
             self.text = text
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
             self.textContext = textContext
             self.sourceFormat = sourceFormat
         }
@@ -99,7 +99,7 @@ public extension SpeakSwiftly {
             case filePath = "file_path"
             case sampleRate = "sample_rate"
             case profileName = "profile_name"
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
         }
 
         public let artifactID: String
@@ -108,7 +108,7 @@ public extension SpeakSwiftly {
         public let filePath: String
         public let sampleRate: Int
         public let profileName: String
-        public let textProfileName: String?
+        public let textProfileID: String?
 
         init(
             artifactID: String,
@@ -117,7 +117,7 @@ public extension SpeakSwiftly {
             filePath: String,
             sampleRate: Int,
             profileName: String,
-            textProfileName: String?,
+            textProfileID: String?,
         ) {
             self.artifactID = artifactID
             self.kind = kind
@@ -125,7 +125,7 @@ public extension SpeakSwiftly {
             self.filePath = filePath
             self.sampleRate = sampleRate
             self.profileName = profileName
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
         }
     }
 
@@ -137,7 +137,7 @@ public extension SpeakSwiftly {
             case createdAt = "created_at"
             case updatedAt = "updated_at"
             case profileName = "profile_name"
-            case textProfileName = "text_profile_name"
+            case textProfileID = "text_profile_id"
             case speechBackend = "speech_backend"
             case state
             case items
@@ -155,7 +155,7 @@ public extension SpeakSwiftly {
         public let createdAt: Date
         public let updatedAt: Date
         public let profileName: String
-        public let textProfileName: String?
+        public let textProfileID: String?
         public let speechBackend: SpeechBackend
         public let state: GenerationJobState
         public let items: [GenerationJobItem]
@@ -173,7 +173,7 @@ public extension SpeakSwiftly {
             createdAt: Date,
             updatedAt: Date,
             profileName: String,
-            textProfileName: String?,
+            textProfileID: String?,
             speechBackend: SpeechBackend,
             state: GenerationJobState,
             items: [GenerationJobItem],
@@ -190,7 +190,7 @@ public extension SpeakSwiftly {
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.profileName = profileName
-            self.textProfileName = textProfileName
+            self.textProfileID = textProfileID
             self.speechBackend = speechBackend
             self.state = state
             self.items = items
@@ -204,8 +204,6 @@ public extension SpeakSwiftly {
         }
     }
 }
-
-// MARK: - SpeakSwiftly.Jobs
 
 public extension SpeakSwiftly {
     // MARK: Jobs Handle

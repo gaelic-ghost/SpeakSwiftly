@@ -406,8 +406,6 @@ private extension QwenBenchmarkE2ETests {
     }
 }
 
-// MARK: - QwenBenchmarkSummary
-
 private struct QwenBenchmarkSummary: Codable {
     let schemaVersion: Int
     let generatedAt: Date
@@ -415,8 +413,6 @@ private struct QwenBenchmarkSummary: Codable {
     let settings: QwenBenchmarkSettings
     let strategies: [QwenConditioningStrategyBenchmarkReport]
 }
-
-// MARK: - QwenBenchmarkHost
 
 private struct QwenBenchmarkHost: Codable {
     let machineArchitecture: String
@@ -447,8 +443,6 @@ private struct QwenBenchmarkHost: Codable {
     }
 }
 
-// MARK: - QwenBenchmarkSettings
-
 private struct QwenBenchmarkSettings: Codable {
     let iterations: Int
     let benchmarkProfileName: String
@@ -472,8 +466,6 @@ private struct QwenBenchmarkSettings: Codable {
         )
     }
 }
-
-// MARK: - QwenConditioningStrategyBenchmarkReport
 
 private struct QwenConditioningStrategyBenchmarkReport: Codable {
     let strategy: SpeakSwiftly.QwenConditioningStrategy
@@ -505,8 +497,6 @@ private struct QwenConditioningStrategyBenchmarkReport: Codable {
     }
 }
 
-// MARK: - QwenBenchmarkSample
-
 private struct QwenBenchmarkSample: Codable {
     let strategy: SpeakSwiftly.QwenConditioningStrategy
     let iteration: Int
@@ -515,8 +505,6 @@ private struct QwenBenchmarkSample: Codable {
     let liveSpeech: QwenRequestBenchmark
 }
 
-// MARK: - QwenRequestBenchmark
-
 private struct QwenRequestBenchmark: Codable {
     let requestID: String
     let operation: String
@@ -524,8 +512,6 @@ private struct QwenRequestBenchmark: Codable {
     let lifecycle: QwenLifecycleMetrics
     let generation: QwenGenerationMetrics
 }
-
-// MARK: - QwenLifecycleMetrics
 
 private struct QwenLifecycleMetrics: Codable {
     var queuedAtMS: Double?
@@ -538,8 +524,6 @@ private struct QwenLifecycleMetrics: Codable {
     var playbackFinishedAtMS: Double?
     var completedAtMS: Double?
 }
-
-// MARK: - QwenGenerationMetrics
 
 private struct QwenGenerationMetrics: Codable {
     var firstTokenAtMS: Double?
@@ -556,8 +540,6 @@ private struct QwenGenerationMetrics: Codable {
     var peakMemoryUsageGB: Double?
 }
 
-// MARK: - QwenRequestBenchmarkAggregate
-
 private struct QwenRequestBenchmarkAggregate: Codable {
     let sampleCount: Int
     let lifecycle: QwenLifecycleMetricAggregate
@@ -571,8 +553,6 @@ private struct QwenRequestBenchmarkAggregate: Codable {
         )
     }
 }
-
-// MARK: - QwenLifecycleMetricAggregate
 
 private struct QwenLifecycleMetricAggregate: Codable {
     let acknowledgedMS: QwenMetricSummary
@@ -593,8 +573,6 @@ private struct QwenLifecycleMetricAggregate: Codable {
         )
     }
 }
-
-// MARK: - QwenGenerationMetricAggregate
 
 private struct QwenGenerationMetricAggregate: Codable {
     let firstTokenMS: QwenMetricSummary
@@ -628,8 +606,6 @@ private struct QwenGenerationMetricAggregate: Codable {
     }
 }
 
-// MARK: - QwenMetricSummary
-
 private struct QwenMetricSummary: Codable {
     let count: Int
     let min: Double?
@@ -655,8 +631,6 @@ private struct QwenMetricSummary: Codable {
         )
     }
 }
-
-// MARK: - BenchmarkError
 
 private struct BenchmarkError: Error, CustomStringConvertible {
     let description: String

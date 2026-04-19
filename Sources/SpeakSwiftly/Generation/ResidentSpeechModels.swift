@@ -1,7 +1,5 @@
 import Foundation
 
-// MARK: - MarvisResidentVoice
-
 enum MarvisResidentVoice: String, Equatable {
     case conversationalA = "conversational_a"
     case conversationalB = "conversational_b"
@@ -16,8 +14,6 @@ enum MarvisResidentVoice: String, Equatable {
     }
 }
 
-// MARK: - MarvisResidentModels
-
 struct MarvisResidentModels {
     let conversationalA: AnySpeechModel
     let conversationalB: AnySpeechModel
@@ -31,8 +27,6 @@ struct MarvisResidentModels {
         }
     }
 }
-
-// MARK: - ResidentSpeechModels
 
 enum ResidentSpeechModels {
     case qwen3(AnySpeechModel)
