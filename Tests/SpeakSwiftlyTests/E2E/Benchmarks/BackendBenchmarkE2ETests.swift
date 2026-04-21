@@ -265,7 +265,7 @@ private struct BackendQueuedLivePenaltyAggregate: Codable {
         Self(
             secondRequestQueueWaitMS: .make(
                 from: samples.compactMap {
-                    Self.queueWaitMS(for: $0.secondRequest.lifecycle)
+                    queueWaitMS(for: $0.secondRequest.lifecycle)
                 },
             ),
             secondRequestFirstAudioPenaltyMS: .make(
@@ -276,6 +276,7 @@ private struct BackendQueuedLivePenaltyAggregate: Codable {
                     else {
                         return nil
                     }
+
                     return second - first
                 },
             ),
@@ -287,6 +288,7 @@ private struct BackendQueuedLivePenaltyAggregate: Codable {
                     else {
                         return nil
                     }
+
                     return second - first
                 },
             ),

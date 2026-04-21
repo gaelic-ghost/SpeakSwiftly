@@ -49,6 +49,7 @@ struct BenchmarkMetricSummary: Codable {
 
     var prettyAverage: String {
         guard let average else { return "n/a" }
+
         return String(format: "%.2f", average)
     }
 
@@ -253,6 +254,19 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var stderrObjects = [[String: Any]]()
 
+    private static func double(_ value: Any?) -> Double? {
+        switch value {
+            case let int as Int:
+                Double(int)
+            case let double as Double:
+                double
+            case let number as NSNumber:
+                number.doubleValue
+            default:
+                nil
+        }
+    }
+
     func appendStderr(_ message: String) {
         let lines = message
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -268,6 +282,7 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
                 else {
                     continue
                 }
+
                 stderrObjects.append(object)
             }
         }
@@ -281,7 +296,6 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
             }) else {
                 return nil
             }
-
             guard let details = object["details"] as? [String: Any] else {
                 return nil
             }
@@ -310,19 +324,6 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
                 maxLeadingAbsAmplitude: Self.double(details["max_leading_abs_amplitude"]),
                 maxTrailingAbsAmplitude: Self.double(details["max_trailing_abs_amplitude"]),
             )
-        }
-    }
-
-    private static func double(_ value: Any?) -> Double? {
-        switch value {
-            case let int as Int:
-                Double(int)
-            case let double as Double:
-                double
-            case let number as NSNumber:
-                number.doubleValue
-            default:
-                nil
         }
     }
 }
@@ -509,8 +510,8 @@ enum BenchmarkHarness {
         )
     }
 
-    static func writeSummary<Summary: Encodable>(
-        _ summary: Summary,
+    static func writeSummary(
+        _ summary: some Encodable,
         timestampedStem: String,
         latestFilename: String,
         generatedAt: Date,

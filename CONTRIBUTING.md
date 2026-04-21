@@ -35,7 +35,7 @@ Use `install-hooks.sh` once per local clone to enable the repository-managed Git
 
 Treat SwiftFormat as the primary style tool in this repository. Keep SwiftLint focused on non-formatting policy checks instead of duplicating formatter behavior.
 
-The repository-managed `pre-commit` hook is now the intended local enforcement path. Run `sh scripts/repo-maintenance/install-hooks.sh` after cloning, and Git will use `scripts/repo-maintenance/hooks/pre-commit` for this clone. That hook runs the same validation entry point as release preflight and CI.
+The repository-managed `pre-commit` hook is now the intended local enforcement path. Run `sh scripts/repo-maintenance/install-hooks.sh` after cloning, and Git will use `scripts/repo-maintenance/hooks/pre-commit` for this clone. That hook applies `swiftformat`, restages tracked changes, and then runs the same validation entry point as release preflight and CI.
 
 ## Runtime Shape
 
