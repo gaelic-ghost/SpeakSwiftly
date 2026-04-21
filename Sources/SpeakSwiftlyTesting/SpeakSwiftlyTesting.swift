@@ -284,6 +284,15 @@ struct SpeakSwiftlyTestingMain {
         let longestRunMaxPerCodebook: Int
     }
 
+    struct QwenCodebookDriftStats: Encodable {
+        let codebookIndex: Int
+        let exactAdjacentRepeatRatio: Double
+        let headDistinctCount: Int
+        let tailDistinctCount: Int
+        let headTailDistinctJaccard: Double
+        let headTailDistributionShift: Double
+    }
+
     struct QwenCodeArtifactStats: Encodable {
         let frameCount: Int
         let codebookCount: Int
@@ -300,6 +309,7 @@ struct SpeakSwiftlyTestingMain {
         let headTailDistributionShiftMean: Double
         let headTailDistributionShiftMax: Double
         let quarters: [QwenCodeQuarterStats]
+        let leadingHeadTailShiftCodebooks: [QwenCodebookDriftStats]
     }
 
     struct QwenCodeArtifactDescriptor: Encodable {
@@ -321,6 +331,14 @@ struct SpeakSwiftlyTestingMain {
         let fullSequenceDistinctJaccardMin: Double
         let fullSequenceDistributionShiftMean: Double
         let fullSequenceDistributionShiftMax: Double
+        let leadingCrossArtifactShiftCodebooks: [QwenCodebookPairStats]
+    }
+
+    struct QwenCodebookPairStats: Encodable {
+        let codebookIndex: Int
+        let exactPositionMatchRatio: Double
+        let distinctJaccard: Double
+        let distributionShift: Double
     }
 
     struct QwenCodeComparisonArtifact: Encodable {
@@ -1289,6 +1307,17 @@ struct SpeakSwiftlyTestingMain {
                 pair.fullSequenceDistributionShiftMax,
             ),
         )
+        for codebook in pair.leadingCrossArtifactShiftCodebooks {
+            print(
+                String(
+                    format: "pair_leading_codebook_%02d: exact_match_ratio=%.5f distinct_jaccard=%.5f distribution_shift=%.5f",
+                    codebook.codebookIndex,
+                    codebook.exactPositionMatchRatio,
+                    codebook.distinctJaccard,
+                    codebook.distributionShift,
+                ),
+            )
+        }
 
         let comparisonArtifactURL = try writeProbeArtifact(
             QwenCodeComparisonArtifact(
@@ -2249,6 +2278,7 @@ struct SpeakSwiftlyTestingMain {
             headTailDistributionShiftMean: headTail.shiftMean,
             headTailDistributionShiftMax: headTail.shiftMax,
             quarters: quarterStats,
+            leadingHeadTailShiftCodebooks: headTail.leadingCodebooks,
         )
     }
 
@@ -2298,12 +2328,22 @@ struct SpeakSwiftlyTestingMain {
         }
 
         let exactMatchRatiosPerCodebook = exactMatchesPerCodebook.map { Double($0) / Double(frameCount) }
-        let distributionJaccards = zip(leftDistributions, rightDistributions).map { pair in
-            qwenCodeJaccard(pair.0, pair.1)
+        let perCodebookComparisons = zip(leftDistributions, rightDistributions).enumerated().map { element in
+            let codebookIndex = element.offset
+            let distributions = element.element
+            return QwenCodebookPairStats(
+                codebookIndex: codebookIndex,
+                exactPositionMatchRatio: Double(exactMatchesPerCodebook[codebookIndex]) / Double(frameCount),
+                distinctJaccard: qwenCodeJaccard(distributions.0, distributions.1),
+                distributionShift: qwenCodeDistributionShift(
+                    distributions.0,
+                    distributions.1,
+                    sampleCount: frameCount,
+                ),
+            )
         }
-        let distributionShifts = zip(leftDistributions, rightDistributions).map { pair in
-            qwenCodeDistributionShift(pair.0, pair.1, sampleCount: frameCount)
-        }
+        let distributionJaccards = perCodebookComparisons.map(\.distinctJaccard)
+        let distributionShifts = perCodebookComparisons.map(\.distributionShift)
 
         return QwenCodePairComparison(
             exactPositionMatchRatio: Double(exactMatches) / Double(totalTokenCount),
@@ -2313,6 +2353,16 @@ struct SpeakSwiftlyTestingMain {
             fullSequenceDistinctJaccardMin: distributionJaccards.min() ?? 0,
             fullSequenceDistributionShiftMean: average(distributionShifts),
             fullSequenceDistributionShiftMax: distributionShifts.max() ?? 0,
+            leadingCrossArtifactShiftCodebooks: Array(
+                perCodebookComparisons
+                    .sorted { lhs, rhs in
+                        if lhs.distributionShift == rhs.distributionShift {
+                            return lhs.codebookIndex < rhs.codebookIndex
+                        }
+                        return lhs.distributionShift > rhs.distributionShift
+                    }
+                    .prefix(3),
+            ),
         )
     }
 
@@ -2351,6 +2401,21 @@ struct SpeakSwiftlyTestingMain {
                     quarter.distinctTokensMaxPerCodebook,
                     quarter.longestRunMeanPerCodebook,
                     quarter.longestRunMaxPerCodebook,
+                ),
+            )
+        }
+
+        for codebook in stats.leadingHeadTailShiftCodebooks {
+            print(
+                String(
+                    format: "%@_leading_codebook_%02d: repeat_ratio=%.5f head_distinct=%d tail_distinct=%d head_tail_jaccard=%.5f head_tail_shift=%.5f",
+                    prefix,
+                    codebook.codebookIndex,
+                    codebook.exactAdjacentRepeatRatio,
+                    codebook.headDistinctCount,
+                    codebook.tailDistinctCount,
+                    codebook.headTailDistinctJaccard,
+                    codebook.headTailDistributionShift,
                 ),
             )
         }
@@ -2421,7 +2486,13 @@ struct SpeakSwiftlyTestingMain {
         _ values: [Int32],
         frameCount: Int,
         codebookCount: Int,
-    ) -> (jaccardMean: Double, jaccardMin: Double, shiftMean: Double, shiftMax: Double) {
+    ) -> (
+        jaccardMean: Double,
+        jaccardMin: Double,
+        shiftMean: Double,
+        shiftMax: Double,
+        leadingCodebooks: [QwenCodebookDriftStats],
+    ) {
         let midpoint = max(frameCount / 2, 1)
         let head = qwenCodeDistributions(
             values,
@@ -2439,23 +2510,52 @@ struct SpeakSwiftlyTestingMain {
         )
         let headFrames = midpoint
         let tailFrames = max(frameCount - midpoint, 1)
-        let jaccards = zip(head, tail).map { pair in
-            qwenCodeJaccard(pair.0, pair.1)
+        var repeatCounts = Array(repeating: 0, count: codebookCount)
+        for frame in 1..<frameCount {
+            let base = frame * codebookCount
+            let previousBase = (frame - 1) * codebookCount
+            for codebook in 0..<codebookCount {
+                if values[base + codebook] == values[previousBase + codebook] {
+                    repeatCounts[codebook] += 1
+                }
+            }
         }
-        let shifts = zip(head, tail).map { pair in
-            qwenCodeDistributionShift(
-                pair.0,
-                pair.1,
-                sampleCountA: headFrames,
-                sampleCountB: tailFrames,
+
+        let perCodebook = zip(head, tail).enumerated().map { element in
+            let codebookIndex = element.offset
+            let distributions = element.element
+            return QwenCodebookDriftStats(
+                codebookIndex: codebookIndex,
+                exactAdjacentRepeatRatio: frameCount > 1 ? Double(repeatCounts[codebookIndex]) / Double(frameCount - 1) : 0,
+                headDistinctCount: distributions.0.count,
+                tailDistinctCount: distributions.1.count,
+                headTailDistinctJaccard: qwenCodeJaccard(distributions.0, distributions.1),
+                headTailDistributionShift: qwenCodeDistributionShift(
+                    distributions.0,
+                    distributions.1,
+                    sampleCountA: headFrames,
+                    sampleCountB: tailFrames,
+                ),
             )
         }
+        let jaccards = perCodebook.map(\.headTailDistinctJaccard)
+        let shifts = perCodebook.map(\.headTailDistributionShift)
 
         return (
             average(jaccards),
             jaccards.min() ?? 0,
             average(shifts),
             shifts.max() ?? 0,
+            Array(
+                perCodebook
+                    .sorted { lhs, rhs in
+                        if lhs.headTailDistributionShift == rhs.headTailDistributionShift {
+                            return lhs.codebookIndex < rhs.codebookIndex
+                        }
+                        return lhs.headTailDistributionShift > rhs.headTailDistributionShift
+                    }
+                    .prefix(3),
+            ),
         )
     }
 

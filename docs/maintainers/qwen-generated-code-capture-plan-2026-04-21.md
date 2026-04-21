@@ -67,6 +67,14 @@ After the raw capture-and-replay pass, the answer is sharper: profile-sensitive
 behavior persists across both `raw` and `artifact` conditioning, and replay
 decode still does not look like the main divergence point.
 
+Also keep the broader operator symptom in view:
+
+- the degraded long-form runs are reported to drift upward in pitch and faster
+  in cadence over time, not just lower in retained loudness
+
+That means the next analysis should stay open to prosody-regime drift rather
+than treating this purely as an amplitude-envelope problem.
+
 ## Purpose
 
 This note plans the next investigation surface for the Qwen long-form decay

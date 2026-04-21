@@ -14,6 +14,14 @@ decay investigation across:
 - four local `SpeakSwiftlyTesting` replays of saved generated-code artifacts
 - three local `SpeakSwiftlyTesting` generated-code comparisons
 
+Operator-observed symptom note:
+
+- The long-form failure is not only a tail-loudness issue. Gale also reports
+  that the generated speech tends to get higher pitched and faster in cadence
+  as generation continues. That broader prosody drift may be related to the
+  same underlying regime shift and should be treated as part of the active
+  symptom cluster, not as a separate unrelated issue.
+
 The live local SpeakSwiftly service was unloaded first with:
 
 ```sh
@@ -458,6 +466,21 @@ Interpretation:
   conditioning-content, or request-setup difference than toward a broad decode
   or distribution-collapse explanation.
 
+Narrower codebook-level read from the updated helper:
+
+- The enhanced `compare-qwen-codes` output now surfaces the most shifted
+  codebooks instead of only whole-run averages.
+- In the first artifact-vs-artifact rerun, both profiles showed codebook `15`
+  among their highest head-vs-tail internal shift lanes, while the strongest
+  cross-artifact divergence showed up at codebooks `06`, `07`, and `04`.
+- That is useful enough to guide a more focused next step, but it is not yet a
+  clean discriminator between "bad soft-femme" and "healthy clear-masc" on its
+  own.
+- The symptom note about rising pitch and faster cadence now matters even more
+  here, because a small set of higher-level prosody-driving codebooks drifting
+  over time would fit that perceptual pattern better than a pure amplitude-only
+  explanation.
+
 ## Overall Readout
 
 The current evidence points to the same shape as the earlier investigation:
@@ -479,6 +502,9 @@ The current evidence points to the same shape as the earlier investigation:
 - The new raw replay controls match the artifact replay result: profile
   sensitivity persists across both conditioning strategies, and the replay
   decode split still is not the primary source of the collapse.
+- The observed symptom cluster now includes loudness decay, pitch rise, and
+  cadence acceleration over longer generations, which makes a broader prosody
+  drift more plausible than a volume-only defect.
 
 ## Recommended Next Steps
 
@@ -487,6 +513,9 @@ The current evidence points to the same shape as the earlier investigation:
    narrower way, such as per-codebook trajectory, token bigrams, tail-localized
    motifs, or alignment against the reference-code prefix rather than in
    whole-run uniqueness or repeat ratios.
+   The new helper can already point at the most shifted codebooks; the next
+   pass should graph or summarize those codebooks across quarters and correlate
+   them against the audible pitch-up and cadence-speed-up symptom.
 2. Add a smaller local matrix variant for daily reruns.
    The current `matrix-volume` shape is too expensive for frequent use; a
    reduced-profile or reduced-length variant would keep the evidence fresh
