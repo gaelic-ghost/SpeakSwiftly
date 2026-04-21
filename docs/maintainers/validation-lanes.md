@@ -200,6 +200,26 @@ xcodebuild test-without-building -quiet \
 That lane excludes the opt-in `DeepTraceE2ETests` and `QwenBenchmarkE2ETests`
 families unless you deliberately inject their extra environment flags too.
 
+For the broader backend-comparison benchmark design that should eventually
+replace the Qwen-only benchmark as the main package benchmark lane, see:
+
+- [backend-benchmarking-plan-2026-04-20.md](backend-benchmarking-plan-2026-04-20.md)
+
+The package now also has an opt-in backend-wide benchmark suite behind:
+
+- `SPEAKSWIFTLY_E2E=1`
+- `SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1`
+- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=<n>`
+- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1`
+
+Prefer the repo-maintenance wrapper instead of exporting those by hand:
+
+```bash
+sh scripts/repo-maintenance/run-benchmark.sh
+sh scripts/repo-maintenance/run-benchmark.sh --audible --iterations 3
+sh scripts/repo-maintenance/run-benchmark.sh --qwen --iterations 5
+```
+
 For Marvis overlap and trace work, prefer the dedicated runbook:
 
 - [marvis-overlap-profiling-runbook-2026-04-16.md](marvis-overlap-profiling-runbook-2026-04-16.md)

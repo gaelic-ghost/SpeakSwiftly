@@ -723,7 +723,7 @@ SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_DEEP_TRACE_E2E=1 swift test --filter DeepTraceE2
 Opt-in qwen resident benchmark comparison:
 
 ```bash
-sh scripts/repo-maintenance/run-e2e.sh --suite qwen-benchmark --benchmark
+sh scripts/repo-maintenance/run-benchmark.sh --qwen
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 swift test --filter QwenBenchmarkE2ETests
 ```
 
@@ -732,11 +732,24 @@ Without `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`, the benchmark suite is skipped duri
 Run multiple comparison samples per Qwen conditioning strategy:
 
 ```bash
-sh scripts/repo-maintenance/run-e2e.sh --suite qwen-benchmark --benchmark --benchmark-iterations 3
+sh scripts/repo-maintenance/run-benchmark.sh --qwen --iterations 3
 SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1 SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=3 swift test --filter QwenBenchmarkE2ETests
 ```
 
 Each benchmark run persists a timestamped JSON summary under `.local/benchmarks` and refreshes `.local/benchmarks/qwen-resident-benchmark-latest.json` for quick inspection.
+
+Opt-in backend-wide queued live benchmark comparison:
+
+```bash
+sh scripts/repo-maintenance/run-benchmark.sh
+sh scripts/repo-maintenance/run-benchmark.sh --audible --iterations 3
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1 swift test --filter BackendBenchmarkE2ETests
+```
+
+The backend-wide suite runs the same two-request live benchmark scenario across
+`qwen3`, `chatterbox_turbo`, and `marvis`. The second request is expected to
+queue behind the first one; if it does not, the suite now fails so the queued
+benchmark contract cannot silently drift into a non-queued workload.
 
 Section-aware weird-text deep-trace probes:
 
