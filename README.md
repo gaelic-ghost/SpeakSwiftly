@@ -76,7 +76,7 @@ swift build
 swift test
 ```
 
-The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
+The current `mlx-audio-swift` `0.7.0` fork pin restores the ordinary SwiftPM
 build and test path. If a future toolchain regression brings back the old
 `EnglishG2P.swift` parser failure, use the documented fallback lane in
 [CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same
@@ -182,9 +182,12 @@ The package also ships a small executable consumer harness, `SpeakSwiftlyTesting
 swift run SpeakSwiftlyTesting resources
 swift run SpeakSwiftlyTesting status
 swift run SpeakSwiftlyTesting smoke
+swift run SpeakSwiftlyTesting create-design-profile --profile probe-fresh-a --voice "A steady, intimate, softly spoken feminine voice with even projection."
+swift run SpeakSwiftlyTesting volume-probe --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
 ```
 
-`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, and `smoke` runs both checks in sequence.
+`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, `smoke` runs both checks in sequence, `create-design-profile` creates and stores a fresh voice-design profile through the typed runtime, `volume-probe` generates a retained file then prints per-window RMS and peak measurements so long-form loudness drift can be inspected against a real stored profile, and `compare-volume` runs that retained-file path against a direct non-stream Qwen decode using the same stored profile conditioning so the drift can be compared side by side.
 
 ## API Notes
 

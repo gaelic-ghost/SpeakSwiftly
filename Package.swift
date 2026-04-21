@@ -26,11 +26,15 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.18.0"),
+            .upToNextMajor(from: "0.18.2"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            from: "69.2.0",
+            exact: "0.7.0",
+        ),
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift.git",
+            .upToNextMajor(from: "0.30.6"),
         ),
     ],
     targets: [
@@ -63,7 +67,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "SpeakSwiftlyTesting",
-            dependencies: ["SpeakSwiftly"],
+            dependencies: [
+                "SpeakSwiftly",
+                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
+                .product(name: "MLX", package: "mlx-swift"),
+            ],
         ),
     ],
     swiftLanguageModes: [
