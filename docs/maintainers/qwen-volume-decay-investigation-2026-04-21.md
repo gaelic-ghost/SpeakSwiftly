@@ -189,6 +189,72 @@ So the upstream audit sharpens the diagnosis:
 - but plain decoder-path mismatch by itself is not yet sufficient to reproduce
   the strongest SpeakSwiftly decay symptom in upstream isolation tests
 
+## Newer Upstream Findings
+
+The local upstream checkout has now gone a step further and added a more
+SpeakSwiftly-like probe matrix in
+`/Users/galew/Workspace/Blaizzy/mlx-audio-swift/Tests/MLXAudioTTSTests.swift`.
+
+That newer probe work adds two important shapes:
+
+- an end-to-end retained-output comparison using a real persisted SpeakSwiftly
+  conditioning artifact from `probe-clear-masc-20260421`
+- a profile-and-length matrix over both `probe-soft-femme-20260421` and
+  `probe-clear-masc-20260421`, comparing raw rebuilt conditioning against the
+  persisted `qwen-conditioning-qwen3.json` artifact on both short and long
+  prompts
+
+### What the newer upstream work found
+
+First, persisted conditioning artifacts are not neutral. On the same machine
+and backend snapshot, using the saved SpeakSwiftly artifact can worsen
+late-utterance retained loudness relative to rebuilding conditioning from
+`reference.wav` plus the stored reference text.
+
+Second, the strongest local repro so far is now a combination effect:
+
+- profile choice matters
+- persisted artifact conditioning matters
+- long prompt length matters
+
+The first strong local repro in upstream `mlx-audio-swift` was:
+
+- `probe-soft-femme-20260421`
+- long prompt
+- persisted artifact conditioning
+
+That combination reportedly dropped to an artifact tail ratio of about `0.0367`
+while the corresponding long raw-conditioned run stayed around `0.867`.
+
+### What still did not happen
+
+Even in the artifact-conditioned probe, the current `decodeChunk(...)` helper
+still stayed roughly aligned with bounded decode at the tail on the exact same
+captured generated code stream. That means the severe field symptom still is
+not explained by helper decode choice alone.
+
+### New caveat: the strongest repro is unstable across reruns
+
+The upstream note also reports that the severe matrix collapse moved around or
+disappeared across later reruns:
+
+- one rerun showed the previously bad `probe-soft-femme-20260421` long-form
+  artifact lane recovering to a much healthier tail ratio
+- another rerun shifted the strongest collapse into the
+  `probe-clear-masc-20260421` long artifact lane instead
+- a later logging-style rerun completed without catastrophic collapse in any
+  matrix entry
+
+So the current best upstream reading is not "one specific profile is broken in a
+fully deterministic way." It is:
+
+- the failure family is now locally reproducible in the upstream repo
+- persisted conditioning artifacts are a real amplifying factor
+- profile choice and prompt length materially affect severity
+- the worst collapse is stochastic enough that the matrix is currently an
+  investigation harness and logging surface, not a reliable pass/fail
+  regression gate
+
 ## What This Means Right Now
 
 The current investigation state is:
@@ -201,9 +267,12 @@ The current investigation state is:
   no longer looks sufficient on its own to explain the entire severe tail-fade
   repro
 - the strongest remaining hidden variables now look more like
-  profile/materialization specifics, runtime-surface differences above raw
-  decode helpers, or longer/more pathological generated token sequences than
-  the current upstream probes exercised
+  profile/materialization specifics, persisted artifact conditioning, runtime
+  surface differences above raw decode helpers, and longer generated sequences
+  interacting together
+- the latest upstream evidence suggests the worst failures are partly
+  stochastic, so we should expect reruns to move severity around instead of
+  giving us one perfectly stable failing lane
 
 ## Next Investigation Pass
 
@@ -218,9 +287,12 @@ The next focused pass should stay narrow and evidence-first:
 4. Reproduce the upstream conditioned generated-code probe shape against the
    specific SpeakSwiftly profiles that showed the strongest collapse, so we can
    tell whether the missing variable is the profile materialization itself.
-5. Inspect whether the intended decoder `slidingWindow` behavior exists in the
+5. Reproduce the newer upstream profile-and-length matrix inside SpeakSwiftly so
+   we can log raw-vs-artifact retained tail ratios for the same profiles and
+   compare how much variance shows up across reruns.
+6. Inspect whether the intended decoder `slidingWindow` behavior exists in the
    Python/reference implementation and whether the Swift port drifted from it.
-6. Compare the raw generated token lengths and decode inputs from the strongest
+7. Compare the raw generated token lengths and decode inputs from the strongest
    SpeakSwiftly repros against the upstream passing probes to see whether the
    failing cases are simply much longer or otherwise more pathological.
 
