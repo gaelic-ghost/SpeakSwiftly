@@ -14,6 +14,7 @@ struct SpeakSwiftlyTestingMain {
         case volumeProbe = "volume-probe"
         case compareVolume = "compare-volume"
         case matrixVolume = "matrix-volume"
+        case captureQwenCodes = "capture-qwen-codes"
     }
 
     enum ConditioningMode: String {
@@ -60,6 +61,20 @@ struct SpeakSwiftlyTestingMain {
         var includeStreamed = false
     }
 
+    struct CaptureQwenCodesOptions {
+        enum Lane: String {
+            case direct
+        }
+
+        var profileName = "default-femme"
+        var profileRoot: String?
+        var textFile: String?
+        var repeatCount = 10
+        var windowSeconds = 2.0
+        var conditioningMode: ConditioningMode = .auto
+        var lane: Lane = .direct
+    }
+
     struct VolumeWindow {
         let index: Int
         let startSeconds: Double
@@ -98,6 +113,22 @@ struct SpeakSwiftlyTestingMain {
         let conditioningMode: ConditioningMode
         let generatedFilePath: String
         let analysis: ProbeAnalysis
+    }
+
+    struct QwenDebugCapture {
+        let generatedCodes: EncodableInt32Tensor
+        let referenceCodes: EncodableInt32Tensor?
+        let referenceTextTokenIDs: EncodableInt32Tensor?
+        let resolvedLanguage: String?
+        let codecLanguageID: Int?
+    }
+
+    struct DirectQwenCaptureRun {
+        let run: CompareRun
+        let modelRepo: String
+        let referenceAudioFile: String
+        let referenceText: String
+        let capture: QwenDebugCapture
     }
 
     struct ComparisonResult {
@@ -178,6 +209,34 @@ struct SpeakSwiftlyTestingMain {
         let windowSeconds: Double
         let includeStreamed: Bool
         let rows: [MatrixProbeRow]
+    }
+
+    struct EncodableInt32Tensor: Encodable {
+        let values: [Int32]
+        let shape: [Int]
+    }
+
+    struct QwenCodeCaptureArtifact: Encodable {
+        let schemaVersion: Int
+        let generatedAt: Date
+        let profileName: String
+        let profileRoot: String?
+        let requestText: String
+        let textCharacters: Int
+        let textWords: Int
+        let conditioningMode: String
+        let lane: String
+        let modelRepo: String
+        let referenceAudioFile: String
+        let referenceText: String
+        let generatedFilePath: String
+        let sampleRate: Int
+        let retainedAnalysis: EncodableProbeAnalysis
+        let generatedCodes: EncodableInt32Tensor
+        let referenceCodes: EncodableInt32Tensor?
+        let referenceTextTokenIDs: EncodableInt32Tensor?
+        let resolvedLanguage: String?
+        let codecLanguageID: Int?
     }
 
     struct ProbeMaterializationManifest: Decodable {
@@ -267,6 +326,9 @@ struct SpeakSwiftlyTestingMain {
             case .matrixVolume:
                 let options = try parseMatrixVolumeOptions(arguments: arguments)
                 try await runMatrixVolume(options: options)
+            case .captureQwenCodes:
+                let options = try parseCaptureQwenCodesOptions(arguments: arguments)
+                try await runCaptureQwenCodes(options: options)
         }
     }
 
@@ -281,6 +343,7 @@ struct SpeakSwiftlyTestingMain {
         if command != .volumeProbe,
            command != .compareVolume,
            command != .matrixVolume,
+           command != .captureQwenCodes,
            command != .createDesignProfile,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
@@ -444,6 +507,63 @@ struct SpeakSwiftlyTestingMain {
 
         if options.profileNames.isEmpty {
             options.profileNames = ["default-femme"]
+        }
+
+        return options
+    }
+
+    static func parseCaptureQwenCodesOptions(arguments: [String]) throws -> CaptureQwenCodesOptions {
+        var options = CaptureQwenCodesOptions()
+        var index = 1
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--profile":
+                    index += 1
+                    options.profileName = try requireOptionValue(arguments, index: index, for: argument)
+                case "--profile-root":
+                    index += 1
+                    options.profileRoot = try requireOptionValue(arguments, index: index, for: argument)
+                case "--text-file":
+                    index += 1
+                    options.textFile = try requireOptionValue(arguments, index: index, for: argument)
+                case "--repeat":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let repeatCount = Int(value), repeatCount > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.repeatCount = repeatCount
+                case "--window-seconds":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let windowSeconds = Double(value), windowSeconds > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.windowSeconds = windowSeconds
+                case "--conditioning":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let conditioningMode = ConditioningMode(rawValue: value) else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.conditioningMode = conditioningMode
+                case "--lane":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let lane = CaptureQwenCodesOptions.Lane(rawValue: value) else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.lane = lane
+                default:
+                    throw UsageError.unknownCommand(argument)
+            }
+            index += 1
         }
 
         return options
@@ -619,6 +739,105 @@ struct SpeakSwiftlyTestingMain {
             ),
             stem: "compare-volume",
             latestFilename: "compare-volume-latest.json",
+        )
+        print("json_artifact: \(artifactURL.path)")
+    }
+
+    static func runCaptureQwenCodes(options: CaptureQwenCodesOptions) async throws {
+        if let profileRoot = options.profileRoot {
+            setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
+        }
+
+        try validateConditioningMode(
+            profileName: options.profileName,
+            profileRootOverride: options.profileRoot,
+            conditioningMode: options.conditioningMode,
+        )
+
+        let text = try loadVolumeProbeText(
+            options: VolumeProbeOptions(
+                profileName: options.profileName,
+                profileRoot: options.profileRoot,
+                textFile: options.textFile,
+                repeatCount: options.repeatCount,
+                windowSeconds: options.windowSeconds,
+                conditioningMode: options.conditioningMode,
+            ),
+        )
+        let (profileDirectoryURL, manifest) = try probeProfileContext(
+            profileName: options.profileName,
+            profileRootOverride: options.profileRoot,
+        )
+
+        let captureRun = switch options.lane {
+            case .direct:
+                try await runDirectQwenCapture(
+                    text: text,
+                    manifest: manifest,
+                    profileDirectoryURL: profileDirectoryURL,
+                    windowSeconds: options.windowSeconds,
+                    conditioningMode: options.conditioningMode,
+                    outputStem: "\(options.profileName)-\(options.conditioningMode.rawValue)-capture-direct",
+                )
+        }
+
+        print("profile_name: \(options.profileName)")
+        if let profileRoot = options.profileRoot {
+            print("profile_root: \(profileRoot)")
+        }
+        print("conditioning_mode: \(options.conditioningMode.rawValue)")
+        print("lane: \(options.lane.rawValue)")
+        print("text_characters: \(text.count)")
+        print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
+        print("model_repo: \(captureRun.modelRepo)")
+        print("reference_audio_file: \(captureRun.referenceAudioFile)")
+        print("generated_file: \(captureRun.run.generatedFilePath)")
+        print("sample_rate: \(captureRun.run.analysis.sampleRate)")
+        print("window_seconds: \(options.windowSeconds)")
+        print("generated_code_shape: \(captureRun.capture.generatedCodes.shape)")
+        print("generated_code_values: \(captureRun.capture.generatedCodes.values.count)")
+        if let referenceCodes = captureRun.capture.referenceCodes {
+            print("reference_code_shape: \(referenceCodes.shape)")
+            print("reference_code_values: \(referenceCodes.values.count)")
+        }
+        if let referenceTextTokenIDs = captureRun.capture.referenceTextTokenIDs {
+            print("reference_text_token_ids_shape: \(referenceTextTokenIDs.shape)")
+            print("reference_text_token_ids_values: \(referenceTextTokenIDs.values.count)")
+        }
+        if let resolvedLanguage = captureRun.capture.resolvedLanguage {
+            print("resolved_language: \(resolvedLanguage)")
+        }
+        if let codecLanguageID = captureRun.capture.codecLanguageID {
+            print("codec_language_id: \(codecLanguageID)")
+        }
+
+        printAnalysis(captureRun.run.analysis, prefix: "window", summaryLabel: "summary")
+
+        let artifactURL = try writeProbeArtifact(
+            QwenCodeCaptureArtifact(
+                schemaVersion: 1,
+                generatedAt: Date(),
+                profileName: options.profileName,
+                profileRoot: options.profileRoot,
+                requestText: text,
+                textCharacters: text.count,
+                textWords: text.split(whereSeparator: \.isWhitespace).count,
+                conditioningMode: options.conditioningMode.rawValue,
+                lane: options.lane.rawValue,
+                modelRepo: captureRun.modelRepo,
+                referenceAudioFile: captureRun.referenceAudioFile,
+                referenceText: captureRun.referenceText,
+                generatedFilePath: captureRun.run.generatedFilePath,
+                sampleRate: captureRun.run.analysis.sampleRate,
+                retainedAnalysis: makeEncodableProbeAnalysis(captureRun.run.analysis),
+                generatedCodes: captureRun.capture.generatedCodes,
+                referenceCodes: captureRun.capture.referenceCodes,
+                referenceTextTokenIDs: captureRun.capture.referenceTextTokenIDs,
+                resolvedLanguage: captureRun.capture.resolvedLanguage,
+                codecLanguageID: captureRun.capture.codecLanguageID,
+            ),
+            stem: "capture-qwen-codes",
+            latestFilename: "capture-qwen-codes-latest.json",
         )
         print("json_artifact: \(artifactURL.path)")
     }
@@ -890,6 +1109,81 @@ struct SpeakSwiftlyTestingMain {
         return ComparisonResult(streamed: streamed, direct: direct)
     }
 
+    static func runDirectQwenCapture(
+        text: String,
+        manifest: ProbeProfileManifest,
+        profileDirectoryURL: URL,
+        windowSeconds: Double,
+        conditioningMode: ConditioningMode,
+        outputStem: String,
+    ) async throws -> DirectQwenCaptureRun {
+        guard let materialization = manifest.backendMaterializations.first(where: { $0.backend == "qwen3" }) else {
+            throw UsageError.profileMissingQwenMaterialization(profileDirectoryURL.path)
+        }
+
+        let loadedModel = try await TTS.loadModel(modelRepo: materialization.modelRepo)
+        guard let qwenModel = loadedModel as? Qwen3TTSModel else {
+            throw UsageError.profileModelIsNotQwen(materialization.modelRepo)
+        }
+
+        var generationParameters = qwenModel.defaultGenerationParameters
+        let wordCount = max(text.split(whereSeparator: \.isWhitespace).count, 1)
+        generationParameters.maxTokens = min(2048, max(56, wordCount * 8))
+        generationParameters.temperature = 0.9
+        generationParameters.topP = 1.0
+        generationParameters.repetitionPenalty = 1.05
+        let conditioning = try makeDirectConditioning(
+            qwenModel: qwenModel,
+            manifest: manifest,
+            materialization: materialization,
+            profileDirectoryURL: profileDirectoryURL,
+            conditioningMode: conditioningMode,
+        )
+        var debugCapture: Qwen3TTSModel.DebugGeneratedCodes?
+        let directSamples = try await qwenModel.generate(
+            text: text,
+            conditioning: conditioning.conditioning,
+            generationParameters: generationParameters,
+            onGeneratedCodes: { debug in
+                debugCapture = debug
+            },
+        )
+        .asArray(Float.self)
+        guard let debugCapture else {
+            throw UsageError.qwenGeneratedCodesMissing(materialization.modelRepo)
+        }
+
+        let directOutputURL = try writeProbeWAV(
+            samples: directSamples,
+            sampleRate: qwenModel.sampleRate,
+            name: "\(outputStem).wav",
+        )
+        let analysis = analyzeVolume(
+            samples: directSamples,
+            sampleRate: qwenModel.sampleRate,
+            windowSeconds: windowSeconds,
+        )
+
+        return DirectQwenCaptureRun(
+            run: CompareRun(
+                lane: "direct",
+                conditioningMode: conditioningMode,
+                generatedFilePath: directOutputURL.path,
+                analysis: analysis,
+            ),
+            modelRepo: materialization.modelRepo,
+            referenceAudioFile: materialization.referenceAudioFile,
+            referenceText: materialization.referenceText,
+            capture: QwenDebugCapture(
+                generatedCodes: encodeInt32Tensor(debugCapture.generatedCodes),
+                referenceCodes: debugCapture.referenceCodes.map(encodeInt32Tensor),
+                referenceTextTokenIDs: encodeInt32Tensor(conditioning.conditioning.referenceTextTokenIDs),
+                resolvedLanguage: conditioning.conditioning.resolvedLanguage,
+                codecLanguageID: conditioning.conditioning.codecLanguageID,
+            ),
+        )
+    }
+
     static func runDirectProbe(
         text: String,
         manifest: ProbeProfileManifest,
@@ -991,6 +1285,46 @@ struct SpeakSwiftlyTestingMain {
             generatedFilePath: directOutputURL.path,
             analysis: analysis,
         )
+    }
+
+    static func makeDirectConditioning(
+        qwenModel: Qwen3TTSModel,
+        manifest: ProbeProfileManifest,
+        materialization: ProbeMaterializationManifest,
+        profileDirectoryURL: URL,
+        conditioningMode: ConditioningMode,
+    ) throws -> (conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning, source: String) {
+        switch conditioningMode {
+            case .artifact:
+                guard let conditioningArtifact = try loadStoredConditioning(
+                    manifest: manifest,
+                    profileDirectoryURL: profileDirectoryURL,
+                ) else {
+                    throw UsageError.profileMissingStoredConditioning(profileDirectoryURL.path)
+                }
+
+                return (conditioningArtifact, "artifact")
+            case .auto:
+                if let conditioningArtifact = try loadStoredConditioning(
+                    manifest: manifest,
+                    profileDirectoryURL: profileDirectoryURL,
+                ) {
+                    return (conditioningArtifact, "artifact")
+                }
+                fallthrough
+            case .raw:
+                let referenceAudioURL = profileDirectoryURL.appendingPathComponent(
+                    materialization.referenceAudioFile,
+                    isDirectory: false,
+                )
+                let refAudio = try loadReferenceAudio(at: referenceAudioURL, sampleRate: qwenModel.sampleRate)
+                let rebuiltConditioning = try qwenModel.prepareReferenceConditioning(
+                    refAudio: refAudio,
+                    refText: materialization.referenceText,
+                    language: "English",
+                )
+                return (rebuiltConditioning, "raw")
+        }
     }
 
     static func profileRootURL(options: VolumeProbeOptions) -> URL {
@@ -1187,6 +1521,13 @@ struct SpeakSwiftlyTestingMain {
             conditioningMode: run.conditioningMode.rawValue,
             generatedFilePath: run.generatedFilePath,
             analysis: makeEncodableProbeAnalysis(run.analysis),
+        )
+    }
+
+    static func encodeInt32Tensor(_ array: MLXArray) -> EncodableInt32Tensor {
+        EncodableInt32Tensor(
+            values: array.asArray(Int32.self),
+            shape: array.shape,
         )
     }
 
@@ -1516,6 +1857,7 @@ extension SpeakSwiftlyTestingMain {
         case profileMissingQwenMaterialization(String)
         case profileMissingStoredConditioning(String)
         case profileModelIsNotQwen(String)
+        case qwenGeneratedCodesMissing(String)
         case referenceAudioLoadFailed(String)
         case packageRootNotFound(String)
 
@@ -1549,6 +1891,8 @@ extension SpeakSwiftlyTestingMain {
                     "SpeakSwiftlyTesting could not find a stored qwen3 conditioning artifact in '\(path)', but this probe run required explicit artifact conditioning."
                 case let .profileModelIsNotQwen(modelRepo):
                     "SpeakSwiftlyTesting expected model repo '\(modelRepo)' to load as Qwen3TTSModel for the direct comparison path, but it resolved to a different speech model type."
+                case let .qwenGeneratedCodesMissing(modelRepo):
+                    "SpeakSwiftlyTesting expected the Qwen debug capture hook to return generated codec data for model repo '\(modelRepo)', but no generated-code payload arrived."
                 case let .referenceAudioLoadFailed(path):
                     "SpeakSwiftlyTesting could not decode any audio samples from '\(path)' for the direct Qwen comparison path."
                 case let .packageRootNotFound(path):
@@ -1566,6 +1910,7 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
               swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
               swift run SpeakSwiftlyTesting matrix-volume [--profile NAME ...] [--profile-root PATH] [--short-text-file PATH] [--long-text-file PATH] [--short-repeat COUNT] [--long-repeat COUNT] [--iterations COUNT] [--window-seconds SECONDS] [--include-streamed]
+              swift run SpeakSwiftlyTesting capture-qwen-codes [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--lane direct]
             """
         }
     }

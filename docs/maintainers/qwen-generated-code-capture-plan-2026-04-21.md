@@ -1,5 +1,26 @@
 # Qwen Generated-Code Capture Plan
 
+## Status
+
+The first direct-lane landing now exists in `SpeakSwiftlyTesting` as
+`capture-qwen-codes`.
+
+What shipped in this first pass:
+
+- direct capture for `--conditioning raw|artifact|auto`
+- replay-friendly JSON artifacts under `.local/volume-probes/`
+- retained waveform analysis in the same artifact
+- generated Qwen codec tensor capture
+- reference codes, reference text token IDs, resolved language, and codec
+  language ID capture
+
+What is still intentionally deferred:
+
+- streamed runtime generated-code capture
+- a replay helper in `SpeakSwiftlyTesting`
+- fixture export automation for upstream `mlx-audio-swift`
+- checksums or deduplicated large-payload storage
+
 ## Purpose
 
 This note plans the next investigation surface for the Qwen long-form decay
