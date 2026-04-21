@@ -21,6 +21,12 @@ Operator-observed symptom note:
   as generation continues. That broader prosody drift may be related to the
   same underlying regime shift and should be treated as part of the active
   symptom cluster, not as a separate unrelated issue.
+- The exact symptom mix is also inconsistent from run to run. Loudness decay,
+  pitch rise, cadence acceleration, and glitchier delivery all seem to be
+  common manifestations, but not every failing run presents the same blend.
+  The working model should therefore stay open to multiple smaller issues that
+  compound in a partly non-deterministic way rather than assuming one neat
+  single defect with one stable presentation.
 
 The live local SpeakSwiftly service was unloaded first with:
 
@@ -118,6 +124,14 @@ swift run SpeakSwiftlyTesting compare-qwen-codes \
 swift run SpeakSwiftlyTesting compare-qwen-codes \
   --left-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-55-33Z.json \
   --right-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-40-02Z.json
+
+swift run SpeakSwiftlyTesting analyze-audio-prosody \
+  --file /var/folders/hw/pp57v7m145vfh7517y14t_zr0000gn/T/SpeakSwiftlyTesting/probe-soft-femme-20260421-replay-warmed-streaming.wav \
+  --window-seconds 0.5
+
+swift run SpeakSwiftlyTesting analyze-audio-prosody \
+  --file /var/folders/hw/pp57v7m145vfh7517y14t_zr0000gn/T/SpeakSwiftlyTesting/probe-clear-masc-20260421-replay-warmed-streaming.wav \
+  --window-seconds 0.5
 ```
 
 Attempted but intentionally stopped:
@@ -520,9 +534,88 @@ The current evidence points to the same shape as the earlier investigation:
 - The observed symptom cluster now includes loudness decay, pitch rise, and
   cadence acceleration over longer generations, which makes a broader prosody
   drift more plausible than a volume-only defect.
+- The symptom presentation is also inconsistent enough that the current best
+  read is "compound and partly non-deterministic" rather than "one bug with one
+  canonical signature."
 - The first quarter-level codebook snapshots did not reveal an obvious single
   late-quarter cliff, so the next analysis likely needs finer-grained
   time-local or prosody-aware measurements rather than broader quarter averages.
+
+### 7. First audio-side prosody summary pass
+
+The replay helper now emits a first-pass prosody summary alongside the existing
+volume summary, using:
+
+- a coarse pitch proxy from short-frame autocorrelation on voiced windows
+- a coarse pulse-rate proxy from smoothed envelope peak density
+
+First artifact replay comparison:
+
+| Profile | Lane | Head Pitch Hz | Tail Pitch Hz | Tail/Head Pitch | Head Pulse Rate | Tail Pulse Rate | Tail/Head Pulse |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `probe-soft-femme-20260421` | `warmed_streaming_decode` | 197.77 | 197.47 | 0.99848 | 3.80 | 3.51 | 0.92417 |
+| `probe-clear-masc-20260421` | `warmed_streaming_decode` | 166.64 | 166.30 | 0.99797 | 4.05 | 3.80 | 0.93910 |
+
+Additional top-line readouts:
+
+- soft-femme warmed streaming first/last pitch proxy: `218.39 Hz` -> `182.55 Hz`
+- clear-masc warmed streaming first/last pitch proxy: `198.15 Hz` -> `177.37 Hz`
+- soft-femme warmed streaming first/last pulse proxy: `4.50` -> `3.26` per second
+- clear-masc warmed streaming first/last pulse proxy: `4.50` -> `2.17` per second
+
+Interpretation:
+
+- This first prosody pass does not reproduce the reported pitch-up / faster
+  cadence symptom directly.
+- The crude proxy actually trends slightly downward on both profiles, and the
+  pulse-rate proxy also softens rather than accelerating.
+- That does not mean the perceptual report is wrong. It means this first proxy
+  is likely too blunt for the exact symptom or is measuring a different aspect
+  of the speech than what the ear is picking up.
+- The audio-side path is still useful because it gives the investigation a
+  place to improve prosody measurements without guessing entirely from codebook
+  drift.
+
+### 8. Finer 0.5-second prosody spot-check with direct WAV analysis
+
+The new `analyze-audio-prosody` helper can also inspect one saved WAV directly
+without rerunning Qwen generation. That gave us a cheaper way to recheck the
+warm-replay audio after one slightly glitchy listening pass.
+
+Matched warmed-streaming replay WAVs:
+
+| Profile | Head Pitch Hz | Tail Pitch Hz | Tail/Head Pitch | Head Pulse Rate | Tail Pulse Rate | Tail/Head Pulse |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `probe-soft-femme-20260421` | 195.77 | 192.95 | 0.98560 | 3.12 | 3.11 | 0.99586 |
+| `probe-clear-masc-20260421` | 165.55 | 163.71 | 0.98892 | 3.32 | 3.60 | 1.08434 |
+
+Additional direct-analysis readouts:
+
+- soft-femme first/last pitch proxy: `260.37 Hz` -> `172.82 Hz`
+- clear-masc first/last pitch proxy: `152.16 Hz` -> `225.78 Hz`
+- soft-femme first/last pulse proxy: `6.00` -> `2.94` per second
+- clear-masc first/last pulse proxy: `0.00` -> `2.94` per second
+- soft-femme quarter pitch medians: `195.77`, `198.42`, `188.82`, `192.95`
+- clear-masc quarter pitch medians: `165.55`, `177.04`, `169.33`, `163.71`
+- soft-femme quarter pulse medians: `3.12`, `3.27`, `3.17`, `3.11`
+- clear-masc quarter pulse medians: `3.32`, `3.63`, `3.68`, `3.60`
+
+Interpretation:
+
+- The finer 0.5-second spot-check still does not cleanly reproduce the
+  operator-reported pitch-up / faster-cadence symptom on the degraded
+  soft-femme run.
+- The quarter medians stay fairly flat on both profiles, and soft-femme still
+  does not show a clear late-run acceleration signal in this proxy.
+- Clear-masc shows a modest tail-ward increase in the pulse-rate proxy even
+  though it is the healthier loudness case, which is another sign that this
+  proxy is not yet isolating the audible failure mode cleanly.
+- The first/last numbers swing more than the quarter medians, especially on
+  clear-masc, which suggests the current estimator is sensitive to local
+  windows and should not be over-read as a literal prosody contour yet.
+- This makes the next measurement task clearer: improve the prosody estimator
+  itself rather than keep paying for more model reruns through the same coarse
+  proxy.
 
 ## Recommended Next Steps
 
@@ -543,3 +636,9 @@ The current evidence points to the same shape as the earlier investigation:
    while the local retained file lane decays, focus next on SpeakSwiftly-owned
    behavior around request text shaping, runtime reuse, or the exact
    profile-materialization inputs rather than the codec decode step itself.
+4. Replace the first-pass prosody proxy with a better-targeted measurement.
+   The replay-level and direct-WAV spot checks are both useful scaffolds, but
+   neither one cleanly captures the reported pitch-up / faster-cadence
+   symptom. The next version should favor a more stable F0 contour and a
+   better speaking-rate estimate rather than more reruns through the same
+   proxy.

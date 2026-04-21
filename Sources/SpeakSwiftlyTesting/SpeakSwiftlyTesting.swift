@@ -17,6 +17,7 @@ struct SpeakSwiftlyTestingMain {
         case captureQwenCodes = "capture-qwen-codes"
         case replayQwenCodes = "replay-qwen-codes"
         case compareQwenCodes = "compare-qwen-codes"
+        case analyzeAudioProsody = "analyze-audio-prosody"
     }
 
     enum ConditioningMode: String {
@@ -87,6 +88,12 @@ struct SpeakSwiftlyTestingMain {
         var rightArtifactFile: String?
     }
 
+    struct AnalyzeAudioProsodyOptions {
+        var file: String?
+        var sampleRate: Int?
+        var windowSeconds = 0.5
+    }
+
     struct VolumeWindow {
         let index: Int
         let startSeconds: Double
@@ -118,6 +125,39 @@ struct SpeakSwiftlyTestingMain {
         let sampleRate: Int
         let windows: [VolumeWindow]
         let summary: VolumeSummary?
+        let prosody: ProsodySummary?
+    }
+
+    struct ProsodyWindow {
+        let index: Int
+        let startSeconds: Double
+        let durationSeconds: Double
+        let voicedFraction: Double
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct ProsodySegment {
+        let label: String
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct ProsodySummary {
+        let windows: [ProsodyWindow]
+        let firstPitchHz: Double
+        let lastPitchHz: Double
+        let pitchChangePercent: Double
+        let headPitchHz: Double
+        let tailPitchHz: Double
+        let tailHeadPitchRatio: Double
+        let firstPulseRatePerSecond: Double
+        let lastPulseRatePerSecond: Double
+        let pulseRateChangePercent: Double
+        let headPulseRatePerSecond: Double
+        let tailPulseRatePerSecond: Double
+        let tailHeadPulseRateRatio: Double
+        let segments: [ProsodySegment]
     }
 
     struct CompareRun {
@@ -184,6 +224,39 @@ struct SpeakSwiftlyTestingMain {
         let sampleRate: Int
         let windows: [EncodableVolumeWindow]
         let summary: EncodableVolumeSummary?
+        let prosody: EncodableProsodySummary?
+    }
+
+    struct EncodableProsodyWindow: Encodable {
+        let index: Int
+        let startSeconds: Double
+        let durationSeconds: Double
+        let voicedFraction: Double
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct EncodableProsodySegment: Encodable {
+        let label: String
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct EncodableProsodySummary: Encodable {
+        let windows: [EncodableProsodyWindow]
+        let firstPitchHz: Double
+        let lastPitchHz: Double
+        let pitchChangePercent: Double
+        let headPitchHz: Double
+        let tailPitchHz: Double
+        let tailHeadPitchRatio: Double
+        let firstPulseRatePerSecond: Double
+        let lastPulseRatePerSecond: Double
+        let pulseRateChangePercent: Double
+        let headPulseRatePerSecond: Double
+        let tailPulseRatePerSecond: Double
+        let tailHeadPulseRateRatio: Double
+        let segments: [EncodableProsodySegment]
     }
 
     struct CompareRunArtifact: Encodable {
@@ -433,6 +506,7 @@ struct SpeakSwiftlyTestingMain {
         let sampleRate: Int
         let windows: [DecodableVolumeWindow]
         let summary: DecodableVolumeSummary?
+        let prosody: DecodableProsodySummary?
 
         func makeProbeAnalysis() -> ProbeAnalysis {
             ProbeAnalysis(
@@ -462,8 +536,73 @@ struct SpeakSwiftlyTestingMain {
                         },
                     )
                 },
+                prosody: prosody.map {
+                    ProsodySummary(
+                        windows: $0.windows.map {
+                            ProsodyWindow(
+                                index: $0.index,
+                                startSeconds: $0.startSeconds,
+                                durationSeconds: $0.durationSeconds,
+                                voicedFraction: $0.voicedFraction,
+                                estimatedPitchHz: $0.estimatedPitchHz,
+                                pulseRatePerSecond: $0.pulseRatePerSecond,
+                            )
+                        },
+                        firstPitchHz: $0.firstPitchHz,
+                        lastPitchHz: $0.lastPitchHz,
+                        pitchChangePercent: $0.pitchChangePercent,
+                        headPitchHz: $0.headPitchHz,
+                        tailPitchHz: $0.tailPitchHz,
+                        tailHeadPitchRatio: $0.tailHeadPitchRatio,
+                        firstPulseRatePerSecond: $0.firstPulseRatePerSecond,
+                        lastPulseRatePerSecond: $0.lastPulseRatePerSecond,
+                        pulseRateChangePercent: $0.pulseRateChangePercent,
+                        headPulseRatePerSecond: $0.headPulseRatePerSecond,
+                        tailPulseRatePerSecond: $0.tailPulseRatePerSecond,
+                        tailHeadPulseRateRatio: $0.tailHeadPulseRateRatio,
+                        segments: $0.segments.map {
+                            ProsodySegment(
+                                label: $0.label,
+                                estimatedPitchHz: $0.estimatedPitchHz,
+                                pulseRatePerSecond: $0.pulseRatePerSecond,
+                            )
+                        },
+                    )
+                },
             )
         }
+    }
+
+    struct DecodableProsodyWindow: Decodable {
+        let index: Int
+        let startSeconds: Double
+        let durationSeconds: Double
+        let voicedFraction: Double
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct DecodableProsodySegment: Decodable {
+        let label: String
+        let estimatedPitchHz: Double
+        let pulseRatePerSecond: Double
+    }
+
+    struct DecodableProsodySummary: Decodable {
+        let windows: [DecodableProsodyWindow]
+        let firstPitchHz: Double
+        let lastPitchHz: Double
+        let pitchChangePercent: Double
+        let headPitchHz: Double
+        let tailPitchHz: Double
+        let tailHeadPitchRatio: Double
+        let firstPulseRatePerSecond: Double
+        let lastPulseRatePerSecond: Double
+        let pulseRateChangePercent: Double
+        let headPulseRatePerSecond: Double
+        let tailPulseRatePerSecond: Double
+        let tailHeadPulseRateRatio: Double
+        let segments: [DecodableProsodySegment]
     }
 
     struct DecodableQwenCodeCaptureArtifact: Decodable {
@@ -538,6 +677,9 @@ struct SpeakSwiftlyTestingMain {
             case .compareQwenCodes:
                 let options = try parseCompareQwenCodesOptions(arguments: arguments)
                 try runCompareQwenCodes(options: options)
+            case .analyzeAudioProsody:
+                let options = try parseAnalyzeAudioProsodyOptions(arguments: arguments)
+                try runAnalyzeAudioProsody(options: options)
         }
     }
 
@@ -555,6 +697,7 @@ struct SpeakSwiftlyTestingMain {
            command != .captureQwenCodes,
            command != .replayQwenCodes,
            command != .compareQwenCodes,
+           command != .analyzeAudioProsody,
            command != .createDesignProfile,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
@@ -820,6 +963,41 @@ struct SpeakSwiftlyTestingMain {
                 case "--right-artifact-file":
                     index += 1
                     options.rightArtifactFile = try requireOptionValue(arguments, index: index, for: argument)
+                default:
+                    throw UsageError.unknownCommand(argument)
+            }
+            index += 1
+        }
+
+        return options
+    }
+
+    static func parseAnalyzeAudioProsodyOptions(arguments: [String]) throws -> AnalyzeAudioProsodyOptions {
+        var options = AnalyzeAudioProsodyOptions()
+        var index = 1
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--file":
+                    index += 1
+                    options.file = try requireOptionValue(arguments, index: index, for: argument)
+                case "--sample-rate":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let sampleRate = Int(value), sampleRate > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.sampleRate = sampleRate
+                case "--window-seconds":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let windowSeconds = Double(value), windowSeconds > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.windowSeconds = windowSeconds
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -1344,6 +1522,26 @@ struct SpeakSwiftlyTestingMain {
             latestFilename: "compare-qwen-codes-latest.json",
         )
         print("json_artifact: \(comparisonArtifactURL.path)")
+    }
+
+    static func runAnalyzeAudioProsody(options: AnalyzeAudioProsodyOptions) throws {
+        guard let file = options.file else {
+            throw UsageError.missingRequiredOption("--file")
+        }
+
+        let data = try Data(contentsOf: URL(fileURLWithPath: file))
+        let wav = try parseFloatWAV(data)
+        let sampleRate = options.sampleRate ?? wav.sampleRate
+        let analysis = analyzeVolume(
+            samples: wav.samples,
+            sampleRate: sampleRate,
+            windowSeconds: options.windowSeconds,
+        )
+
+        print("audio_file: \(file)")
+        print("sample_rate: \(sampleRate)")
+        print("window_seconds: \(options.windowSeconds)")
+        printAnalysis(analysis, prefix: "window", summaryLabel: "summary")
     }
 
     static func loadVolumeProbeText(options: VolumeProbeOptions) throws -> String {
@@ -2090,6 +2288,39 @@ struct SpeakSwiftlyTestingMain {
                     },
                 )
             },
+            prosody: analysis.prosody.map {
+                EncodableProsodySummary(
+                    windows: $0.windows.map {
+                        EncodableProsodyWindow(
+                            index: $0.index,
+                            startSeconds: $0.startSeconds,
+                            durationSeconds: $0.durationSeconds,
+                            voicedFraction: $0.voicedFraction,
+                            estimatedPitchHz: $0.estimatedPitchHz,
+                            pulseRatePerSecond: $0.pulseRatePerSecond,
+                        )
+                    },
+                    firstPitchHz: $0.firstPitchHz,
+                    lastPitchHz: $0.lastPitchHz,
+                    pitchChangePercent: $0.pitchChangePercent,
+                    headPitchHz: $0.headPitchHz,
+                    tailPitchHz: $0.tailPitchHz,
+                    tailHeadPitchRatio: $0.tailHeadPitchRatio,
+                    firstPulseRatePerSecond: $0.firstPulseRatePerSecond,
+                    lastPulseRatePerSecond: $0.lastPulseRatePerSecond,
+                    pulseRateChangePercent: $0.pulseRateChangePercent,
+                    headPulseRatePerSecond: $0.headPulseRatePerSecond,
+                    tailPulseRatePerSecond: $0.tailPulseRatePerSecond,
+                    tailHeadPulseRateRatio: $0.tailHeadPulseRateRatio,
+                    segments: $0.segments.map {
+                        EncodableProsodySegment(
+                            label: $0.label,
+                            estimatedPitchHz: $0.estimatedPitchHz,
+                            pulseRatePerSecond: $0.pulseRatePerSecond,
+                        )
+                    },
+                )
+            },
         )
     }
 
@@ -2187,6 +2418,11 @@ struct SpeakSwiftlyTestingMain {
             sampleRate: sampleRate,
             windows: windows,
             summary: summarizeWindows(windows),
+            prosody: summarizeProsody(
+                samples: samples,
+                sampleRate: sampleRate,
+                volumeWindows: windows,
+            ),
         )
     }
 
@@ -2237,6 +2473,236 @@ struct SpeakSwiftlyTestingMain {
                 )
             }
         }
+
+        if let prosody = analysis.prosody {
+            print(
+                String(
+                    format: "%@_prosody: first_pitch_hz=%.2f last_pitch_hz=%.2f pitch_change_pct=%.2f head_pitch_hz=%.2f tail_pitch_hz=%.2f tail_head_pitch_ratio=%.5f first_pulse_rate=%.2f last_pulse_rate=%.2f pulse_change_pct=%.2f head_pulse_rate=%.2f tail_pulse_rate=%.2f tail_head_pulse_ratio=%.5f",
+                    summaryLabel,
+                    prosody.firstPitchHz,
+                    prosody.lastPitchHz,
+                    prosody.pitchChangePercent,
+                    prosody.headPitchHz,
+                    prosody.tailPitchHz,
+                    prosody.tailHeadPitchRatio,
+                    prosody.firstPulseRatePerSecond,
+                    prosody.lastPulseRatePerSecond,
+                    prosody.pulseRateChangePercent,
+                    prosody.headPulseRatePerSecond,
+                    prosody.tailPulseRatePerSecond,
+                    prosody.tailHeadPulseRateRatio,
+                ),
+            )
+            for segment in prosody.segments {
+                print(
+                    String(
+                        format: "%@_prosody_%@: pitch_hz=%.2f pulse_rate=%.2f",
+                        summaryLabel,
+                        segment.label,
+                        segment.estimatedPitchHz,
+                        segment.pulseRatePerSecond,
+                    ),
+                )
+            }
+        }
+    }
+
+    static func summarizeProsody(
+        samples: [Float],
+        sampleRate: Int,
+        volumeWindows: [VolumeWindow],
+    ) -> ProsodySummary? {
+        guard !samples.isEmpty, !volumeWindows.isEmpty else { return nil }
+
+        let prosodyWindows = volumeWindows.map { window in
+            let start = Int((window.startSeconds * Double(sampleRate)).rounded(.down))
+            let end = min(samples.count, start + Int((window.durationSeconds * Double(sampleRate)).rounded()))
+            let segment = start < end ? Array(samples[start..<end]) : []
+            let voicedFraction = estimateVoicedFraction(segment, sampleRate: sampleRate)
+            return ProsodyWindow(
+                index: window.index,
+                startSeconds: window.startSeconds,
+                durationSeconds: window.durationSeconds,
+                voicedFraction: voicedFraction,
+                estimatedPitchHz: estimatePitchHz(segment, sampleRate: sampleRate),
+                pulseRatePerSecond: estimatePulseRatePerSecond(segment, sampleRate: sampleRate),
+            )
+        }
+
+        guard let first = prosodyWindows.first, let last = prosodyWindows.last else { return nil }
+
+        let segments = makeProsodySegments(prosodyWindows)
+        let head = segments.first
+        let tail = segments.last
+        let headPitch = head?.estimatedPitchHz ?? first.estimatedPitchHz
+        let tailPitch = tail?.estimatedPitchHz ?? last.estimatedPitchHz
+        let headPulse = head?.pulseRatePerSecond ?? first.pulseRatePerSecond
+        let tailPulse = tail?.pulseRatePerSecond ?? last.pulseRatePerSecond
+
+        return ProsodySummary(
+            windows: prosodyWindows,
+            firstPitchHz: first.estimatedPitchHz,
+            lastPitchHz: last.estimatedPitchHz,
+            pitchChangePercent: percentChange(from: first.estimatedPitchHz, to: last.estimatedPitchHz),
+            headPitchHz: headPitch,
+            tailPitchHz: tailPitch,
+            tailHeadPitchRatio: ratio(numerator: tailPitch, denominator: headPitch),
+            firstPulseRatePerSecond: first.pulseRatePerSecond,
+            lastPulseRatePerSecond: last.pulseRatePerSecond,
+            pulseRateChangePercent: percentChange(from: first.pulseRatePerSecond, to: last.pulseRatePerSecond),
+            headPulseRatePerSecond: headPulse,
+            tailPulseRatePerSecond: tailPulse,
+            tailHeadPulseRateRatio: ratio(numerator: tailPulse, denominator: headPulse),
+            segments: segments,
+        )
+    }
+
+    static func makeProsodySegments(_ windows: [ProsodyWindow]) -> [ProsodySegment] {
+        guard !windows.isEmpty else { return [] }
+
+        let chunkSize = max(1, windows.count / 4)
+        var segments = [ProsodySegment]()
+        var start = 0
+        let labels = ["q1", "q2", "q3", "q4"]
+        var labelIndex = 0
+        while start < windows.count, labelIndex < labels.count {
+            let end = labelIndex == labels.count - 1 ? windows.count : min(windows.count, start + chunkSize)
+            let slice = Array(windows[start..<end])
+            segments.append(
+                ProsodySegment(
+                    label: labels[labelIndex],
+                    estimatedPitchHz: average(slice.map(\.estimatedPitchHz)),
+                    pulseRatePerSecond: average(slice.map(\.pulseRatePerSecond)),
+                ),
+            )
+            start = end
+            labelIndex += 1
+        }
+        return segments
+    }
+
+    static func estimateVoicedFraction(_ samples: [Float], sampleRate: Int) -> Double {
+        guard !samples.isEmpty else { return 0 }
+
+        let frameSize = max(1, Int(Double(sampleRate) * 0.04))
+        let hop = max(1, frameSize / 2)
+        var total = 0
+        var voiced = 0
+        var start = 0
+        while start + frameSize <= samples.count {
+            let frame = Array(samples[start..<(start + frameSize)])
+            if rootMeanSquare(frame) > 0.02 {
+                voiced += 1
+            }
+            total += 1
+            start += hop
+        }
+        guard total > 0 else { return 0 }
+
+        return Double(voiced) / Double(total)
+    }
+
+    static func estimatePitchHz(_ samples: [Float], sampleRate: Int) -> Double {
+        guard !samples.isEmpty else { return 0 }
+
+        let frameSize = max(1, Int(Double(sampleRate) * 0.04))
+        let hop = max(1, frameSize / 2)
+        let minLag = max(1, sampleRate / 400)
+        let maxLag = max(minLag + 1, sampleRate / 80)
+        var pitches = [Double]()
+        var start = 0
+        while start + frameSize <= samples.count {
+            let frame = Array(samples[start..<(start + frameSize)])
+            if rootMeanSquare(frame) < 0.02 {
+                start += hop
+                continue
+            }
+            let mean = frame.reduce(0, +) / Float(frame.count)
+            let centered = frame.map { $0 - mean }
+            let energy = centered.reduce(into: 0.0) { $0 += Double($1 * $1) }
+            if energy <= 0 {
+                start += hop
+                continue
+            }
+            var bestLag = 0
+            var bestScore = 0.0
+            let cappedMaxLag = min(maxLag, centered.count - 1)
+            if cappedMaxLag >= minLag {
+                for lag in minLag...cappedMaxLag {
+                    var score = 0.0
+                    var compareEnergy = 0.0
+                    for index in 0..<(centered.count - lag) {
+                        let a = Double(centered[index])
+                        let b = Double(centered[index + lag])
+                        score += a * b
+                        compareEnergy += b * b
+                    }
+                    let normalized = compareEnergy > 0 ? score / Foundation.sqrt(energy * compareEnergy) : 0
+                    if normalized > bestScore {
+                        bestScore = normalized
+                        bestLag = lag
+                    }
+                }
+            }
+            if bestLag > 0, bestScore > 0.3 {
+                pitches.append(Double(sampleRate) / Double(bestLag))
+            }
+            start += hop
+        }
+        guard !pitches.isEmpty else { return 0 }
+
+        return average(pitches)
+    }
+
+    static func estimatePulseRatePerSecond(_ samples: [Float], sampleRate: Int) -> Double {
+        guard !samples.isEmpty else { return 0 }
+
+        let envelopeStep = max(1, Int(Double(sampleRate) * 0.02))
+        var envelope = [Double]()
+        var start = 0
+        while start < samples.count {
+            let end = min(samples.count, start + envelopeStep)
+            let frame = Array(samples[start..<end])
+            envelope.append(frame.map { abs(Double($0)) }.reduce(0, +) / Double(frame.count))
+            start = end
+        }
+        guard envelope.count >= 3 else { return 0 }
+
+        let smoothed = movingAverage(envelope, radius: 2)
+        let mean = average(smoothed)
+        let threshold = mean * 1.15
+        var peaks = 0
+        for index in 1..<(smoothed.count - 1) {
+            if smoothed[index] > threshold,
+               smoothed[index] >= smoothed[index - 1],
+               smoothed[index] > smoothed[index + 1] {
+                peaks += 1
+            }
+        }
+        let durationSeconds = Double(samples.count) / Double(sampleRate)
+        return durationSeconds > 0 ? Double(peaks) / durationSeconds : 0
+    }
+
+    static func movingAverage(_ values: [Double], radius: Int) -> [Double] {
+        guard !values.isEmpty else { return [] }
+
+        return values.indices.map { index in
+            let start = max(0, index - radius)
+            let end = min(values.count, index + radius + 1)
+            return average(Array(values[start..<end]))
+        }
+    }
+
+    static func percentChange(from first: Double, to last: Double) -> Double {
+        guard first != 0 else { return 0 }
+
+        return ((last - first) / first) * 100.0
+    }
+
+    static func ratio(numerator: Double, denominator: Double) -> Double {
+        guard denominator != 0 else { return 0 }
+
+        return numerator / denominator
     }
 
     static func summarizeQwenCodes(_ tensor: ProbeInt32Tensor) throws -> QwenCodeArtifactStats {
@@ -2990,6 +3456,7 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting capture-qwen-codes [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--lane direct]
               swift run SpeakSwiftlyTesting replay-qwen-codes [--artifact-file PATH] [--window-seconds SECONDS]
               swift run SpeakSwiftlyTesting compare-qwen-codes --left-artifact-file PATH --right-artifact-file PATH
+              swift run SpeakSwiftlyTesting analyze-audio-prosody --file PATH [--sample-rate HZ] [--window-seconds SECONDS]
             """
         }
     }

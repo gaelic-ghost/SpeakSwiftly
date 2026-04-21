@@ -71,6 +71,10 @@ Also keep the broader operator symptom in view:
 
 - the degraded long-form runs are reported to drift upward in pitch and faster
   in cadence over time, not just lower in retained loudness
+- those symptoms also do not present identically on every bad run; loudness
+  decay, pitch rise, faster cadence, and glitchier delivery appear to be
+  common but inconsistent manifestations, which makes a compound and partly
+  non-deterministic failure model more plausible than one tidy single bug
 
 That means the next analysis should stay open to prosody-regime drift rather
 than treating this purely as an amplitude-envelope problem.
@@ -83,6 +87,22 @@ either:
 - inspect those suspect codebooks on a finer time grid than quarters, or
 - add audio-side pitch and cadence summaries so the token drift can be checked
   against the reported perceptual shift directly
+
+That first audio-side prosody summary path now exists as well, using lightweight
+pitch and pulse-rate proxies derived from the saved waveform windows. The first
+read is informative but not yet aligned with the reported symptom: the coarse
+proxy trends slightly downward on both profiles rather than clearly surfacing
+the reported pitch-up / faster-cadence drift. That means the next prosody pass
+should use a better-targeted measurement, not assume the symptom is disproven.
+
+The new `analyze-audio-prosody` helper also gives us a cheaper direct-WAV spot
+check without rerunning Qwen generation. That tighter `0.5s` pass was useful
+for ruling out one glitchy replay as the whole story, but it still did not
+produce a clean soft-femme-only pitch-up / cadence-speedup signature. The
+quarter medians stayed fairly flat on both profiles, and the healthier
+clear-masc run still showed a modest tail-ward pulse-rate increase. So the next
+audio-side slice should improve the estimator itself, not expand the same proxy
+across more reruns.
 
 ## Purpose
 
