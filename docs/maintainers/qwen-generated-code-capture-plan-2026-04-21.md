@@ -13,6 +13,11 @@ What shipped in this first pass:
 - generated Qwen codec tensor capture
 - reference codes, reference text token IDs, resolved language, and codec
   language ID capture
+- paired capture-plus-replay artifacts for both
+  `probe-soft-femme-20260421` and `probe-clear-masc-20260421`
+- `compare-qwen-codes` for artifact-versus-artifact generated-code summaries
+  and direct code-stream comparison
+- raw-conditioning capture and replay controls for both investigation profiles
 
 What is still intentionally deferred:
 
@@ -37,7 +42,7 @@ That replay helper should:
 
 - load one saved capture artifact
 - rebuild the captured generated and reference code tensors as `MLXArray`
-- run the same three decode surfaces already used in the upstream fork audit
+- run the same four decode surfaces already used in the upstream fork audit
   - bounded decode
   - current `debugDecodeChunk(...)`
   - reference-warmed `debugStreamingDecode(...)`
@@ -45,8 +50,22 @@ That replay helper should:
 - reuse the same retained waveform summaries already used by
   `compare-volume` and `capture-qwen-codes`
 
-That gives us a local narrow lane for answering the decode-path question from a
-single preserved bad run before we build any fixture-export convenience.
+That now gives us a local narrow lane for answering the decode-path question
+from both a degraded saved run and a healthier saved run before we build any
+fixture-export convenience.
+
+The next investigation step is no longer "capture the second profile." It is
+to compare the captured-code statistics directly across:
+
+- soft-femme versus clear-masc
+- raw versus artifact conditioning for the same profile
+
+That should tell us whether the meaningful divergence is already present in the
+generated codec sequence before replay decode starts.
+
+After the raw capture-and-replay pass, the answer is sharper: profile-sensitive
+behavior persists across both `raw` and `artifact` conditioning, and replay
+decode still does not look like the main divergence point.
 
 ## Purpose
 

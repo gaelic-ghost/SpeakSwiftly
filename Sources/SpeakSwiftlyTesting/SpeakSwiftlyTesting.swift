@@ -16,6 +16,7 @@ struct SpeakSwiftlyTestingMain {
         case matrixVolume = "matrix-volume"
         case captureQwenCodes = "capture-qwen-codes"
         case replayQwenCodes = "replay-qwen-codes"
+        case compareQwenCodes = "compare-qwen-codes"
     }
 
     enum ConditioningMode: String {
@@ -79,6 +80,11 @@ struct SpeakSwiftlyTestingMain {
     struct ReplayQwenCodesOptions {
         var artifactFile: String?
         var windowSeconds: Double?
+    }
+
+    struct CompareQwenCodesOptions {
+        var leftArtifactFile: String?
+        var rightArtifactFile: String?
     }
 
     struct VolumeWindow {
@@ -267,6 +273,64 @@ struct SpeakSwiftlyTestingMain {
         let analysis: EncodableProbeAnalysis
     }
 
+    struct QwenCodeQuarterStats: Encodable {
+        let label: String
+        let frameCount: Int
+        let exactAdjacentRepeatRatio: Double
+        let distinctTokensMeanPerCodebook: Double
+        let distinctTokensMinPerCodebook: Int
+        let distinctTokensMaxPerCodebook: Int
+        let longestRunMeanPerCodebook: Double
+        let longestRunMaxPerCodebook: Int
+    }
+
+    struct QwenCodeArtifactStats: Encodable {
+        let frameCount: Int
+        let codebookCount: Int
+        let totalTokenCount: Int
+        let distinctTokenCount: Int
+        let exactAdjacentRepeatRatio: Double
+        let distinctTokensMeanPerCodebook: Double
+        let distinctTokensMinPerCodebook: Int
+        let distinctTokensMaxPerCodebook: Int
+        let longestRunMeanPerCodebook: Double
+        let longestRunMaxPerCodebook: Int
+        let headTailDistinctJaccardMean: Double
+        let headTailDistinctJaccardMin: Double
+        let headTailDistributionShiftMean: Double
+        let headTailDistributionShiftMax: Double
+        let quarters: [QwenCodeQuarterStats]
+    }
+
+    struct QwenCodeArtifactDescriptor: Encodable {
+        let artifactPath: String
+        let profileName: String
+        let conditioningMode: String
+        let lane: String
+        let modelRepo: String
+        let generatedAt: Date
+        let tailHeadRatio: Double?
+        let stats: QwenCodeArtifactStats
+    }
+
+    struct QwenCodePairComparison: Encodable {
+        let exactPositionMatchRatio: Double
+        let exactPositionMatchMinPerCodebook: Double
+        let exactPositionMatchMaxPerCodebook: Double
+        let fullSequenceDistinctJaccardMean: Double
+        let fullSequenceDistinctJaccardMin: Double
+        let fullSequenceDistributionShiftMean: Double
+        let fullSequenceDistributionShiftMax: Double
+    }
+
+    struct QwenCodeComparisonArtifact: Encodable {
+        let schemaVersion: Int
+        let generatedAt: Date
+        let left: QwenCodeArtifactDescriptor
+        let right: QwenCodeArtifactDescriptor
+        let pair: QwenCodePairComparison
+    }
+
     struct ProbeMaterializationManifest: Decodable {
         let backend: String
         let modelRepo: String
@@ -440,6 +504,9 @@ struct SpeakSwiftlyTestingMain {
             case .replayQwenCodes:
                 let options = try parseReplayQwenCodesOptions(arguments: arguments)
                 try await runReplayQwenCodes(options: options)
+            case .compareQwenCodes:
+                let options = try parseCompareQwenCodesOptions(arguments: arguments)
+                try runCompareQwenCodes(options: options)
         }
     }
 
@@ -456,6 +523,7 @@ struct SpeakSwiftlyTestingMain {
            command != .matrixVolume,
            command != .captureQwenCodes,
            command != .replayQwenCodes,
+           command != .compareQwenCodes,
            command != .createDesignProfile,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
@@ -699,6 +767,28 @@ struct SpeakSwiftlyTestingMain {
                     }
 
                     options.windowSeconds = windowSeconds
+                default:
+                    throw UsageError.unknownCommand(argument)
+            }
+            index += 1
+        }
+
+        return options
+    }
+
+    static func parseCompareQwenCodesOptions(arguments: [String]) throws -> CompareQwenCodesOptions {
+        var options = CompareQwenCodesOptions()
+        var index = 1
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--left-artifact-file":
+                    index += 1
+                    options.leftArtifactFile = try requireOptionValue(arguments, index: index, for: argument)
+                case "--right-artifact-file":
+                    index += 1
+                    options.rightArtifactFile = try requireOptionValue(arguments, index: index, for: argument)
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -1131,6 +1221,89 @@ struct SpeakSwiftlyTestingMain {
         print("json_artifact: \(replayArtifactURL.path)")
     }
 
+    static func runCompareQwenCodes(options: CompareQwenCodesOptions) throws {
+        let leftArtifactURL = try qwenComparisonArtifactURL(
+            path: options.leftArtifactFile,
+            option: "--left-artifact-file",
+        )
+        let rightArtifactURL = try qwenComparisonArtifactURL(
+            path: options.rightArtifactFile,
+            option: "--right-artifact-file",
+        )
+        let leftArtifact = try loadCapturedQwenCodeArtifact(from: leftArtifactURL)
+        let rightArtifact = try loadCapturedQwenCodeArtifact(from: rightArtifactURL)
+
+        let leftStats = try summarizeQwenCodes(leftArtifact.generatedCodes)
+        let rightStats = try summarizeQwenCodes(rightArtifact.generatedCodes)
+        let pair = try compareQwenCodeTensors(
+            leftArtifact.generatedCodes,
+            rightArtifact.generatedCodes,
+        )
+
+        let leftDescriptor = QwenCodeArtifactDescriptor(
+            artifactPath: leftArtifactURL.path,
+            profileName: leftArtifact.profileName,
+            conditioningMode: leftArtifact.conditioningMode,
+            lane: leftArtifact.lane,
+            modelRepo: leftArtifact.modelRepo,
+            generatedAt: leftArtifact.generatedAt,
+            tailHeadRatio: leftArtifact.retainedAnalysis.summary?.tailHeadRatio,
+            stats: leftStats,
+        )
+        let rightDescriptor = QwenCodeArtifactDescriptor(
+            artifactPath: rightArtifactURL.path,
+            profileName: rightArtifact.profileName,
+            conditioningMode: rightArtifact.conditioningMode,
+            lane: rightArtifact.lane,
+            modelRepo: rightArtifact.modelRepo,
+            generatedAt: rightArtifact.generatedAt,
+            tailHeadRatio: rightArtifact.retainedAnalysis.summary?.tailHeadRatio,
+            stats: rightStats,
+        )
+
+        print("left_artifact: \(leftArtifactURL.path)")
+        print("left_profile: \(leftArtifact.profileName)")
+        print("left_conditioning_mode: \(leftArtifact.conditioningMode)")
+        if let tailHeadRatio = leftArtifact.retainedAnalysis.summary?.tailHeadRatio {
+            print(String(format: "left_tail_head_ratio: %.5f", tailHeadRatio))
+        }
+        printQwenCodeArtifactStats(leftStats, prefix: "left")
+
+        print("right_artifact: \(rightArtifactURL.path)")
+        print("right_profile: \(rightArtifact.profileName)")
+        print("right_conditioning_mode: \(rightArtifact.conditioningMode)")
+        if let tailHeadRatio = rightArtifact.retainedAnalysis.summary?.tailHeadRatio {
+            print(String(format: "right_tail_head_ratio: %.5f", tailHeadRatio))
+        }
+        printQwenCodeArtifactStats(rightStats, prefix: "right")
+
+        print(
+            String(
+                format: "pair_summary: exact_match_ratio=%.5f exact_match_min_per_codebook=%.5f exact_match_max_per_codebook=%.5f distinct_jaccard_mean=%.5f distinct_jaccard_min=%.5f distribution_shift_mean=%.5f distribution_shift_max=%.5f",
+                pair.exactPositionMatchRatio,
+                pair.exactPositionMatchMinPerCodebook,
+                pair.exactPositionMatchMaxPerCodebook,
+                pair.fullSequenceDistinctJaccardMean,
+                pair.fullSequenceDistinctJaccardMin,
+                pair.fullSequenceDistributionShiftMean,
+                pair.fullSequenceDistributionShiftMax,
+            ),
+        )
+
+        let comparisonArtifactURL = try writeProbeArtifact(
+            QwenCodeComparisonArtifact(
+                schemaVersion: 1,
+                generatedAt: Date(),
+                left: leftDescriptor,
+                right: rightDescriptor,
+                pair: pair,
+            ),
+            stem: "compare-qwen-codes",
+            latestFilename: "compare-qwen-codes-latest.json",
+        )
+        print("json_artifact: \(comparisonArtifactURL.path)")
+    }
+
     static func loadVolumeProbeText(options: VolumeProbeOptions) throws -> String {
         if let textFile = options.textFile {
             let text = try String(contentsOfFile: textFile, encoding: .utf8)
@@ -1143,6 +1316,14 @@ struct SpeakSwiftlyTestingMain {
         }
 
         return makeProbeText(repeatCount: options.repeatCount)
+    }
+
+    static func qwenComparisonArtifactURL(path: String?, option: String) throws -> URL {
+        guard let path else {
+            throw UsageError.missingRequiredOption(option)
+        }
+
+        return URL(fileURLWithPath: path, isDirectory: false)
     }
 
     static func runMatrixVolume(options: MatrixVolumeOptions) async throws {
@@ -2016,6 +2197,343 @@ struct SpeakSwiftlyTestingMain {
         }
     }
 
+    static func summarizeQwenCodes(_ tensor: ProbeInt32Tensor) throws -> QwenCodeArtifactStats {
+        guard tensor.shape.count == 3, tensor.shape[0] == 1 else {
+            throw UsageError.invalidWAV(
+                "SpeakSwiftlyTesting expected generated Qwen codes to have shape [1, time, codebooks], but found \(tensor.shape).",
+            )
+        }
+
+        let frameCount = tensor.shape[1]
+        let codebookCount = tensor.shape[2]
+        let totalTokenCount = tensor.values.count
+        let quarterBounds = makeQuarterBounds(frameCount: frameCount)
+        let quarterStats = quarterBounds.map { quarter in
+            summarizeQwenCodeRange(
+                tensor.values,
+                frameCount: frameCount,
+                codebookCount: codebookCount,
+                startFrame: quarter.start,
+                endFrame: quarter.end,
+                label: quarter.label,
+            )
+        }
+
+        let fullRange = summarizeQwenCodeRange(
+            tensor.values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            startFrame: 0,
+            endFrame: frameCount,
+            label: "full",
+        )
+        let headTail = summarizeQwenHeadTailShift(
+            tensor.values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+        )
+
+        return QwenCodeArtifactStats(
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            totalTokenCount: totalTokenCount,
+            distinctTokenCount: Set(tensor.values).count,
+            exactAdjacentRepeatRatio: fullRange.exactAdjacentRepeatRatio,
+            distinctTokensMeanPerCodebook: fullRange.distinctTokensMeanPerCodebook,
+            distinctTokensMinPerCodebook: fullRange.distinctTokensMinPerCodebook,
+            distinctTokensMaxPerCodebook: fullRange.distinctTokensMaxPerCodebook,
+            longestRunMeanPerCodebook: fullRange.longestRunMeanPerCodebook,
+            longestRunMaxPerCodebook: fullRange.longestRunMaxPerCodebook,
+            headTailDistinctJaccardMean: headTail.jaccardMean,
+            headTailDistinctJaccardMin: headTail.jaccardMin,
+            headTailDistributionShiftMean: headTail.shiftMean,
+            headTailDistributionShiftMax: headTail.shiftMax,
+            quarters: quarterStats,
+        )
+    }
+
+    static func compareQwenCodeTensors(
+        _ left: ProbeInt32Tensor,
+        _ right: ProbeInt32Tensor,
+    ) throws -> QwenCodePairComparison {
+        guard left.shape == right.shape else {
+            throw UsageError.invalidWAV(
+                "SpeakSwiftlyTesting expected both generated-code tensors to share the same shape for comparison, but found \(left.shape) and \(right.shape).",
+            )
+        }
+        guard left.shape.count == 3, left.shape[0] == 1 else {
+            throw UsageError.invalidWAV(
+                "SpeakSwiftlyTesting expected generated Qwen codes to have shape [1, time, codebooks], but found \(left.shape).",
+            )
+        }
+
+        let frameCount = left.shape[1]
+        let codebookCount = left.shape[2]
+        let totalTokenCount = left.values.count
+        var exactMatches = 0
+        var exactMatchesPerCodebook = Array(repeating: 0, count: codebookCount)
+        let leftDistributions = qwenCodeDistributions(
+            left.values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            startFrame: 0,
+            endFrame: frameCount,
+        )
+        let rightDistributions = qwenCodeDistributions(
+            right.values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            startFrame: 0,
+            endFrame: frameCount,
+        )
+
+        for frame in 0..<frameCount {
+            let base = frame * codebookCount
+            for codebook in 0..<codebookCount {
+                if left.values[base + codebook] == right.values[base + codebook] {
+                    exactMatches += 1
+                    exactMatchesPerCodebook[codebook] += 1
+                }
+            }
+        }
+
+        let exactMatchRatiosPerCodebook = exactMatchesPerCodebook.map { Double($0) / Double(frameCount) }
+        let distributionJaccards = zip(leftDistributions, rightDistributions).map { pair in
+            qwenCodeJaccard(pair.0, pair.1)
+        }
+        let distributionShifts = zip(leftDistributions, rightDistributions).map { pair in
+            qwenCodeDistributionShift(pair.0, pair.1, sampleCount: frameCount)
+        }
+
+        return QwenCodePairComparison(
+            exactPositionMatchRatio: Double(exactMatches) / Double(totalTokenCount),
+            exactPositionMatchMinPerCodebook: exactMatchRatiosPerCodebook.min() ?? 0,
+            exactPositionMatchMaxPerCodebook: exactMatchRatiosPerCodebook.max() ?? 0,
+            fullSequenceDistinctJaccardMean: average(distributionJaccards),
+            fullSequenceDistinctJaccardMin: distributionJaccards.min() ?? 0,
+            fullSequenceDistributionShiftMean: average(distributionShifts),
+            fullSequenceDistributionShiftMax: distributionShifts.max() ?? 0,
+        )
+    }
+
+    static func printQwenCodeArtifactStats(_ stats: QwenCodeArtifactStats, prefix: String) {
+        print(
+            String(
+                format: "%@_summary: frames=%d codebooks=%d tokens=%d distinct_tokens=%d repeat_ratio=%.5f distinct_mean=%.2f distinct_min=%d distinct_max=%d longest_run_mean=%.2f longest_run_max=%d head_tail_jaccard_mean=%.5f head_tail_jaccard_min=%.5f head_tail_shift_mean=%.5f head_tail_shift_max=%.5f",
+                prefix,
+                stats.frameCount,
+                stats.codebookCount,
+                stats.totalTokenCount,
+                stats.distinctTokenCount,
+                stats.exactAdjacentRepeatRatio,
+                stats.distinctTokensMeanPerCodebook,
+                stats.distinctTokensMinPerCodebook,
+                stats.distinctTokensMaxPerCodebook,
+                stats.longestRunMeanPerCodebook,
+                stats.longestRunMaxPerCodebook,
+                stats.headTailDistinctJaccardMean,
+                stats.headTailDistinctJaccardMin,
+                stats.headTailDistributionShiftMean,
+                stats.headTailDistributionShiftMax,
+            ),
+        )
+
+        for quarter in stats.quarters {
+            print(
+                String(
+                    format: "%@_%@: frames=%d repeat_ratio=%.5f distinct_mean=%.2f distinct_min=%d distinct_max=%d longest_run_mean=%.2f longest_run_max=%d",
+                    prefix,
+                    quarter.label,
+                    quarter.frameCount,
+                    quarter.exactAdjacentRepeatRatio,
+                    quarter.distinctTokensMeanPerCodebook,
+                    quarter.distinctTokensMinPerCodebook,
+                    quarter.distinctTokensMaxPerCodebook,
+                    quarter.longestRunMeanPerCodebook,
+                    quarter.longestRunMaxPerCodebook,
+                ),
+            )
+        }
+    }
+
+    static func summarizeQwenCodeRange(
+        _ values: [Int32],
+        frameCount: Int,
+        codebookCount: Int,
+        startFrame: Int,
+        endFrame: Int,
+        label: String,
+    ) -> QwenCodeQuarterStats {
+        let clampedStart = max(0, min(startFrame, frameCount))
+        let clampedEnd = max(clampedStart, min(endFrame, frameCount))
+        let sampledFrames = clampedEnd - clampedStart
+        guard sampledFrames > 0 else {
+            return QwenCodeQuarterStats(
+                label: label,
+                frameCount: 0,
+                exactAdjacentRepeatRatio: 0,
+                distinctTokensMeanPerCodebook: 0,
+                distinctTokensMinPerCodebook: 0,
+                distinctTokensMaxPerCodebook: 0,
+                longestRunMeanPerCodebook: 0,
+                longestRunMaxPerCodebook: 0,
+            )
+        }
+
+        var distinctSets = Array(repeating: Set<Int32>(), count: codebookCount)
+        var longestRuns = Array(repeating: 1, count: codebookCount)
+        var currentRuns = Array(repeating: 1, count: codebookCount)
+        var repeatCount = 0
+
+        for frame in clampedStart..<clampedEnd {
+            let base = frame * codebookCount
+            for codebook in 0..<codebookCount {
+                let value = values[base + codebook]
+                distinctSets[codebook].insert(value)
+                if frame > clampedStart {
+                    let previous = values[(frame - 1) * codebookCount + codebook]
+                    if previous == value {
+                        repeatCount += 1
+                        currentRuns[codebook] += 1
+                        longestRuns[codebook] = max(longestRuns[codebook], currentRuns[codebook])
+                    } else {
+                        currentRuns[codebook] = 1
+                    }
+                }
+            }
+        }
+
+        let distinctCounts = distinctSets.map(\.count)
+        let denominator = max((sampledFrames - 1) * codebookCount, 1)
+        return QwenCodeQuarterStats(
+            label: label,
+            frameCount: sampledFrames,
+            exactAdjacentRepeatRatio: sampledFrames > 1 ? Double(repeatCount) / Double(denominator) : 0,
+            distinctTokensMeanPerCodebook: average(distinctCounts.map(Double.init)),
+            distinctTokensMinPerCodebook: distinctCounts.min() ?? 0,
+            distinctTokensMaxPerCodebook: distinctCounts.max() ?? 0,
+            longestRunMeanPerCodebook: average(longestRuns.map(Double.init)),
+            longestRunMaxPerCodebook: longestRuns.max() ?? 0,
+        )
+    }
+
+    static func summarizeQwenHeadTailShift(
+        _ values: [Int32],
+        frameCount: Int,
+        codebookCount: Int,
+    ) -> (jaccardMean: Double, jaccardMin: Double, shiftMean: Double, shiftMax: Double) {
+        let midpoint = max(frameCount / 2, 1)
+        let head = qwenCodeDistributions(
+            values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            startFrame: 0,
+            endFrame: midpoint,
+        )
+        let tail = qwenCodeDistributions(
+            values,
+            frameCount: frameCount,
+            codebookCount: codebookCount,
+            startFrame: midpoint,
+            endFrame: frameCount,
+        )
+        let headFrames = midpoint
+        let tailFrames = max(frameCount - midpoint, 1)
+        let jaccards = zip(head, tail).map { pair in
+            qwenCodeJaccard(pair.0, pair.1)
+        }
+        let shifts = zip(head, tail).map { pair in
+            qwenCodeDistributionShift(
+                pair.0,
+                pair.1,
+                sampleCountA: headFrames,
+                sampleCountB: tailFrames,
+            )
+        }
+
+        return (
+            average(jaccards),
+            jaccards.min() ?? 0,
+            average(shifts),
+            shifts.max() ?? 0,
+        )
+    }
+
+    static func qwenCodeDistributions(
+        _ values: [Int32],
+        frameCount: Int,
+        codebookCount: Int,
+        startFrame: Int,
+        endFrame: Int,
+    ) -> [[Int32: Int]] {
+        let clampedStart = max(0, min(startFrame, frameCount))
+        let clampedEnd = max(clampedStart, min(endFrame, frameCount))
+        var distributions = Array(repeating: [Int32: Int](), count: codebookCount)
+        for frame in clampedStart..<clampedEnd {
+            let base = frame * codebookCount
+            for codebook in 0..<codebookCount {
+                let value = values[base + codebook]
+                distributions[codebook][value, default: 0] += 1
+            }
+        }
+        return distributions
+    }
+
+    static func qwenCodeJaccard(_ left: [Int32: Int], _ right: [Int32: Int]) -> Double {
+        guard !left.isEmpty || !right.isEmpty else { return 1 }
+
+        let leftKeys = Set(left.keys)
+        let rightKeys = Set(right.keys)
+        let union = leftKeys.union(rightKeys)
+        guard !union.isEmpty else { return 1 }
+
+        return Double(leftKeys.intersection(rightKeys).count) / Double(union.count)
+    }
+
+    static func qwenCodeDistributionShift(
+        _ left: [Int32: Int],
+        _ right: [Int32: Int],
+        sampleCount: Int,
+    ) -> Double {
+        qwenCodeDistributionShift(left, right, sampleCountA: sampleCount, sampleCountB: sampleCount)
+    }
+
+    static func qwenCodeDistributionShift(
+        _ left: [Int32: Int],
+        _ right: [Int32: Int],
+        sampleCountA: Int,
+        sampleCountB: Int,
+    ) -> Double {
+        guard sampleCountA > 0, sampleCountB > 0 else { return 0 }
+
+        let keys = Set(left.keys).union(right.keys)
+        let total = keys.reduce(into: 0.0) { partialResult, key in
+            let leftProbability = Double(left[key] ?? 0) / Double(sampleCountA)
+            let rightProbability = Double(right[key] ?? 0) / Double(sampleCountB)
+            partialResult += abs(leftProbability - rightProbability)
+        }
+        return total / 2.0
+    }
+
+    static func makeQuarterBounds(frameCount: Int) -> [(label: String, start: Int, end: Int)] {
+        let quarter = max(frameCount / 4, 1)
+        let q1End = min(quarter, frameCount)
+        let q2End = min(quarter * 2, frameCount)
+        let q3End = min(quarter * 3, frameCount)
+        return [
+            ("q1", 0, q1End),
+            ("q2", q1End, q2End),
+            ("q3", q2End, q3End),
+            ("q4", q3End, frameCount),
+        ]
+    }
+
+    static func average(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+
+        return values.reduce(0, +) / Double(values.count)
+    }
+
     static func rootMeanSquare(_ samples: [Float]) -> Double {
         guard !samples.isEmpty else { return 0 }
 
@@ -2267,6 +2785,7 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting matrix-volume [--profile NAME ...] [--profile-root PATH] [--short-text-file PATH] [--long-text-file PATH] [--short-repeat COUNT] [--long-repeat COUNT] [--iterations COUNT] [--window-seconds SECONDS] [--include-streamed]
               swift run SpeakSwiftlyTesting capture-qwen-codes [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--lane direct]
               swift run SpeakSwiftlyTesting replay-qwen-codes [--artifact-file PATH] [--window-seconds SECONDS]
+              swift run SpeakSwiftlyTesting compare-qwen-codes --left-artifact-file PATH --right-artifact-file PATH
             """
         }
     }

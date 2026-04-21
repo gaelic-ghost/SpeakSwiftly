@@ -10,7 +10,9 @@ decay investigation across:
 - the forked `mlx-audio-swift` regression suite on `tests/qwen3tts-decay-repro`
 - the local `SpeakSwiftly` Qwen benchmark suite
 - local `SpeakSwiftlyTesting` direct investigation commands and saved artifacts
-- one local `SpeakSwiftlyTesting` replay of the saved generated-code artifact
+- four local `SpeakSwiftlyTesting` generated-code captures
+- four local `SpeakSwiftlyTesting` replays of saved generated-code artifacts
+- three local `SpeakSwiftlyTesting` generated-code comparisons
 
 The live local SpeakSwiftly service was unloaded first with:
 
@@ -67,8 +69,47 @@ swift run SpeakSwiftlyTesting capture-qwen-codes \
   --repeat 16 \
   --lane direct
 
+swift run SpeakSwiftlyTesting capture-qwen-codes \
+  --profile probe-clear-masc-20260421 \
+  --profile-root "$HOME/Library/Application Support/SpeakSwiftly" \
+  --conditioning artifact \
+  --repeat 16 \
+  --lane direct
+
+swift run SpeakSwiftlyTesting capture-qwen-codes \
+  --profile probe-soft-femme-20260421 \
+  --profile-root "$HOME/Library/Application Support/SpeakSwiftly" \
+  --conditioning raw \
+  --repeat 16 \
+  --lane direct
+
+swift run SpeakSwiftlyTesting capture-qwen-codes \
+  --profile probe-clear-masc-20260421 \
+  --profile-root "$HOME/Library/Application Support/SpeakSwiftly" \
+  --conditioning raw \
+  --repeat 16 \
+  --lane direct
+
 swift run SpeakSwiftlyTesting replay-qwen-codes \
   --artifact-file .local/volume-probes/capture-qwen-codes-latest.json
+
+swift run SpeakSwiftlyTesting replay-qwen-codes \
+  --artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-52-42Z.json
+
+swift run SpeakSwiftlyTesting replay-qwen-codes \
+  --artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-55-33Z.json
+
+swift run SpeakSwiftlyTesting compare-qwen-codes \
+  --left-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T19-29-27Z.json \
+  --right-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-40-02Z.json
+
+swift run SpeakSwiftlyTesting compare-qwen-codes \
+  --left-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-52-42Z.json \
+  --right-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T19-29-27Z.json
+
+swift run SpeakSwiftlyTesting compare-qwen-codes \
+  --left-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-55-33Z.json \
+  --right-artifact-file .local/volume-probes/capture-qwen-codes-2026-04-21T20-40-02Z.json
 ```
 
 Attempted but intentionally stopped:
@@ -188,57 +229,55 @@ Interpretation:
 
 ### 4. Local generated-code capture
 
-The completed capture run wrote:
+The completed capture runs wrote:
 
 - `.local/volume-probes/capture-qwen-codes-2026-04-21T19-29-27Z.json`
+- `.local/volume-probes/capture-qwen-codes-2026-04-21T20-40-02Z.json`
+- `.local/volume-probes/capture-qwen-codes-2026-04-21T20-52-42Z.json`
+- `.local/volume-probes/capture-qwen-codes-2026-04-21T20-55-33Z.json`
 - `.local/volume-probes/capture-qwen-codes-latest.json`
 
-Run:
+Common capture shape:
 
-- profile: `probe-soft-femme-20260421`
 - conditioning: `artifact`
 - lane: `direct`
 - model repo: `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit`
-
-Captured payload highlights:
-
 - generated code shape: `[1, 2048, 16]`
 - generated code values: `32768`
-- reference code shape: `[1, 16, 47]`
 - reference text token shape: `[1, 11]`
 - resolved language: `english`
 - codec language ID: `2050`
 
-Waveform summary:
+Per-run capture summaries:
 
-| Metric | Value |
-| --- | ---: |
-| First RMS | 0.12379 |
-| Last RMS | 0.05830 |
-| RMS drop | -52.90% |
-| Head RMS | 0.09045 |
-| Tail RMS | 0.06752 |
-| Tail/Head | 0.74651 |
+| Profile | Conditioning | Reference code shape | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `probe-soft-femme-20260421` | `artifact` | `[1, 16, 47]` | 0.12379 | 0.05830 | -52.90% | 0.09045 | 0.06752 | 0.74651 |
+| `probe-soft-femme-20260421` | `raw` | `[1, 16, 47]` | 0.10787 | 0.06973 | -35.36% | 0.08932 | 0.06628 | 0.74207 |
+| `probe-clear-masc-20260421` | `artifact` | `[1, 16, 49]` | 0.13393 | 0.10120 | -24.44% | 0.11398 | 0.10482 | 0.91959 |
+| `probe-clear-masc-20260421` | `raw` | `[1, 16, 49]` | 0.11999 | 0.08783 | -26.80% | 0.09045 | 0.07892 | 0.87257 |
 
 Interpretation:
 
-- The new capture path is working.
-- We now have a replay-friendly artifact that preserves both the degraded
-  waveform summary and the exact generated codec tensor from the same run.
+- The new capture path is working on both investigation profiles.
+- We now have replay-friendly artifacts that preserve both the waveform summary
+  and the exact generated codec tensor across both profiles and both
+  conditioning strategies.
 - That closes the main instrumentation gap called out in the generated-code
   capture design note.
 
-### 5. Local replay from the saved generated-code artifact
+### 5. Local replay from the saved generated-code artifacts
 
-The first local replay run wrote:
+The completed local replay runs wrote:
 
 - `.local/volume-probes/replay-qwen-codes-2026-04-21T19-39-35Z.json`
+- `.local/volume-probes/replay-qwen-codes-2026-04-21T20-40-55Z.json`
+- `.local/volume-probes/replay-qwen-codes-2026-04-21T21-09-43Z.json`
+- `.local/volume-probes/replay-qwen-codes-2026-04-21T21-10-20Z.json`
 - `.local/volume-probes/replay-qwen-codes-latest.json`
 
-Replay input:
+Replay inputs:
 
-- source artifact: `.local/volume-probes/capture-qwen-codes-latest.json`
-- profile: `probe-soft-femme-20260421`
 - conditioning: `artifact`
 - model repo: `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit`
 
@@ -249,10 +288,10 @@ Available local replay lanes today:
 - plain streaming decode from the captured generated codes
 - reference-warmed streaming decode from the same captured generated codes
 
-Key result:
+Soft-femme replay input:
 
-- all three currently public replay lanes preserved essentially the same
-  degraded tail shape as the original captured run
+- source artifact: `.local/volume-probes/capture-qwen-codes-2026-04-21T19-29-27Z.json`
+- profile: `probe-soft-femme-20260421`
 
 Representative summaries:
 
@@ -276,6 +315,149 @@ Interpretation:
 - For this saved soft-femme artifact, the degraded envelope appears to be
   largely present before those decode-path choices diverge.
 
+Clear-masc replay input:
+
+- source artifact: `.local/volume-probes/capture-qwen-codes-2026-04-21T20-40-02Z.json`
+- profile: `probe-clear-masc-20260421`
+
+Representative summaries:
+
+| Lane | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Source retained capture | 0.13393 | 0.10120 | -24.44% | 0.11398 | 0.10482 | 0.91959 |
+| Bounded decode | 0.13393 | 0.10111 | -24.50% | 0.11395 | 0.10499 | 0.92133 |
+| Helper decode | 0.13393 | 0.10120 | -24.44% | 0.11398 | 0.10482 | 0.91959 |
+| Plain streaming replay | 0.13969 | 0.10146 | -27.37% | 0.11581 | 0.10508 | 0.90729 |
+| Warmed streaming replay | 0.13393 | 0.10120 | -24.44% | 0.11399 | 0.10482 | 0.91955 |
+
+Interpretation:
+
+- The clear-masc artifact stays healthy across the same four replay lanes.
+- The warmed, helper, and retained summaries are nearly identical.
+- The plain streaming replay is slightly worse on tail/head than the other
+  lanes, but not in a way that resembles the soft-femme collapse.
+- Taken together with the soft-femme replay, the local replay harness now shows
+  profile-sensitive behavior that is already present in the captured sequence
+  or earlier request setup, not a single replay decode path introducing the
+  entire failure.
+
+Soft-femme raw replay input:
+
+- source artifact: `.local/volume-probes/capture-qwen-codes-2026-04-21T20-52-42Z.json`
+- profile: `probe-soft-femme-20260421`
+- conditioning: `raw`
+
+Representative summaries:
+
+| Lane | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Source retained capture | 0.10787 | 0.06973 | -35.36% | 0.08932 | 0.06628 | 0.74207 |
+| Bounded decode | 0.10787 | 0.06718 | -37.73% | 0.08886 | 0.06479 | 0.72917 |
+| Helper decode | 0.10787 | 0.06973 | -35.36% | 0.08932 | 0.06628 | 0.74207 |
+| Plain streaming replay | 0.10971 | 0.06977 | -36.40% | 0.08960 | 0.06632 | 0.74014 |
+| Warmed streaming replay | 0.10787 | 0.06973 | -35.36% | 0.08932 | 0.06629 | 0.74216 |
+
+Interpretation:
+
+- The raw soft-femme artifact behaves just like the artifact-conditioned
+  soft-femme artifact: the degraded tail is already present in the captured
+  run, and replay does not introduce a dramatically different outcome.
+- Bounded decode is again slightly worse than the helper and warmed streaming
+  lanes, but only modestly.
+
+Clear-masc raw replay input:
+
+- source artifact: `.local/volume-probes/capture-qwen-codes-2026-04-21T20-55-33Z.json`
+- profile: `probe-clear-masc-20260421`
+- conditioning: `raw`
+
+Representative summaries:
+
+| Lane | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Source retained capture | 0.11999 | 0.08783 | -26.80% | 0.09045 | 0.07892 | 0.87257 |
+| Bounded decode | 0.11999 | 0.08728 | -27.26% | 0.09062 | 0.07894 | 0.87111 |
+| Helper decode | 0.11999 | 0.08783 | -26.80% | 0.09045 | 0.07892 | 0.87257 |
+| Plain streaming replay | 0.11923 | 0.08803 | -26.16% | 0.09071 | 0.07908 | 0.87181 |
+| Warmed streaming replay | 0.11999 | 0.08783 | -26.80% | 0.09045 | 0.07892 | 0.87258 |
+
+Interpretation:
+
+- The raw clear-masc artifact also stays healthy across the replay triangle.
+- The raw replay control therefore matches the artifact replay control on both
+  profiles: soft-femme remains the degraded case and clear-masc remains the
+  healthier case, with only small bounded-vs-helper-vs-streaming differences.
+
+### 6. Local generated-code comparison
+
+The comparison runs wrote:
+
+- `.local/volume-probes/compare-qwen-codes-2026-04-21T20-49-57Z.json`
+- `.local/volume-probes/compare-qwen-codes-2026-04-21T20-52-52Z.json`
+- `.local/volume-probes/compare-qwen-codes-2026-04-21T20-55-40Z.json`
+- `.local/volume-probes/compare-qwen-codes-latest.json`
+
+Soft-femme artifact versus clear-masc artifact:
+
+| Metric | Value |
+| --- | ---: |
+| Soft-femme tail/head | 0.74651 |
+| Clear-masc tail/head | 0.91959 |
+| Soft-femme repeat ratio | 0.00727 |
+| Clear-masc repeat ratio | 0.00705 |
+| Soft-femme head/tail shift mean | 0.59222 |
+| Clear-masc head/tail shift mean | 0.59198 |
+| Cross-artifact exact match ratio | 0.00101 |
+| Cross-artifact distinct-set Jaccard mean | 0.44270 |
+| Cross-artifact distribution shift mean | 0.53296 |
+
+Soft-femme raw versus artifact:
+
+| Metric | Raw | Artifact |
+| --- | ---: | ---: |
+| Tail/Head | 0.74207 | 0.74651 |
+| Repeat ratio | 0.00693 | 0.00727 |
+| Distinct mean per codebook | 1076.88 | 1082.38 |
+| Head/tail shift mean | 0.59052 | 0.59222 |
+
+Cross-run comparison:
+
+- exact match ratio `0.00070`
+- distinct-set Jaccard mean `0.48826`
+- distribution shift mean `0.47165`
+
+Clear-masc raw versus artifact:
+
+| Metric | Raw | Artifact |
+| --- | ---: | ---: |
+| Tail/Head | 0.87257 | 0.91959 |
+| Repeat ratio | 0.00910 | 0.00705 |
+| Distinct mean per codebook | 1084.88 | 1090.00 |
+| Head/tail shift mean | 0.59039 | 0.59198 |
+
+Cross-run comparison:
+
+- exact match ratio `0.00085`
+- distinct-set Jaccard mean `0.47112`
+- distribution shift mean `0.48947`
+
+Interpretation:
+
+- The new `compare-qwen-codes` helper is working and gives us a stable
+  artifact-to-artifact summary surface.
+- Across soft-femme and clear-masc, the coarse generated-code statistics remain
+  surprisingly similar even though the retained waveform outcomes are very
+  different.
+- Across raw and artifact conditioning for the same profile, the generated code
+  streams are still different runs, but the high-level token-shape metrics stay
+  very close.
+- That means we still do not have a simple codec-level smoking gun like
+  "soft-femme collapses into obvious repetition" or "artifact conditioning
+  massively changes the coarse token distribution."
+- The evidence now points more strongly toward a narrower sequence-level,
+  conditioning-content, or request-setup difference than toward a broad decode
+  or distribution-collapse explanation.
+
 ## Overall Readout
 
 The current evidence points to the same shape as the earlier investigation:
@@ -285,25 +467,31 @@ The current evidence points to the same shape as the earlier investigation:
 - The direct-vs-streamed decode path is not the primary root cause.
 - The new generated-code capture hook is now available and producing the exact
   codec payload we need for offline replay or narrower upstream comparisons.
-- The first local replay from a saved bad run kept the same degraded tail
-  shape across helper decode and both streaming replay variants.
+- The soft-femme saved bad run kept the same degraded tail shape across
+  bounded, helper, and both streaming replay variants.
+- The clear-masc saved run stayed healthy across those same replay lanes, which
+  makes the profile-specific divergence even more likely to be upstream of the
+  replay decode split.
+- The new generated-code comparisons did not reveal an obvious coarse token
+  collapse signature. Soft-femme, clear-masc, raw, and artifact runs all stay
+  in roughly the same band for repeat ratio, distinct-token spread, and
+  head-versus-tail distribution shift.
+- The new raw replay controls match the artifact replay result: profile
+  sensitivity persists across both conditioning strategies, and the replay
+  decode split still is not the primary source of the collapse.
 
 ## Recommended Next Steps
 
-1. Re-run `capture-qwen-codes` for `probe-clear-masc-20260421` so we have one
-   replay artifact per probe profile, not just the soft-femme lane.
-2. Replay the clear-masc artifact through the same bounded, helper, and
-   streaming lanes, and compare whether it shows the same near-identical replay
-   behavior as the soft-femme artifact.
-3. Add a smaller local matrix variant for daily reruns.
+1. Go deeper than coarse token-distribution summaries.
+   The next useful question is whether the bad soft-femme run differs in a
+   narrower way, such as per-codebook trajectory, token bigrams, tail-localized
+   motifs, or alignment against the reference-code prefix rather than in
+   whole-run uniqueness or repeat ratios.
+2. Add a smaller local matrix variant for daily reruns.
    The current `matrix-volume` shape is too expensive for frequent use; a
    reduced-profile or reduced-length variant would keep the evidence fresh
    without tying up the machine for a very long batch.
-4. Compare the captured generated-code statistics across raw and artifact
-   conditioning for the same profile.
-   The next useful question is whether the bad tail comes from materially
-   different generated codec sequences or from later decode/render behavior.
-5. If replay from the captured codes still produces healthy tails upstream
+3. If replay from the captured codes still produces healthy tails upstream
    while the local retained file lane decays, focus next on SpeakSwiftly-owned
    behavior around request text shaping, runtime reuse, or the exact
    profile-materialization inputs rather than the codec decode step itself.
