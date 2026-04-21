@@ -75,6 +75,15 @@ Also keep the broader operator symptom in view:
 That means the next analysis should stay open to prosody-regime drift rather
 than treating this purely as an amplitude-envelope problem.
 
+The first quarter-level codebook pass now exists too. It is directionally
+useful, but it did not reveal one obvious late-quarter cliff that cleanly
+explains the bad profile by itself. The next narrower slice should therefore
+either:
+
+- inspect those suspect codebooks on a finer time grid than quarters, or
+- add audio-side pitch and cadence summaries so the token drift can be checked
+  against the reported perceptual shift directly
+
 ## Purpose
 
 This note plans the next investigation surface for the Qwen long-form decay

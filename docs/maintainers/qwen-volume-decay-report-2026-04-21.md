@@ -481,6 +481,21 @@ Narrower codebook-level read from the updated helper:
   over time would fit that perceptual pattern better than a pure amplitude-only
   explanation.
 
+Quarter-level codebook follow-up:
+
+- The helper now also logs quarter-by-quarter snapshots for the most shifted
+  codebooks in each artifact.
+- In the first artifact-vs-artifact rerun, codebook `15` stayed a leading
+  head-vs-tail drift lane for both profiles, but its quarter snapshots did not
+  show a dramatic late-run cliff by themselves.
+- The strongest cross-artifact divergence still came from codebooks `06`, `07`,
+  and `04`, while the per-profile internal leaders differed slightly after
+  codebook `15`.
+- That means the next best move is probably not "look for one quarter where
+  everything suddenly collapses." It is to compare a small set of suspect
+  codebooks against audible prosody measures or against finer-grained sequence
+  motifs in the later quarters.
+
 ## Overall Readout
 
 The current evidence points to the same shape as the earlier investigation:
@@ -505,6 +520,9 @@ The current evidence points to the same shape as the earlier investigation:
 - The observed symptom cluster now includes loudness decay, pitch rise, and
   cadence acceleration over longer generations, which makes a broader prosody
   drift more plausible than a volume-only defect.
+- The first quarter-level codebook snapshots did not reveal an obvious single
+  late-quarter cliff, so the next analysis likely needs finer-grained
+  time-local or prosody-aware measurements rather than broader quarter averages.
 
 ## Recommended Next Steps
 
@@ -514,8 +532,9 @@ The current evidence points to the same shape as the earlier investigation:
    motifs, or alignment against the reference-code prefix rather than in
    whole-run uniqueness or repeat ratios.
    The new helper can already point at the most shifted codebooks; the next
-   pass should graph or summarize those codebooks across quarters and correlate
-   them against the audible pitch-up and cadence-speed-up symptom.
+   pass should either graph those codebooks on a finer time grid than quarters
+   or correlate them against an actual audio-side pitch/cadence summary so the
+   token analysis can be compared to the reported perceptual drift directly.
 2. Add a smaller local matrix variant for daily reruns.
    The current `matrix-volume` shape is too expensive for frequent use; a
    reduced-profile or reduced-length variant would keep the evidence fresh

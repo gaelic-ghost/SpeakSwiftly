@@ -293,6 +293,18 @@ struct SpeakSwiftlyTestingMain {
         let headTailDistributionShift: Double
     }
 
+    struct QwenCodebookQuarterTrajectory: Encodable {
+        let codebookIndex: Int
+        let quarters: [QwenCodebookQuarterSnapshot]
+    }
+
+    struct QwenCodebookQuarterSnapshot: Encodable {
+        let label: String
+        let frameCount: Int
+        let exactAdjacentRepeatRatio: Double
+        let distinctTokenCount: Int
+    }
+
     struct QwenCodeArtifactStats: Encodable {
         let frameCount: Int
         let codebookCount: Int
@@ -310,6 +322,7 @@ struct SpeakSwiftlyTestingMain {
         let headTailDistributionShiftMax: Double
         let quarters: [QwenCodeQuarterStats]
         let leadingHeadTailShiftCodebooks: [QwenCodebookDriftStats]
+        let leadingCodebookQuarterTrajectories: [QwenCodebookQuarterTrajectory]
     }
 
     struct QwenCodeArtifactDescriptor: Encodable {
@@ -2261,6 +2274,15 @@ struct SpeakSwiftlyTestingMain {
             frameCount: frameCount,
             codebookCount: codebookCount,
         )
+        let leadingQuarterTrajectories = headTail.leadingCodebooks.map { codebook in
+            summarizeQwenCodebookQuarterTrajectory(
+                tensor.values,
+                frameCount: frameCount,
+                codebookCount: codebookCount,
+                codebookIndex: codebook.codebookIndex,
+                quarterBounds: quarterBounds,
+            )
+        }
 
         return QwenCodeArtifactStats(
             frameCount: frameCount,
@@ -2279,6 +2301,7 @@ struct SpeakSwiftlyTestingMain {
             headTailDistributionShiftMax: headTail.shiftMax,
             quarters: quarterStats,
             leadingHeadTailShiftCodebooks: headTail.leadingCodebooks,
+            leadingCodebookQuarterTrajectories: leadingQuarterTrajectories,
         )
     }
 
@@ -2419,6 +2442,22 @@ struct SpeakSwiftlyTestingMain {
                 ),
             )
         }
+
+        for trajectory in stats.leadingCodebookQuarterTrajectories {
+            for quarter in trajectory.quarters {
+                print(
+                    String(
+                        format: "%@_leading_codebook_%02d_%@: frames=%d repeat_ratio=%.5f distinct=%d",
+                        prefix,
+                        trajectory.codebookIndex,
+                        quarter.label,
+                        quarter.frameCount,
+                        quarter.exactAdjacentRepeatRatio,
+                        quarter.distinctTokenCount,
+                    ),
+                )
+            }
+        }
     }
 
     static func summarizeQwenCodeRange(
@@ -2479,6 +2518,71 @@ struct SpeakSwiftlyTestingMain {
             distinctTokensMaxPerCodebook: distinctCounts.max() ?? 0,
             longestRunMeanPerCodebook: average(longestRuns.map(Double.init)),
             longestRunMaxPerCodebook: longestRuns.max() ?? 0,
+        )
+    }
+
+    static func summarizeQwenCodebookQuarterTrajectory(
+        _ values: [Int32],
+        frameCount: Int,
+        codebookCount: Int,
+        codebookIndex: Int,
+        quarterBounds: [(label: String, start: Int, end: Int)],
+    ) -> QwenCodebookQuarterTrajectory {
+        QwenCodebookQuarterTrajectory(
+            codebookIndex: codebookIndex,
+            quarters: quarterBounds.map { quarter in
+                summarizeQwenSingleCodebookRange(
+                    values,
+                    frameCount: frameCount,
+                    codebookCount: codebookCount,
+                    codebookIndex: codebookIndex,
+                    startFrame: quarter.start,
+                    endFrame: quarter.end,
+                    label: quarter.label,
+                )
+            },
+        )
+    }
+
+    static func summarizeQwenSingleCodebookRange(
+        _ values: [Int32],
+        frameCount: Int,
+        codebookCount: Int,
+        codebookIndex: Int,
+        startFrame: Int,
+        endFrame: Int,
+        label: String,
+    ) -> QwenCodebookQuarterSnapshot {
+        let clampedStart = max(0, min(startFrame, frameCount))
+        let clampedEnd = max(clampedStart, min(endFrame, frameCount))
+        let sampledFrames = clampedEnd - clampedStart
+        guard sampledFrames > 0 else {
+            return QwenCodebookQuarterSnapshot(
+                label: label,
+                frameCount: 0,
+                exactAdjacentRepeatRatio: 0,
+                distinctTokenCount: 0,
+            )
+        }
+
+        var distinct = Set<Int32>()
+        var repeats = 0
+        for frame in clampedStart..<clampedEnd {
+            let value = values[frame * codebookCount + codebookIndex]
+            distinct.insert(value)
+            if frame > clampedStart {
+                let previous = values[(frame - 1) * codebookCount + codebookIndex]
+                if previous == value {
+                    repeats += 1
+                }
+            }
+        }
+
+        return QwenCodebookQuarterSnapshot(
+            label: label,
+            frameCount: sampledFrames,
+            exactAdjacentRepeatRatio: sampledFrames > 1 ? Double(repeats) / Double(sampledFrames - 1) : 0,
+            distinctTokenCount: distinct.count,
         )
     }
 
