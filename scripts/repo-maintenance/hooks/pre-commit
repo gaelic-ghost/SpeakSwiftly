@@ -2,4 +2,10 @@
 set -eu
 
 repo_root="$(git rev-parse --show-toplevel)"
+
+cd "$repo_root"
+
+swiftformat --config .swiftformat .
+git add -u
+
 exec "$repo_root/scripts/repo-maintenance/validate-all.sh"

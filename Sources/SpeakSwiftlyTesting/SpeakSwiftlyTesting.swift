@@ -6,8 +6,6 @@ import SpeakSwiftly
 
 @main
 struct SpeakSwiftlyTestingMain {
-    static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
-
     enum Command: String {
         case resources
         case status
@@ -120,6 +118,8 @@ struct SpeakSwiftlyTestingMain {
         }
     }
 
+    static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
+
     static func main() async {
         do {
             try await run()
@@ -160,11 +160,11 @@ struct SpeakSwiftlyTestingMain {
         guard let command = Command(rawValue: rawCommand) else {
             throw UsageError.unknownCommand(rawCommand)
         }
+
         if command != .volumeProbe,
            command != .compareVolume,
            command != .createDesignProfile,
-           arguments.count != 1
-        {
+           arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
         }
 
@@ -238,6 +238,7 @@ struct SpeakSwiftlyTestingMain {
                     guard let repeatCount = Int(value), repeatCount > 0 else {
                         throw UsageError.invalidOptionValue(argument, value)
                     }
+
                     options.repeatCount = repeatCount
                 case "--window-seconds":
                     index += 1
@@ -245,6 +246,7 @@ struct SpeakSwiftlyTestingMain {
                     guard let windowSeconds = Double(value), windowSeconds > 0 else {
                         throw UsageError.invalidOptionValue(argument, value)
                     }
+
                     options.windowSeconds = windowSeconds
                 default:
                     throw UsageError.unknownCommand(argument)
@@ -411,6 +413,7 @@ struct SpeakSwiftlyTestingMain {
             guard !trimmed.isEmpty else {
                 throw UsageError.emptyProbeText
             }
+
             return trimmed
         }
 
@@ -459,6 +462,7 @@ struct SpeakSwiftlyTestingMain {
         guard let vibe = SpeakSwiftly.Vibe(rawValue: rawValue) else {
             throw UsageError.invalidOptionValue("--vibe", rawValue)
         }
+
         return vibe
     }
 
@@ -539,7 +543,8 @@ struct SpeakSwiftlyTestingMain {
                 text: text,
                 conditioning: conditioningArtifact,
                 generationParameters: generationParameters,
-            ).asArray(Float.self)
+            )
+            .asArray(Float.self)
         } else {
             let referenceAudioURL = profileDirectoryURL.appendingPathComponent(
                 materialization.referenceAudioFile,
@@ -553,7 +558,8 @@ struct SpeakSwiftlyTestingMain {
                 refText: materialization.referenceText,
                 language: "English",
                 generationParameters: generationParameters,
-            ).asArray(Float.self)
+            )
+            .asArray(Float.self)
         }
 
         let directOutputURL = try writeProbeWAV(
@@ -618,7 +624,8 @@ struct SpeakSwiftlyTestingMain {
         sampleRate: Int,
         name: String,
     ) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
+        let directory = FileManager.default
+            .temporaryDirectory
             .appendingPathComponent("SpeakSwiftlyTesting", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent(name, isDirectory: false)
@@ -754,6 +761,7 @@ struct SpeakSwiftlyTestingMain {
 
     static func rootMeanSquare(_ samples: [Float]) -> Double {
         guard !samples.isEmpty else { return 0 }
+
         let sum = samples.reduce(into: 0.0) { partialResult, sample in
             let value = Double(sample)
             partialResult += value * value
@@ -763,6 +771,7 @@ struct SpeakSwiftlyTestingMain {
 
     static func summarizeWindows(_ windows: [VolumeWindow]) -> VolumeSummary? {
         guard let first = windows.first, let last = windows.last else { return nil }
+
         let firstRMS = first.rms
         let lastRMS = last.rms
         let rmsDropPercent = firstRMS == 0 ? 0 : ((lastRMS - firstRMS) / firstRMS) * 100.0
@@ -794,13 +803,15 @@ struct SpeakSwiftlyTestingMain {
         func uint16(at offset: Int) -> UInt16 {
             data.withUnsafeBytes { rawBuffer in
                 rawBuffer.load(fromByteOffset: offset, as: UInt16.self)
-            }.littleEndian
+            }
+            .littleEndian
         }
 
         func uint32(at offset: Int) -> UInt32 {
             data.withUnsafeBytes { rawBuffer in
                 rawBuffer.load(fromByteOffset: offset, as: UInt32.self)
-            }.littleEndian
+            }
+            .littleEndian
         }
 
         guard data.count >= 12 else {
@@ -831,6 +842,7 @@ struct SpeakSwiftlyTestingMain {
                 guard chunkSize >= 16 else {
                     throw UsageError.invalidWAV("The WAV fmt chunk is too small.")
                 }
+
                 formatTag = uint16(at: chunkStart)
                 channelCount = uint16(at: chunkStart + 2)
                 sampleRate = uint32(at: chunkStart + 4)
