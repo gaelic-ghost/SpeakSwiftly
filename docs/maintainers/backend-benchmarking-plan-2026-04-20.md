@@ -335,6 +335,21 @@ The summary should record:
 Keep the schema versioned so comparison tooling can evolve without corrupting
 older retained runs.
 
+## Near-Term Follow-Up
+
+Investigate the Qwen long-form volume-decay regression soon as a dedicated
+follow-up pass.
+
+- Re-run the retained-file `volume-probe` and direct-vs-stream
+  `compare-volume` paths after dependency updates, profile rerolls, and any
+  upstream `mlx-audio-swift` changes that could affect Qwen decode behavior.
+- Keep comparing saved profiles against fresh voice-design profiles so prompt
+  content and profile materialization changes can be separated from model-side
+  drift.
+- Record whether the decay is present in direct non-stream decode, streamed
+  retained-file generation, or both before attributing regressions to playback
+  shaping.
+
 ## Suggested Test Layout
 
 The current Qwen benchmark suite proves the basic shape already works. The next

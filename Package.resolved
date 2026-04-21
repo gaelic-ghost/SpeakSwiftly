@@ -1,5 +1,5 @@
 {
-  "originHash" : "9280ae85fbc587bef76543d4c9cbb5b3ff2334ec634b6103e392baca2fb329c2",
+  "originHash" : "45b1192a75535e522b815a08dcce27584621c12e8c3b55fc0441236b57595aa3",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/mlx-audio-swift.git",
       "state" : {
-        "revision" : "a40ac9fb1ce8f4ead5f8d913ef1f15fb80e69847",
-        "version" : "69.2.0"
+        "revision" : "dfb55adee9437e973b98b9dbd00caa30d48b3809",
+        "version" : "0.7.0"
       }
     },
     {
@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/TextForSpeech.git",
       "state" : {
-        "revision" : "0a1e5adca30cfe520171419218372506cd70115a",
-        "version" : "0.18.0"
+        "revision" : "810ad9e60650d8d9617aa61060f461dfcfe43839",
+        "version" : "0.18.2"
       }
     },
     {
