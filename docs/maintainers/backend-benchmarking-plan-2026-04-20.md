@@ -337,18 +337,14 @@ older retained runs.
 
 ## Near-Term Follow-Up
 
-Investigate the Qwen long-form volume-decay regression soon as a dedicated
-follow-up pass.
+Track the Qwen long-form volume-decay regression in the dedicated maintainer
+note:
 
-- Re-run the retained-file `volume-probe` and direct-vs-stream
-  `compare-volume` paths after dependency updates, profile rerolls, and any
-  upstream `mlx-audio-swift` changes that could affect Qwen decode behavior.
-- Keep comparing saved profiles against fresh voice-design profiles so prompt
-  content and profile materialization changes can be separated from model-side
-  drift.
-- Record whether the decay is present in direct non-stream decode, streamed
-  retained-file generation, or both before attributing regressions to playback
-  shaping.
+- `docs/maintainers/qwen-volume-decay-investigation-2026-04-21.md`
+
+Keep the benchmarking note focused on benchmark coverage, storage, and lane
+design. Keep the decode-path investigation, retained loudness evidence, and
+Qwen-specific follow-up steps in the dedicated investigation document.
 
 ## Suggested Test Layout
 
