@@ -125,6 +125,11 @@ app-hosted iOS e2e story later.
 
 ## E2E and Real-Model Notes
 
+Before running E2E, real-model, or other MLX-backed validation on Gale's
+machine, unload the live local SpeakSwiftly service first. Keep those runs
+strictly serialized so the machine is not carrying both the live service models
+and the validation models at the same time.
+
 Now that the plain SwiftPM parser failure in `EnglishG2P.swift` has been fixed
 in the current `mlx-audio-swift` fork pin, prefer the repo-maintenance shell
 wrappers instead of the older Xcode `.xctestrun` dance for ordinary E2E work:

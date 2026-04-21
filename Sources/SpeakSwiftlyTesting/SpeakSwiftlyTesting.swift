@@ -504,6 +504,12 @@ struct SpeakSwiftlyTestingMain {
             setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
         }
 
+        try validateConditioningMode(
+            profileName: options.profileName,
+            profileRootOverride: options.profileRoot,
+            conditioningMode: options.conditioningMode,
+        )
+
         let text = try loadVolumeProbeText(options: options)
         let result = try await runStreamedProbe(
             profileName: options.profileName,
@@ -644,14 +650,13 @@ struct SpeakSwiftlyTestingMain {
             textFile: options.longTextFile,
             repeatCount: options.longRepeatCount,
         )
-        let profileRootURL = profileRootURL(profileRootOverride: options.profileRoot)
         var rows = [MatrixProbeRow]()
 
         for profileName in options.profileNames {
-            let profileDirectoryURL = profileRootURL
-                .appendingPathComponent("profiles", isDirectory: true)
-                .appendingPathComponent(profileName, isDirectory: true)
-            let manifest = try loadProfileManifest(from: profileDirectoryURL)
+            let (profileDirectoryURL, manifest) = try probeProfileContext(
+                profileName: profileName,
+                profileRootOverride: options.profileRoot,
+            )
             let hasStoredConditioning = manifest.qwenConditioningArtifacts.contains { $0.backend == "qwen3" }
 
             for iteration in 1...options.iterations {
@@ -859,11 +864,10 @@ struct SpeakSwiftlyTestingMain {
         options: VolumeProbeOptions,
         text: String,
     ) async throws -> ComparisonResult {
-        let profileRootURL = profileRootURL(options: options)
-        let profileDirectoryURL = profileRootURL
-            .appendingPathComponent("profiles", isDirectory: true)
-            .appendingPathComponent(options.profileName, isDirectory: true)
-        let manifest = try loadProfileManifest(from: profileDirectoryURL)
+        let (profileDirectoryURL, manifest) = try probeProfileContext(
+            profileName: options.profileName,
+            profileRootOverride: options.profileRoot,
+        )
         if options.conditioningMode == .artifact,
            try loadStoredConditioning(manifest: manifest, profileDirectoryURL: profileDirectoryURL) == nil {
             throw UsageError.profileMissingStoredConditioning(profileDirectoryURL.path)
@@ -991,6 +995,33 @@ struct SpeakSwiftlyTestingMain {
 
     static func profileRootURL(options: VolumeProbeOptions) -> URL {
         profileRootURL(profileRootOverride: options.profileRoot)
+    }
+
+    static func probeProfileContext(
+        profileName: String,
+        profileRootOverride: String?,
+    ) throws -> (profileDirectoryURL: URL, manifest: ProbeProfileManifest) {
+        let profileDirectoryURL = profileRootURL(profileRootOverride: profileRootOverride)
+            .appendingPathComponent("profiles", isDirectory: true)
+            .appendingPathComponent(profileName, isDirectory: true)
+        let manifest = try loadProfileManifest(from: profileDirectoryURL)
+        return (profileDirectoryURL, manifest)
+    }
+
+    static func validateConditioningMode(
+        profileName: String,
+        profileRootOverride: String?,
+        conditioningMode: ConditioningMode,
+    ) throws {
+        guard conditioningMode == .artifact else { return }
+
+        let (profileDirectoryURL, manifest) = try probeProfileContext(
+            profileName: profileName,
+            profileRootOverride: profileRootOverride,
+        )
+        guard try loadStoredConditioning(manifest: manifest, profileDirectoryURL: profileDirectoryURL) != nil else {
+            throw UsageError.profileMissingStoredConditioning(profileDirectoryURL.path)
+        }
     }
 
     static func profileRootURL(profileRootOverride: String?) -> URL {
@@ -1351,7 +1382,13 @@ struct SpeakSwiftlyTestingMain {
             guard start < end else { continue }
 
             let segmentWindows = Array(windows[start..<end])
-            let rms = segmentWindows.reduce(0.0) { $0 + $1.rms } / Double(segmentWindows.count)
+            let totalDuration = segmentWindows.reduce(0.0) { $0 + $1.durationSeconds }
+            guard totalDuration > 0 else { continue }
+
+            let weightedSquareSum = segmentWindows.reduce(0.0) { partialResult, window in
+                partialResult + ((window.rms * window.rms) * window.durationSeconds)
+            }
+            let rms = Foundation.sqrt(weightedSquareSum / totalDuration)
             let peak = segmentWindows.map(\.peak).max() ?? 0
             segments.append(VolumeSegment(label: label, rms: rms, peak: peak))
         }

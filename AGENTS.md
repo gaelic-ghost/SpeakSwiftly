@@ -79,6 +79,8 @@
 
 - Never run multiple build toolchains, package managers, test runners, or other heavy validation commands at the same time on Gale's machine.
 - Never run multiple SwiftPM or Xcode build or test processes concurrently for this repository.
+- Keep real-model probes, MLX-backed tests, E2E runs, and other model-loading validation strictly serialized. Do not overlap them, and do not leave multiple warmed model processes resident at the same time.
+- Before running any E2E, real-model, or other MLX-backed validation for this repository, unload the live local SpeakSwiftly service first so Gale's machine is not carrying both the live service models and the validation models at once.
 - Treat `swift build` and `swift test` as the fast inner-loop checks for this package.
 - For MLX-backed package tests, stay in the plain `swift test` lane by default. The test target bundles `default.metallib` and the shared test bootstrap stages it into the direct SwiftPM probe path under `.build/...` before the first MLX-backed test model is created.
 - If `swift build` or `swift test` hit the current vendored `mlx-audio-swift` parser failure in `EnglishG2P.swift`, stop retrying the same SwiftPM lane and switch to the Xcode-backed validation path documented in `CONTRIBUTING.md` and `docs/maintainers/validation-lanes.md`.
