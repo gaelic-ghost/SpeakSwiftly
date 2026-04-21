@@ -155,6 +155,40 @@ The vendored `mlx-audio-swift` TTS benchmark path calls `generateStream(...)`:
 So the current upstream CLI benchmark surface will naturally emphasize any bug
 that only appears in the incremental decode lane or is amplified there.
 
+## New Upstream Audit Result
+
+The local upstream checkout now has a dedicated maintainer note at:
+
+- `/Users/galew/Workspace/Blaizzy/mlx-audio-swift/docs/maintainers/qwen3tts-audio-decay-audit.md`
+
+That audit confirms the decode-path split described above and adds regression
+coverage in upstream `MLXAudioTTSTests.swift` for three comparisons:
+
+- synthetic bounded decode vs incremental streaming decode
+- real encoder-produced codec sequences decoded through both paths
+- real conditioned generated-code comparison using the current helper,
+  bounded decode, and a reference-warmed incremental decode
+
+The important update is that those probes currently pass on that machine and do
+not reproduce the severe late-tail RMS collapse by themselves.
+
+The closest upstream probe to the SpeakSwiftly symptom uses a real conditioned
+generation, captures the produced Qwen codec sequence, and then decodes that
+same sequence three ways. On that machine:
+
+- the current `decodeChunk(...)` helper and a manual reference-warmed
+  incremental decode matched each other closely
+- both were somewhat hotter than bounded decode at the head of the waveform
+- the tail RMS stayed roughly aligned across all three decode paths
+
+So the upstream audit sharpens the diagnosis:
+
+- the decode-path mismatch is definitely real
+- the missing reference warm-up difference is definitely real
+- the missing sliding-window enforcement is still suspicious
+- but plain decoder-path mismatch by itself is not yet sufficient to reproduce
+  the strongest SpeakSwiftly decay symptom in upstream isolation tests
+
 ## What This Means Right Now
 
 The current investigation state is:
@@ -163,8 +197,13 @@ The current investigation state is:
 - we already proved the fade exists in retained output
 - we already proved the severity varies by profile
 - we already proved `mlx-audio-swift 0.7.0` did not fix it
-- the strongest remaining repo-visible suspects are now inside Qwen decode-path
-  selection and decoder-history management
+- the Qwen decode-path mismatch remains a real bug-shaped inconsistency, but it
+  no longer looks sufficient on its own to explain the entire severe tail-fade
+  repro
+- the strongest remaining hidden variables now look more like
+  profile/materialization specifics, runtime-surface differences above raw
+  decode helpers, or longer/more pathological generated token sequences than
+  the current upstream probes exercised
 
 ## Next Investigation Pass
 
@@ -176,8 +215,14 @@ The next focused pass should stay narrow and evidence-first:
    changes late-utterance RMS relative to `streamingDecode(...)`.
 3. Verify whether prepending `refCodes` into the streaming decode state changes
    the loudness trajectory for conditioned generations.
-4. Inspect whether the intended decoder `slidingWindow` behavior exists in the
+4. Reproduce the upstream conditioned generated-code probe shape against the
+   specific SpeakSwiftly profiles that showed the strongest collapse, so we can
+   tell whether the missing variable is the profile materialization itself.
+5. Inspect whether the intended decoder `slidingWindow` behavior exists in the
    Python/reference implementation and whether the Swift port drifted from it.
+6. Compare the raw generated token lengths and decode inputs from the strongest
+   SpeakSwiftly repros against the upstream passing probes to see whether the
+   failing cases are simply much longer or otherwise more pathological.
 
 ## Related Files
 
