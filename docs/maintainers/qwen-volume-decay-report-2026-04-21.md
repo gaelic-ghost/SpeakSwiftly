@@ -248,6 +248,36 @@ Interpretation:
   - drop percentage differs by only about `2.49` points
 - That matches the upstream conclusion that the severe local symptom is not
   explained by the direct-vs-streamed decode path alone.
+- The next high-value runtime control is therefore not another broad replay
+  rerun but a cadence sweep on the live streaming path. The current
+  `residentStreamingInterval = 0.18` means Qwen streaming decode is being asked
+  to flush approximately every two codec frames, because the vendored Qwen path
+  derives `streamingChunkSize` from `Int(streamingInterval * 12.5)`.
+- That decoder cadence is much tighter than the vendored README example
+  `0.32s`, and dramatically tighter than the Qwen-path default `2.0s`. It does
+  not directly change sampling randomness, but it likely does increase decoder
+  call frequency, chunk-boundary churn, and generation-time overhead during
+  long-form playback.
+
+Recommended next cadence sweep:
+
+- `0.18s`
+- `0.32s`
+- `0.64s`
+- `1.0s`
+- `1.5s`
+- `2.0s`
+
+Sweep goals:
+
+- compare symptom severity across the operator-reported cluster
+  - loudness decay
+  - pitch rise
+  - cadence acceleration
+  - glitchier delivery
+- compare throughput and first-audio behavior against the original rationale
+  for the tight cadence
+- separate startup-buffer benefits from long-form streaming-decoder costs
 
 ### 4. Local generated-code capture
 

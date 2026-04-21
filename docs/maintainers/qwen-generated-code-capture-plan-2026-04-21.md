@@ -104,6 +104,41 @@ clear-masc run still showed a modest tail-ward pulse-rate increase. So the next
 audio-side slice should improve the estimator itself, not expand the same proxy
 across more reruns.
 
+The next controlled runtime sweep should also test resident streaming cadence
+directly. The current `0.18s` cadence appears to be a playback-oriented policy
+chosen to reduce one-chunk startup shudder, but on the Qwen path it also forces
+very frequent streaming decoder flushes. In the current vendored implementation
+the streaming decoder flush size is derived from:
+
+- `streamingChunkSize = max(1, Int(streamingInterval * 12.5))`
+
+That means the current sweep should cover:
+
+- `0.18s`
+- `0.32s`
+- `0.64s`
+- `1.0s`
+- `1.5s`
+- `2.0s`
+
+And it should explicitly track two linked questions:
+
+1. Does a larger cadence improve long-form output quality or stability for the
+   degraded profiles?
+2. Does a larger cadence reduce generation-and-decode churn enough to improve
+   throughput, chunk smoothness, or glitch resistance without reintroducing the
+   original startup shudder that motivated the tighter cadence?
+
+The current working model is:
+
+- cadence does not change Qwen sampling randomness directly
+- cadence does change how often the decoder is asked to flush tiny batches of
+  new codec frames into waveform output
+- smaller cadences likely increase decoder call overhead, chunk-boundary churn,
+  and generation-time contention
+- those factors are plausible contributors to the observed inconsistent symptom
+  cluster even if they are not the only root cause
+
 ## Purpose
 
 This note plans the next investigation surface for the Qwen long-form decay
