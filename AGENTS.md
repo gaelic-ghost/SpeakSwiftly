@@ -71,6 +71,7 @@
 ## Dependencies, Logging, and State
 
 - Prefer first-party and top-tier Swift ecosystem packages from Apple, `swiftlang`, the Swift Server Work Group, and similar trusted core Swift projects when they simplify the code and make it easier to reason about.
+- Never depend on a machine-local checkout of `mlx-audio-swift` or `TextForSpeech` from this repository. Use a remote Git dependency such as a tagged release, commit, or branch on the fork or upstream remote, and keep `Package.swift` and `Package.resolved` pointed at that remote source of truth.
 - For packages, server-side, or cross-platform Swift, prefer Swift Logging as the primary logging API.
 - Prefer Swift OpenTelemetry for telemetry and instrumentation when telemetry is needed, and prefer existing ecosystem integrations over bespoke wrappers.
 - Prefer Nick Lockwood's SwiftFormat and/or SwiftLint as the baseline Swift formatting and linting tools; at least one should stay configured and used in this repository.
