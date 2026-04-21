@@ -13,6 +13,22 @@ struct SpeakSwiftlyTestingMain {
         case createDesignProfile = "create-design-profile"
         case volumeProbe = "volume-probe"
         case compareVolume = "compare-volume"
+        case matrixVolume = "matrix-volume"
+    }
+
+    enum ConditioningMode: String {
+        case auto
+        case raw
+        case artifact
+
+        var runtimeStrategy: SpeakSwiftly.QwenConditioningStrategy {
+            switch self {
+                case .auto, .artifact:
+                    .preparedConditioning
+                case .raw:
+                    .legacyRaw
+            }
+        }
     }
 
     struct CreateDesignProfileOptions {
@@ -29,12 +45,31 @@ struct SpeakSwiftlyTestingMain {
         var textFile: String?
         var repeatCount = 10
         var windowSeconds = 2.0
+        var conditioningMode: ConditioningMode = .auto
+    }
+
+    struct MatrixVolumeOptions {
+        var profileNames = [String]()
+        var profileRoot: String?
+        var shortTextFile: String?
+        var longTextFile: String?
+        var shortRepeatCount = 4
+        var longRepeatCount = 14
+        var iterations = 1
+        var windowSeconds = 2.0
+        var includeStreamed = false
     }
 
     struct VolumeWindow {
         let index: Int
         let startSeconds: Double
         let durationSeconds: Double
+        let rms: Double
+        let peak: Double
+    }
+
+    struct VolumeSegment {
+        let label: String
         let rms: Double
         let peak: Double
     }
@@ -46,6 +81,10 @@ struct SpeakSwiftlyTestingMain {
         let slopePerWindow: Double
         let firstPeak: Double
         let lastPeak: Double
+        let headRMS: Double
+        let tailRMS: Double
+        let tailHeadRatio: Double
+        let segments: [VolumeSegment]
     }
 
     struct ProbeAnalysis {
@@ -55,6 +94,8 @@ struct SpeakSwiftlyTestingMain {
     }
 
     struct CompareRun {
+        let lane: String
+        let conditioningMode: ConditioningMode
         let generatedFilePath: String
         let analysis: ProbeAnalysis
     }
@@ -67,6 +108,76 @@ struct SpeakSwiftlyTestingMain {
     struct ProbeProfileManifest: Decodable {
         let backendMaterializations: [ProbeMaterializationManifest]
         let qwenConditioningArtifacts: [ProbeConditioningArtifactManifest]
+    }
+
+    struct EncodableVolumeWindow: Encodable {
+        let index: Int
+        let startSeconds: Double
+        let durationSeconds: Double
+        let rms: Double
+        let peak: Double
+    }
+
+    struct EncodableVolumeSegment: Encodable {
+        let label: String
+        let rms: Double
+        let peak: Double
+    }
+
+    struct EncodableVolumeSummary: Encodable {
+        let firstRMS: Double
+        let lastRMS: Double
+        let rmsDropPercent: Double
+        let slopePerWindow: Double
+        let firstPeak: Double
+        let lastPeak: Double
+        let headRMS: Double
+        let tailRMS: Double
+        let tailHeadRatio: Double
+        let segments: [EncodableVolumeSegment]
+    }
+
+    struct EncodableProbeAnalysis: Encodable {
+        let sampleRate: Int
+        let windows: [EncodableVolumeWindow]
+        let summary: EncodableVolumeSummary?
+    }
+
+    struct CompareRunArtifact: Encodable {
+        let lane: String
+        let conditioningMode: String
+        let generatedFilePath: String
+        let analysis: EncodableProbeAnalysis
+    }
+
+    struct ComparisonArtifact: Encodable {
+        let profileName: String
+        let profileRoot: String?
+        let textCharacters: Int
+        let textWords: Int
+        let windowSeconds: Double
+        let generatedAt: Date
+        let streamed: CompareRunArtifact
+        let direct: CompareRunArtifact
+    }
+
+    struct MatrixProbeRow: Encodable {
+        let profileName: String
+        let iteration: Int
+        let textLabel: String
+        let lane: String
+        let conditioningMode: String
+        let generatedFilePath: String
+        let analysis: EncodableProbeAnalysis
+    }
+
+    struct MatrixProbeArtifact: Encodable {
+        let generatedAt: Date
+        let profileRoot: String?
+        let iterations: Int
+        let windowSeconds: Double
+        let includeStreamed: Bool
+        let rows: [MatrixProbeRow]
     }
 
     struct ProbeMaterializationManifest: Decodable {
@@ -119,6 +230,9 @@ struct SpeakSwiftlyTestingMain {
     }
 
     static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
+    static let defaultProbeParagraph = """
+    This is a long-form loudness probe for SpeakSwiftly. Please keep the voice steady, natural, and evenly projected from beginning to end. We are intentionally using a much longer passage so we can inspect whether the waveform stays consistent over time or gradually loses energy. The content itself is not important. What matters is that the generated speech remains stable, full, and equally audible throughout the entire passage, even after many seconds of continuous synthesis.
+    """
 
     static func main() async {
         do {
@@ -150,6 +264,9 @@ struct SpeakSwiftlyTestingMain {
             case .compareVolume:
                 let options = try parseVolumeProbeOptions(arguments: arguments)
                 try await runCompareVolume(options: options)
+            case .matrixVolume:
+                let options = try parseMatrixVolumeOptions(arguments: arguments)
+                try await runMatrixVolume(options: options)
         }
     }
 
@@ -163,6 +280,7 @@ struct SpeakSwiftlyTestingMain {
 
         if command != .volumeProbe,
            command != .compareVolume,
+           command != .matrixVolume,
            command != .createDesignProfile,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
@@ -248,10 +366,84 @@ struct SpeakSwiftlyTestingMain {
                     }
 
                     options.windowSeconds = windowSeconds
+                case "--conditioning":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let conditioningMode = ConditioningMode(rawValue: value) else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.conditioningMode = conditioningMode
                 default:
                     throw UsageError.unknownCommand(argument)
             }
             index += 1
+        }
+
+        return options
+    }
+
+    static func parseMatrixVolumeOptions(arguments: [String]) throws -> MatrixVolumeOptions {
+        var options = MatrixVolumeOptions()
+        var index = 1
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--profile":
+                    index += 1
+                    try options.profileNames.append(requireOptionValue(arguments, index: index, for: argument))
+                case "--profile-root":
+                    index += 1
+                    options.profileRoot = try requireOptionValue(arguments, index: index, for: argument)
+                case "--short-text-file":
+                    index += 1
+                    options.shortTextFile = try requireOptionValue(arguments, index: index, for: argument)
+                case "--long-text-file":
+                    index += 1
+                    options.longTextFile = try requireOptionValue(arguments, index: index, for: argument)
+                case "--short-repeat":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let repeatCount = Int(value), repeatCount > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.shortRepeatCount = repeatCount
+                case "--long-repeat":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let repeatCount = Int(value), repeatCount > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.longRepeatCount = repeatCount
+                case "--iterations":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let iterations = Int(value), iterations > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.iterations = iterations
+                case "--window-seconds":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let windowSeconds = Double(value), windowSeconds > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.windowSeconds = windowSeconds
+                case "--include-streamed":
+                    options.includeStreamed = true
+                default:
+                    throw UsageError.unknownCommand(argument)
+            }
+            index += 1
+        }
+
+        if options.profileNames.isEmpty {
+            options.profileNames = ["default-femme"]
         }
 
         return options
@@ -317,12 +509,14 @@ struct SpeakSwiftlyTestingMain {
             profileName: options.profileName,
             text: text,
             windowSeconds: options.windowSeconds,
+            conditioningMode: options.conditioningMode,
         )
 
         print("profile_name: \(options.profileName)")
         if let profileRoot = options.profileRoot {
             print("profile_root: \(profileRoot)")
         }
+        print("conditioning_mode: \(options.conditioningMode.rawValue)")
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
         print("generated_file: \(result.generatedFilePath)")
@@ -370,6 +564,7 @@ struct SpeakSwiftlyTestingMain {
         if let profileRoot = options.profileRoot {
             print("profile_root: \(profileRoot)")
         }
+        print("conditioning_mode: \(options.conditioningMode.rawValue)")
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
         print("window_seconds: \(options.windowSeconds)")
@@ -404,6 +599,22 @@ struct SpeakSwiftlyTestingMain {
                 ),
             )
         }
+
+        let artifactURL = try writeProbeArtifact(
+            ComparisonArtifact(
+                profileName: options.profileName,
+                profileRoot: options.profileRoot,
+                textCharacters: text.count,
+                textWords: text.split(whereSeparator: \.isWhitespace).count,
+                windowSeconds: options.windowSeconds,
+                generatedAt: Date(),
+                streamed: makeCompareRunArtifact(comparison.streamed),
+                direct: makeCompareRunArtifact(comparison.direct),
+            ),
+            stem: "compare-volume",
+            latestFilename: "compare-volume-latest.json",
+        )
+        print("json_artifact: \(artifactURL.path)")
     }
 
     static func loadVolumeProbeText(options: VolumeProbeOptions) throws -> String {
@@ -417,11 +628,155 @@ struct SpeakSwiftlyTestingMain {
             return trimmed
         }
 
-        let paragraph = """
-        This is a long-form loudness probe for SpeakSwiftly. Please keep the voice steady, natural, and evenly projected from beginning to end. We are intentionally using a much longer passage so we can inspect whether the waveform stays consistent over time or gradually loses energy. The content itself is not important. What matters is that the generated speech remains stable, full, and equally audible throughout the entire passage, even after many seconds of continuous synthesis.
-        """
+        return makeProbeText(repeatCount: options.repeatCount)
+    }
 
-        return Array(repeating: paragraph, count: options.repeatCount).joined(separator: "\n\n")
+    static func runMatrixVolume(options: MatrixVolumeOptions) async throws {
+        if let profileRoot = options.profileRoot {
+            setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
+        }
+
+        let shortText = try loadMatrixText(
+            textFile: options.shortTextFile,
+            repeatCount: options.shortRepeatCount,
+        )
+        let longText = try loadMatrixText(
+            textFile: options.longTextFile,
+            repeatCount: options.longRepeatCount,
+        )
+        let profileRootURL = profileRootURL(profileRootOverride: options.profileRoot)
+        var rows = [MatrixProbeRow]()
+
+        for profileName in options.profileNames {
+            let profileDirectoryURL = profileRootURL
+                .appendingPathComponent("profiles", isDirectory: true)
+                .appendingPathComponent(profileName, isDirectory: true)
+            let manifest = try loadProfileManifest(from: profileDirectoryURL)
+            let hasStoredConditioning = manifest.qwenConditioningArtifacts.contains { $0.backend == "qwen3" }
+
+            for iteration in 1...options.iterations {
+                for (textLabel, text) in [("short", shortText), ("long", longText)] {
+                    let rawDirect = try await runDirectProbe(
+                        text: text,
+                        manifest: manifest,
+                        profileDirectoryURL: profileDirectoryURL,
+                        windowSeconds: options.windowSeconds,
+                        conditioningMode: .raw,
+                        outputStem: "\(profileName)-\(textLabel)-raw-direct-\(iteration)",
+                    )
+                    rows.append(
+                        MatrixProbeRow(
+                            profileName: profileName,
+                            iteration: iteration,
+                            textLabel: textLabel,
+                            lane: rawDirect.lane,
+                            conditioningMode: rawDirect.conditioningMode.rawValue,
+                            generatedFilePath: rawDirect.generatedFilePath,
+                            analysis: makeEncodableProbeAnalysis(rawDirect.analysis),
+                        ),
+                    )
+
+                    if hasStoredConditioning {
+                        let artifactDirect = try await runDirectProbe(
+                            text: text,
+                            manifest: manifest,
+                            profileDirectoryURL: profileDirectoryURL,
+                            windowSeconds: options.windowSeconds,
+                            conditioningMode: .artifact,
+                            outputStem: "\(profileName)-\(textLabel)-artifact-direct-\(iteration)",
+                        )
+                        rows.append(
+                            MatrixProbeRow(
+                                profileName: profileName,
+                                iteration: iteration,
+                                textLabel: textLabel,
+                                lane: artifactDirect.lane,
+                                conditioningMode: artifactDirect.conditioningMode.rawValue,
+                                generatedFilePath: artifactDirect.generatedFilePath,
+                                analysis: makeEncodableProbeAnalysis(artifactDirect.analysis),
+                            ),
+                        )
+                    }
+
+                    if options.includeStreamed {
+                        let rawStreamed = try await runStreamedProbe(
+                            profileName: profileName,
+                            text: text,
+                            windowSeconds: options.windowSeconds,
+                            conditioningMode: .raw,
+                        )
+                        rows.append(
+                            MatrixProbeRow(
+                                profileName: profileName,
+                                iteration: iteration,
+                                textLabel: textLabel,
+                                lane: rawStreamed.lane,
+                                conditioningMode: rawStreamed.conditioningMode.rawValue,
+                                generatedFilePath: rawStreamed.generatedFilePath,
+                                analysis: makeEncodableProbeAnalysis(rawStreamed.analysis),
+                            ),
+                        )
+
+                        if hasStoredConditioning {
+                            let artifactStreamed = try await runStreamedProbe(
+                                profileName: profileName,
+                                text: text,
+                                windowSeconds: options.windowSeconds,
+                                conditioningMode: .artifact,
+                            )
+                            rows.append(
+                                MatrixProbeRow(
+                                    profileName: profileName,
+                                    iteration: iteration,
+                                    textLabel: textLabel,
+                                    lane: artifactStreamed.lane,
+                                    conditioningMode: artifactStreamed.conditioningMode.rawValue,
+                                    generatedFilePath: artifactStreamed.generatedFilePath,
+                                    analysis: makeEncodableProbeAnalysis(artifactStreamed.analysis),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        for row in rows {
+            if let summary = row.analysis.summary {
+                print(
+                    String(
+                        format: "matrix_row: profile=%@ iteration=%d text=%@ lane=%@ conditioning=%@ head_rms=%.5f tail_rms=%.5f tail_head_ratio=%.5f first_rms=%.5f last_rms=%.5f drop_pct=%.2f slope=%.6f file=%@",
+                        row.profileName,
+                        row.iteration,
+                        row.textLabel,
+                        row.lane,
+                        row.conditioningMode,
+                        summary.headRMS,
+                        summary.tailRMS,
+                        summary.tailHeadRatio,
+                        summary.firstRMS,
+                        summary.lastRMS,
+                        summary.rmsDropPercent,
+                        summary.slopePerWindow,
+                        row.generatedFilePath,
+                    ),
+                )
+            }
+        }
+
+        let artifactURL = try writeProbeArtifact(
+            MatrixProbeArtifact(
+                generatedAt: Date(),
+                profileRoot: options.profileRoot,
+                iterations: options.iterations,
+                windowSeconds: options.windowSeconds,
+                includeStreamed: options.includeStreamed,
+                rows: rows,
+            ),
+            stem: "matrix-volume",
+            latestFilename: "matrix-volume-latest.json",
+        )
+        print("json_artifact: \(artifactURL.path)")
     }
 
     static func awaitGeneratedFile(
@@ -470,8 +825,14 @@ struct SpeakSwiftlyTestingMain {
         profileName: String,
         text: String,
         windowSeconds: Double,
+        conditioningMode: ConditioningMode,
     ) async throws -> CompareRun {
-        let runtime = await SpeakSwiftly.liftoff()
+        let runtime = await SpeakSwiftly.liftoff(
+            configuration: SpeakSwiftly.Configuration(
+                speechBackend: .qwen3,
+                qwenConditioningStrategy: conditioningMode.runtimeStrategy,
+            ),
+        )
         await runtime.start()
 
         let handle = await runtime.generate.audio(
@@ -487,6 +848,8 @@ struct SpeakSwiftlyTestingMain {
         )
 
         return CompareRun(
+            lane: "streamed",
+            conditioningMode: conditioningMode,
             generatedFilePath: generatedFile.filePath,
             analysis: analysis,
         )
@@ -496,21 +859,29 @@ struct SpeakSwiftlyTestingMain {
         options: VolumeProbeOptions,
         text: String,
     ) async throws -> ComparisonResult {
-        let streamed = try await runStreamedProbe(
-            profileName: options.profileName,
-            text: text,
-            windowSeconds: options.windowSeconds,
-        )
         let profileRootURL = profileRootURL(options: options)
         let profileDirectoryURL = profileRootURL
             .appendingPathComponent("profiles", isDirectory: true)
             .appendingPathComponent(options.profileName, isDirectory: true)
         let manifest = try loadProfileManifest(from: profileDirectoryURL)
+        if options.conditioningMode == .artifact,
+           try loadStoredConditioning(manifest: manifest, profileDirectoryURL: profileDirectoryURL) == nil {
+            throw UsageError.profileMissingStoredConditioning(profileDirectoryURL.path)
+        }
+
+        let streamed = try await runStreamedProbe(
+            profileName: options.profileName,
+            text: text,
+            windowSeconds: options.windowSeconds,
+            conditioningMode: options.conditioningMode,
+        )
         let direct = try await runDirectProbe(
             text: text,
             manifest: manifest,
             profileDirectoryURL: profileDirectoryURL,
             windowSeconds: options.windowSeconds,
+            conditioningMode: options.conditioningMode,
+            outputStem: "\(options.profileName)-\(options.conditioningMode.rawValue)-direct",
         )
         return ComparisonResult(streamed: streamed, direct: direct)
     }
@@ -520,6 +891,8 @@ struct SpeakSwiftlyTestingMain {
         manifest: ProbeProfileManifest,
         profileDirectoryURL: URL,
         windowSeconds: Double,
+        conditioningMode: ConditioningMode,
+        outputStem: String,
     ) async throws -> CompareRun {
         guard let materialization = manifest.backendMaterializations.first(where: { $0.backend == "qwen3" }) else {
             throw UsageError.profileMissingQwenMaterialization(profileDirectoryURL.path)
@@ -538,34 +911,69 @@ struct SpeakSwiftlyTestingMain {
         generationParameters.repetitionPenalty = 1.05
         let directSamples: [Float]
 
-        if let conditioningArtifact = try loadStoredConditioning(manifest: manifest, profileDirectoryURL: profileDirectoryURL) {
-            directSamples = try await qwenModel.generate(
-                text: text,
-                conditioning: conditioningArtifact,
-                generationParameters: generationParameters,
-            )
-            .asArray(Float.self)
-        } else {
-            let referenceAudioURL = profileDirectoryURL.appendingPathComponent(
-                materialization.referenceAudioFile,
-                isDirectory: false,
-            )
-            let refAudio = try loadReferenceAudio(at: referenceAudioURL, sampleRate: qwenModel.sampleRate)
-            directSamples = try await qwenModel.generate(
-                text: text,
-                voice: nil,
-                refAudio: refAudio,
-                refText: materialization.referenceText,
-                language: "English",
-                generationParameters: generationParameters,
-            )
-            .asArray(Float.self)
+        switch conditioningMode {
+            case .artifact:
+                guard let conditioningArtifact = try loadStoredConditioning(
+                    manifest: manifest,
+                    profileDirectoryURL: profileDirectoryURL,
+                ) else {
+                    throw UsageError.profileMissingStoredConditioning(profileDirectoryURL.path)
+                }
+
+                directSamples = try await qwenModel.generate(
+                    text: text,
+                    conditioning: conditioningArtifact,
+                    generationParameters: generationParameters,
+                )
+                .asArray(Float.self)
+            case .auto:
+                if let conditioningArtifact = try loadStoredConditioning(
+                    manifest: manifest,
+                    profileDirectoryURL: profileDirectoryURL,
+                ) {
+                    directSamples = try await qwenModel.generate(
+                        text: text,
+                        conditioning: conditioningArtifact,
+                        generationParameters: generationParameters,
+                    )
+                    .asArray(Float.self)
+                } else {
+                    let referenceAudioURL = profileDirectoryURL.appendingPathComponent(
+                        materialization.referenceAudioFile,
+                        isDirectory: false,
+                    )
+                    let refAudio = try loadReferenceAudio(at: referenceAudioURL, sampleRate: qwenModel.sampleRate)
+                    directSamples = try await qwenModel.generate(
+                        text: text,
+                        voice: nil,
+                        refAudio: refAudio,
+                        refText: materialization.referenceText,
+                        language: "English",
+                        generationParameters: generationParameters,
+                    )
+                    .asArray(Float.self)
+                }
+            case .raw:
+                let referenceAudioURL = profileDirectoryURL.appendingPathComponent(
+                    materialization.referenceAudioFile,
+                    isDirectory: false,
+                )
+                let refAudio = try loadReferenceAudio(at: referenceAudioURL, sampleRate: qwenModel.sampleRate)
+                directSamples = try await qwenModel.generate(
+                    text: text,
+                    voice: nil,
+                    refAudio: refAudio,
+                    refText: materialization.referenceText,
+                    language: "English",
+                    generationParameters: generationParameters,
+                )
+                .asArray(Float.self)
         }
 
         let directOutputURL = try writeProbeWAV(
             samples: directSamples,
             sampleRate: qwenModel.sampleRate,
-            name: "qwen-direct-volume-probe.wav",
+            name: "\(outputStem).wav",
         )
         let analysis = analyzeVolume(
             samples: directSamples,
@@ -574,14 +982,20 @@ struct SpeakSwiftlyTestingMain {
         )
 
         return CompareRun(
+            lane: "direct",
+            conditioningMode: conditioningMode,
             generatedFilePath: directOutputURL.path,
             analysis: analysis,
         )
     }
 
     static func profileRootURL(options: VolumeProbeOptions) -> URL {
-        if let profileRoot = options.profileRoot {
-            return URL(fileURLWithPath: profileRoot, isDirectory: true)
+        profileRootURL(profileRootOverride: options.profileRoot)
+    }
+
+    static func profileRootURL(profileRootOverride: String?) -> URL {
+        if let profileRootOverride {
+            return URL(fileURLWithPath: profileRootOverride, isDirectory: true)
         }
 
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -617,6 +1031,24 @@ struct SpeakSwiftlyTestingMain {
     static func loadReferenceAudio(at url: URL, sampleRate: Int) throws -> MLXArray {
         let (_, audio) = try MLXAudioCore.loadAudioArray(from: url, sampleRate: sampleRate)
         return audio
+    }
+
+    static func makeProbeText(repeatCount: Int) -> String {
+        Array(repeating: defaultProbeParagraph, count: repeatCount).joined(separator: "\n\n")
+    }
+
+    static func loadMatrixText(textFile: String?, repeatCount: Int) throws -> String {
+        if let textFile {
+            let text = try String(contentsOfFile: textFile, encoding: .utf8)
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                throw UsageError.emptyProbeText
+            }
+
+            return trimmed
+        }
+
+        return makeProbeText(repeatCount: repeatCount)
     }
 
     static func writeProbeWAV(
@@ -687,6 +1119,90 @@ struct SpeakSwiftlyTestingMain {
         )
     }
 
+    static func makeEncodableProbeAnalysis(_ analysis: ProbeAnalysis) -> EncodableProbeAnalysis {
+        EncodableProbeAnalysis(
+            sampleRate: analysis.sampleRate,
+            windows: analysis.windows.map {
+                EncodableVolumeWindow(
+                    index: $0.index,
+                    startSeconds: $0.startSeconds,
+                    durationSeconds: $0.durationSeconds,
+                    rms: $0.rms,
+                    peak: $0.peak,
+                )
+            },
+            summary: analysis.summary.map {
+                EncodableVolumeSummary(
+                    firstRMS: $0.firstRMS,
+                    lastRMS: $0.lastRMS,
+                    rmsDropPercent: $0.rmsDropPercent,
+                    slopePerWindow: $0.slopePerWindow,
+                    firstPeak: $0.firstPeak,
+                    lastPeak: $0.lastPeak,
+                    headRMS: $0.headRMS,
+                    tailRMS: $0.tailRMS,
+                    tailHeadRatio: $0.tailHeadRatio,
+                    segments: $0.segments.map {
+                        EncodableVolumeSegment(label: $0.label, rms: $0.rms, peak: $0.peak)
+                    },
+                )
+            },
+        )
+    }
+
+    static func makeCompareRunArtifact(_ run: CompareRun) -> CompareRunArtifact {
+        CompareRunArtifact(
+            lane: run.lane,
+            conditioningMode: run.conditioningMode.rawValue,
+            generatedFilePath: run.generatedFilePath,
+            analysis: makeEncodableProbeAnalysis(run.analysis),
+        )
+    }
+
+    static func writeProbeArtifact(
+        _ artifact: some Encodable,
+        stem: String,
+        latestFilename: String,
+    ) throws -> URL {
+        let artifactsRoot = try packageRootURL()
+            .appendingPathComponent(".local/volume-probes", isDirectory: true)
+        try FileManager.default.createDirectory(at: artifactsRoot, withIntermediateDirectories: true)
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let artifactURL = artifactsRoot.appendingPathComponent("\(stem)-\(stamp).json", isDirectory: false)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode(artifact)
+        try encoded.write(to: artifactURL, options: .atomic)
+
+        let latestURL = artifactsRoot.appendingPathComponent(latestFilename, isDirectory: false)
+        try encoded.write(to: latestURL, options: .atomic)
+        return artifactURL
+    }
+
+    static func packageRootURL() throws -> URL {
+        let fileManager = FileManager.default
+        var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+        while true {
+            let manifestURL = candidateURL.appendingPathComponent("Package.swift", isDirectory: false)
+            if fileManager.fileExists(atPath: manifestURL.path) {
+                return candidateURL
+            }
+
+            let parentURL = candidateURL.deletingLastPathComponent()
+            guard parentURL != candidateURL else {
+                throw UsageError.packageRootNotFound(#filePath)
+            }
+
+            candidateURL = parentURL
+        }
+    }
+
     static func analyzeVolume(
         samples: [Float],
         sampleRate: Int,
@@ -746,7 +1262,7 @@ struct SpeakSwiftlyTestingMain {
         if let summary = analysis.summary {
             print(
                 String(
-                    format: "%@: first_rms=%.5f last_rms=%.5f rms_drop_pct=%.2f slope_per_window=%.6f first_peak=%.5f last_peak=%.5f",
+                    format: "%@: first_rms=%.5f last_rms=%.5f rms_drop_pct=%.2f slope_per_window=%.6f first_peak=%.5f last_peak=%.5f head_rms=%.5f tail_rms=%.5f tail_head_ratio=%.5f",
                     summaryLabel,
                     summary.firstRMS,
                     summary.lastRMS,
@@ -754,8 +1270,22 @@ struct SpeakSwiftlyTestingMain {
                     summary.slopePerWindow,
                     summary.firstPeak,
                     summary.lastPeak,
+                    summary.headRMS,
+                    summary.tailRMS,
+                    summary.tailHeadRatio,
                 ),
             )
+            for segment in summary.segments {
+                print(
+                    String(
+                        format: "%@_%@: rms=%.5f peak=%.5f",
+                        summaryLabel,
+                        segment.label,
+                        segment.rms,
+                        segment.peak,
+                    ),
+                )
+            }
         }
     }
 
@@ -788,6 +1318,10 @@ struct SpeakSwiftlyTestingMain {
             partialResult += offset * offset
         }
         let slopePerWindow = denominator == 0 ? 0 : numerator / denominator
+        let segments = makeVolumeSegments(windows)
+        let headRMS = segments.first?.rms ?? firstRMS
+        let tailRMS = segments.last?.rms ?? lastRMS
+        let tailHeadRatio = headRMS == 0 ? 0 : tailRMS / headRMS
 
         return VolumeSummary(
             firstRMS: firstRMS,
@@ -796,7 +1330,33 @@ struct SpeakSwiftlyTestingMain {
             slopePerWindow: slopePerWindow,
             firstPeak: first.peak,
             lastPeak: last.peak,
+            headRMS: headRMS,
+            tailRMS: tailRMS,
+            tailHeadRatio: tailHeadRatio,
+            segments: segments,
         )
+    }
+
+    static func makeVolumeSegments(_ windows: [VolumeWindow]) -> [VolumeSegment] {
+        guard !windows.isEmpty else { return [] }
+
+        let labels = ["q1", "q2", "q3", "q4"]
+        let count = windows.count
+        var segments = [VolumeSegment]()
+        segments.reserveCapacity(labels.count)
+
+        for (segmentIndex, label) in labels.enumerated() {
+            let start = (segmentIndex * count) / labels.count
+            let end = ((segmentIndex + 1) * count) / labels.count
+            guard start < end else { continue }
+
+            let segmentWindows = Array(windows[start..<end])
+            let rms = segmentWindows.reduce(0.0) { $0 + $1.rms } / Double(segmentWindows.count)
+            let peak = segmentWindows.map(\.peak).max() ?? 0
+            segments.append(VolumeSegment(label: label, rms: rms, peak: peak))
+        }
+
+        return segments
     }
 
     static func parseFloatWAV(_ data: Data) throws -> (sampleRate: Int, channelCount: Int, samples: [Float]) {
@@ -917,8 +1477,10 @@ extension SpeakSwiftlyTestingMain {
         case emptyProbeText
         case invalidWAV(String)
         case profileMissingQwenMaterialization(String)
+        case profileMissingStoredConditioning(String)
         case profileModelIsNotQwen(String)
         case referenceAudioLoadFailed(String)
+        case packageRootNotFound(String)
 
         var errorDescription: String? {
             switch self {
@@ -946,10 +1508,14 @@ extension SpeakSwiftlyTestingMain {
                     message
                 case let .profileMissingQwenMaterialization(path):
                     "SpeakSwiftlyTesting could not find a stored qwen3 backend materialization in '\(path)/profile.json'."
+                case let .profileMissingStoredConditioning(path):
+                    "SpeakSwiftlyTesting could not find a stored qwen3 conditioning artifact in '\(path)', but this probe run required explicit artifact conditioning."
                 case let .profileModelIsNotQwen(modelRepo):
                     "SpeakSwiftlyTesting expected model repo '\(modelRepo)' to load as Qwen3TTSModel for the direct comparison path, but it resolved to a different speech model type."
                 case let .referenceAudioLoadFailed(path):
                     "SpeakSwiftlyTesting could not decode any audio samples from '\(path)' for the direct Qwen comparison path."
+                case let .packageRootNotFound(path):
+                    "SpeakSwiftlyTesting could not find the package root while walking upward from '\(path)' to write the local investigation artifact."
             }
         }
 
@@ -960,8 +1526,9 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting status
               swift run SpeakSwiftlyTesting smoke
               swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--profile-root PATH]
-              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
-              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
+              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
+              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
+              swift run SpeakSwiftlyTesting matrix-volume [--profile NAME ...] [--profile-root PATH] [--short-text-file PATH] [--long-text-file PATH] [--short-repeat COUNT] [--long-repeat COUNT] [--iterations COUNT] [--window-seconds SECONDS] [--include-streamed]
             """
         }
     }

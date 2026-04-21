@@ -296,6 +296,37 @@ The next focused pass should stay narrow and evidence-first:
    SpeakSwiftly repros against the upstream passing probes to see whether the
    failing cases are simply much longer or otherwise more pathological.
 
+## Implemented Probe Refinement
+
+The local `SpeakSwiftlyTesting` surface now has a better investigation harness
+for this issue.
+
+What landed:
+
+- `compare-volume` now accepts `--conditioning auto|raw|artifact`
+- `matrix-volume` now logs profile-and-length probe rows across one or more
+  profiles, with optional streamed runtime rows
+- probe summaries now include quarter-style segment metrics, `head_rms`,
+  `tail_rms`, and `tail_head_ratio`
+- `compare-volume` and `matrix-volume` now write structured JSON artifacts under
+  `.local/volume-probes/`
+
+What this improves:
+
+- raw rebuilt conditioning can now be compared against persisted artifact
+  conditioning directly
+- profile sensitivity and prompt-length sensitivity can now be logged without
+  manually stitching together many ad hoc runs
+- reruns can now be compared from retained JSON artifacts instead of terminal
+  scrollback alone
+
+Current limitation:
+
+- this harness is still for logging and investigation, not a strict regression
+  gate
+- the upstream evidence still says the strongest collapse is stochastic enough
+  that one-shot numeric expectations are flaky
+
 ## Related Files
 
 - `docs/maintainers/backend-benchmarking-plan-2026-04-20.md`
