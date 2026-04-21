@@ -24,17 +24,18 @@ SpeakSwiftly uses the checked-in [.swiftformat](.swiftformat) file as the reposi
 Use these commands from the package root:
 
 ```bash
+sh scripts/repo-maintenance/install-hooks.sh
 sh scripts/repo-maintenance/validate-all.sh
 swiftformat --lint --config .swiftformat .
 swiftformat --config .swiftformat .
 swiftlint lint --config .swiftlint.yml
 ```
 
-Use `validate-all.sh` when you want the shared repo-maintenance gate that backs the sample pre-commit hook, the release preflight, and CI. Use the first `swiftformat` command when you want to see formatting drift without rewriting files. Use the second `swiftformat` command when you intentionally want to apply formatting changes. Use the SwiftLint command for the smaller safety and maintainability checks that are intentionally left outside SwiftFormat.
+Use `install-hooks.sh` once per local clone to enable the repository-managed Git hooks through `core.hooksPath`. Use `validate-all.sh` when you want the shared repo-maintenance gate that backs the pre-commit hook, the release preflight, and CI. Use the first `swiftformat` command when you want to see formatting drift without rewriting files. Use the second `swiftformat` command when you intentionally want to apply formatting changes. Use the SwiftLint command for the smaller safety and maintainability checks that are intentionally left outside SwiftFormat.
 
 Treat SwiftFormat as the primary style tool in this repository. Keep SwiftLint focused on non-formatting policy checks instead of duplicating formatter behavior.
 
-If your local clone wants automatic hook enforcement, copy `scripts/repo-maintenance/hooks/pre-commit.sample` into `.git/hooks/pre-commit` and make it executable. That hook intentionally stays optional, but it now runs the same validation entry point as release preflight and CI.
+The repository-managed `pre-commit` hook is now the intended local enforcement path. Run `sh scripts/repo-maintenance/install-hooks.sh` after cloning, and Git will use `scripts/repo-maintenance/hooks/pre-commit` for this clone. That hook runs the same validation entry point as release preflight and CI.
 
 ## Runtime Shape
 
