@@ -10,6 +10,7 @@ decay investigation across:
 - the forked `mlx-audio-swift` regression suite on `tests/qwen3tts-decay-repro`
 - the local `SpeakSwiftly` Qwen benchmark suite
 - local `SpeakSwiftlyTesting` direct investigation commands and saved artifacts
+- one local `SpeakSwiftlyTesting` replay of the saved generated-code artifact
 
 The live local SpeakSwiftly service was unloaded first with:
 
@@ -65,6 +66,9 @@ swift run SpeakSwiftlyTesting capture-qwen-codes \
   --conditioning artifact \
   --repeat 16 \
   --lane direct
+
+swift run SpeakSwiftlyTesting replay-qwen-codes \
+  --artifact-file .local/volume-probes/capture-qwen-codes-latest.json
 ```
 
 Attempted but intentionally stopped:
@@ -224,6 +228,54 @@ Interpretation:
 - That closes the main instrumentation gap called out in the generated-code
   capture design note.
 
+### 5. Local replay from the saved generated-code artifact
+
+The first local replay run wrote:
+
+- `.local/volume-probes/replay-qwen-codes-2026-04-21T19-39-35Z.json`
+- `.local/volume-probes/replay-qwen-codes-latest.json`
+
+Replay input:
+
+- source artifact: `.local/volume-probes/capture-qwen-codes-latest.json`
+- profile: `probe-soft-femme-20260421`
+- conditioning: `artifact`
+- model repo: `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit`
+
+Available local replay lanes today:
+
+- pure bounded decode from the captured codes
+- helper decode via `debugDecodeChunk(...)`
+- plain streaming decode from the captured generated codes
+- reference-warmed streaming decode from the same captured generated codes
+
+Key result:
+
+- all three currently public replay lanes preserved essentially the same
+  degraded tail shape as the original captured run
+
+Representative summaries:
+
+| Lane | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Source retained capture | 0.12379 | 0.05830 | -52.90% | 0.09045 | 0.06752 | 0.74651 |
+| Bounded decode | 0.12379 | 0.05612 | -54.66% | 0.08981 | 0.06546 | 0.72884 |
+| Helper decode | 0.12379 | 0.05830 | -52.90% | 0.09045 | 0.06752 | 0.74651 |
+| Plain streaming replay | 0.12336 | 0.05830 | -52.74% | 0.09025 | 0.06752 | 0.74822 |
+| Warmed streaming replay | 0.12379 | 0.05830 | -52.90% | 0.09045 | 0.06752 | 0.74652 |
+
+Interpretation:
+
+- The full local replay triangle still suggests the preserved bad tail is not
+  introduced by a dramatic divergence between bounded, helper, and warmed
+  streaming decode paths.
+- The bounded lane is somewhat worse on this capture, but only modestly:
+  - bounded tail/head `0.72884`
+  - helper tail/head `0.74651`
+  - warmed streaming tail/head `0.74652`
+- For this saved soft-femme artifact, the degraded envelope appears to be
+  largely present before those decode-path choices diverge.
+
 ## Overall Readout
 
 The current evidence points to the same shape as the earlier investigation:
@@ -233,16 +285,16 @@ The current evidence points to the same shape as the earlier investigation:
 - The direct-vs-streamed decode path is not the primary root cause.
 - The new generated-code capture hook is now available and producing the exact
   codec payload we need for offline replay or narrower upstream comparisons.
+- The first local replay from a saved bad run kept the same degraded tail
+  shape across helper decode and both streaming replay variants.
 
 ## Recommended Next Steps
 
-1. Use the saved `capture-qwen-codes-latest.json` artifact to build a narrow
-   replay path in the fork so we can compare:
-   - bounded decode from captured codes
-   - warmed streaming decode from captured codes
-   - any helper or convenience decode path used in SpeakSwiftly
-2. Re-run `capture-qwen-codes` for `probe-clear-masc-20260421` so we have one
+1. Re-run `capture-qwen-codes` for `probe-clear-masc-20260421` so we have one
    replay artifact per probe profile, not just the soft-femme lane.
+2. Replay the clear-masc artifact through the same bounded, helper, and
+   streaming lanes, and compare whether it shows the same near-identical replay
+   behavior as the soft-femme artifact.
 3. Add a smaller local matrix variant for daily reruns.
    The current `matrix-volume` shape is too expensive for frequent use; a
    reduced-profile or reduced-length variant would keep the evidence fresh

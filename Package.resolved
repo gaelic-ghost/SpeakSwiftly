@@ -16,7 +16,7 @@
       "location" : "https://github.com/gaelic-ghost/mlx-audio-swift.git",
       "state" : {
         "branch" : "tests/qwen3tts-decay-repro",
-        "revision" : "bb56e8a5b0a8e885b4b979d4cdb980121281e080"
+        "revision" : "d82ad715fd1ffb841c7771deacd158faa8183f0c"
       }
     },
     {

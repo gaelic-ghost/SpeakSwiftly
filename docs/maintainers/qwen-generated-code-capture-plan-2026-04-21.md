@@ -17,9 +17,36 @@ What shipped in this first pass:
 What is still intentionally deferred:
 
 - streamed runtime generated-code capture
-- a replay helper in `SpeakSwiftlyTesting`
 - fixture export automation for upstream `mlx-audio-swift`
 - checksums or deduplicated large-payload storage
+
+## Current Next Slice
+
+The next concrete step after the first capture landing is a local replay helper
+that can consume `capture-qwen-codes-*.json` directly inside
+`SpeakSwiftlyTesting`.
+
+That helper now exists as `replay-qwen-codes` and can now compare:
+
+- pure bounded decode from the captured codes
+- current helper decode (`debugDecodeChunk(...)`)
+- plain streaming decode from the captured generated codes
+- reference-warmed streaming decode from the same captured generated codes
+
+That replay helper should:
+
+- load one saved capture artifact
+- rebuild the captured generated and reference code tensors as `MLXArray`
+- run the same three decode surfaces already used in the upstream fork audit
+  - bounded decode
+  - current `debugDecodeChunk(...)`
+  - reference-warmed `debugStreamingDecode(...)`
+- write one replay artifact under `.local/volume-probes/`
+- reuse the same retained waveform summaries already used by
+  `compare-volume` and `capture-qwen-codes`
+
+That gives us a local narrow lane for answering the decode-path question from a
+single preserved bad run before we build any fixture-export convenience.
 
 ## Purpose
 

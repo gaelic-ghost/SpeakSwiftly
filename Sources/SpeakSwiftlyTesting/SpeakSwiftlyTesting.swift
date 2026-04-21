@@ -15,6 +15,7 @@ struct SpeakSwiftlyTestingMain {
         case compareVolume = "compare-volume"
         case matrixVolume = "matrix-volume"
         case captureQwenCodes = "capture-qwen-codes"
+        case replayQwenCodes = "replay-qwen-codes"
     }
 
     enum ConditioningMode: String {
@@ -73,6 +74,11 @@ struct SpeakSwiftlyTestingMain {
         var windowSeconds = 2.0
         var conditioningMode: ConditioningMode = .auto
         var lane: Lane = .direct
+    }
+
+    struct ReplayQwenCodesOptions {
+        var artifactFile: String?
+        var windowSeconds: Double?
     }
 
     struct VolumeWindow {
@@ -239,6 +245,28 @@ struct SpeakSwiftlyTestingMain {
         let codecLanguageID: Int?
     }
 
+    struct ReplayQwenCodesArtifact: Encodable {
+        let schemaVersion: Int
+        let generatedAt: Date
+        let sourceArtifactPath: String
+        let sourceGeneratedAt: Date
+        let profileName: String
+        let profileRoot: String?
+        let conditioningMode: String
+        let lane: String
+        let modelRepo: String
+        let sampleRate: Int
+        let windowSeconds: Double
+        let sourceRetainedAnalysis: EncodableProbeAnalysis
+        let replayRuns: [ReplayRunArtifact]
+    }
+
+    struct ReplayRunArtifact: Encodable {
+        let lane: String
+        let generatedFilePath: String
+        let analysis: EncodableProbeAnalysis
+    }
+
     struct ProbeMaterializationManifest: Decodable {
         let backend: String
         let modelRepo: String
@@ -277,6 +305,86 @@ struct SpeakSwiftlyTestingMain {
         func makeArray() -> MLXArray {
             MLXArray(values).reshaped(shape)
         }
+    }
+
+    struct DecodableVolumeWindow: Decodable {
+        let index: Int
+        let startSeconds: Double
+        let durationSeconds: Double
+        let rms: Double
+        let peak: Double
+    }
+
+    struct DecodableVolumeSegment: Decodable {
+        let label: String
+        let rms: Double
+        let peak: Double
+    }
+
+    struct DecodableVolumeSummary: Decodable {
+        let firstRMS: Double
+        let lastRMS: Double
+        let rmsDropPercent: Double
+        let slopePerWindow: Double
+        let firstPeak: Double
+        let lastPeak: Double
+        let headRMS: Double
+        let tailRMS: Double
+        let tailHeadRatio: Double
+        let segments: [DecodableVolumeSegment]
+    }
+
+    struct DecodableProbeAnalysis: Decodable {
+        let sampleRate: Int
+        let windows: [DecodableVolumeWindow]
+        let summary: DecodableVolumeSummary?
+
+        func makeProbeAnalysis() -> ProbeAnalysis {
+            ProbeAnalysis(
+                sampleRate: sampleRate,
+                windows: windows.map {
+                    VolumeWindow(
+                        index: $0.index,
+                        startSeconds: $0.startSeconds,
+                        durationSeconds: $0.durationSeconds,
+                        rms: $0.rms,
+                        peak: $0.peak,
+                    )
+                },
+                summary: summary.map {
+                    VolumeSummary(
+                        firstRMS: $0.firstRMS,
+                        lastRMS: $0.lastRMS,
+                        rmsDropPercent: $0.rmsDropPercent,
+                        slopePerWindow: $0.slopePerWindow,
+                        firstPeak: $0.firstPeak,
+                        lastPeak: $0.lastPeak,
+                        headRMS: $0.headRMS,
+                        tailRMS: $0.tailRMS,
+                        tailHeadRatio: $0.tailHeadRatio,
+                        segments: $0.segments.map {
+                            VolumeSegment(label: $0.label, rms: $0.rms, peak: $0.peak)
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    struct DecodableQwenCodeCaptureArtifact: Decodable {
+        let generatedAt: Date
+        let profileName: String
+        let profileRoot: String?
+        let conditioningMode: String
+        let lane: String
+        let modelRepo: String
+        let sampleRate: Int
+        let retainedAnalysis: DecodableProbeAnalysis
+        let generatedCodes: ProbeInt32Tensor
+        let referenceCodes: ProbeInt32Tensor?
+        let referenceTextTokenIDs: ProbeInt32Tensor?
+        let resolvedLanguage: String?
+        let codecLanguageID: Int?
     }
 
     struct ProbeInt32Tensor: Decodable {
@@ -329,6 +437,9 @@ struct SpeakSwiftlyTestingMain {
             case .captureQwenCodes:
                 let options = try parseCaptureQwenCodesOptions(arguments: arguments)
                 try await runCaptureQwenCodes(options: options)
+            case .replayQwenCodes:
+                let options = try parseReplayQwenCodesOptions(arguments: arguments)
+                try await runReplayQwenCodes(options: options)
         }
     }
 
@@ -344,6 +455,7 @@ struct SpeakSwiftlyTestingMain {
            command != .compareVolume,
            command != .matrixVolume,
            command != .captureQwenCodes,
+           command != .replayQwenCodes,
            command != .createDesignProfile,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
@@ -560,6 +672,33 @@ struct SpeakSwiftlyTestingMain {
                     }
 
                     options.lane = lane
+                default:
+                    throw UsageError.unknownCommand(argument)
+            }
+            index += 1
+        }
+
+        return options
+    }
+
+    static func parseReplayQwenCodesOptions(arguments: [String]) throws -> ReplayQwenCodesOptions {
+        var options = ReplayQwenCodesOptions()
+        var index = 1
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--artifact-file":
+                    index += 1
+                    options.artifactFile = try requireOptionValue(arguments, index: index, for: argument)
+                case "--window-seconds":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let windowSeconds = Double(value), windowSeconds > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.windowSeconds = windowSeconds
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -840,6 +979,156 @@ struct SpeakSwiftlyTestingMain {
             latestFilename: "capture-qwen-codes-latest.json",
         )
         print("json_artifact: \(artifactURL.path)")
+    }
+
+    static func runReplayQwenCodes(options: ReplayQwenCodesOptions) async throws {
+        let artifactURL = try replayArtifactURL(options: options)
+        let sourceArtifact = try loadCapturedQwenCodeArtifact(from: artifactURL)
+        let retainedAnalysis = sourceArtifact.retainedAnalysis.makeProbeAnalysis()
+        let windowSeconds = options.windowSeconds
+            ?? retainedAnalysis.windows.first?.durationSeconds
+            ?? 2.0
+
+        let loadedModel = try await TTS.loadModel(modelRepo: sourceArtifact.modelRepo)
+        guard let qwenModel = loadedModel as? Qwen3TTSModel else {
+            throw UsageError.profileModelIsNotQwen(sourceArtifact.modelRepo)
+        }
+
+        let generatedCodes = sourceArtifact.generatedCodes.makeArray()
+        let referenceCodes = sourceArtifact.referenceCodes?.makeArray()
+        let decodeCodes = makeReplayDecodeCodes(
+            generatedCodes: generatedCodes,
+            referenceCodes: referenceCodes,
+        )
+
+        let boundedSamples = trimDecodedReferencePrefix(
+            qwenModel.debugBoundedDecode(decodeCodes).asArray(Float.self),
+            generatedCodes: generatedCodes,
+            referenceCodes: referenceCodes,
+        )
+        let helperSamples = trimDecodedReferencePrefix(
+            qwenModel.debugDecodeChunk(decodeCodes).asArray(Float.self),
+            generatedCodes: generatedCodes,
+            referenceCodes: referenceCodes,
+        )
+        let streamingSamples = qwenModel.debugStreamingDecode(
+            generatedCodes: generatedCodes,
+            referenceCodes: referenceCodes,
+            chunkTokens: 300,
+            warmWithReferenceCodes: false,
+        )
+        .asArray(Float.self)
+        let warmedStreamingSamples = qwenModel.debugStreamingDecode(
+            generatedCodes: generatedCodes,
+            referenceCodes: referenceCodes,
+            chunkTokens: 300,
+            warmWithReferenceCodes: true,
+        )
+        .asArray(Float.self)
+
+        let boundedRun = try makeReplayRun(
+            lane: "bounded_decode",
+            samples: boundedSamples,
+            sampleRate: sourceArtifact.sampleRate,
+            windowSeconds: windowSeconds,
+            outputStem: "\(sourceArtifact.profileName)-replay-bounded",
+        )
+        let helperRun = try makeReplayRun(
+            lane: "helper_decode_chunk",
+            samples: helperSamples,
+            sampleRate: sourceArtifact.sampleRate,
+            windowSeconds: windowSeconds,
+            outputStem: "\(sourceArtifact.profileName)-replay-helper",
+        )
+        let streamingRun = try makeReplayRun(
+            lane: "streaming_decode",
+            samples: streamingSamples,
+            sampleRate: sourceArtifact.sampleRate,
+            windowSeconds: windowSeconds,
+            outputStem: "\(sourceArtifact.profileName)-replay-streaming",
+        )
+        let warmedRun = try makeReplayRun(
+            lane: "warmed_streaming_decode",
+            samples: warmedStreamingSamples,
+            sampleRate: sourceArtifact.sampleRate,
+            windowSeconds: windowSeconds,
+            outputStem: "\(sourceArtifact.profileName)-replay-warmed-streaming",
+        )
+
+        print("source_artifact: \(artifactURL.path)")
+        print("source_generated_at: \(ISO8601DateFormatter().string(from: sourceArtifact.generatedAt))")
+        print("profile_name: \(sourceArtifact.profileName)")
+        if let profileRoot = sourceArtifact.profileRoot {
+            print("profile_root: \(profileRoot)")
+        }
+        print("conditioning_mode: \(sourceArtifact.conditioningMode)")
+        print("lane: \(sourceArtifact.lane)")
+        print("model_repo: \(sourceArtifact.modelRepo)")
+        print("sample_rate: \(sourceArtifact.sampleRate)")
+        print("window_seconds: \(windowSeconds)")
+        print("generated_code_shape: \(sourceArtifact.generatedCodes.shape)")
+        print("generated_code_values: \(sourceArtifact.generatedCodes.values.count)")
+        if let referenceCodes = sourceArtifact.referenceCodes {
+            print("reference_code_shape: \(referenceCodes.shape)")
+            print("reference_code_values: \(referenceCodes.values.count)")
+        }
+        if let referenceTextTokenIDs = sourceArtifact.referenceTextTokenIDs {
+            print("reference_text_token_ids_shape: \(referenceTextTokenIDs.shape)")
+            print("reference_text_token_ids_values: \(referenceTextTokenIDs.values.count)")
+        }
+        if let resolvedLanguage = sourceArtifact.resolvedLanguage {
+            print("resolved_language: \(resolvedLanguage)")
+        }
+        if let codecLanguageID = sourceArtifact.codecLanguageID {
+            print("codec_language_id: \(codecLanguageID)")
+        }
+
+        if let retainedSummary = retainedAnalysis.summary {
+            print(
+                String(
+                    format: "source_retained_summary: first_rms=%.5f last_rms=%.5f rms_drop_pct=%.2f head_rms=%.5f tail_rms=%.5f tail_head_ratio=%.5f",
+                    retainedSummary.firstRMS,
+                    retainedSummary.lastRMS,
+                    retainedSummary.rmsDropPercent,
+                    retainedSummary.headRMS,
+                    retainedSummary.tailRMS,
+                    retainedSummary.tailHeadRatio,
+                ),
+            )
+        }
+
+        for run in [boundedRun, helperRun, streamingRun, warmedRun] {
+            print("replay_lane: \(run.lane)")
+            print("generated_file: \(run.generatedFilePath)")
+            printAnalysis(run.analysis, prefix: run.lane, summaryLabel: "\(run.lane)_summary")
+        }
+
+        let replayArtifactURL = try writeProbeArtifact(
+            ReplayQwenCodesArtifact(
+                schemaVersion: 1,
+                generatedAt: Date(),
+                sourceArtifactPath: artifactURL.path,
+                sourceGeneratedAt: sourceArtifact.generatedAt,
+                profileName: sourceArtifact.profileName,
+                profileRoot: sourceArtifact.profileRoot,
+                conditioningMode: sourceArtifact.conditioningMode,
+                lane: sourceArtifact.lane,
+                modelRepo: sourceArtifact.modelRepo,
+                sampleRate: sourceArtifact.sampleRate,
+                windowSeconds: windowSeconds,
+                sourceRetainedAnalysis: makeEncodableProbeAnalysis(retainedAnalysis),
+                replayRuns: [boundedRun, helperRun, streamingRun, warmedRun].map {
+                    ReplayRunArtifact(
+                        lane: $0.lane,
+                        generatedFilePath: $0.generatedFilePath,
+                        analysis: makeEncodableProbeAnalysis($0.analysis),
+                    )
+                },
+            ),
+            stem: "replay-qwen-codes",
+            latestFilename: "replay-qwen-codes-latest.json",
+        )
+        print("json_artifact: \(replayArtifactURL.path)")
     }
 
     static func loadVolumeProbeText(options: VolumeProbeOptions) throws -> String {
@@ -1325,6 +1614,72 @@ struct SpeakSwiftlyTestingMain {
                 )
                 return (rebuiltConditioning, "raw")
         }
+    }
+
+    static func replayArtifactURL(options: ReplayQwenCodesOptions) throws -> URL {
+        if let artifactFile = options.artifactFile {
+            return URL(fileURLWithPath: artifactFile, isDirectory: false)
+        }
+
+        return try packageRootURL()
+            .appendingPathComponent(".local/volume-probes/capture-qwen-codes-latest.json", isDirectory: false)
+    }
+
+    static func loadCapturedQwenCodeArtifact(from url: URL) throws -> DecodableQwenCodeCaptureArtifact {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(DecodableQwenCodeCaptureArtifact.self, from: data)
+    }
+
+    static func makeReplayDecodeCodes(
+        generatedCodes: MLXArray,
+        referenceCodes: MLXArray?,
+    ) -> MLXArray {
+        if let referenceCodes {
+            return concatenated([referenceCodes.transposed(0, 2, 1), generatedCodes], axis: 1)
+        }
+
+        return generatedCodes
+    }
+
+    static func trimDecodedReferencePrefix(
+        _ samples: [Float],
+        generatedCodes: MLXArray,
+        referenceCodes: MLXArray?,
+    ) -> [Float] {
+        guard let referenceCodes else { return samples }
+
+        let totalLength = generatedCodes.dim(1) + referenceCodes.dim(2)
+        let cut = Int(Double(referenceCodes.dim(2)) / Double(max(totalLength, 1)) * Double(samples.count))
+        guard cut > 0, cut < samples.count else { return samples }
+
+        return Array(samples[cut...])
+    }
+
+    static func makeReplayRun(
+        lane: String,
+        samples: [Float],
+        sampleRate: Int,
+        windowSeconds: Double,
+        outputStem: String,
+    ) throws -> CompareRun {
+        let outputURL = try writeProbeWAV(
+            samples: samples,
+            sampleRate: sampleRate,
+            name: "\(outputStem).wav",
+        )
+        let analysis = analyzeVolume(
+            samples: samples,
+            sampleRate: sampleRate,
+            windowSeconds: windowSeconds,
+        )
+        return CompareRun(
+            lane: lane,
+            conditioningMode: .auto,
+            generatedFilePath: outputURL.path,
+            analysis: analysis,
+        )
     }
 
     static func profileRootURL(options: VolumeProbeOptions) -> URL {
@@ -1911,6 +2266,7 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
               swift run SpeakSwiftlyTesting matrix-volume [--profile NAME ...] [--profile-root PATH] [--short-text-file PATH] [--long-text-file PATH] [--short-repeat COUNT] [--long-repeat COUNT] [--iterations COUNT] [--window-seconds SECONDS] [--include-streamed]
               swift run SpeakSwiftlyTesting capture-qwen-codes [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--lane direct]
+              swift run SpeakSwiftlyTesting replay-qwen-codes [--artifact-file PATH] [--window-seconds SECONDS]
             """
         }
     }
