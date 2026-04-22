@@ -29,8 +29,10 @@ At startup the worker may emit status events while the resident backend warms.
 Every request includes an `id` and an `op`:
 
 ```json
-{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
+{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}
 ```
+
+For generation requests, the current worker keys are `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 Representative operations include:
 

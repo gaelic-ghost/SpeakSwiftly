@@ -195,8 +195,8 @@ extension SpeakSwiftly.Runtime {
             profileName: let profileName,
             textProfileID: _,
             jobType: _,
-            textContext: _,
-            sourceFormat: _,
+            inputTextContext: _,
+            requestContext: _,
         ):
                 profileName
             case .queueBatch(id: _, profileName: let profileName, items: _):

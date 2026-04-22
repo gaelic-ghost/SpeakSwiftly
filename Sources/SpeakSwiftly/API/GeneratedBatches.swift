@@ -13,33 +13,33 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
             case text
-            case textProfileID = "text_profile_id"
-            case textContext = "text_context"
-            case sourceFormat = "source_format"
+            case textProfile = "text_profile"
+            case inputTextContext = "input_text_context"
+            case requestContext = "request_context"
         }
 
         // MARK: Properties
 
         public let artifactID: String?
         public let text: String
-        public let textProfileID: String?
-        public let textContext: TextForSpeech.Context?
-        public let sourceFormat: TextForSpeech.SourceFormat?
+        public let textProfile: SpeakSwiftly.TextProfileID?
+        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let requestContext: SpeakSwiftly.RequestContext?
 
         // MARK: Lifecycle
 
         public init(
             artifactID: String? = nil,
             text: String,
-            textProfileID: String? = nil,
-            textContext: TextForSpeech.Context? = nil,
-            sourceFormat: TextForSpeech.SourceFormat? = nil,
+            textProfile: SpeakSwiftly.TextProfileID? = nil,
+            inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+            requestContext: SpeakSwiftly.RequestContext? = nil,
         ) {
             self.artifactID = artifactID
             self.text = text
-            self.textProfileID = textProfileID
-            self.textContext = textContext
-            self.sourceFormat = sourceFormat
+            self.textProfile = textProfile
+            self.inputTextContext = inputTextContext
+            self.requestContext = requestContext
         }
     }
 
@@ -49,8 +49,8 @@ public extension SpeakSwiftly {
     struct GeneratedBatch: Codable, Sendable, Equatable {
         enum CodingKeys: String, CodingKey {
             case batchID = "batch_id"
-            case profileName = "profile_name"
-            case textProfileID = "text_profile_id"
+            case voiceProfile = "voice_profile"
+            case textProfile = "text_profile"
             case speechBackend = "speech_backend"
             case state
             case items
@@ -66,8 +66,8 @@ public extension SpeakSwiftly {
         }
 
         public let batchID: String
-        public let profileName: String
-        public let textProfileID: String?
+        public let voiceProfile: String
+        public let textProfile: SpeakSwiftly.TextProfileID?
         public let speechBackend: SpeechBackend
         public let state: GenerationJobState
         public let items: [GenerationJobItem]
@@ -83,8 +83,8 @@ public extension SpeakSwiftly {
 
         init(
             batchID: String,
-            profileName: String,
-            textProfileID: String?,
+            voiceProfile: String,
+            textProfile: SpeakSwiftly.TextProfileID?,
             speechBackend: SpeechBackend,
             state: GenerationJobState,
             items: [GenerationJobItem],
@@ -99,8 +99,8 @@ public extension SpeakSwiftly {
             retentionPolicy: GenerationRetentionPolicy,
         ) {
             self.batchID = batchID
-            self.profileName = profileName
-            self.textProfileID = textProfileID
+            self.voiceProfile = voiceProfile
+            self.textProfile = textProfile
             self.speechBackend = speechBackend
             self.state = state
             self.items = items
@@ -143,9 +143,9 @@ public extension SpeakSwiftly.Runtime {
             SpeakSwiftly.GenerationJobItem(
                 artifactID: item.artifactID ?? "\(batchID)-artifact-\(index + 1)",
                 text: item.text,
-                textProfileID: item.textProfileID,
-                textContext: item.textContext,
-                sourceFormat: item.sourceFormat,
+                textProfile: item.textProfile,
+                inputTextContext: item.inputTextContext,
+                requestContext: item.requestContext,
             )
         }
     }

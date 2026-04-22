@@ -239,8 +239,8 @@ final class LockedFlag: @unchecked Sendable {
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            textContext: nil,
-            sourceFormat: nil,
+            inputTextContext: nil,
+            requestContext: nil,
         ),
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()

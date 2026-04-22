@@ -8,6 +8,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let textProfileID: String?
     let textContext: TextForSpeech.Context?
     let sourceFormat: TextForSpeech.SourceFormat?
+    let requestContext: SpeakSwiftly.RequestContext?
     let normalizedText: String
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
@@ -21,6 +22,10 @@ final class LiveSpeechRequestState: @unchecked Sendable {
 
     var op: String {
         request.opName
+    }
+
+    var voiceProfile: String {
+        profileName
     }
 
     init(
@@ -38,8 +43,8 @@ final class LiveSpeechRequestState: @unchecked Sendable {
             profileName: profileName,
             textProfileID: textProfileID,
             jobType: .live,
-            textContext: textContext,
-            sourceFormat: sourceFormat,
+            inputTextContext: inputTextContext,
+            requestContext: requestContext,
         ) = request else {
             fatalError(
                 "SpeakSwiftly attempted to create live speech request state for request '\(request.id)' (\(request.opName)), but that request does not require live playback. This indicates a runtime queueing bug.",
@@ -50,8 +55,9 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.text = text
         self.profileName = profileName
         self.textProfileID = textProfileID
-        self.textContext = textContext
-        self.sourceFormat = sourceFormat
+        textContext = inputTextContext?.context
+        sourceFormat = inputTextContext?.sourceFormat
+        self.requestContext = requestContext
         self.normalizedText = normalizedText
         self.textFeatures = textFeatures
         self.textSections = textSections

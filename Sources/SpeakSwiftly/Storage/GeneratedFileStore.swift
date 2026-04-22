@@ -4,8 +4,10 @@ struct GeneratedFileManifest: Codable, Equatable {
     let version: Int
     let artifactID: String
     let createdAt: Date
-    let profileName: String
-    let textProfileID: String?
+    let voiceProfile: String
+    let textProfile: SpeakSwiftly.TextProfileID?
+    let inputTextContext: SpeakSwiftly.InputTextContext?
+    let requestContext: SpeakSwiftly.RequestContext?
     let sampleRate: Int
     let audioFile: String
 }
@@ -15,16 +17,20 @@ public extension SpeakSwiftly {
     struct GeneratedFile: Codable, Sendable, Equatable {
         public let artifactID: String
         public let createdAt: Date
-        public let profileName: String
-        public let textProfileID: String?
+        public let voiceProfile: String
+        public let textProfile: SpeakSwiftly.TextProfileID?
+        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let requestContext: SpeakSwiftly.RequestContext?
         public let sampleRate: Int
         public let filePath: String
 
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
             case createdAt = "created_at"
-            case profileName = "profile_name"
-            case textProfileID = "text_profile_id"
+            case voiceProfile = "voice_profile"
+            case textProfile = "text_profile"
+            case inputTextContext = "input_text_context"
+            case requestContext = "request_context"
             case sampleRate = "sample_rate"
             case filePath = "file_path"
         }
@@ -32,15 +38,19 @@ public extension SpeakSwiftly {
         init(
             artifactID: String,
             createdAt: Date,
-            profileName: String,
-            textProfileID: String?,
+            voiceProfile: String,
+            textProfile: SpeakSwiftly.TextProfileID?,
+            inputTextContext: SpeakSwiftly.InputTextContext?,
+            requestContext: SpeakSwiftly.RequestContext?,
             sampleRate: Int,
             filePath: String,
         ) {
             self.artifactID = artifactID
             self.createdAt = createdAt
-            self.profileName = profileName
-            self.textProfileID = textProfileID
+            self.voiceProfile = voiceProfile
+            self.textProfile = textProfile
+            self.inputTextContext = inputTextContext
+            self.requestContext = requestContext
             self.sampleRate = sampleRate
             self.filePath = filePath
         }
@@ -56,8 +66,10 @@ struct StoredGeneratedFile: Equatable {
         SpeakSwiftly.GeneratedFile(
             artifactID: manifest.artifactID,
             createdAt: manifest.createdAt,
-            profileName: manifest.profileName,
-            textProfileID: manifest.textProfileID,
+            voiceProfile: manifest.voiceProfile,
+            textProfile: manifest.textProfile,
+            inputTextContext: manifest.inputTextContext,
+            requestContext: manifest.requestContext,
             sampleRate: manifest.sampleRate,
             filePath: audioURL.standardizedFileURL.path,
         )
@@ -105,8 +117,10 @@ struct GeneratedFileStore {
 
     func createGeneratedFile(
         artifactID: String,
-        profileName: String,
-        textProfileID: String?,
+        voiceProfile: String,
+        textProfile: SpeakSwiftly.TextProfileID?,
+        inputTextContext: SpeakSwiftly.InputTextContext?,
+        requestContext: SpeakSwiftly.RequestContext?,
         sampleRate: Int,
         audioData: Data,
     ) throws -> StoredGeneratedFile {
@@ -126,8 +140,10 @@ struct GeneratedFileStore {
             version: 1,
             artifactID: artifactID,
             createdAt: Date(),
-            profileName: profileName,
-            textProfileID: textProfileID,
+            voiceProfile: voiceProfile,
+            textProfile: textProfile,
+            inputTextContext: inputTextContext,
+            requestContext: requestContext,
             sampleRate: sampleRate,
             audioFile: Self.audioFileName,
         )

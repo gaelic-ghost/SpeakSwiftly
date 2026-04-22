@@ -39,7 +39,7 @@ import TextForSpeech
     let requestID = await runtime.generate
         .audio(
             text: "Hello from the generated file path.",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -85,7 +85,7 @@ import TextForSpeech
                 let generationJob = $0["generation_job"] as? [String: Any],
                 let generatedFile = $0["generated_file"] as? [String: Any],
                 generatedFile["artifact_id"] as? String == "\(requestID)-artifact-1",
-                generatedFile["profile_name"] as? String == "default-femme",
+                generatedFile["voice_profile"] as? String == "default-femme",
                 let filePath = generatedFile["file_path"] as? String
             else {
                 return false
@@ -111,8 +111,10 @@ import TextForSpeech
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     _ = try generatedFileStore.createGeneratedFile(
         artifactID: "req-file-lookup",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
@@ -179,15 +181,15 @@ import TextForSpeech
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     _ = try generationJobStore.createFileJob(
         jobID: "job-file-lookup",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
         speechBackend: .qwen3,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-file-lookup-artifact-1",
             text: "Hello from a persisted file job.",
-            textProfileID: nil,
-            textContext: nil,
-            sourceFormat: nil,
+            textProfile: nil,
+            inputTextContext: nil,
+            requestContext: nil,
         ),
         createdAt: Date(timeIntervalSince1970: 1234),
     )
@@ -256,23 +258,25 @@ import TextForSpeech
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     let storedFile = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-file-artifact-1",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     _ = try generationJobStore.createFileJob(
         jobID: "job-expire-file",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
         speechBackend: .qwen3,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-expire-file-artifact-1",
             text: "Persisted file job",
-            textProfileID: nil,
-            textContext: nil,
-            sourceFormat: nil,
+            textProfile: nil,
+            inputTextContext: nil,
+            requestContext: nil,
         ),
         createdAt: Date(timeIntervalSince1970: 3000),
     )
@@ -285,8 +289,10 @@ import TextForSpeech
                 createdAt: storedFile.summary.createdAt,
                 filePath: storedFile.summary.filePath,
                 sampleRate: storedFile.summary.sampleRate,
-                profileName: storedFile.summary.profileName,
-                textProfileID: storedFile.summary.textProfileID,
+                voiceProfile: storedFile.summary.voiceProfile,
+                textProfile: storedFile.summary.textProfile,
+                inputTextContext: storedFile.summary.inputTextContext,
+                requestContext: storedFile.summary.requestContext,
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 3001),
@@ -348,38 +354,42 @@ import TextForSpeech
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
     let first = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-batch-artifact-1",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x01]),
     )
     let second = try generatedFileStore.createGeneratedFile(
         artifactID: "job-expire-batch-artifact-2",
-        profileName: "default-femme",
-        textProfileID: "logs",
+        voiceProfile: "default-femme",
+        textProfile: "logs",
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x02]),
     )
     let generationJobStore = try makeGenerationJobStore(rootURL: rootURL)
     _ = try generationJobStore.createBatchJob(
         jobID: "job-expire-batch",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
         speechBackend: .qwen3,
         items: [
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-1",
                 text: "First",
-                textProfileID: nil,
-                textContext: nil,
-                sourceFormat: nil,
+                textProfile: nil,
+                inputTextContext: nil,
+                requestContext: nil,
             ),
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-2",
                 text: "Second",
-                textProfileID: "logs",
-                textContext: nil,
-                sourceFormat: nil,
+                textProfile: "logs",
+                inputTextContext: nil,
+                requestContext: nil,
             ),
         ],
         createdAt: Date(timeIntervalSince1970: 3100),
@@ -393,8 +403,10 @@ import TextForSpeech
                 createdAt: first.summary.createdAt,
                 filePath: first.summary.filePath,
                 sampleRate: first.summary.sampleRate,
-                profileName: first.summary.profileName,
-                textProfileID: first.summary.textProfileID,
+                voiceProfile: first.summary.voiceProfile,
+                textProfile: first.summary.textProfile,
+                inputTextContext: first.summary.inputTextContext,
+                requestContext: first.summary.requestContext,
             ),
             SpeakSwiftly.GenerationArtifact(
                 artifactID: second.summary.artifactID,
@@ -402,8 +414,10 @@ import TextForSpeech
                 createdAt: second.summary.createdAt,
                 filePath: second.summary.filePath,
                 sampleRate: second.summary.sampleRate,
-                profileName: second.summary.profileName,
-                textProfileID: second.summary.textProfileID,
+                voiceProfile: second.summary.voiceProfile,
+                textProfile: second.summary.textProfile,
+                inputTextContext: second.summary.inputTextContext,
+                requestContext: second.summary.requestContext,
             ),
         ],
         completedAt: Date(timeIntervalSince1970: 3101),

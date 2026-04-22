@@ -176,7 +176,7 @@ extension SpeakSwiftly.Runtime {
     ) async {
         let requestID = activeRequest?.id
         let op = activeRequest?.op
-        let profileName = activeRequest?.profileName
+        let profileName = activeRequest?.voiceProfile
 
         switch event {
             case let .outputDeviceObserved(currentDevice):

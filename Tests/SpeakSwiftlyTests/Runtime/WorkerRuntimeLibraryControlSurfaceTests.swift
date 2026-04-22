@@ -90,7 +90,7 @@ import TextForSpeech
     let speakFileID = await runtime.generate
         .audio(
             text: "Save this request as an artifact.",
-            with: "clear-guide",
+            voiceProfile: "clear-guide",
         )
         .id
     let fileArtifactID = "\(speakFileID)-artifact-1"

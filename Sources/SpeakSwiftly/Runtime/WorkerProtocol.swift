@@ -8,8 +8,8 @@ enum WorkerRequest: Equatable {
         profileName: String,
         textProfileID: String?,
         jobType: SpeechJobType,
-        textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?,
+        inputTextContext: SpeakSwiftly.InputTextContext?,
+        requestContext: SpeakSwiftly.RequestContext?,
     )
     case queueBatch(
         id: String,
@@ -75,7 +75,7 @@ enum WorkerRequest: Equatable {
 
     var id: String {
         switch self {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _),
                  .queueBatch(id: let id, profileName: _, items: _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
@@ -124,9 +124,9 @@ enum WorkerRequest: Equatable {
 
     var opName: String {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _):
                 "generate_speech"
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, inputTextContext: _, requestContext: _):
                 "generate_audio_file"
             case .queueBatch:
                 "generate_batch"
@@ -250,7 +250,7 @@ enum WorkerRequest: Equatable {
 
     var requiresPlayback: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _):
                 true
             default:
                 false
@@ -268,7 +268,7 @@ enum WorkerRequest: Equatable {
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, inputTextContext: _, requestContext: _),
                  .queueBatch,
                  .switchSpeechBackend,
                  .reloadModels,
@@ -336,9 +336,9 @@ enum WorkerRequest: Equatable {
         mutatesResidentState
     }
 
-    var profileName: String? {
+    var voiceProfile: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, textContext: _, sourceFormat: _),
+            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _),
                  .queueBatch(id: _, profileName: let profileName, items: _),
                  let .createProfile(_, profileName, _, _, _, _, _),
                  let .createClone(_, profileName, _, _, _, _),
@@ -390,10 +390,10 @@ enum WorkerRequest: Equatable {
 
     var textProfileID: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: let textProfileID, jobType: _, textContext: _, sourceFormat: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: let textProfileID, jobType: _, inputTextContext: _, requestContext: _):
                 return textProfileID
             case .queueBatch(id: _, profileName: _, items: let items):
-                let ids = Set(items.compactMap(\.textProfileID))
+                let ids = Set(items.compactMap(\.textProfile))
                 return ids.count == 1 ? ids.first : nil
             case .generatedFile,
                  .generatedFiles,
@@ -443,10 +443,10 @@ enum WorkerRequest: Equatable {
         }
     }
 
-    var textContext: TextForSpeech.Context? {
+    var inputTextContext: SpeakSwiftly.InputTextContext? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, textContext: let textContext, sourceFormat: _):
-                textContext
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, inputTextContext: let inputTextContext, requestContext: _):
+                inputTextContext
             case .queueBatch:
                 nil
             case .generatedFile,
@@ -494,10 +494,10 @@ enum WorkerRequest: Equatable {
         }
     }
 
-    var sourceFormat: TextForSpeech.SourceFormat? {
+    var requestContext: SpeakSwiftly.RequestContext? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, textContext: _, sourceFormat: let sourceFormat):
-                sourceFormat
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, inputTextContext: _, requestContext: let requestContext):
+                requestContext
             case .queueBatch:
                 nil
             case .generatedFile,

@@ -99,7 +99,8 @@ public extension SpeakSwiftly {
         struct RequestBroker {
             let id: String
             let operation: String
-            let profileName: String?
+            let voiceProfile: String?
+            let requestContext: SpeakSwiftly.RequestContext?
             let acceptedAt: Date
             var lastUpdatedAt: Date
             var stateSequence = 0
@@ -159,7 +160,8 @@ public extension SpeakSwiftly {
                 return SpeakSwiftly.RequestSnapshot(
                     id: id,
                     operation: operation,
-                    profileName: profileName,
+                    voiceProfile: voiceProfile,
+                    requestContext: requestContext,
                     acceptedAt: acceptedAt,
                     lastUpdatedAt: lastUpdatedAt,
                     sequence: stateSequence,
@@ -273,9 +275,13 @@ public extension SpeakSwiftly {
                 case jobID = "job_id"
                 case items
                 case text
+                case voiceProfile = "voice_profile"
                 case profileName = "profile_name"
                 case newProfileName = "new_profile_name"
+                case textProfile = "text_profile"
                 case textProfileID = "text_profile_id"
+                case inputTextContext = "input_text_context"
+                case requestContext = "request_context"
                 case textProfileStyle = "text_profile_style"
                 case replacement
                 case replacementID = "replacement_id"
@@ -300,9 +306,12 @@ public extension SpeakSwiftly {
             let jobID: String?
             let items: [SpeakSwiftly.GenerationJobItem]?
             let text: String?
+            let voiceProfile: String?
             let profileName: String?
             let newProfileName: String?
-            let textProfileID: String?
+            let textProfile: SpeakSwiftly.TextProfileID?
+            let inputTextContext: SpeakSwiftly.InputTextContext?
+            let requestContext: SpeakSwiftly.RequestContext?
             let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
             let replacement: TextForSpeech.Replacement?
             let replacementID: String?
@@ -318,6 +327,38 @@ public extension SpeakSwiftly {
             let outputPath: String?
             let referenceAudioPath: String?
             let transcript: String?
+
+            func encode(to encoder: any Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(id, forKey: .id)
+                try container.encode(op, forKey: .op)
+                try container.encodeIfPresent(artifactID, forKey: .artifactID)
+                try container.encodeIfPresent(batchID, forKey: .batchID)
+                try container.encodeIfPresent(jobID, forKey: .jobID)
+                try container.encodeIfPresent(items, forKey: .items)
+                try container.encodeIfPresent(text, forKey: .text)
+                try container.encodeIfPresent(voiceProfile, forKey: .voiceProfile)
+                try container.encodeIfPresent(profileName, forKey: .profileName)
+                try container.encodeIfPresent(newProfileName, forKey: .newProfileName)
+                try container.encodeIfPresent(textProfile, forKey: .textProfile)
+                try container.encodeIfPresent(inputTextContext, forKey: .inputTextContext)
+                try container.encodeIfPresent(requestContext, forKey: .requestContext)
+                try container.encodeIfPresent(textProfileStyle, forKey: .textProfileStyle)
+                try container.encodeIfPresent(replacement, forKey: .replacement)
+                try container.encodeIfPresent(replacementID, forKey: .replacementID)
+                try container.encodeIfPresent(cwd, forKey: .cwd)
+                try container.encodeIfPresent(repoRoot, forKey: .repoRoot)
+                try container.encodeIfPresent(textFormat, forKey: .textFormat)
+                try container.encodeIfPresent(nestedSourceFormat, forKey: .nestedSourceFormat)
+                try container.encodeIfPresent(sourceFormat, forKey: .sourceFormat)
+                try container.encodeIfPresent(requestID, forKey: .requestID)
+                try container.encodeIfPresent(speechBackend, forKey: .speechBackend)
+                try container.encodeIfPresent(vibe, forKey: .vibe)
+                try container.encodeIfPresent(voiceDescription, forKey: .voiceDescription)
+                try container.encodeIfPresent(outputPath, forKey: .outputPath)
+                try container.encodeIfPresent(referenceAudioPath, forKey: .referenceAudioPath)
+                try container.encodeIfPresent(transcript, forKey: .transcript)
+            }
         }
 
         typealias LogLevel = WorkerLogLevel

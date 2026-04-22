@@ -26,27 +26,27 @@ public extension SpeakSwiftly.Generate {
     ///
     /// - Parameters:
     ///   - text: The text to synthesize.
-    ///   - profileName: The stored voice profile to use.
-    ///   - textProfileID: An optional text-normalization profile override.
-    ///   - textContext: Optional normalization context metadata.
-    ///   - sourceFormat: Optional format hint for the source text.
+    ///   - voiceProfile: The stored voice profile to use.
+    ///   - textProfile: An optional text-normalization profile override.
+    ///   - inputTextContext: Optional metadata that describes how the input text should be interpreted.
+    ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
-        with profileName: SpeakSwiftly.Name,
-        textProfileID: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
+        voiceProfile: SpeakSwiftly.Name,
+        textProfile: SpeakSwiftly.TextProfileID? = nil,
+        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .queueSpeech(
                 id: UUID().uuidString,
                 text: text,
-                profileName: profileName,
-                textProfileID: textProfileID,
+                profileName: voiceProfile,
+                textProfileID: textProfile,
                 jobType: .live,
-                textContext: textContext,
-                sourceFormat: sourceFormat,
+                inputTextContext: inputTextContext,
+                requestContext: requestContext,
             ),
         )
     }
@@ -57,20 +57,20 @@ public extension SpeakSwiftly.Generate {
     /// immediate live playback.
     func audio(
         text: String,
-        with profileName: SpeakSwiftly.Name,
-        textProfileID: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
+        voiceProfile: SpeakSwiftly.Name,
+        textProfile: SpeakSwiftly.TextProfileID? = nil,
+        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .queueSpeech(
                 id: UUID().uuidString,
                 text: text,
-                profileName: profileName,
-                textProfileID: textProfileID,
+                profileName: voiceProfile,
+                textProfileID: textProfile,
                 jobType: .file,
-                textContext: textContext,
-                sourceFormat: sourceFormat,
+                inputTextContext: inputTextContext,
+                requestContext: requestContext,
             ),
         )
     }
@@ -79,17 +79,17 @@ public extension SpeakSwiftly.Generate {
     ///
     /// - Parameters:
     ///   - items: The items to synthesize.
-    ///   - profileName: The stored voice profile to use for every item in the batch.
+    ///   - voiceProfile: The stored voice profile to use for every item in the batch.
     /// - Returns: A request handle whose terminal success payload includes the created batch.
     func batch(
         _ items: [SpeakSwiftly.BatchItem],
-        with profileName: SpeakSwiftly.Name,
+        voiceProfile: SpeakSwiftly.Name,
     ) async -> SpeakSwiftly.RequestHandle {
         let requestID = UUID().uuidString
         return await runtime.submit(
             .queueBatch(
                 id: requestID,
-                profileName: profileName,
+                profileName: voiceProfile,
                 items: SpeakSwiftly.Runtime.resolveBatchItems(items, batchID: requestID),
             ),
         )

@@ -174,34 +174,30 @@ import Darwin
 // MARK: - Runtime Helpers
 
 @Test func `public library surface exposes queueing helpers`() {
-    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, SpeakSwiftly.InputTextContext?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
-        textProfileID,
-        textContext,
-        sourceFormat in
+        textProfile,
+        inputTextContext in
         await generate.speech(
             text: text,
-            with: profileName,
-            textProfileID: textProfileID,
-            textContext: textContext,
-            sourceFormat: sourceFormat,
+            voiceProfile: profileName,
+            textProfile: textProfile,
+            inputTextContext: inputTextContext,
         )
     }
-    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, String?, TextForSpeech.Context?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
+    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, SpeakSwiftly.InputTextContext?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
-        textProfileID,
-        textContext,
-        sourceFormat in
+        textProfile,
+        inputTextContext in
         await generate.audio(
             text: text,
-            with: profileName,
-            textProfileID: textProfileID,
-            textContext: textContext,
-            sourceFormat: sourceFormat,
+            voiceProfile: profileName,
+            textProfile: textProfile,
+            inputTextContext: inputTextContext,
         )
     }
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
@@ -389,7 +385,7 @@ import Darwin
         generate,
         items,
         profileName in
-        await generate.batch(items, with: profileName)
+        await generate.batch(items, voiceProfile: profileName)
     }
     let generatedBatch: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, batchID in
         await artifacts.batch(id: batchID)
@@ -524,12 +520,12 @@ import Darwin
 
 @Test func `public worker request handle exposes stable metadata`() {
     let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation
-    let profileName: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.profileName
+    let voiceProfile: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.voiceProfile
     let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
     let generationEvents: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>> = \.generationEvents
 
     _ = operation
-    _ = profileName
+    _ = voiceProfile
     _ = events
     _ = generationEvents
 }
@@ -551,7 +547,7 @@ import Darwin
     let updateState: KeyPath<SpeakSwiftly.RequestUpdate, SpeakSwiftly.RequestState> = \.state
     let snapshotID: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.id
     let snapshotOperation: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.operation
-    let snapshotProfileName: KeyPath<SpeakSwiftly.RequestSnapshot, String?> = \.profileName
+    let snapshotVoiceProfile: KeyPath<SpeakSwiftly.RequestSnapshot, String?> = \.voiceProfile
     let snapshotAcceptedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.acceptedAt
     let snapshotLastUpdatedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.lastUpdatedAt
     let snapshotSequence: KeyPath<SpeakSwiftly.RequestSnapshot, Int> = \.sequence
@@ -573,7 +569,7 @@ import Darwin
     _ = updateState
     _ = snapshotID
     _ = snapshotOperation
-    _ = snapshotProfileName
+    _ = snapshotVoiceProfile
     _ = snapshotAcceptedAt
     _ = snapshotLastUpdatedAt
     _ = snapshotSequence
@@ -583,15 +579,15 @@ import Darwin
 @Test func `public generated file surface exposes stable metadata`() {
     let artifactID: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.artifactID
     let createdAt: KeyPath<SpeakSwiftly.GeneratedFile, Date> = \.createdAt
-    let profileName: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.profileName
-    let textProfileID: KeyPath<SpeakSwiftly.GeneratedFile, String?> = \.textProfileID
+    let voiceProfile: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.voiceProfile
+    let textProfile: KeyPath<SpeakSwiftly.GeneratedFile, String?> = \.textProfile
     let sampleRate: KeyPath<SpeakSwiftly.GeneratedFile, Int> = \.sampleRate
     let filePath: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.filePath
 
     _ = artifactID
     _ = createdAt
-    _ = profileName
-    _ = textProfileID
+    _ = voiceProfile
+    _ = textProfile
     _ = sampleRate
     _ = filePath
 }

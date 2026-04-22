@@ -102,14 +102,14 @@ private extension QwenBenchmarkE2ETests {
             let generatedFile = try await BenchmarkHarness.runRequestBenchmark(
                 handle: session.runtime.generate.audio(
                     text: E2EHarness.testingPlaybackText,
-                    with: benchmarkProfileName,
+                    voiceProfile: benchmarkProfileName,
                 ),
                 logRecorder: session.logRecorder,
             )
             let liveSpeech = try await BenchmarkHarness.runRequestBenchmark(
                 handle: session.runtime.generate.speech(
                     text: E2EHarness.testingPlaybackText,
-                    with: benchmarkProfileName,
+                    voiceProfile: benchmarkProfileName,
                 ),
                 logRecorder: session.logRecorder,
             )

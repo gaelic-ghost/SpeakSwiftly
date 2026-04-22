@@ -211,15 +211,18 @@ Current resident-status stages:
 
 ## JSONL Reference
 
+For generation requests, the worker now documents `voice_profile`, `text_profile`, `input_text_context`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names.
+
 Representative request shapes:
 
 ```json
-{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}
-{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","profile_name":"default-femme","text_profile_id":"logs","cwd":"./","repo_root":"./","text_format":"cli_output"}
-{"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}
-{"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
-{"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","profile_name":"default-femme"}
-{"id":"req-1g","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile_id":"logs"}]}
+{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}
+{"id":"req-1b","op":"generate_speech","text":"Explain the latest runtime status.","voice_profile":"default-femme","request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime"}}
+{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","voice_profile":"default-femme","text_profile":"logs","input_text_context":{"context":{"cwd":"./","repo_root":"./","text_format":"cli_output"}}}
+{"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","voice_profile":"default-femme","input_text_context":{"context":{"text_format":"markdown","nested_source_format":"swift_source"}}}
+{"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","voice_profile":"default-femme","input_text_context":{"source_format":"swift_source"}}
+{"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","voice_profile":"default-femme"}
+{"id":"req-1g","op":"generate_batch","voice_profile":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile":"logs","request_context":{"source":"batch_export","topic":"follow-up"}}]}
 {"id":"req-1h","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
 {"id":"req-1i","op":"list_generated_files"}
 {"id":"req-1j","op":"get_generated_batch","batch_id":"req-1g"}
@@ -268,7 +271,7 @@ Representative response and event shapes:
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
-{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","profile_name":"default-femme","text_profile_id":null,"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile_id":null,"text_context":null,"source_format":null}]}}
+{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","voice_profile":"default-femme","text_profile":null,"input_text_context":null,"request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime","attributes":{}},"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","voice_profile":"default-femme","text_profile":null,"state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile":null,"input_text_context":null,"request_context":null}]}}
 ```
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. SpeakSwiftly resolves those paths against caller-provided context, not the worker launch directory.

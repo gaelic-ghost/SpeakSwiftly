@@ -12,6 +12,68 @@ public enum SpeakSwiftly {
     /// A stable operator-facing name used for stored resources such as voice profiles.
     public typealias Name = String
 
+    /// A stable identifier for one stored text-normalization profile.
+    public typealias TextProfileID = String
+
+    /// Describes how one input text payload should be interpreted before generation.
+    public struct InputTextContext: Codable, Sendable, Equatable {
+        public let context: TextForSpeech.Context?
+        public let sourceFormat: TextForSpeech.SourceFormat?
+
+        public init(
+            context: TextForSpeech.Context? = nil,
+            sourceFormat: TextForSpeech.SourceFormat? = nil,
+        ) {
+            self.context = context
+            self.sourceFormat = sourceFormat
+        }
+    }
+
+    /// Describes where a generation request came from and what it is related to.
+    public struct RequestContext: Codable, Sendable, Equatable {
+        enum CodingKeys: String, CodingKey {
+            case source
+            case app
+            case agent
+            case project
+            case topic
+            case attributes
+        }
+
+        public let source: String?
+        public let app: String?
+        public let agent: String?
+        public let project: String?
+        public let topic: String?
+        public let attributes: [String: String]
+
+        public init(
+            source: String? = nil,
+            app: String? = nil,
+            agent: String? = nil,
+            project: String? = nil,
+            topic: String? = nil,
+            attributes: [String: String] = [:],
+        ) {
+            self.source = source
+            self.app = app
+            self.agent = agent
+            self.project = project
+            self.topic = topic
+            self.attributes = attributes
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            source = try container.decodeIfPresent(String.self, forKey: .source)
+            app = try container.decodeIfPresent(String.self, forKey: .app)
+            agent = try container.decodeIfPresent(String.self, forKey: .agent)
+            project = try container.decodeIfPresent(String.self, forKey: .project)
+            topic = try container.decodeIfPresent(String.self, forKey: .topic)
+            attributes = try container.decodeIfPresent([String: String].self, forKey: .attributes) ?? [:]
+        }
+    }
+
     /// Describes the current playback state of the live audio player.
     public enum PlaybackState: String, Codable, Sendable, Equatable {
         case idle
@@ -76,7 +138,8 @@ public enum SpeakSwiftly {
     public struct RequestSnapshot: Sendable, Equatable {
         public let id: String
         public let operation: String
-        public let profileName: String?
+        public let voiceProfile: String?
+        public let requestContext: RequestContext?
         public let acceptedAt: Date
         public let lastUpdatedAt: Date
         public let sequence: Int
@@ -89,7 +152,8 @@ public enum SpeakSwiftly {
     public struct RequestHandle: Sendable {
         public let id: String
         public let operation: String
-        public let profileName: String?
+        public let voiceProfile: String?
+        public let requestContext: RequestContext?
         /// A stream of lifecycle events such as queueing, start, progress, and completion.
         public let events: AsyncThrowingStream<RequestEvent, any Swift.Error>
         /// A stream of generation-specific updates such as token counts and audio chunks.
@@ -98,13 +162,15 @@ public enum SpeakSwiftly {
         init(
             id: String,
             operation: String,
-            profileName: String?,
+            voiceProfile: String?,
+            requestContext: RequestContext?,
             events: AsyncThrowingStream<RequestEvent, any Swift.Error>,
             generationEvents: AsyncThrowingStream<GenerationEventUpdate, any Swift.Error>,
         ) {
             self.id = id
             self.operation = operation
-            self.profileName = profileName
+            self.voiceProfile = voiceProfile
+            self.requestContext = requestContext
             self.events = events
             self.generationEvents = generationEvents
         }
