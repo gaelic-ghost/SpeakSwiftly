@@ -5,6 +5,7 @@ import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
 enum GenerationPolicy {
+    private static let qwenDefaultMaxTokens = 4096
     private static let residentTemperature: Float = 0.9
     private static let residentTopP: Float = 1.0
     private static let residentRepetitionPenalty: Float = 1.05
@@ -17,7 +18,7 @@ enum GenerationPolicy {
 
     static func residentParameters(for text: String) -> GenerateParameters {
         GenerateParameters(
-            maxTokens: residentMaxTokens(for: text),
+            maxTokens: qwenDefaultMaxTokens,
             temperature: residentTemperature,
             topP: residentTopP,
             repetitionPenalty: residentRepetitionPenalty,
@@ -26,7 +27,7 @@ enum GenerationPolicy {
 
     static func profileParameters(for text: String) -> GenerateParameters {
         GenerateParameters(
-            maxTokens: profileMaxTokens(for: text),
+            maxTokens: qwenDefaultMaxTokens,
             temperature: profileTemperature,
             topP: profileTopP,
             repetitionPenalty: profileRepetitionPenalty,
@@ -44,16 +45,6 @@ enum GenerationPolicy {
             chunkDuration: cloneTranscriptionChunkDuration,
             minChunkDuration: cloneTranscriptionMinimumChunkDuration,
         )
-    }
-
-    private static func residentMaxTokens(for text: String) -> Int {
-        let wordCount = max(SpeakSwiftly.DeepTrace.words(in: text).count, 1)
-        return min(2048, max(56, wordCount * 8))
-    }
-
-    private static func profileMaxTokens(for text: String) -> Int {
-        let wordCount = max(SpeakSwiftly.DeepTrace.words(in: text).count, 1)
-        return min(3072, max(96, wordCount * 10))
     }
 }
 
