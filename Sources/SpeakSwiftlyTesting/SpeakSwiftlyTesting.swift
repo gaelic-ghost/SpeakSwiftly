@@ -531,8 +531,6 @@ struct SpeakSwiftlyTestingMain {
         }
 
         var generationParameters = qwenModel.defaultGenerationParameters
-        let wordCount = max(text.split(whereSeparator: \.isWhitespace).count, 1)
-        generationParameters.maxTokens = min(2048, max(56, wordCount * 8))
         generationParameters.temperature = 0.9
         generationParameters.topP = 1.0
         generationParameters.repetitionPenalty = 1.05
