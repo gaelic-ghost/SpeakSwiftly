@@ -104,61 +104,11 @@ clear-masc run still showed a modest tail-ward pulse-rate increase. So the next
 audio-side slice should improve the estimator itself, not expand the same proxy
 across more reruns.
 
-The next controlled runtime sweep should also test resident streaming cadence
-directly. The current `0.18s` cadence appears to be a playback-oriented policy
-chosen to reduce one-chunk startup shudder, but on the Qwen path it also forces
-very frequent streaming decoder flushes. In the current vendored implementation
-the streaming decoder flush size is derived from:
-
-- `streamingChunkSize = max(1, Int(streamingInterval * 12.5))`
-
-That means the current sweep should cover:
-
-- `0.18s`
-- `0.32s`
-- `0.64s`
-- `1.0s`
-- `1.5s`
-- `2.0s`
-
-And it should explicitly track two linked questions:
-
-1. Does a larger cadence improve long-form output quality or stability for the
-   degraded profiles?
-2. Does a larger cadence reduce generation-and-decode churn enough to improve
-   throughput, chunk smoothness, or glitch resistance without reintroducing the
-   original startup shudder that motivated the tighter cadence?
-
-The current working model is:
-
-- cadence does not change Qwen sampling randomness directly
-- cadence does change how often the decoder is asked to flush tiny batches of
-  new codec frames into waveform output
-- smaller cadences likely increase decoder call overhead, chunk-boundary churn,
-  and generation-time contention
-- those factors are plausible contributors to the observed inconsistent symptom
-  cluster even if they are not the only root cause
-
-The first real sweep is now complete for
-`probe-soft-femme-20260421` under artifact conditioning, and it reinforces the
-same conclusion while narrowing the next step:
-
-- `0.18s` remained strongly degraded
-- `0.32s` improved dramatically in the streamed lane
-- `0.64s` and `1.0s` swung back toward heavy degradation
-- `1.5s` improved relative to the baseline but was still clearly degraded
-- `2.0s` also improved relative to the baseline
-
-So the cadence effect is real, but not monotonic. The next practical slice
-should be:
-
-1. remove the hardcoded English language setting
-2. rerun a narrower cadence set centered on the strongest current candidate
-   - `0.18s`
-   - `0.32s`
-   - `2.0s`
-3. repeat that narrower set on `probe-clear-masc-20260421` so the healthier
-   profile can serve as a control against the soft-femme degraded profile
+Any future runtime cadence investigation needs a stricter comparison surface
+than the old `compare-volume` path. Do not treat prior `compare-volume`-based
+cadence results as usable evidence. Before any new cadence sweep, the harness
+must first guarantee that both sides of a comparison are measuring the same
+effective generated span with clearly defined summary metrics.
 
 ## Purpose
 
