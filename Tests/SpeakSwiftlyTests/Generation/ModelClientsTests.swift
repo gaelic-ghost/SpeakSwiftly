@@ -78,12 +78,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         tuningProfile: .firstDrainedLiveMarvis,
     ).thresholds
 
-    #expect(compact.startupBufferTargetMS == 1440)
-    #expect(compact.lowWaterTargetMS == 640)
-    #expect(compact.resumeBufferTargetMS == 1700)
-    #expect(balanced.startupBufferTargetMS == 2320)
-    #expect(balanced.lowWaterTargetMS == 1040)
-    #expect(balanced.resumeBufferTargetMS == 2700)
+    #expect(compact.startupBufferTargetMS == 2880)
+    #expect(compact.lowWaterTargetMS == 1200)
+    #expect(compact.resumeBufferTargetMS == 3360)
+    #expect(balanced.startupBufferTargetMS == 5280)
+    #expect(balanced.lowWaterTargetMS == 2240)
+    #expect(balanced.resumeBufferTargetMS == 6140)
     #expect(extended.startupBufferTargetMS == 13120)
     #expect(extended.lowWaterTargetMS == 5000)
     #expect(extended.resumeBufferTargetMS == 16480)
@@ -225,9 +225,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let afterMoreChunks = controller.thresholds
 
     #expect(controller.phase == .recovery || controller.phase == .steady)
-    #expect(afterMoreChunks.startupBufferTargetMS >= 1660)
-    #expect(afterMoreChunks.lowWaterTargetMS >= 760)
-    #expect(afterMoreChunks.resumeBufferTargetMS >= 2000)
+    #expect(afterMoreChunks.startupBufferTargetMS >= 2600)
+    #expect(afterMoreChunks.lowWaterTargetMS >= 1100)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= 3000)
     #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
     #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
     #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
@@ -251,8 +251,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let hardened = controller.thresholds
 
     #expect(controller.phase == .recovery)
-    #expect(hardened.lowWaterTargetMS > adapted.lowWaterTargetMS)
-    #expect(hardened.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(hardened.lowWaterTargetMS >= adapted.lowWaterTargetMS)
+    #expect(hardened.resumeBufferTargetMS >= adapted.resumeBufferTargetMS)
+    #expect(hardened.startupBufferTargetMS >= adapted.startupBufferTargetMS)
     #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
 }
 
@@ -267,14 +268,14 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     }
 
     let adapted = controller.thresholds
-    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2600)
-    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2400)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 6400)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 6000)
 
     #expect(controller.phase == .warmup)
     #expect(controller.thresholds == adapted)
 }
 
-@Test func `marvis live cadence roles keep the first request faster without slowing the follower by default`() {
+@Test func `resident cadence aligns chatterbox and marvis with the looser baseline`() {
     let qwenStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .qwen3,
         cadenceProfile: .standard,
@@ -290,20 +291,15 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .firstDrainedLiveMarvis,
     )
-    let overlapSecondLaneInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .overlapSecondLaneDuringFirstDrain,
-    )
 
     #expect(qwenStandardInterval == 0.32)
-    #expect(marvisStandardInterval == 0.18)
-    #expect(chatterboxStandardInterval == 0.18)
-    #expect(firstRequestInterval == 0.10)
-    #expect(overlapSecondLaneInterval == 0.18)
-    #expect(firstRequestInterval < marvisStandardInterval)
-    #expect(overlapSecondLaneInterval == marvisStandardInterval)
+    #expect(marvisStandardInterval == 0.5)
+    #expect(chatterboxStandardInterval == 0.5)
+    #expect(firstRequestInterval == 0.5)
+    #expect(firstRequestInterval == marvisStandardInterval)
 }
 
-@Test func `marvis live cadence role selection distinguishes first request from overlap follower`() {
+@Test func `marvis live cadence role selection reserves the special role for the first request only`() {
     let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
         speechBackend: .qwen3,
         existingPlaybackJobCount: 0,
@@ -312,7 +308,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         speechBackend: .marvis,
         existingPlaybackJobCount: 0,
     )
-    let overlapFollowerProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+    let secondMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
         speechBackend: .marvis,
         existingPlaybackJobCount: 1,
     )
@@ -323,7 +319,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     #expect(qwenProfile == .standard)
     #expect(firstMarvisProfile == .firstDrainedLiveMarvis)
-    #expect(overlapFollowerProfile == .overlapSecondLaneDuringFirstDrain)
+    #expect(secondMarvisProfile == .standard)
     #expect(laterMarvisProfile == .standard)
 }
 
@@ -340,25 +336,25 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     #expect(standardAdmission.concurrentGenerationTargetMS == 2320)
-    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 2800)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 3040)
     #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
 }
 
 @Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
     let configuration = PlaybackController.fragileOverlapWindowConfiguration(
         tuningProfile: .firstDrainedLiveMarvis,
-        concurrentGenerationTargetMS: 2800,
+        concurrentGenerationTargetMS: 3160,
         lowWaterTargetMS: 1040,
     )
 
     #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
-        holdBufferTargetMS: 3120,
-        requiredStableBufferEventCount: 2,
+        holdBufferTargetMS: 3680,
+        requiredStableBufferEventCount: 4,
     ))
     #expect(
         PlaybackController.fragileOverlapWindowConfiguration(
             tuningProfile: .standard,
-            concurrentGenerationTargetMS: 2800,
+            concurrentGenerationTargetMS: 3160,
             lowWaterTargetMS: 1040,
         ) == nil,
     )
@@ -368,13 +364,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(
         PlaybackController.allowsConcurrentGeneration(
             bufferedAudioMS: 2160,
-            targetMS: 2700,
+            targetMS: 3160,
         ) == false,
     )
     #expect(
         PlaybackController.allowsConcurrentGeneration(
-            bufferedAudioMS: 2720,
-            targetMS: 2700,
+            bufferedAudioMS: 3200,
+            targetMS: 3160,
         ) == true,
     )
 }
@@ -382,39 +378,59 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 @Test func `fragile overlap window requires a brief healthy hold and re closes when reserve sags`() {
     let progress = PlaybackController.FragileOverlapWindowProgress(
         configuration: .init(
-            holdBufferTargetMS: 3120,
-            requiredStableBufferEventCount: 2,
+            holdBufferTargetMS: 3800,
+            requiredStableBufferEventCount: 4,
         ),
         stableBufferEventCount: 0,
         hasSatisfiedHold: false,
     )
 
     let firstHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3200,
-        concurrentGenerationTargetMS: 2800,
+        bufferedAudioMS: 3900,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: progress,
     )
     #expect(firstHealthyEvent.allowsConcurrentGeneration == false)
-    #expect(firstHealthyEvent.effectiveTargetMS == 3120)
+    #expect(firstHealthyEvent.effectiveTargetMS == 3800)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 1)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
     let secondHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3250,
-        concurrentGenerationTargetMS: 2800,
+        bufferedAudioMS: 3920,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
     )
-    #expect(secondHealthyEvent.allowsConcurrentGeneration == true)
-    #expect(secondHealthyEvent.effectiveTargetMS == 2800)
-    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
+    #expect(secondHealthyEvent.allowsConcurrentGeneration == false)
+    #expect(secondHealthyEvent.effectiveTargetMS == 3800)
+    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 2)
+    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3000,
-        concurrentGenerationTargetMS: 2800,
+    let thirdHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3940,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
     )
+    #expect(thirdHealthyEvent.allowsConcurrentGeneration == false)
+    #expect(thirdHealthyEvent.effectiveTargetMS == 3800)
+    #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 3)
+    #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
+
+    let fourthHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3960,
+        concurrentGenerationTargetMS: 3160,
+        fragileOverlapWindowProgress: thirdHealthyEvent.fragileOverlapWindowProgress,
+    )
+    #expect(fourthHealthyEvent.allowsConcurrentGeneration == true)
+    #expect(fourthHealthyEvent.effectiveTargetMS == 3160)
+    #expect(fourthHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
+
+    let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3600,
+        concurrentGenerationTargetMS: 3160,
+        fragileOverlapWindowProgress: fourthHealthyEvent.fragileOverlapWindowProgress,
+    )
     #expect(collapsingReserveEvent.allowsConcurrentGeneration == false)
-    #expect(collapsingReserveEvent.effectiveTargetMS == 3120)
+    #expect(collapsingReserveEvent.effectiveTargetMS == 3800)
     #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 0)
     #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 }
@@ -1251,6 +1267,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         toProfile: logs.profileID,
     )
     await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
 
     await runtime.accept(
         line: #"""
@@ -1289,6 +1311,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
 
     await runtime.accept(
         line: #"""
@@ -1303,7 +1331,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(normalized.contains("sample Rate"))
 }
 
-@Test func `live speech chunk planner keeps the first chunk short and packs later chunks`() {
+@Test func `live speech chunk planner groups three sentences first and two sentences thereafter`() {
     let text = """
     Please read this first sentence slowly and clearly for testing.
     Please read this second sentence slowly and clearly for testing.
@@ -1313,29 +1341,24 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let chunks = LiveSpeechChunkPlanner.chunks(for: text)
 
-    #expect(chunks.count == 3)
+    #expect(chunks.count == 2)
     #expect(chunks.map(\.text) == [
-        "Please read this first sentence slowly and clearly for testing.",
-        "Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
+        "Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
         "Please read this fourth sentence slowly and clearly for testing.",
     ])
-    #expect(chunks[0].wordCount < chunks[1].wordCount)
-    #expect(chunks[1].wordCount > chunks[2].wordCount)
+    #expect(chunks[0].wordCount > chunks[1].wordCount)
 }
 
-@Test func `live speech chunk planner splits oversized single sentences at clause boundaries`() {
+@Test func `live speech chunk planner keeps oversized sentences intact when chunking by sentence`() {
     let text = longPlaybackPlannerFixtureText
 
     let chunks = LiveSpeechChunkPlanner.chunks(for: text)
 
-    #expect(chunks.count == 3)
+    #expect(chunks.count == 1)
     #expect(chunks.map(\.text) == [
-        "Hello from the real resident SpeakSwiftly playback path.",
-        "This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing,",
-        "and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.",
+        "Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.",
     ])
-    #expect(chunks[0].wordCount < chunks[1].wordCount)
-    #expect(chunks[1].wordCount >= chunks[2].wordCount)
+    #expect(chunks[0].wordCount > 0)
 }
 
 @Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
@@ -1398,7 +1421,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedChunkTexts.count })
 
     #expect(residentRecorder.recordedTexts == expectedChunkTexts)
-    #expect(residentRecorder.recordedTexts.count == 3)
+    #expect(residentRecorder.recordedTexts.count == 2)
     #expect(residentRecorder.lastRefAudioWasProvided == true)
     #expect(residentRecorder.lastRefText == nil)
 }

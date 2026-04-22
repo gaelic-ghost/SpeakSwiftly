@@ -29,7 +29,7 @@ struct ChatterboxE2ETests {
             on: worker,
             id: "req-create-chatterbox-voice-design",
             profileName: profileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )

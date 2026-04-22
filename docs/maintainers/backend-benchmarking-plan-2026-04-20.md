@@ -352,8 +352,10 @@ follow-up pass.
 
 ## Suggested Test Layout
 
-The current Qwen benchmark suite proves the basic shape already works. The next
-step should be to generalize it instead of creating a second unrelated harness.
+The current Qwen benchmark suite proved the basic shape. The repository now has
+the generalized backend benchmark harness, and the next useful widening is
+Marvis-specific comparison work inside that shared harness instead of spinning
+up a second unrelated benchmark system.
 
 Recommended test layout:
 
@@ -427,6 +429,23 @@ Goal:
 Do not wait for every backend to surface identical model-native metrics before
 landing this slice. The comparison is still valuable with the shared timing,
 process-resource, and playback metrics.
+
+Status:
+
+- landed as `BackendBenchmarkE2ETests`
+
+### Slice 5: Add Marvis Resident-Policy Comparison Inside The Shared Harness
+
+Goal:
+
+- compare `dual_resident_serialized` against `single_resident_dynamic`
+- use one Marvis-specific three-request voice order that goes
+  `femme` -> `masc` -> `femme`
+- keep the result shape inside the same benchmark-summary and retention model
+
+Status:
+
+- landed as a Marvis-specific benchmark inside `BackendBenchmarkE2ETests`
 
 ### Slice 5: Add The Audible Lane
 

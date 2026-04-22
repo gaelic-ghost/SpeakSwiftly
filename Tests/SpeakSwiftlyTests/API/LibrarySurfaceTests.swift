@@ -25,6 +25,7 @@ import Darwin
     )
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -33,6 +34,7 @@ import Darwin
 
     #expect(configuration.speechBackend == .qwen3)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
 }
 
 @Test func `public configuration supports chatterbox turbo backend`() {
@@ -40,6 +42,7 @@ import Darwin
 
     #expect(configuration.speechBackend == .chatterboxTurbo)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
 }
 
 @Test func `public configuration round trips to disk`() throws {
@@ -51,6 +54,7 @@ import Darwin
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         qwenConditioningStrategy: .preparedConditioning,
+        marvisResidentPolicy: .singleResidentDynamic,
     )
 
     try configuration.save(to: persistenceURL)
@@ -58,6 +62,7 @@ import Darwin
 
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
+    #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
     #expect(loaded.textNormalizer == nil)
 }
 
@@ -91,6 +96,7 @@ import Darwin
 
     #expect(loaded.speechBackend == .qwen3)
     #expect(loaded.qwenConditioningStrategy == .legacyRaw)
+    #expect(loaded.marvisResidentPolicy == .dualResidentSerialized)
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {
@@ -98,11 +104,13 @@ import Darwin
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         qwenConditioningStrategy: .legacyRaw,
+        marvisResidentPolicy: .singleResidentDynamic,
         textNormalizer: normalizer,
     )
 
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .legacyRaw)
+    #expect(configuration.marvisResidentPolicy == .singleResidentDynamic)
     #expect(configuration.textNormalizer != nil)
 }
 

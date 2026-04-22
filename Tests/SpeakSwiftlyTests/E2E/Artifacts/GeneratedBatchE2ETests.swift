@@ -27,7 +27,7 @@ struct GeneratedBatchE2ETests {
             on: worker,
             id: "req-create-generated-batch-profile",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )

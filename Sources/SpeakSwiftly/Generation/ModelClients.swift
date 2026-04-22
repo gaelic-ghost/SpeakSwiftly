@@ -5,10 +5,12 @@ import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
 enum GenerationPolicy {
-    private static let qwenDefaultMaxTokens = 4096
-    private static let residentTemperature: Float = 0.9
-    private static let residentTopP: Float = 1.0
-    private static let residentRepetitionPenalty: Float = 1.05
+    private static let qwenResidentMaxTokens = 4096
+    private static let qwenResidentTemperature: Float = 0.9
+    private static let qwenResidentTopP: Float = 1.0
+    private static let qwenResidentRepetitionPenalty: Float = 1.05
+    private static let chatterboxResidentTemperature: Float = 0.8
+    private static let chatterboxResidentTopP: Float = 0.8
     private static let profileTemperature: Float = 0.9
     private static let profileTopP: Float = 1.0
     private static let profileRepetitionPenalty: Float = 1.05
@@ -16,18 +18,36 @@ enum GenerationPolicy {
     private static let cloneTranscriptionChunkDuration: Float = 120.0
     private static let cloneTranscriptionMinimumChunkDuration: Float = 1.0
 
-    static func residentParameters(for text: String) -> GenerateParameters {
-        GenerateParameters(
-            maxTokens: qwenDefaultMaxTokens,
-            temperature: residentTemperature,
-            topP: residentTopP,
-            repetitionPenalty: residentRepetitionPenalty,
-        )
+    static func residentParameters(
+        for backend: SpeakSwiftly.SpeechBackend,
+        text _: String,
+    ) -> GenerateParameters {
+        switch backend {
+            case .qwen3:
+                GenerateParameters(
+                    maxTokens: qwenResidentMaxTokens,
+                    temperature: qwenResidentTemperature,
+                    topP: qwenResidentTopP,
+                    repetitionPenalty: qwenResidentRepetitionPenalty,
+                )
+            case .chatterboxTurbo:
+                // Current mlx-audio-swift Chatterbox Turbo computes its own max-token
+                // cap and hardcodes repetition penalty internally, so only pass the
+                // knobs that upstream actually reads from the caller surface.
+                GenerateParameters(
+                    temperature: chatterboxResidentTemperature,
+                    topP: chatterboxResidentTopP,
+                )
+            case .marvis:
+                // Current mlx-audio-swift Marvis ignores caller-supplied generation
+                // parameters and samples with its own internal settings.
+                GenerateParameters()
+        }
     }
 
-    static func profileParameters(for text: String) -> GenerateParameters {
+    static func profileModelParameters(for _: String) -> GenerateParameters {
         GenerateParameters(
-            maxTokens: qwenDefaultMaxTokens,
+            maxTokens: qwenResidentMaxTokens,
             temperature: profileTemperature,
             topP: profileTopP,
             repetitionPenalty: profileRepetitionPenalty,
@@ -60,24 +80,33 @@ enum ModelFactory {
     static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
     static let importedCloneVoiceDescription = "Imported reference audio clone."
 
-    static func loadResidentModels(for backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels {
+    static func loadResidentModels(
+        for backend: SpeakSwiftly.SpeechBackend,
+        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy,
+    ) async throws -> ResidentSpeechModels {
         switch backend {
             case .qwen3:
                 return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .chatterboxTurbo:
                 return try await .chatterboxTurbo(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .marvis:
-                // Marvis keeps mutable generation caches on the model instance, so each
-                // resident lane needs its own model object even though both lanes load
-                // the same published weights.
-                async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
-                async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
-                return try await .marvis(
-                    MarvisResidentModels(
-                        conversationalA: conversationalA,
-                        conversationalB: conversationalB,
-                    ),
-                )
+                switch marvisResidentPolicy {
+                    case .dualResidentSerialized:
+                        // Marvis keeps mutable generation caches on the model instance,
+                        // so this policy warms one model object per conversational
+                        // voice while runtime scheduling still serializes generation.
+                        async let conversationalA = loadModel(modelRepo: residentModelRepo(for: backend))
+                        async let conversationalB = loadModel(modelRepo: residentModelRepo(for: backend))
+                        return try await .marvis(
+                            .dual(
+                                conversationalA: conversationalA,
+                                conversationalB: conversationalB,
+                            ),
+                        )
+                    case .singleResidentDynamic:
+                        let model = try await loadModel(modelRepo: residentModelRepo(for: backend))
+                        return .marvis(.single(model))
+                }
         }
     }
 

@@ -49,7 +49,7 @@ Use ``SpeakSwiftly/Voices/create(clone:from:vibe:transcript:)`` when you already
 let handle = await runtime.voices.create(
     clone: "archive-guide",
     from: URL(fileURLWithPath: "/tmp/reference.wav"),
-    vibe: .androgenous,
+    vibe: .femme,
     transcript: "The transcript of the recorded sample."
 )
 ```

@@ -31,7 +31,7 @@ extension SpeakSwiftly.Runtime {
             refAudio: nil,
             refText: nil,
             language: nil,
-            generationParameters: GenerationPolicy.profileParameters(for: storedProfile.manifest.sourceText),
+            generationParameters: GenerationPolicy.profileModelParameters(for: storedProfile.manifest.sourceText),
         )
         await logRequestEvent(
             "profile_audio_rerolled",

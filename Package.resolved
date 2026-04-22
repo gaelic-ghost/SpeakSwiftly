@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/TextForSpeech.git",
       "state" : {
-        "revision" : "78f935b6da04f923854fd5bc14394deb10c132c4",
-        "version" : "0.18.3"
+        "revision" : "b9640e2dd11054764aecd6117f98ad83db17d914",
+        "version" : "0.18.5"
       }
     },
     {

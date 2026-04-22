@@ -32,7 +32,7 @@ struct DeepTraceE2ETests {
             on: worker,
             id: "req-create-deep-trace",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )
@@ -102,7 +102,7 @@ struct DeepTraceE2ETests {
             on: worker,
             id: "req-create-segmented",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )
@@ -182,7 +182,7 @@ struct DeepTraceE2ETests {
             on: worker,
             id: "req-create-reversed-segmented",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )
@@ -262,7 +262,7 @@ struct DeepTraceE2ETests {
             on: worker,
             id: "req-create-conversational",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )
@@ -341,7 +341,7 @@ struct DeepTraceE2ETests {
             on: worker,
             id: "req-create-reversed-conversational",
             profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingProfileText,
+            text: E2EHarness.testingCloneSourceText,
             vibe: .masc,
             voiceDescription: E2EHarness.testingProfileVoiceDescription,
         )

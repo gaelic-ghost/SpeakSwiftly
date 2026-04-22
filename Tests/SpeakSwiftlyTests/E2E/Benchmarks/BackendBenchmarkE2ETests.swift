@@ -65,6 +65,58 @@ struct BackendBenchmarkE2ETests {
             print(report.prettyDescription)
         }
     }
+
+    @Test func `compare marvis resident policies with three queued voice switches`() async throws {
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+
+        try await Self.provisionMarvisBenchmarkProfiles(in: sandbox.profileRootURL)
+
+        let iterations = speakSwiftlyBackendBenchmarkIterations()
+        let playbackMode = BenchmarkHarness.effectivePlaybackMode()
+        var samples = [MarvisResidentPolicyBenchmarkSample]()
+        samples.reserveCapacity(iterations * SpeakSwiftly.MarvisResidentPolicy.allCases.count)
+
+        for residentPolicy in SpeakSwiftly.MarvisResidentPolicy.allCases {
+            for iteration in 1...iterations {
+                try await samples.append(
+                    Self.runMarvisResidentPolicySample(
+                        profileRootURL: sandbox.profileRootURL,
+                        residentPolicy: residentPolicy,
+                        iteration: iteration,
+                        playbackMode: playbackMode,
+                    ),
+                )
+            }
+        }
+
+        let summary = MarvisResidentPolicyBenchmarkSummary(
+            schemaVersion: backendBenchmarkSchemaVersion,
+            generatedAt: Date(),
+            host: .localMachine(),
+            settings: .current(
+                iterations: iterations,
+                playbackMode: playbackMode,
+                benchmarkTextCharacterCount: Self.benchmarkText.count,
+            ),
+            residentPolicies: MarvisResidentPolicyBenchmarkReport.make(from: samples),
+        )
+        let summaryURL = try BenchmarkHarness.writeSummary(
+            summary,
+            timestampedStem: playbackMode == .audible
+                ? "marvis-resident-policy-audible-benchmark"
+                : "marvis-resident-policy-benchmark",
+            latestFilename: playbackMode == .audible
+                ? "marvis-resident-policy-audible-benchmark-latest.json"
+                : "marvis-resident-policy-benchmark-latest.json",
+            generatedAt: summary.generatedAt,
+        )
+
+        print("SpeakSwiftly Marvis resident policy benchmark summary: \(summaryURL.path)")
+        for report in summary.residentPolicies {
+            print(report.prettyDescription)
+        }
+    }
 }
 
 private extension BackendBenchmarkE2ETests {
@@ -92,6 +144,26 @@ private extension BackendBenchmarkE2ETests {
                     from: E2EHarness.testingProfileText,
                     vibe: .masc,
                     voice: E2EHarness.testingProfileVoiceDescription,
+                )
+                _ = try await BenchmarkHarness.awaitSuccess(from: handle)
+            }
+        }
+    }
+
+    static func provisionMarvisBenchmarkProfiles(in profileRootURL: URL) async throws {
+        try await BenchmarkHarness.withBenchmarkRuntime(
+            profileRootURL: profileRootURL,
+            backend: .marvis,
+            qwenConditioningStrategy: .preparedConditioning,
+        ) { session in
+            _ = try await BenchmarkHarness.awaitResidentReady(on: session.runtime)
+
+            for fixture in MarvisResidentPolicyFixture.allCases {
+                let handle = await session.runtime.voices.create(
+                    design: fixture.profileName,
+                    from: E2EHarness.testingCloneSourceText,
+                    vibe: fixture.vibe,
+                    voice: fixture.voiceDescription,
                 )
                 _ = try await BenchmarkHarness.awaitSuccess(from: handle)
             }
@@ -160,6 +232,119 @@ private extension BackendBenchmarkE2ETests {
 
         return pair
     }
+
+    static func runMarvisResidentPolicySample(
+        profileRootURL: URL,
+        residentPolicy: SpeakSwiftly.MarvisResidentPolicy,
+        iteration: Int,
+        playbackMode: BenchmarkPlaybackMode,
+    ) async throws -> MarvisResidentPolicyBenchmarkSample {
+        try await BenchmarkHarness.withBenchmarkRuntime(
+            profileRootURL: profileRootURL,
+            backend: .marvis,
+            qwenConditioningStrategy: .preparedConditioning,
+            marvisResidentPolicy: residentPolicy,
+            playbackMode: playbackMode,
+        ) { session in
+            let residentPreloadMS = try await BenchmarkHarness.awaitResidentReady(on: session.runtime)
+            let threeRequestSwitch = try await runMarvisThreeRequestSwitchBenchmark(in: session)
+
+            return MarvisResidentPolicyBenchmarkSample(
+                residentPolicy: residentPolicy,
+                iteration: iteration,
+                residentPreloadMS: residentPreloadMS,
+                threeRequestSwitch: threeRequestSwitch,
+            )
+        }
+    }
+
+    static func runMarvisThreeRequestSwitchBenchmark(
+        in session: BenchmarkRuntimeSession,
+    ) async throws -> MarvisThreeRequestSwitchBenchmark {
+        let handles = await [
+            session.runtime.generate.speech(
+                text: benchmarkText,
+                with: MarvisResidentPolicyFixture.femme.profileName,
+            ),
+            session.runtime.generate.speech(
+                text: benchmarkText,
+                with: MarvisResidentPolicyFixture.masc.profileName,
+            ),
+            session.runtime.generate.speech(
+                text: benchmarkText,
+                with: MarvisResidentPolicyFixture.returnToA.profileName,
+            ),
+        ]
+
+        async let firstRequest = BenchmarkHarness.runRequestBenchmark(
+            handle: handles[0],
+            logRecorder: session.logRecorder,
+        )
+        async let secondRequest = BenchmarkHarness.runRequestBenchmark(
+            handle: handles[1],
+            logRecorder: session.logRecorder,
+        )
+        async let thirdRequest = BenchmarkHarness.runRequestBenchmark(
+            handle: handles[2],
+            logRecorder: session.logRecorder,
+        )
+
+        let result = try await MarvisThreeRequestSwitchBenchmark(
+            firstRequest: firstRequest,
+            secondRequest: secondRequest,
+            thirdRequest: thirdRequest,
+        )
+
+        guard
+            result.secondRequest.lifecycle.queuedAtMS != nil,
+            result.thirdRequest.lifecycle.queuedAtMS != nil
+        else {
+            throw BenchmarkError(
+                "The Marvis resident-policy benchmark expected the second and third live requests to enter the queue, but one of them never reported a queued event.",
+            )
+        }
+
+        return result
+    }
+}
+
+private enum MarvisResidentPolicyFixture: CaseIterable {
+    case femme
+    case masc
+    case returnToA
+
+    var profileName: String {
+        switch self {
+            case .femme:
+                "benchmark-marvis-femme-profile"
+            case .masc:
+                "benchmark-marvis-masc-profile"
+            case .returnToA:
+                "benchmark-marvis-return-to-a-profile"
+        }
+    }
+
+    var vibe: SpeakSwiftly.Vibe {
+        switch self {
+            case .femme:
+                .femme
+            case .masc:
+                .masc
+            case .returnToA:
+                .femme
+        }
+    }
+
+    var voiceDescription: String {
+        switch self {
+            case .femme:
+                "A warm, bright, feminine narrator voice."
+            case .masc:
+                "A grounded, rich, masculine speaking voice."
+            case .returnToA:
+                "A polished, airy, feminine speaking voice."
+        }
+    }
 }
 
 private struct BackendBenchmarkSummary: Codable {
@@ -168,6 +353,14 @@ private struct BackendBenchmarkSummary: Codable {
     let host: BenchmarkHost
     let settings: BackendBenchmarkSettings
     let backends: [BackendBenchmarkReport]
+}
+
+private struct MarvisResidentPolicyBenchmarkSummary: Codable {
+    let schemaVersion: Int
+    let generatedAt: Date
+    let host: BenchmarkHost
+    let settings: MarvisResidentPolicyBenchmarkSettings
+    let residentPolicies: [MarvisResidentPolicyBenchmarkReport]
 }
 
 private struct BackendBenchmarkSettings: Codable {
@@ -194,6 +387,36 @@ private struct BackendBenchmarkSettings: Codable {
                 ? "backend-live-audible-benchmark-latest.json"
                 : "backend-live-benchmark-latest.json",
             benchmarkedBackends: SpeakSwiftly.SpeechBackend.allCases,
+        )
+    }
+}
+
+private struct MarvisResidentPolicyBenchmarkSettings: Codable {
+    let iterations: Int
+    let playbackMode: BenchmarkPlaybackMode
+    let benchmarkTextCharacterCount: Int
+    let timestampedSummaryPattern: String
+    let latestSummaryFilename: String
+    let benchmarkedResidentPolicies: [SpeakSwiftly.MarvisResidentPolicy]
+    let requestProfileOrder: [String]
+
+    static func current(
+        iterations: Int,
+        playbackMode: BenchmarkPlaybackMode,
+        benchmarkTextCharacterCount: Int,
+    ) -> Self {
+        Self(
+            iterations: iterations,
+            playbackMode: playbackMode,
+            benchmarkTextCharacterCount: benchmarkTextCharacterCount,
+            timestampedSummaryPattern: playbackMode == .audible
+                ? "marvis-resident-policy-audible-benchmark-<ISO8601>.json"
+                : "marvis-resident-policy-benchmark-<ISO8601>.json",
+            latestSummaryFilename: playbackMode == .audible
+                ? "marvis-resident-policy-audible-benchmark-latest.json"
+                : "marvis-resident-policy-benchmark-latest.json",
+            benchmarkedResidentPolicies: SpeakSwiftly.MarvisResidentPolicy.allCases,
+            requestProfileOrder: MarvisResidentPolicyFixture.allCases.map(\.profileName),
         )
     }
 }
@@ -228,6 +451,34 @@ private struct BackendBenchmarkReport: Codable {
     }
 }
 
+private struct MarvisResidentPolicyBenchmarkReport: Codable {
+    let residentPolicy: SpeakSwiftly.MarvisResidentPolicy
+    let sampleCount: Int
+    let residentPreloadMS: BenchmarkMetricSummary
+    let threeRequestSwitch: MarvisThreeRequestSwitchAggregate
+    let samples: [MarvisResidentPolicyBenchmarkSample]
+
+    var prettyDescription: String {
+        """
+        \(residentPolicy.rawValue): preload \(residentPreloadMS.prettyAverage) ms, first complete \(threeRequestSwitch.firstRequest.lifecycle.completedMS.prettyAverage) ms, second complete \(threeRequestSwitch.secondRequest.lifecycle.completedMS.prettyAverage) ms, third complete \(threeRequestSwitch.thirdRequest.lifecycle.completedMS.prettyAverage) ms, third queue wait \(threeRequestSwitch.penalties.thirdRequestQueueWaitMS.prettyAverage) ms, return-to-a first audio penalty \(threeRequestSwitch.penalties.thirdRequestFirstAudioPenaltyMS.prettyAverage) ms
+        """
+    }
+
+    static func make(from samples: [MarvisResidentPolicyBenchmarkSample]) -> [Self] {
+        Dictionary(grouping: samples, by: \.residentPolicy)
+            .map { residentPolicy, policySamples in
+                Self(
+                    residentPolicy: residentPolicy,
+                    sampleCount: policySamples.count,
+                    residentPreloadMS: .make(from: policySamples.map(\.residentPreloadMS)),
+                    threeRequestSwitch: .make(from: policySamples.map(\.threeRequestSwitch)),
+                    samples: policySamples.sorted { $0.iteration < $1.iteration },
+                )
+            }
+            .sorted { $0.residentPolicy.rawValue < $1.residentPolicy.rawValue }
+    }
+}
+
 private struct BackendBenchmarkSample: Codable {
     let backend: SpeakSwiftly.SpeechBackend
     let iteration: Int
@@ -235,9 +486,22 @@ private struct BackendBenchmarkSample: Codable {
     let queuedLivePair: BackendQueuedLivePairBenchmark
 }
 
+private struct MarvisResidentPolicyBenchmarkSample: Codable {
+    let residentPolicy: SpeakSwiftly.MarvisResidentPolicy
+    let iteration: Int
+    let residentPreloadMS: Double
+    let threeRequestSwitch: MarvisThreeRequestSwitchBenchmark
+}
+
 private struct BackendQueuedLivePairBenchmark: Codable {
     let firstRequest: BenchmarkRequest
     let secondRequest: BenchmarkRequest
+}
+
+private struct MarvisThreeRequestSwitchBenchmark: Codable {
+    let firstRequest: BenchmarkRequest
+    let secondRequest: BenchmarkRequest
+    let thirdRequest: BenchmarkRequest
 }
 
 private struct BackendQueuedLivePairAggregate: Codable {
@@ -251,6 +515,24 @@ private struct BackendQueuedLivePairAggregate: Codable {
             sampleCount: samples.count,
             firstRequest: .make(from: samples.map(\.firstRequest)),
             secondRequest: .make(from: samples.map(\.secondRequest)),
+            penalties: .make(from: samples),
+        )
+    }
+}
+
+private struct MarvisThreeRequestSwitchAggregate: Codable {
+    let sampleCount: Int
+    let firstRequest: BenchmarkRequestAggregate
+    let secondRequest: BenchmarkRequestAggregate
+    let thirdRequest: BenchmarkRequestAggregate
+    let penalties: MarvisThreeRequestSwitchPenaltyAggregate
+
+    static func make(from samples: [MarvisThreeRequestSwitchBenchmark]) -> Self {
+        Self(
+            sampleCount: samples.count,
+            firstRequest: .make(from: samples.map(\.firstRequest)),
+            secondRequest: .make(from: samples.map(\.secondRequest)),
+            thirdRequest: .make(from: samples.map(\.thirdRequest)),
             penalties: .make(from: samples),
         )
     }
@@ -304,6 +586,73 @@ private struct BackendQueuedLivePenaltyAggregate: Codable {
         }
 
         return startedAtMS - queuedAtMS
+    }
+}
+
+private struct MarvisThreeRequestSwitchPenaltyAggregate: Codable {
+    let secondRequestQueueWaitMS: BenchmarkMetricSummary
+    let thirdRequestQueueWaitMS: BenchmarkMetricSummary
+    let secondRequestFirstAudioPenaltyMS: BenchmarkMetricSummary
+    let thirdRequestFirstAudioPenaltyMS: BenchmarkMetricSummary
+    let returnToACompletionPenaltyMS: BenchmarkMetricSummary
+
+    static func make(from samples: [MarvisThreeRequestSwitchBenchmark]) -> Self {
+        Self(
+            secondRequestQueueWaitMS: .make(from: samples.compactMap {
+                queueWaitMS(for: $0.secondRequest)
+            }),
+            thirdRequestQueueWaitMS: .make(from: samples.compactMap {
+                queueWaitMS(for: $0.thirdRequest)
+            }),
+            secondRequestFirstAudioPenaltyMS: .make(from: samples.compactMap {
+                firstAudioPenaltyMS(for: $0.firstRequest, comparedTo: $0.secondRequest)
+            }),
+            thirdRequestFirstAudioPenaltyMS: .make(from: samples.compactMap {
+                firstAudioPenaltyMS(for: $0.firstRequest, comparedTo: $0.thirdRequest)
+            }),
+            returnToACompletionPenaltyMS: .make(from: samples.compactMap {
+                completionPenaltyMS(for: $0.firstRequest, comparedTo: $0.thirdRequest)
+            }),
+        )
+    }
+
+    private static func queueWaitMS(for request: BenchmarkRequest) -> Double? {
+        guard
+            let queuedAtMS = request.lifecycle.queuedAtMS,
+            let startedAtMS = request.lifecycle.startedAtMS
+        else {
+            return nil
+        }
+
+        return startedAtMS - queuedAtMS
+    }
+
+    private static func firstAudioPenaltyMS(
+        for baseline: BenchmarkRequest,
+        comparedTo request: BenchmarkRequest,
+    ) -> Double? {
+        guard
+            let baselineFirstAudio = baseline.generation.firstAudioChunkAtMS,
+            let requestFirstAudio = request.generation.firstAudioChunkAtMS
+        else {
+            return nil
+        }
+
+        return requestFirstAudio - baselineFirstAudio
+    }
+
+    private static func completionPenaltyMS(
+        for baseline: BenchmarkRequest,
+        comparedTo request: BenchmarkRequest,
+    ) -> Double? {
+        guard
+            let baselineCompleted = baseline.lifecycle.completedAtMS,
+            let requestCompleted = request.lifecycle.completedAtMS
+        else {
+            return nil
+        }
+
+        return requestCompleted - baselineCompleted
     }
 }
 #endif

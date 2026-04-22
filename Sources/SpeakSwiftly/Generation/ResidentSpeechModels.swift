@@ -6,7 +6,7 @@ enum MarvisResidentVoice: String, Equatable {
 
     static func forVibe(_ vibe: SpeakSwiftly.Vibe) -> MarvisResidentVoice {
         switch vibe {
-            case .femme, .androgenous:
+            case .femme:
                 .conversationalA
             case .masc:
                 .conversationalB
@@ -14,16 +14,35 @@ enum MarvisResidentVoice: String, Equatable {
     }
 }
 
-struct MarvisResidentModels {
-    let conversationalA: AnySpeechModel
-    let conversationalB: AnySpeechModel
+enum MarvisResidentModels {
+    case dual(
+        conversationalA: AnySpeechModel,
+        conversationalB: AnySpeechModel,
+    )
+    case single(AnySpeechModel)
+
+    var primaryModel: AnySpeechModel {
+        switch self {
+            case let .dual(conversationalA, _):
+                conversationalA
+            case let .single(model):
+                model
+        }
+    }
 
     func model(for vibe: SpeakSwiftly.Vibe) -> (model: AnySpeechModel, voice: MarvisResidentVoice) {
-        switch MarvisResidentVoice.forVibe(vibe) {
-            case .conversationalA:
-                (conversationalA, .conversationalA)
-            case .conversationalB:
-                (conversationalB, .conversationalB)
+        let voice = MarvisResidentVoice.forVibe(vibe)
+
+        switch self {
+            case let .dual(conversationalA, conversationalB):
+                switch voice {
+                    case .conversationalA:
+                        return (conversationalA, MarvisResidentVoice.conversationalA)
+                    case .conversationalB:
+                        return (conversationalB, MarvisResidentVoice.conversationalB)
+                }
+            case let .single(model):
+                return (model, voice)
         }
     }
 }

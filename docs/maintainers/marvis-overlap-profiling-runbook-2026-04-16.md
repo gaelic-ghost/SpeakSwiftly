@@ -1,13 +1,15 @@
-# Marvis Overlap Profiling Runbook
+# Marvis Profiling Runbook
 
 ## Why This Exists
 
 This note captures the current maintainer workflow for profiling the Marvis
-resident overlap path on Apple silicon.
+generation path on Apple silicon.
 
 The immediate use case is:
 
-- compare a clean Marvis baseline against the current dual-lane overlap behavior
+- compare a clean Marvis baseline against the current serialized package behavior
+- compare the current serialized `SpeakSwiftly` Marvis path against candidate
+  resident policies or upstream-informed changes
 - line Instruments captures up with the package's existing JSONL deep-trace events
 - determine whether first-request rebuffering is mainly caused by CPU contention,
   GPU scheduling pressure, unified-memory pressure, or some combination of those
@@ -15,8 +17,7 @@ The immediate use case is:
   reconstruct the Xcode-backed test path from old notes and shell history
 
 This is not a general-purpose Xcode profiling guide. It is a package-specific
-runbook for the exact `SpeakSwiftly` Marvis path that has already been under
-investigation.
+runbook for the current serialized `SpeakSwiftly` Marvis path.
 
 ## Current Ground Truth
 
@@ -28,9 +29,10 @@ That configuration lives in
 [Sources/SpeakSwiftly/Generation/ModelClients.swift](../../Sources/SpeakSwiftly/Generation/ModelClients.swift).
 
 So the current profiling question is not "is Marvis bf16 or int8?" The package
-is already using the MLX 8-bit build. The more relevant question is whether the
-current dual-lane overlap shape still creates enough sustained Apple-silicon
-CPU, GPU, or unified-memory pressure to make the first audible playback unstable.
+is already using the MLX 8-bit build. The more relevant question now is whether
+the remaining audible instability comes from the current `mlx-audio-swift`
+generation path itself, from resident-policy differences, or from some local
+playback-policy mismatch that still survives after the runtime simplification.
 
 ## Existing Trace Anchors
 
@@ -133,49 +135,44 @@ PY
 
 ## Targeted Test Command
 
-Use this exact command for the current dual-lane Marvis overlap baseline:
+Use this exact command for the current serialized Marvis baseline:
 
 ```bash
   xcodebuild test-without-building -quiet \
   -xctestrun .local/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
-  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
-  -resultBundlePath .local/results/Instruments-MarvisProfile-dual-lane.xcresult
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`queued audible playback stays serialized and routes expected voices`()' \
+  -resultBundlePath .local/results/Instruments-MarvisProfile-serialized.xcresult
 ```
 
 ## Scenario Matrix
 
-### Scenario A: Current Dual-Lane Marvis Baseline
+### Scenario A: Current Serialized Marvis Baseline
 
 Use the test command above exactly as written.
 
 This is the current package behavior and should be the first stable comparison
 point for any profiling pass.
 
-### Scenario B: Current or Candidate Safer-Overlap Policy
+### Scenario B: Current Or Candidate Resident-Policy Comparison
 
-If there is an in-branch overlap experiment to compare, rerun the same command
-and change only the result bundle path:
+If there is an in-branch resident-policy or upstream-informed candidate to
+compare, rerun the same command and change only the result bundle path:
 
 ```bash
   xcodebuild test-without-building -quiet \
   -xctestrun .local/derived-data/Instruments-MarvisProfile/Build/Products/SpeakSwiftly-Package_SpeakSwiftly-Package_macosx26.4-arm64.xctestrun \
   -destination 'platform=macOS' \
-  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`prequeued jobs drain in order`()' \
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests/`queued audible playback stays serialized and routes expected voices`()' \
   -resultBundlePath .local/results/Instruments-MarvisProfile-candidate-policy.xcresult
 ```
 
-### Scenario C: Single-Lane Marvis Baseline
+### Scenario C: Single-Resident Dynamic Marvis Baseline
 
-This is not yet a stable package backend.
-
-If a real `marvis_single_lane` or `marvis_sequential` backend is added later,
-this runbook should be updated so the single-lane command becomes a first-class
-copy-paste path.
-
-Until then, do not pretend there is already a stable shell-only single-lane
-command. If a single-lane comparison is needed before that backend exists, make
-it in an isolated branch and record exactly what was changed for that branch.
+The package now has a real `single_resident_dynamic` policy option. If that
+mode is under investigation, keep the same test command and record the exact
+configuration override used for the run so the capture stays comparable to the
+default `dual_resident_serialized` baseline.
 
 ## Instruments Capture Order
 
@@ -191,10 +188,10 @@ Do not try to cram everything into one giant capture first.
 
 Use this template to answer:
 
-- what got hot on CPU when overlap started
-- whether the reservation moment itself is expensive
-- whether the first request only becomes expensive later while it tries to
-  rebuild reserve
+- what got hot on CPU when a Marvis generation actually began
+- whether lane reservation itself is expensive
+- whether the first request only becomes expensive later while playback tries
+  to recover reserve
 
 Workflow:
 
@@ -208,13 +205,13 @@ Workflow:
 7. Stop recording.
 8. Save the trace with a scenario-specific name such as:
    - `single-lane-time-profiler.trace`
-   - `dual-lane-time-profiler.trace`
+   - `serialized-baseline-time-profiler.trace`
    - `candidate-policy-time-profiler.trace`
 
 What to compare:
 
 - the window just before `marvis_generation_lane_reserved`
-- the window immediately after overlap is active
+- the window immediately after the queued follower request begins generating
 - the first `playback_rebuffer_started` -> `playback_rebuffer_resumed` window
 
 ### Metal System Trace
@@ -236,13 +233,13 @@ Workflow:
 5. Stop the capture after the first queued request has drained.
 6. Save the trace with a scenario-specific name such as:
    - `single-lane-metal-system-trace.trace`
-   - `dual-lane-metal-system-trace.trace`
+   - `serialized-baseline-metal-system-trace.trace`
    - `candidate-policy-metal-system-trace.trace`
 
 What to compare:
 
 - just before `marvis_generation_lane_reserved`
-- the period immediately after overlap becomes active
+- the period immediately after the follower request begins generating
 - the first rebuffer window
 
 ### Allocations or VM Tracker
@@ -262,7 +259,7 @@ Workflow:
 5. Stop the capture after the first queued request has drained.
 6. Save the trace with a scenario-specific name such as:
    - `single-lane-memory.trace`
-   - `dual-lane-memory.trace`
+   - `serialized-baseline-memory.trace`
    - `candidate-policy-memory.trace`
 
 ## How To Line the Capture Up With JSONL
@@ -288,28 +285,28 @@ If needed, also keep the corresponding result bundle:
 
 ## What Good Evidence Looks Like
 
-### Evidence that the overlap shape is the problem
+### Evidence that the former local queue policy was the problem
 
 - single-lane stays clean
-- dual-lane degrades
+- serialized baseline stays cleaner than a more aggressive candidate
 - lane reservation itself is quiet
-- the expensive behavior appears only after overlap has already been active
+- the expensive behavior appears only after a second request is allowed to compete
 
 ### Evidence that the machine is just near its ceiling
 
 - single-lane is already rough
-- dual-lane is worse, but not categorically different
+- the serialized baseline is still rough, and more aggressive candidates are only worse by degree
 - Time Profiler and Metal System Trace both show pressure even before the
-  follower lane has really joined the overlap window
+  follower request has really joined the active generation window
 
 ### Evidence that startup policy is still the main problem
 
 - reservation and early overlap are the expensive moment
 - later sustained overlap is not much worse than the initial handoff
 
-## Follow-On Backend Option
+## Follow-On Resident Policy Option
 
-### Why a Single-Lane Marvis Backend Is Worth Considering
+### Why A Single-Resident Marvis Policy Is Worth Considering
 
 This would be a durable building-block change, not a local scheduler tweak.
 
@@ -320,55 +317,47 @@ The current backend surface already has:
 - the JSONL `set_speech_backend` control path
 - runtime overview and job surfaces that already report which backend is active
 
-So a backend such as:
-
-- `marvis_single_lane`
-- `marvis_sequential`
-
-would fit naturally beside:
-
-- `qwen3`
-- `marvis`
-
 The near-term use case it unlocks is simple:
 
-- keep Marvis available on machines where the two-lane overlap trade is not
+- keep Marvis available on machines where the dual-resident default trade is not
   worth the audible instability
 - preserve explicit operator intent instead of hiding that behavior behind
-  scheduler heuristics
+  scheduler heuristics or machine-local folklore
 - let docs, tests, runtime overview, and stored job records say plainly which
   Marvis mode the worker is using
 
 ### Simpler Extension Path Considered First
 
-The simpler path is to keep one `marvis` backend and add a hidden internal flag
-or scheduler special case for single-lane behavior.
+The simpler path is the one the package now already has: keep one `marvis`
+backend and expose the resident choice through `marvisResidentPolicy` instead
+of adding another backend name.
 
 That path was considered first, but it is less clear:
 
-- it hides a major behavior difference inside policy
-- it makes logs and runtime expectations fuzzier
-- it makes machine-specific behavior harder to reason about
+- it still needs clean profiling and docs work so the policy choices stay
+  obvious
+- it makes machine-specific behavior worth documenting explicitly
+- it makes upstream-versus-local behavior comparison more important
 
-A distinct backend is cleaner because it turns "single-lane Marvis" into a
-first-class operator-facing choice.
+The current policy-based shape is acceptable as long as the runtime and docs
+keep the active resident policy explicit.
 
-### Where That Backend Would Fit
+### Where That Policy Investigation Fits
 
 The main surfaces that would need to widen are:
 
-- [Sources/SpeakSwiftly/Generation/SpeechBackend.swift](../../Sources/SpeakSwiftly/Generation/SpeechBackend.swift)
 - [Sources/SpeakSwiftly/API/Configuration.swift](../../Sources/SpeakSwiftly/API/Configuration.swift)
-- [Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing+ResidentModels.swift](../../Sources/SpeakSwiftly/Runtime/WorkerRuntimeProcessing+ResidentModels.swift)
+- [Sources/SpeakSwiftly/Generation/ResidentSpeechModels.swift](../../Sources/SpeakSwiftly/Generation/ResidentSpeechModels.swift)
 - [Sources/SpeakSwiftly/Runtime/WorkerRuntimeScheduling.swift](../../Sources/SpeakSwiftly/Runtime/WorkerRuntimeScheduling.swift)
 
-The expected behavior split is:
+The expected behavior split is now:
 
 - model loading can still reuse the same Marvis weights and the same built-in
   voice routing for `conversational_a` and `conversational_b`
-- the real behavior change lives in scheduling
-- the single-lane backend should cap Marvis live generation concurrency at one
-  and stop trying to open a second Marvis generation lane
+- `dual_resident_serialized` keeps both voices warm while still serializing
+  generation
+- `single_resident_dynamic` reuses one resident model object for whichever
+  conversational voice the next request needs
 
 ## Apple Documentation Anchors
 

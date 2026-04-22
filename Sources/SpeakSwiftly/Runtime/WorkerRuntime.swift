@@ -23,27 +23,17 @@ public extension SpeakSwiftly {
             enum ResidentStreamingCadenceProfile: String, Equatable {
                 case standard
                 case firstDrainedLiveMarvis = "first_drained_live_marvis"
-                case overlapSecondLaneDuringFirstDrain = "overlap_second_lane_during_first_drain"
             }
 
-            /// Shorter chunk cadence gives playback a second chunk in reserve before
-            /// the first one drains, which reduces audible shudder from one-chunk starts.
-            static let standardResidentStreamingInterval = 0.18
+            /// Use a less aggressive resident cadence for Chatterbox and the normal
+            /// Marvis path so backend chunk delivery stays closer to upstream timing.
+            static let standardResidentStreamingInterval = 0.5
             static let qwenResidentStreamingInterval = 0.32
 
-            /// The first drained live Marvis request is the only path that has to
-            /// bootstrap audible reserve from nothing. Give it a tighter resident
-            /// streaming cadence so playback can accumulate preroll before overlap
-            /// opens the second generation lane.
-            static let firstDrainedLiveMarvisStreamingInterval = 0.10
-
-            /// The queued follower behind that first drained Marvis request has its
-            /// own cadence role so overlap experiments can tune it without
-            /// overloading the first-request playback profile. The current baseline
-            /// keeps it on the ordinary resident cadence because the first `0.20`
-            /// follower experiment only helped modestly under clean conditions and
-            /// still left startup sounding too fragile to keep as the fixed policy.
-            static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.18
+            /// Keep the Marvis-specific cadence roles for scheduling and playback
+            /// policy, but align their timing to the current upstream streaming
+            /// cadence instead of a SpeakSwiftly-specific faster interval.
+            static let firstDrainedLiveMarvisStreamingInterval = 0.5
 
             static func residentStreamingCadenceProfile(
                 speechBackend: SpeakSwiftly.SpeechBackend,
@@ -54,8 +44,6 @@ public extension SpeakSwiftly {
                 return switch existingPlaybackJobCount {
                     case 0:
                         .firstDrainedLiveMarvis
-                    case 1:
-                        .overlapSecondLaneDuringFirstDrain
                     default:
                         .standard
                 }
@@ -70,8 +58,6 @@ public extension SpeakSwiftly {
                         speechBackend == .qwen3 ? qwenResidentStreamingInterval : standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
-                    case .overlapSecondLaneDuringFirstDrain:
-                        overlapSecondLaneDuringFirstDrainStreamingInterval
                 }
             }
 
@@ -83,8 +69,6 @@ public extension SpeakSwiftly {
                         standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
-                    case .overlapSecondLaneDuringFirstDrain:
-                        overlapSecondLaneDuringFirstDrainStreamingInterval
                 }
             }
         }
@@ -189,7 +173,6 @@ public extension SpeakSwiftly {
             case waitingForResidentModels = "waiting_for_resident_models"
             case waitingForActiveRequest = "waiting_for_active_request"
             case waitingForPlaybackStability = "waiting_for_playback_stability"
-            case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
         }
 
         struct GenerationScheduleDecision {
@@ -344,6 +327,7 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let generatedFileStore: GeneratedFileStore
@@ -372,6 +356,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
@@ -381,6 +366,7 @@ public extension SpeakSwiftly {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.marvisResidentPolicy = marvisResidentPolicy
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore

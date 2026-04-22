@@ -719,6 +719,7 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
 
 func makeResidentModels(
     for backend: SpeakSwiftly.SpeechBackend,
+    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     recorder: ResidentModelRecorder? = nil,
     chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
@@ -728,12 +729,19 @@ func makeResidentModels(
         case .chatterboxTurbo:
             .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .marvis:
-            .marvis(
-                MarvisResidentModels(
-                    conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
-                    conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
-                ),
-            )
+            switch marvisResidentPolicy {
+                case .dualResidentSerialized:
+                    .marvis(
+                        .dual(
+                            conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
+                            conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
+                        ),
+                    )
+                case .singleResidentDynamic:
+                    .marvis(
+                        .single(makeResidentModel(recorder: recorder, chunkCount: chunkCount)),
+                    )
+            }
     }
 }
 
@@ -793,6 +801,7 @@ func makeRuntime(
     playback: PlaybackSpy,
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
     loadedCloneAudioSamples: [Float] = [],
@@ -826,12 +835,17 @@ func makeRuntime(
                     case .chatterboxTurbo:
                         return .chatterboxTurbo(model)
                     case .marvis:
-                        return .marvis(
-                            MarvisResidentModels(
-                                conversationalA: model,
-                                conversationalB: model,
-                            ),
-                        )
+                        switch marvisResidentPolicy {
+                            case .dualResidentSerialized:
+                                return .marvis(
+                                    .dual(
+                                        conversationalA: model,
+                                        conversationalB: model,
+                                    ),
+                                )
+                            case .singleResidentDynamic:
+                                return .marvis(.single(model))
+                        }
                 }
             }
             fatalError("Test support received an unexpected resident model loader result type: \(type(of: loaded))")
@@ -862,6 +876,7 @@ func makeRuntime(
         dependencies: dependencies,
         speechBackend: speechBackend,
         qwenConditioningStrategy: qwenConditioningStrategy,
+        marvisResidentPolicy: marvisResidentPolicy,
         profileStore: store,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
@@ -901,7 +916,7 @@ private func inferredTestVibe(profileName: String, voiceDescription: String) -> 
     if signal.contains("masc") || signal.contains("male") || signal.contains("masculine") {
         return .masc
     }
-    return .androgenous
+    return .femme
 }
 
 extension SpeakSwiftly.Voices {

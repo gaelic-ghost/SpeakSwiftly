@@ -152,15 +152,9 @@ extension SpeakSwiftly.Runtime {
         if speechBackend == .marvis {
             if isLiveSpeechGenerationRequest(request),
                playbackAdmission.activeRequestID != nil,
-               !playbackAdmission.allowsConcurrentGeneration {
+               playbackAdmission.activeRequestTuningProfile == .firstDrainedLiveMarvis
+               || !playbackAdmission.allowsConcurrentGeneration {
                 return .park(.waitingForPlaybackStability)
-            }
-
-            if let lane = try marvisGenerationLane(for: request) {
-                let activeLanes = try Set(activeJobs.compactMap { try marvisGenerationLane(for: $0.request) })
-                if activeLanes.contains(lane) {
-                    return .park(.waitingForMarvisGenerationLane)
-                }
             }
         }
 
@@ -177,7 +171,7 @@ extension SpeakSwiftly.Runtime {
     ) -> Int {
         switch backend {
             case .marvis:
-                2
+                1
             case .qwen3, .chatterboxTurbo:
                 1
         }

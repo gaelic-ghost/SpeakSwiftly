@@ -180,13 +180,13 @@ struct PlaybackThresholdController {
 
         return switch (complexityClass, phase) {
             case (.compact, .warmup):
-                (960, 420, 1160, 0, 0)
+                (2400, 980, 2820, 0, 0)
             case (.balanced, .warmup):
-                (1600, 700, 1900, 0, 0)
+                (4560, 1900, 5340, 0, 0)
             case (.compact, .recovery):
-                (600, 240, 760, 0, 0)
+                (1120, 500, 1460, 0, 0)
             case (.balanced, .recovery):
-                (1000, 420, 1260, 0, 0)
+                (2060, 880, 2580, 0, 0)
             case (_, .steady), (.extended, _):
                 (0, 0, 0, 0, 0)
         }
