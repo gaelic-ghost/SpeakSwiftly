@@ -556,7 +556,7 @@ struct SpeakSwiftlyTestingMain {
                 voice: nil,
                 refAudio: refAudio,
                 refText: materialization.referenceText,
-                language: "English",
+                language: nil,
                 generationParameters: generationParameters,
             )
             .asArray(Float.self)

@@ -65,7 +65,10 @@ extension SpeakSwiftly.Runtime {
             text: normalizedText,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(for: normalizedText),
-            streamingInterval: PlaybackConfiguration.residentStreamingInterval,
+            streamingInterval: PlaybackConfiguration.residentStreamingInterval(
+                for: speechBackend,
+                cadenceProfile: .standard,
+            ),
         )
         var audio = [Float]()
         for try await chunk in stream {

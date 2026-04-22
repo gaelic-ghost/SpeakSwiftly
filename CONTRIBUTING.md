@@ -285,7 +285,7 @@ Current live-playback behavior:
 - `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
 - Marvis resident warmup keeps both `conversational_a` and `conversational_b` loaded at once because the model is small enough that preset switching does not need another preload cycle.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.androgenous` -> `conversational_a`, `.masc` -> `conversational_b`.
-- Resident generation currently streams chunks at the `0.18` cadence.
+- Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. Marvis keeps its own tuned `0.10` / `0.18` live-playback profiles, and the ordinary non-Qwen resident baseline stays `0.18`.
 - Playback uses adaptive duration-based startup and low-water thresholds rather than a fixed one-chunk gate.
 
 Current generated-file behavior:
@@ -585,7 +585,7 @@ swift build
 swift test
 ```
 
-The current `mlx-audio-swift` `69.2.0` fork pin restores the ordinary SwiftPM
+The current `mlx-audio-swift` `0.7.0` fork pin restores the ordinary SwiftPM
 lane for this repository, including the worker-backed `QuickE2ETests` path.
 Treat plain `swift build` and `swift test` as the default verification story
 again.

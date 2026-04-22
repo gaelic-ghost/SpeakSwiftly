@@ -28,7 +28,8 @@ public extension SpeakSwiftly {
 
             /// Shorter chunk cadence gives playback a second chunk in reserve before
             /// the first one drains, which reduces audible shudder from one-chunk starts.
-            static let residentStreamingInterval = 0.18
+            static let standardResidentStreamingInterval = 0.18
+            static let qwenResidentStreamingInterval = 0.32
 
             /// The first drained live Marvis request is the only path that has to
             /// bootstrap audible reserve from nothing. Give it a tighter resident
@@ -61,11 +62,25 @@ public extension SpeakSwiftly {
             }
 
             static func residentStreamingInterval(
+                for speechBackend: SpeakSwiftly.SpeechBackend,
+                cadenceProfile: ResidentStreamingCadenceProfile,
+            ) -> Double {
+                switch cadenceProfile {
+                    case .standard:
+                        speechBackend == .qwen3 ? qwenResidentStreamingInterval : standardResidentStreamingInterval
+                    case .firstDrainedLiveMarvis:
+                        firstDrainedLiveMarvisStreamingInterval
+                    case .overlapSecondLaneDuringFirstDrain:
+                        overlapSecondLaneDuringFirstDrainStreamingInterval
+                }
+            }
+
+            static func residentStreamingInterval(
                 for cadenceProfile: ResidentStreamingCadenceProfile,
             ) -> Double {
                 switch cadenceProfile {
                     case .standard:
-                        residentStreamingInterval
+                        standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
                     case .overlapSecondLaneDuringFirstDrain:
