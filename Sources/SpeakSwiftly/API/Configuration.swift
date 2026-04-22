@@ -38,12 +38,15 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case speechBackend
             case qwenConditioningStrategy
+            case residentStreamingIntervalOverride
         }
 
         /// The speech backend to activate when the runtime starts.
         public let speechBackend: SpeakSwiftly.SpeechBackend
         /// The Qwen conditioning strategy to use for Qwen-backed generation.
         public let qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        /// An optional resident streaming interval override for investigation or testing.
+        public let residentStreamingIntervalOverride: Double?
         /// An optional text normalizer to reuse instead of creating the default one.
         public let textNormalizer: SpeakSwiftly.Normalizer?
 
@@ -51,10 +54,12 @@ public extension SpeakSwiftly {
         public init(
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            residentStreamingIntervalOverride: Double? = nil,
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.residentStreamingIntervalOverride = residentStreamingIntervalOverride
             self.textNormalizer = textNormalizer
         }
 
@@ -65,6 +70,10 @@ public extension SpeakSwiftly {
                 SpeakSwiftly.QwenConditioningStrategy.self,
                 forKey: .qwenConditioningStrategy,
             ) ?? .preparedConditioning
+            residentStreamingIntervalOverride = try container.decodeIfPresent(
+                Double.self,
+                forKey: .residentStreamingIntervalOverride,
+            )
             textNormalizer = nil
         }
 
@@ -134,6 +143,10 @@ public extension SpeakSwiftly {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(speechBackend, forKey: .speechBackend)
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
+            try container.encodeIfPresent(
+                residentStreamingIntervalOverride,
+                forKey: .residentStreamingIntervalOverride,
+            )
         }
 
         /// Saves this configuration value to disk.

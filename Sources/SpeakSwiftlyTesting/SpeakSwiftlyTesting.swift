@@ -50,6 +50,7 @@ struct SpeakSwiftlyTestingMain {
         var repeatCount = 10
         var windowSeconds = 2.0
         var conditioningMode: ConditioningMode = .auto
+        var streamingInterval: Double?
     }
 
     struct MatrixVolumeOptions {
@@ -272,6 +273,7 @@ struct SpeakSwiftlyTestingMain {
         let textCharacters: Int
         let textWords: Int
         let windowSeconds: Double
+        let streamingInterval: Double?
         let generatedAt: Date
         let streamed: CompareRunArtifact
         let direct: CompareRunArtifact
@@ -791,6 +793,14 @@ struct SpeakSwiftlyTestingMain {
                     }
 
                     options.conditioningMode = conditioningMode
+                case "--streaming-interval":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let streamingInterval = Double(value), streamingInterval > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.streamingInterval = streamingInterval
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -1074,6 +1084,7 @@ struct SpeakSwiftlyTestingMain {
             text: text,
             windowSeconds: options.windowSeconds,
             conditioningMode: options.conditioningMode,
+            streamingInterval: options.streamingInterval,
         )
 
         print("profile_name: \(options.profileName)")
@@ -1086,6 +1097,9 @@ struct SpeakSwiftlyTestingMain {
         print("generated_file: \(result.generatedFilePath)")
         print("sample_rate: \(result.analysis.sampleRate)")
         print("window_seconds: \(options.windowSeconds)")
+        if let streamingInterval = options.streamingInterval {
+            print("streaming_interval: \(streamingInterval)")
+        }
 
         printAnalysis(result.analysis, prefix: "window", summaryLabel: "summary")
     }
@@ -1132,6 +1146,9 @@ struct SpeakSwiftlyTestingMain {
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
         print("window_seconds: \(options.windowSeconds)")
+        if let streamingInterval = options.streamingInterval {
+            print("streaming_interval: \(streamingInterval)")
+        }
         print("streamed_generated_file: \(comparison.streamed.generatedFilePath)")
         print("streamed_sample_rate: \(comparison.streamed.analysis.sampleRate)")
         print("direct_generated_file: \(comparison.direct.generatedFilePath)")
@@ -1171,6 +1188,7 @@ struct SpeakSwiftlyTestingMain {
                 textCharacters: text.count,
                 textWords: text.split(whereSeparator: \.isWhitespace).count,
                 windowSeconds: options.windowSeconds,
+                streamingInterval: options.streamingInterval,
                 generatedAt: Date(),
                 streamed: makeCompareRunArtifact(comparison.streamed),
                 direct: makeCompareRunArtifact(comparison.direct),
@@ -1638,6 +1656,7 @@ struct SpeakSwiftlyTestingMain {
                             text: text,
                             windowSeconds: options.windowSeconds,
                             conditioningMode: .raw,
+                            streamingInterval: nil,
                         )
                         rows.append(
                             MatrixProbeRow(
@@ -1657,6 +1676,7 @@ struct SpeakSwiftlyTestingMain {
                                 text: text,
                                 windowSeconds: options.windowSeconds,
                                 conditioningMode: .artifact,
+                                streamingInterval: nil,
                             )
                             rows.append(
                                 MatrixProbeRow(
@@ -1760,11 +1780,13 @@ struct SpeakSwiftlyTestingMain {
         text: String,
         windowSeconds: Double,
         conditioningMode: ConditioningMode,
+        streamingInterval: Double?,
     ) async throws -> CompareRun {
         let runtime = await SpeakSwiftly.liftoff(
             configuration: SpeakSwiftly.Configuration(
                 speechBackend: .qwen3,
                 qwenConditioningStrategy: conditioningMode.runtimeStrategy,
+                residentStreamingIntervalOverride: streamingInterval,
             ),
         )
         await runtime.start()
@@ -1807,6 +1829,7 @@ struct SpeakSwiftlyTestingMain {
             text: text,
             windowSeconds: options.windowSeconds,
             conditioningMode: options.conditioningMode,
+            streamingInterval: options.streamingInterval,
         )
         let direct = try await runDirectProbe(
             text: text,
@@ -3450,8 +3473,8 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting status
               swift run SpeakSwiftlyTesting smoke
               swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--profile-root PATH]
-              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
-              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact]
+              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--streaming-interval SECONDS]
+              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--streaming-interval SECONDS]
               swift run SpeakSwiftlyTesting matrix-volume [--profile NAME ...] [--profile-root PATH] [--short-text-file PATH] [--long-text-file PATH] [--short-repeat COUNT] [--long-repeat COUNT] [--iterations COUNT] [--window-seconds SECONDS] [--include-streamed]
               swift run SpeakSwiftlyTesting capture-qwen-codes [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--conditioning auto|raw|artifact] [--lane direct]
               swift run SpeakSwiftlyTesting replay-qwen-codes [--artifact-file PATH] [--window-seconds SECONDS]

@@ -222,9 +222,10 @@ extension SpeakSwiftly.Runtime {
             speechBackend: speechBackend,
             existingPlaybackJobCount: existingPlaybackJobCount,
         )
-        let residentStreamingInterval = PlaybackConfiguration.residentStreamingInterval(
-            for: residentStreamingCadenceProfile,
-        )
+        let residentStreamingInterval = residentStreamingIntervalOverride
+            ?? PlaybackConfiguration.residentStreamingInterval(
+                for: residentStreamingCadenceProfile,
+            )
         return LiveSpeechRequestState(
             request: request,
             normalizedText: normalizedText,

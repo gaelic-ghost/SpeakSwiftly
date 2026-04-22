@@ -96,6 +96,7 @@ extension SpeakSwiftly.Runtime {
             dependencies: dependencies,
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
+            residentStreamingIntervalOverride: configuration?.residentStreamingIntervalOverride,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,

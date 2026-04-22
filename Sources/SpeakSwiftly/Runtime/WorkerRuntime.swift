@@ -329,6 +329,7 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let residentStreamingIntervalOverride: Double?
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let generatedFileStore: GeneratedFileStore
@@ -357,6 +358,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            residentStreamingIntervalOverride: Double? = nil,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
@@ -366,6 +368,7 @@ public extension SpeakSwiftly {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.residentStreamingIntervalOverride = residentStreamingIntervalOverride
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore

@@ -279,6 +279,60 @@ Sweep goals:
   for the tight cadence
 - separate startup-buffer benefits from long-form streaming-decoder costs
 
+### 4. Cadence sweep on the streamed artifact lane
+
+Follow-up cadence sweep run:
+
+```sh
+.build/debug/SpeakSwiftlyTesting compare-volume \
+  --profile probe-soft-femme-20260421 \
+  --profile-root "$HOME/Library/Application Support/SpeakSwiftly" \
+  --conditioning artifact \
+  --repeat 16 \
+  --streaming-interval <0.18|0.32|0.64|1.0|1.5|2.0>
+```
+
+All six runs were executed sequentially with the live LaunchAgent service
+unloaded first.
+
+Extracted streamed-lane summaries:
+
+| Streaming interval | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `0.18s` | `0.10806` | `0.05601` | `-48.17%` | `0.08433` | `0.06794` | `0.80561` |
+| `0.32s` | `0.09048` | `0.07832` | `-13.44%` | `0.07120` | `0.05901` | `0.82882` |
+| `0.64s` | `0.11855` | `0.06001` | `-49.38%` | `0.09033` | `0.06479` | `0.71720` |
+| `1.0s` | `0.10997` | `0.05735` | `-47.84%` | `0.08103` | `0.05132` | `0.63337` |
+| `1.5s` | `0.11962` | `0.07414` | `-38.02%` | `0.08927` | `0.06946` | `0.77806` |
+| `2.0s` | `0.08248` | `0.06137` | `-25.60%` | `0.07142` | `0.05763` | `0.80690` |
+
+Direct-lane control summaries from the same compare runs:
+
+| Streaming interval | First RMS | Last RMS | Drop | Head RMS | Tail RMS | Tail/Head |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `0.18s` | `0.11764` | `0.06248` | `-46.89%` | `0.09281` | `0.07345` | `0.79139` |
+| `0.32s` | `0.11926` | `0.08462` | `-29.05%` | `0.09491` | `0.07274` | `0.76640` |
+| `0.64s` | `0.10505` | `0.06197` | `-41.01%` | `0.08414` | `0.06278` | `0.74620` |
+| `1.0s` | `0.12357` | `0.06945` | `-43.80%` | `0.08390` | `0.06614` | `0.78835` |
+| `1.5s` | `0.11364` | `0.05296` | `-53.40%` | `0.08741` | `0.06533` | `0.74740` |
+| `2.0s` | `0.11708` | `0.04016` | `-65.70%` | `0.09043` | `0.05112` | `0.56529` |
+
+Interpretation:
+
+- The cadence sweep does not produce a clean monotonic story.
+- The streamed lane improved substantially at `0.32s` and improved again at
+  `2.0s` relative to the `0.18s` baseline, while `0.64s` and `1.0s` remained
+  strongly degraded.
+- That mixed result supports the current compound/non-deterministic model more
+  than a simple "larger cadence always fixes Qwen" theory.
+- Even so, the sweep still gives useful negative evidence against the current
+  fixed `0.18s` policy: some larger chunking regimes are plainly healthier than
+  the current production cadence on this degraded profile.
+- The strongest streamed-lane result in this pass was `0.32s`, which is also
+  the vendored README example cadence. That makes `0.32s` the clearest next
+  candidate for a focused rerun and for any cautious policy experiment after we
+  remove the hardcoded English language setting.
+
 ### 4. Local generated-code capture
 
 The completed capture runs wrote:

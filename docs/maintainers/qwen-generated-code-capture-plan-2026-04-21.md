@@ -139,6 +139,27 @@ The current working model is:
 - those factors are plausible contributors to the observed inconsistent symptom
   cluster even if they are not the only root cause
 
+The first real sweep is now complete for
+`probe-soft-femme-20260421` under artifact conditioning, and it reinforces the
+same conclusion while narrowing the next step:
+
+- `0.18s` remained strongly degraded
+- `0.32s` improved dramatically in the streamed lane
+- `0.64s` and `1.0s` swung back toward heavy degradation
+- `1.5s` improved relative to the baseline but was still clearly degraded
+- `2.0s` also improved relative to the baseline
+
+So the cadence effect is real, but not monotonic. The next practical slice
+should be:
+
+1. remove the hardcoded English language setting
+2. rerun a narrower cadence set centered on the strongest current candidate
+   - `0.18s`
+   - `0.32s`
+   - `2.0s`
+3. repeat that narrower set on `probe-clear-masc-20260421` so the healthier
+   profile can serve as a control against the soft-femme degraded profile
+
 ## Purpose
 
 This note plans the next investigation surface for the Qwen long-form decay
