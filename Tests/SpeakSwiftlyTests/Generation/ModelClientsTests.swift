@@ -275,8 +275,17 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `marvis live cadence roles keep the first request faster without slowing the follower by default`() {
-    let standardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .standard,
+    let qwenStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .qwen3,
+        cadenceProfile: .standard,
+    )
+    let marvisStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .marvis,
+        cadenceProfile: .standard,
+    )
+    let chatterboxStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
+        for: .chatterboxTurbo,
+        cadenceProfile: .standard,
     )
     let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .firstDrainedLiveMarvis,
@@ -285,11 +294,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         for: .overlapSecondLaneDuringFirstDrain,
     )
 
-    #expect(standardInterval == 0.18)
+    #expect(qwenStandardInterval == 0.32)
+    #expect(marvisStandardInterval == 0.18)
+    #expect(chatterboxStandardInterval == 0.18)
     #expect(firstRequestInterval == 0.10)
     #expect(overlapSecondLaneInterval == 0.18)
-    #expect(firstRequestInterval < standardInterval)
-    #expect(overlapSecondLaneInterval == standardInterval)
+    #expect(firstRequestInterval < marvisStandardInterval)
+    #expect(overlapSecondLaneInterval == marvisStandardInterval)
 }
 
 @Test func `marvis live cadence role selection distinguishes first request from overlap follower`() {
@@ -764,7 +775,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
             }
 
             return details["chunk_count"] as? Int == 3
-                && details["streaming_interval"] as? Double == 0.18
+                && details["streaming_interval"] as? Double == 0.32
                 && (details["startup_buffer_target_ms"] as? Int ?? 0) >= 360
                 && (details["low_water_target_ms"] as? Int ?? 0) >= 140
                 && (details["chunk_gap_warning_threshold_ms"] as? Int ?? 0) >= 450

@@ -30,7 +30,7 @@ extension SpeakSwiftly.Runtime {
             voice: storedProfile.manifest.voiceDescription,
             refAudio: nil,
             refText: nil,
-            language: "English",
+            language: nil,
             generationParameters: GenerationPolicy.profileParameters(for: storedProfile.manifest.sourceText),
         )
         await logRequestEvent(

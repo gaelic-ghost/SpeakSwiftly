@@ -31,7 +31,7 @@ extension SpeakSwiftly.Runtime {
             voice: nil,
             refAudio: refAudio,
             refText: materialization.manifest.referenceText,
-            language: "English",
+            language: nil,
             generationParameters: generationParameters,
             streamingInterval: streamingInterval,
         )

@@ -209,7 +209,7 @@ extension SpeakSwiftly.Runtime {
         let preparedConditioning = try model.prepareQwenReferenceConditioning(
             refAudio: refAudio,
             refText: materialization.manifest.referenceText,
-            language: "English",
+            language: nil,
         )
         await logRequestEvent(
             "qwen_reference_conditioning_prepared",
