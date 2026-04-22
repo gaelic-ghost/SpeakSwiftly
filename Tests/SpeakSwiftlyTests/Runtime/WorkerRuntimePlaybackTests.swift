@@ -96,7 +96,7 @@ private actor EnvironmentEventRecorder {
     let activeID = await runtime.generate
         .speech(
             text: "Hello there",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
     #expect(await waitUntil {
@@ -110,7 +110,7 @@ private actor EnvironmentEventRecorder {
     let backgroundID = await runtime.generate
         .speech(
             text: "Hi there",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -181,7 +181,7 @@ private actor EnvironmentEventRecorder {
     let failedID = await runtime.generate
         .speech(
             text: "Hello there",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -243,7 +243,7 @@ private actor EnvironmentEventRecorder {
     let playbackID = await runtime.generate
         .speech(
             text: "Hello there",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -311,7 +311,7 @@ private actor EnvironmentEventRecorder {
     let metricsID = await runtime.generate
         .speech(
             text: "Hello there",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 

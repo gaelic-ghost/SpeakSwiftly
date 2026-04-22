@@ -13,33 +13,33 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"
             case text
-            case textProfileID = "text_profile_id"
-            case textContext = "text_context"
-            case sourceFormat = "source_format"
+            case textProfile = "text_profile"
+            case inputTextContext = "input_text_context"
+            case requestContext = "request_context"
         }
 
         // MARK: Properties
 
         public let artifactID: String
         public let text: String
-        public let textProfileID: String?
-        public let textContext: TextForSpeech.Context?
-        public let sourceFormat: TextForSpeech.SourceFormat?
+        public let textProfile: SpeakSwiftly.TextProfileID?
+        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let requestContext: SpeakSwiftly.RequestContext?
 
         // MARK: Lifecycle
 
         init(
             artifactID: String,
             text: String,
-            textProfileID: String?,
-            textContext: TextForSpeech.Context?,
-            sourceFormat: TextForSpeech.SourceFormat?,
+            textProfile: SpeakSwiftly.TextProfileID?,
+            inputTextContext: SpeakSwiftly.InputTextContext?,
+            requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID
             self.text = text
-            self.textProfileID = textProfileID
-            self.textContext = textContext
-            self.sourceFormat = sourceFormat
+            self.textProfile = textProfile
+            self.inputTextContext = inputTextContext
+            self.requestContext = requestContext
         }
     }
 
@@ -98,8 +98,10 @@ public extension SpeakSwiftly {
             case createdAt = "created_at"
             case filePath = "file_path"
             case sampleRate = "sample_rate"
-            case profileName = "profile_name"
-            case textProfileID = "text_profile_id"
+            case voiceProfile = "voice_profile"
+            case textProfile = "text_profile"
+            case inputTextContext = "input_text_context"
+            case requestContext = "request_context"
         }
 
         public let artifactID: String
@@ -107,8 +109,10 @@ public extension SpeakSwiftly {
         public let createdAt: Date
         public let filePath: String
         public let sampleRate: Int
-        public let profileName: String
-        public let textProfileID: String?
+        public let voiceProfile: String
+        public let textProfile: SpeakSwiftly.TextProfileID?
+        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let requestContext: SpeakSwiftly.RequestContext?
 
         init(
             artifactID: String,
@@ -116,16 +120,20 @@ public extension SpeakSwiftly {
             createdAt: Date,
             filePath: String,
             sampleRate: Int,
-            profileName: String,
-            textProfileID: String?,
+            voiceProfile: String,
+            textProfile: SpeakSwiftly.TextProfileID?,
+            inputTextContext: SpeakSwiftly.InputTextContext?,
+            requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID
             self.kind = kind
             self.createdAt = createdAt
             self.filePath = filePath
             self.sampleRate = sampleRate
-            self.profileName = profileName
-            self.textProfileID = textProfileID
+            self.voiceProfile = voiceProfile
+            self.textProfile = textProfile
+            self.inputTextContext = inputTextContext
+            self.requestContext = requestContext
         }
     }
 
@@ -136,8 +144,8 @@ public extension SpeakSwiftly {
             case jobKind = "job_kind"
             case createdAt = "created_at"
             case updatedAt = "updated_at"
-            case profileName = "profile_name"
-            case textProfileID = "text_profile_id"
+            case voiceProfile = "voice_profile"
+            case textProfile = "text_profile"
             case speechBackend = "speech_backend"
             case state
             case items
@@ -154,8 +162,8 @@ public extension SpeakSwiftly {
         public let jobKind: GenerationJobKind
         public let createdAt: Date
         public let updatedAt: Date
-        public let profileName: String
-        public let textProfileID: String?
+        public let voiceProfile: String
+        public let textProfile: SpeakSwiftly.TextProfileID?
         public let speechBackend: SpeechBackend
         public let state: GenerationJobState
         public let items: [GenerationJobItem]
@@ -172,8 +180,8 @@ public extension SpeakSwiftly {
             jobKind: GenerationJobKind,
             createdAt: Date,
             updatedAt: Date,
-            profileName: String,
-            textProfileID: String?,
+            voiceProfile: String,
+            textProfile: SpeakSwiftly.TextProfileID?,
             speechBackend: SpeechBackend,
             state: GenerationJobState,
             items: [GenerationJobItem],
@@ -189,8 +197,8 @@ public extension SpeakSwiftly {
             self.jobKind = jobKind
             self.createdAt = createdAt
             self.updatedAt = updatedAt
-            self.profileName = profileName
-            self.textProfileID = textProfileID
+            self.voiceProfile = voiceProfile
+            self.textProfile = textProfile
             self.speechBackend = speechBackend
             self.state = state
             self.items = items

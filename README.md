@@ -107,7 +107,7 @@ await runtime.start()
 
 let handle = await runtime.generate.speech(
     text: "Hello there.",
-    with: "default-femme"
+    voiceProfile: "default-femme"
 )
 
 for try await event in handle.events {
@@ -115,15 +115,30 @@ for try await event in handle.events {
 }
 ```
 
-When the input is source code rather than prose with embedded snippets, pass `sourceFormat`:
+When the input is source code rather than prose with embedded snippets, pass an `inputTextContext`:
 
 ```swift
 let sourceHandle = await runtime.generate.speech(
     text: "struct WorkerRuntime { let sampleRate: Int }",
-    with: "default-femme",
-    sourceFormat: .swift
+    voiceProfile: "default-femme",
+    inputTextContext: .init(sourceFormat: .swift)
+)
+
+let requestHandle = await runtime.generate.audio(
+    text: "Read the latest release note summary.",
+    voiceProfile: "default-femme",
+    textProfile: "logs",
+    requestContext: .init(
+        source: "release_panel",
+        app: "SpeakSwiftlyOperator",
+        project: "SpeakSwiftly",
+        topic: "release-notes"
+    )
 )
 ```
+
+The typed Swift surface uses `voiceProfile`, `textProfile`, `inputTextContext`, and `requestContext`.
+The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 The runtime is organized around stored concern handles that callers can keep and reuse:
 
@@ -199,9 +214,9 @@ The package publishes:
 
 Key typed runtime entry points include:
 
-- `runtime.generate.speech(text:with:textProfileID:textContext:sourceFormat:)`
-- `runtime.generate.audio(text:with:textProfileID:textContext:sourceFormat:)`
-- `runtime.generate.batch(_:with:)`
+- `runtime.generate.speech(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
+- `runtime.generate.audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
+- `runtime.generate.batch(_:voiceProfile:)`
 - `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
 - `runtime.voices.list()`

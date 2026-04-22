@@ -12,30 +12,32 @@ extension SpeakSwiftly.Runtime {
         op: String,
         artifactID: String,
         text: String,
-        profileName: String,
-        textProfileID: String?,
-        textContext: TextForSpeech.Context?,
-        sourceFormat: TextForSpeech.SourceFormat?,
+        voiceProfile: String,
+        textProfile: SpeakSwiftly.TextProfileID?,
+        inputTextContext: SpeakSwiftly.InputTextContext?,
+        requestContext: SpeakSwiftly.RequestContext?,
     ) async throws -> SpeakSwiftly.GeneratedFile {
         let residentInputs = try await loadResidentSpeechInputs(
             requestID: id,
             op: op,
-            profileName: profileName,
+            profileName: voiceProfile,
         )
         let residentModel = residentInputs.model
 
+        let textContext = inputTextContext?.context
+        let sourceFormat = inputTextContext?.sourceFormat
         let textProfileStyle = await normalizerRef.style.getActive()
-        let textProfile: TextForSpeech.Profile
-        if let textProfileID,
-           let details = try? await normalizerRef.profiles.get(id: textProfileID) {
-            textProfile = TextForSpeech.Profile(
+        let normalizationProfile: TextForSpeech.Profile
+        if let textProfile,
+           let details = try? await normalizerRef.profiles.get(id: textProfile) {
+            normalizationProfile = TextForSpeech.Profile(
                 id: details.profileID,
                 name: details.summary.name,
                 replacements: details.replacements,
             )
         } else {
             let details = await normalizerRef.profiles.getActive()
-            textProfile = TextForSpeech.Profile(
+            normalizationProfile = TextForSpeech.Profile(
                 id: details.profileID,
                 name: details.summary.name,
                 replacements: details.replacements,
@@ -46,14 +48,14 @@ extension SpeakSwiftly.Runtime {
                 text,
                 as: sourceFormat,
                 context: textContext,
-                customProfile: textProfile,
+                customProfile: normalizationProfile,
                 style: textProfileStyle,
             )
         } else {
             TextForSpeech.Normalize.text(
                 text,
                 context: textContext,
-                customProfile: textProfile,
+                customProfile: normalizationProfile,
                 style: textProfileStyle,
             )
         }
@@ -82,7 +84,7 @@ extension SpeakSwiftly.Runtime {
             "generated_file_audio_rendered",
             requestID: id,
             op: op,
-            profileName: profileName,
+            profileName: voiceProfile,
             details: [
                 "speech_backend": .string(speechBackend.rawValue),
                 "duration_ms": .int(elapsedMS(since: generationStartedAt)),
@@ -107,8 +109,10 @@ extension SpeakSwiftly.Runtime {
         let writeStartedAt = dependencies.now()
         let generatedFile = try generatedFileStore.createGeneratedFile(
             artifactID: artifactID,
-            profileName: profileName,
-            textProfileID: textProfileID,
+            voiceProfile: voiceProfile,
+            textProfile: textProfile,
+            inputTextContext: inputTextContext,
+            requestContext: requestContext,
             sampleRate: residentModel.sampleRate,
             audioData: audioData,
         )
@@ -116,7 +120,7 @@ extension SpeakSwiftly.Runtime {
             "generated_file_written",
             requestID: id,
             op: op,
-            profileName: profileName,
+            profileName: voiceProfile,
             details: [
                 "speech_backend": .string(speechBackend.rawValue),
                 "path": .string(generatedFile.audioURL.path),

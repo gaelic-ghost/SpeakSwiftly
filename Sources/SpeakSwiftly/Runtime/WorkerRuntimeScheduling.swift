@@ -49,7 +49,7 @@ extension SpeakSwiftly.Runtime {
                 "request_started",
                 requestID: job.request.id,
                 op: job.request.opName,
-                profileName: job.request.profileName,
+                profileName: job.request.voiceProfile,
                 queueDepth: generationQueueDepth(),
                 details: details,
             )
@@ -58,7 +58,7 @@ extension SpeakSwiftly.Runtime {
                 await self.processGeneration(job.request, token: job.token)
             }
             activeGenerations[job.token] = ActiveRequest(token: job.token, request: job.request, task: task)
-            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _) = job.request {
+            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _) = job.request {
                 await playbackController.setGenerationTask(task, for: id)
             }
             await logMarvisGenerationLaneReservedIfNeeded(
@@ -184,8 +184,8 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .live,
-            textContext: _,
-            sourceFormat: _,
+            inputTextContext: _,
+            requestContext: _,
         ) = request {
             return true
         }
@@ -197,7 +197,7 @@ extension SpeakSwiftly.Runtime {
         activeJobs: [SpeechGenerationController.Job],
         queuedJobs: [SpeechGenerationController.Job],
     ) -> Bool {
-        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, textContext: _, sourceFormat: _) = job.request else {
+        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _) = job.request else {
             return false
         }
 
@@ -313,7 +313,7 @@ extension SpeakSwiftly.Runtime {
             "marvis_generation_lane_reserved",
             requestID: request.id,
             op: request.opName,
-            profileName: request.profileName,
+            profileName: request.voiceProfile,
             details: [
                 "marvis_lane": .string(lane.rawValue),
                 "active_generation_count": .int(activeJobs.count),
@@ -344,7 +344,7 @@ extension SpeakSwiftly.Runtime {
             "marvis_generation_lane_released",
             requestID: request.id,
             op: request.opName,
-            profileName: request.profileName,
+            profileName: request.voiceProfile,
             details: [
                 "marvis_lane": .string(lane.rawValue),
                 "generation_disposition": .string(dispositionSummary),

@@ -35,7 +35,7 @@ import TextForSpeech
         }
     })
 
-    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeHandle.id
@@ -44,7 +44,7 @@ import TextForSpeech
         }
     })
 
-    let queuedHandle = await runtime.generate.speech(text: "Hi there", with: "default-femme")
+    let queuedHandle = await runtime.generate.speech(text: "Hi there", voiceProfile: "default-femme")
 
     let listID = await runtime.player.list().id
 
@@ -101,7 +101,7 @@ import TextForSpeech
         }
     })
 
-    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeHandle.id
@@ -110,7 +110,7 @@ import TextForSpeech
         }
     })
 
-    _ = await runtime.generate.speech(text: "Hi there", with: "default-femme")
+    _ = await runtime.generate.speech(text: "Hi there", voiceProfile: "default-femme")
     let stateID = await runtime.player.state().id
 
     #expect(await waitUntil {
@@ -203,8 +203,8 @@ import TextForSpeech
         }
     })
 
-    let firstHandle = await runtime.generate.speech(text: "First request", with: "lane-a-primary")
-    let secondHandle = await runtime.generate.speech(text: "Second request", with: "lane-b-secondary")
+    let firstHandle = await runtime.generate.speech(text: "First request", voiceProfile: "lane-a-primary")
+    let secondHandle = await runtime.generate.speech(text: "Second request", voiceProfile: "lane-b-secondary")
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -436,7 +436,7 @@ import TextForSpeech
     let queuedFileID = await runtime.generate
         .audio(
             text: "Save this request once the resident models are back.",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
     #expect(await waitUntil {
@@ -522,7 +522,7 @@ import TextForSpeech
         }
     })
 
-    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeHandle.id
@@ -535,7 +535,7 @@ import TextForSpeech
     let queuedFileID = await runtime.generate
         .audio(
             text: "Save this request after the backend switch barrier.",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -718,8 +718,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            textContext: nil,
-            sourceFormat: nil,
+            inputTextContext: nil,
+            requestContext: nil,
         ),
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()

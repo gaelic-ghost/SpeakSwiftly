@@ -7,7 +7,8 @@ extension SpeakSwiftly.Runtime {
         WorkerRequestHandle(
             id: request.id,
             operation: request.opName,
-            profileName: request.profileName,
+            voiceProfile: request.voiceProfile,
+            requestContext: request.requestContext,
             events: makeLegacyRequestEventStream(for: request.id),
             generationEvents: makeGenerationEventStream(for: request.id),
         )
@@ -24,7 +25,8 @@ extension SpeakSwiftly.Runtime {
         requestBrokers[request.id] = RequestBroker(
             id: request.id,
             operation: request.opName,
-            profileName: request.profileName,
+            voiceProfile: request.voiceProfile,
+            requestContext: request.requestContext,
             acceptedAt: acceptedAt,
             lastUpdatedAt: acceptedAt,
         )

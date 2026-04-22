@@ -25,16 +25,16 @@ extension WorkerRequest {
 
         switch op {
             case "generate_speech":
-                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileID: raw.textProfileID,
-                    cwd: raw.cwd,
-                    repoRoot: raw.repoRoot,
-                    textFormat: raw.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat,
+                    textProfileID: raw.textProfile ?? raw.textProfileID,
+                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
+                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
+                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
+                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
+                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
                 )
                 return .queueSpeech(
                     id: id,
@@ -42,21 +42,21 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .live,
-                    textContext: resolved.textContext,
-                    sourceFormat: resolved.sourceFormat,
+                    inputTextContext: resolved.inputTextContext,
+                    requestContext: raw.requestContext,
                 )
 
             case "generate_audio_file":
-                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileID: raw.textProfileID,
-                    cwd: raw.cwd,
-                    repoRoot: raw.repoRoot,
-                    textFormat: raw.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat,
+                    textProfileID: raw.textProfile ?? raw.textProfileID,
+                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
+                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
+                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
+                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
+                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
                 )
                 return .queueSpeech(
                     id: id,
@@ -64,12 +64,12 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .file,
-                    textContext: resolved.textContext,
-                    sourceFormat: resolved.sourceFormat,
+                    inputTextContext: resolved.inputTextContext,
+                    requestContext: raw.requestContext,
                 )
 
             case "generate_batch":
-                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
                 let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
                 return .queueBatch(id: id, profileName: profileName, items: items)
 
@@ -103,7 +103,7 @@ extension WorkerRequest {
                 let text = try requireNonEmpty(raw.text, field: "text", id: id)
                 let vibe = try require(raw.vibe, field: "vibe", id: id)
                 let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
-                let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 return .createProfile(
                     id: id,
                     profileName: profileName,
@@ -111,21 +111,21 @@ extension WorkerRequest {
                     vibe: vibe,
                     voiceDescription: voiceDescription,
                     outputPath: outputPath,
-                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
                 )
 
             case "create_voice_profile_from_audio":
                 let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
                 let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
                 let vibe = try require(raw.vibe, field: "vibe", id: id)
-                let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 return .createClone(
                     id: id,
                     profileName: profileName,
                     referenceAudioPath: referenceAudioPath,
                     vibe: vibe,
                     transcript: transcript,
-                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
                 )
 
             case "list_voice_profiles":
@@ -208,7 +208,9 @@ extension WorkerRequest {
                     )
                 }
 
-                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let textProfileID = (raw.textProfile ?? raw.textProfileID)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .emptyAsNil
                 return .addTextReplacement(id: id, replacement: replacement, profileID: textProfileID)
 
             case "replace_text_replacement":
@@ -219,12 +221,16 @@ extension WorkerRequest {
                     )
                 }
 
-                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let textProfileID = (raw.textProfile ?? raw.textProfileID)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .emptyAsNil
                 return .replaceTextReplacement(id: id, replacement: replacement, profileID: textProfileID)
 
             case "delete_text_replacement":
                 let replacementID = try requireNonEmpty(raw.replacementID, field: "replacement_id", id: id)
-                let textProfileID = raw.textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let textProfileID = (raw.textProfile ?? raw.textProfileID)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .emptyAsNil
                 return .removeTextReplacement(id: id, replacementID: replacementID, profileID: textProfileID)
 
             case "list_generation_queue":
@@ -297,5 +303,11 @@ extension WorkerRequest {
             @unknown default:
                 "The request payload could not be decoded."
         }
+    }
+}
+
+private extension String {
+    var emptyAsNil: String? {
+        isEmpty ? nil : self
     }
 }

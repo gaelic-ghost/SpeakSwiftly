@@ -152,9 +152,14 @@ For any single generation request, the mental model is:
 3. compute the effective merged profile for that job
 4. normalize the input text with request-local context
 
-That is why the generation APIs now carry `textProfileID` rather than `textProfileName`.
+That is why the generation APIs now carry `textProfile` rather than `textProfileName`.
 
 The generation request is selecting a stored profile by stable identifier, not by mutable label.
+
+The typed generation surface also keeps text-shaping and caller metadata separate:
+
+- `inputTextContext`: how to interpret the text itself
+- `requestContext`: what app, agent, project, or topic the request belongs to
 
 ## Persistence
 

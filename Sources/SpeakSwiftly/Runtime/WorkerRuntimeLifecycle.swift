@@ -198,7 +198,7 @@ extension SpeakSwiftly.Runtime {
                 "request_accepted",
                 requestID: request.id,
                 op: request.opName,
-                profileName: request.profileName,
+                profileName: request.voiceProfile,
                 queueDepth: generationQueueDepth(),
             )
             await emitStarted(for: request)
@@ -207,7 +207,7 @@ extension SpeakSwiftly.Runtime {
                 "request_started",
                 requestID: request.id,
                 op: request.opName,
-                profileName: request.profileName,
+                profileName: request.voiceProfile,
                 queueDepth: generationQueueDepth(),
             )
             Task {
@@ -257,7 +257,7 @@ extension SpeakSwiftly.Runtime {
             "request_accepted",
             requestID: request.id,
             op: request.opName,
-            profileName: request.profileName,
+            profileName: request.voiceProfile,
             queueDepth: generationQueueDepth(),
         )
         if request.requiresPlayback {
@@ -272,7 +272,7 @@ extension SpeakSwiftly.Runtime {
                 "request_queued",
                 requestID: request.id,
                 op: request.opName,
-                profileName: request.profileName,
+                profileName: request.voiceProfile,
                 queueDepth: generationQueueDepth(),
                 details: [
                     "park_reason": .string(queuedEvent.reason.rawValue),
@@ -290,7 +290,7 @@ extension SpeakSwiftly.Runtime {
                 "request_enqueue_acknowledged",
                 requestID: request.id,
                 op: request.opName,
-                profileName: request.profileName,
+                profileName: request.voiceProfile,
                 queueDepth: generationQueueDepth(),
             )
             await emit(acknowledgement)

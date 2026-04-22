@@ -203,11 +203,11 @@ private extension BackendBenchmarkE2ETests {
     ) async throws -> BackendQueuedLivePairBenchmark {
         let firstHandle = await session.runtime.generate.speech(
             text: benchmarkText,
-            with: profileName(for: backend),
+            voiceProfile: profileName(for: backend),
         )
         let secondHandle = await session.runtime.generate.speech(
             text: benchmarkText,
-            with: profileName(for: backend),
+            voiceProfile: profileName(for: backend),
         )
 
         async let firstRequest = BenchmarkHarness.runRequestBenchmark(
@@ -264,15 +264,15 @@ private extension BackendBenchmarkE2ETests {
         let handles = await [
             session.runtime.generate.speech(
                 text: benchmarkText,
-                with: MarvisResidentPolicyFixture.femme.profileName,
+                voiceProfile: MarvisResidentPolicyFixture.femme.profileName,
             ),
             session.runtime.generate.speech(
                 text: benchmarkText,
-                with: MarvisResidentPolicyFixture.masc.profileName,
+                voiceProfile: MarvisResidentPolicyFixture.masc.profileName,
             ),
             session.runtime.generate.speech(
                 text: benchmarkText,
-                with: MarvisResidentPolicyFixture.returnToA.profileName,
+                voiceProfile: MarvisResidentPolicyFixture.returnToA.profileName,
             ),
         ]
 

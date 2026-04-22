@@ -144,7 +144,8 @@ extension SpeakSwiftly.Runtime {
                 ActiveWorkerRequestSummary(
                     id: $0.id,
                     op: $0.opName,
-                    profileName: $0.profileName,
+                    voiceProfile: $0.voiceProfile,
+                    requestContext: $0.requestContext,
                 )
             }
     }
@@ -157,7 +158,8 @@ extension SpeakSwiftly.Runtime {
                     QueuedWorkerRequestSummary(
                         id: job.request.id,
                         op: job.request.opName,
-                        profileName: job.request.profileName,
+                        voiceProfile: job.request.voiceProfile,
+                        requestContext: job.request.requestContext,
                         queuePosition: offset + 1,
                     )
                 }
@@ -262,14 +264,15 @@ extension SpeakSwiftly.Runtime {
         jobID: String? = nil,
         items: [SpeakSwiftly.GenerationJobItem]? = nil,
         text: String? = nil,
+        voiceProfile: String? = nil,
         profileName: String? = nil,
         newProfileName: String? = nil,
-        textProfileID: String? = nil,
+        textProfile: SpeakSwiftly.TextProfileID? = nil,
+        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
         textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
         replacement: TextForSpeech.Replacement? = nil,
         replacementID: String? = nil,
-        textContext: TextForSpeech.Context? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestID: String? = nil,
         speechBackend: SpeakSwiftly.SpeechBackend? = nil,
         vibe: SpeakSwiftly.Vibe? = nil,
@@ -287,17 +290,20 @@ extension SpeakSwiftly.Runtime {
             jobID: jobID,
             items: items,
             text: text,
+            voiceProfile: voiceProfile,
             profileName: profileName,
             newProfileName: newProfileName,
-            textProfileID: textProfileID,
+            textProfile: textProfile,
+            inputTextContext: inputTextContext,
+            requestContext: requestContext,
             textProfileStyle: textProfileStyle,
             replacement: replacement,
             replacementID: replacementID,
-            cwd: cwd ?? textContext?.cwd,
-            repoRoot: textContext?.repoRoot,
-            textFormat: textContext?.textFormat,
-            nestedSourceFormat: textContext?.nestedSourceFormat,
-            sourceFormat: sourceFormat,
+            cwd: cwd ?? inputTextContext?.context?.cwd,
+            repoRoot: inputTextContext?.context?.repoRoot,
+            textFormat: inputTextContext?.context?.textFormat,
+            nestedSourceFormat: inputTextContext?.context?.nestedSourceFormat,
+            sourceFormat: inputTextContext?.sourceFormat,
             requestID: requestID,
             speechBackend: speechBackend,
             vibe: vibe,
@@ -324,22 +330,22 @@ extension SpeakSwiftly.Runtime {
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-            case let .queueSpeech(id, text, profileName, textProfileID, _, textContext, sourceFormat):
+            case let .queueSpeech(id, text, profileName, textProfileID, _, inputTextContext, requestContext):
                 await submitRequest(
                     id: id,
                     op: request.opName,
                     text: text,
-                    profileName: profileName,
-                    textProfileID: textProfileID,
-                    textContext: textContext,
-                    sourceFormat: sourceFormat,
+                    voiceProfile: profileName,
+                    textProfile: textProfileID,
+                    inputTextContext: inputTextContext,
+                    requestContext: requestContext,
                 )
             case let .queueBatch(id, profileName, items):
                 await submitRequest(
                     id: id,
                     op: request.opName,
                     items: items,
-                    profileName: profileName,
+                    voiceProfile: profileName,
                 )
             case let .generatedFile(id, artifactID):
                 await submitRequest(
@@ -436,7 +442,7 @@ extension SpeakSwiftly.Runtime {
                  let .setActiveTextProfile(id, profileID),
                  let .deleteTextProfile(id, profileID),
                  let .resetTextProfile(id, profileID):
-                await submitRequest(id: id, op: request.opName, textProfileID: profileID)
+                await submitRequest(id: id, op: request.opName, textProfile: profileID)
             case let .textProfileEffective(id):
                 await submitRequest(id: id, op: request.opName)
             case let .setActiveTextProfileStyle(id, style):
@@ -456,21 +462,21 @@ extension SpeakSwiftly.Runtime {
                     id: id,
                     op: request.opName,
                     newProfileName: profileName,
-                    textProfileID: profileID,
+                    textProfile: profileID,
                 )
             case let .addTextReplacement(id, replacement, profileID),
                  let .replaceTextReplacement(id, replacement, profileID):
                 await submitRequest(
                     id: id,
                     op: request.opName,
-                    textProfileID: profileID,
+                    textProfile: profileID,
                     replacement: replacement,
                 )
             case let .removeTextReplacement(id, replacementID, profileID):
                 await submitRequest(
                     id: id,
                     op: request.opName,
-                    textProfileID: profileID,
+                    textProfile: profileID,
                     replacementID: replacementID,
                 )
             case let .listQueue(id, _):

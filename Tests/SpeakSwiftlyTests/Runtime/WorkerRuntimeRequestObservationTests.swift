@@ -53,7 +53,7 @@ import TextForSpeech
 
     let handle = await runtime.generate.audio(
         text: "Hello from the generation event side channel.",
-        with: "default-femme",
+        voiceProfile: "default-femme",
     )
 
     let runtimeEvents = await runtime.generationEvents(for: handle.id)
@@ -357,7 +357,7 @@ import TextForSpeech
     let requestID = await runtime.generate
         .speech(
             text: "Hello there, galew.",
-            with: "default-femme",
+            voiceProfile: "default-femme",
         )
         .id
 
@@ -500,7 +500,7 @@ import TextForSpeech
         }
     })
 
-    let activeHandle = await runtime.generate.speech(text: "Hello there", with: "default-femme")
+    let activeHandle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == activeHandle.id
@@ -516,8 +516,8 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            textContext: nil,
-            sourceFormat: nil,
+            inputTextContext: nil,
+            requestContext: nil,
         ),
     )
     var iterator = handle.events.makeAsyncIterator()

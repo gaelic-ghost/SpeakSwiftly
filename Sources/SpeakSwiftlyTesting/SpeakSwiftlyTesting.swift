@@ -476,7 +476,7 @@ struct SpeakSwiftlyTestingMain {
 
         let handle = await runtime.generate.audio(
             text: text,
-            with: profileName,
+            voiceProfile: profileName,
         )
 
         let generatedFile = try await awaitGeneratedFile(from: handle)

@@ -228,7 +228,8 @@ actor PlaybackController {
         return ActiveWorkerRequestSummary(
             id: requestID,
             op: playbackState.request.op,
-            profileName: playbackState.request.profileName,
+            voiceProfile: playbackState.request.voiceProfile,
+            requestContext: playbackState.request.requestContext,
         )
     }
 
@@ -257,13 +258,14 @@ actor PlaybackController {
 
     func queuedRequestSummaries() -> [QueuedWorkerRequestSummary] {
         let waitingQueue = queue.filter { $0 != activePlayback?.requestID }
-        return waitingQueue.enumerated().compactMap { offset, requestID in
+        return waitingQueue.enumerated().compactMap { offset, requestID -> QueuedWorkerRequestSummary? in
             guard let playbackState = jobs[requestID] else { return nil }
 
             return QueuedWorkerRequestSummary(
                 id: requestID,
                 op: playbackState.request.op,
-                profileName: playbackState.request.profileName,
+                voiceProfile: playbackState.request.voiceProfile,
+                requestContext: playbackState.request.requestContext,
                 queuePosition: offset + 1,
             )
         }

@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, textContext: _, sourceFormat: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -19,18 +19,18 @@ extension SpeakSwiftly.Runtime {
                 profileName: let profileName,
                 textProfileID: let textProfileID,
                 jobType: .file,
-                textContext: let textContext,
-                sourceFormat: let sourceFormat,
+                inputTextContext: let inputTextContext,
+                requestContext: let requestContext,
             ):
                     let generatedFile = try await handleQueueSpeechFileGeneration(
                         requestID: id,
                         op: request.opName,
                         artifactID: fileArtifactID(for: request),
                         text: text,
-                        profileName: profileName,
-                        textProfileID: textProfileID,
-                        textContext: textContext,
-                        sourceFormat: sourceFormat,
+                        voiceProfile: profileName,
+                        textProfile: textProfileID,
+                        inputTextContext: inputTextContext,
+                        requestContext: requestContext,
                     )
                     let completedJob = try generationJobStore.markCompleted(
                         id: id,
@@ -41,8 +41,10 @@ extension SpeakSwiftly.Runtime {
                                 createdAt: generatedFile.createdAt,
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
-                                profileName: generatedFile.profileName,
-                                textProfileID: generatedFile.textProfileID,
+                                voiceProfile: generatedFile.voiceProfile,
+                                textProfile: generatedFile.textProfile,
+                                inputTextContext: generatedFile.inputTextContext,
+                                requestContext: generatedFile.requestContext,
                             ),
                         ],
                         completedAt: dependencies.now(),
@@ -75,8 +77,10 @@ extension SpeakSwiftly.Runtime {
                                 createdAt: generatedFile.createdAt,
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
-                                profileName: generatedFile.profileName,
-                                textProfileID: generatedFile.textProfileID,
+                                voiceProfile: generatedFile.voiceProfile,
+                                textProfile: generatedFile.textProfile,
+                                inputTextContext: generatedFile.inputTextContext,
+                                requestContext: generatedFile.requestContext,
                             )
                         },
                         completedAt: dependencies.now(),
@@ -345,10 +349,10 @@ extension SpeakSwiftly.Runtime {
                     op: op,
                     artifactID: item.artifactID,
                     text: item.text,
-                    profileName: profileName,
-                    textProfileID: item.textProfileID,
-                    textContext: item.textContext,
-                    sourceFormat: item.sourceFormat,
+                    voiceProfile: profileName,
+                    textProfile: item.textProfile,
+                    inputTextContext: item.inputTextContext,
+                    requestContext: item.requestContext,
                 ),
             )
         }

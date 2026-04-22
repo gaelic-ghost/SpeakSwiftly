@@ -11,8 +11,10 @@ import Testing
     let store = try makeGeneratedFileStore(rootURL: rootURL)
     let created = try store.createGeneratedFile(
         artifactID: "req-file-1",
-        profileName: "default-femme",
-        textProfileID: "logs",
+        voiceProfile: "default-femme",
+        textProfile: "logs",
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
@@ -21,8 +23,8 @@ import Testing
 
     let loaded = try store.loadGeneratedFile(id: "req-file-1")
     #expect(loaded.summary.artifactID == "req-file-1")
-    #expect(loaded.summary.profileName == "default-femme")
-    #expect(loaded.summary.textProfileID == "logs")
+    #expect(loaded.summary.voiceProfile == "default-femme")
+    #expect(loaded.summary.textProfile == "logs")
     #expect(loaded.summary.sampleRate == 24000)
     #expect(loaded.summary.filePath == created.audioURL.path)
 
@@ -48,16 +50,18 @@ import Testing
     let store = try makeGeneratedFileStore(rootURL: rootURL)
     let created = try store.createGeneratedFile(
         artifactID: "req-file-2",
-        profileName: "default-femme",
-        textProfileID: nil,
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        inputTextContext: nil,
+        requestContext: nil,
         sampleRate: 24000,
         audioData: Data([0x01, 0x02, 0x03]),
     )
 
     let removed = try store.removeGeneratedFile(id: "req-file-2")
     #expect(removed?.artifactID == created.summary.artifactID)
-    #expect(removed?.profileName == created.summary.profileName)
-    #expect(removed?.textProfileID == created.summary.textProfileID)
+    #expect(removed?.voiceProfile == created.summary.voiceProfile)
+    #expect(removed?.textProfile == created.summary.textProfile)
     #expect(removed?.sampleRate == created.summary.sampleRate)
     #expect(removed?.filePath == created.summary.filePath)
     #expect(!FileManager.default.fileExists(atPath: created.directoryURL.path))

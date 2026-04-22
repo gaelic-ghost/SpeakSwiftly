@@ -98,38 +98,50 @@ public extension SpeakSwiftly {
     struct ActiveRequest: Codable, Sendable, Equatable {
         public let id: String
         public let op: String
-        public let profileName: String?
+        public let voiceProfile: String?
+        public let requestContext: SpeakSwiftly.RequestContext?
 
         enum CodingKeys: String, CodingKey {
             case id
             case op
-            case profileName = "profile_name"
+            case voiceProfile = "voice_profile"
+            case requestContext = "request_context"
         }
 
-        public init(id: String, op: String, profileName: String?) {
+        public init(id: String, op: String, voiceProfile: String?, requestContext: SpeakSwiftly.RequestContext?) {
             self.id = id
             self.op = op
-            self.profileName = profileName
+            self.voiceProfile = voiceProfile
+            self.requestContext = requestContext
         }
     }
 
     struct QueuedRequest: Codable, Sendable, Equatable {
         public let id: String
         public let op: String
-        public let profileName: String?
+        public let voiceProfile: String?
+        public let requestContext: SpeakSwiftly.RequestContext?
         public let queuePosition: Int
 
         enum CodingKeys: String, CodingKey {
             case id
             case op
-            case profileName = "profile_name"
+            case voiceProfile = "voice_profile"
+            case requestContext = "request_context"
             case queuePosition = "queue_position"
         }
 
-        public init(id: String, op: String, profileName: String?, queuePosition: Int) {
+        public init(
+            id: String,
+            op: String,
+            voiceProfile: String?,
+            requestContext: SpeakSwiftly.RequestContext?,
+            queuePosition: Int,
+        ) {
             self.id = id
             self.op = op
-            self.profileName = profileName
+            self.voiceProfile = voiceProfile
+            self.requestContext = requestContext
             self.queuePosition = queuePosition
         }
     }
