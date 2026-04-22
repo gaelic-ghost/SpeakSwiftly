@@ -9,8 +9,8 @@ enum GenerationPolicy {
     private static let qwenResidentTemperature: Float = 0.9
     private static let qwenResidentTopP: Float = 1.0
     private static let qwenResidentRepetitionPenalty: Float = 1.05
-    private static let chatterboxResidentTemperature: Float = 0.9
-    private static let chatterboxResidentTopP: Float = 1.0
+    private static let chatterboxResidentTemperature: Float = 0.8
+    private static let chatterboxResidentTopP: Float = 0.8
     private static let profileTemperature: Float = 0.9
     private static let profileTopP: Float = 1.0
     private static let profileRepetitionPenalty: Float = 1.05

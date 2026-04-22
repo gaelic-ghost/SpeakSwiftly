@@ -164,7 +164,7 @@ struct MarvisE2ETests {
                 on: worker,
                 id: testCase.createRequestID,
                 profileName: testCase.profileName,
-                text: E2EHarness.testingProfileText,
+                text: E2EHarness.testingCloneSourceText,
                 vibe: testCase.vibe,
                 voiceDescription: testCase.voiceDescription,
             )
@@ -224,7 +224,7 @@ struct MarvisE2ETests {
                 on: worker,
                 id: lane.createID,
                 profileName: lane.profileName,
-                text: E2EHarness.testingProfileText,
+                text: E2EHarness.testingCloneSourceText,
                 vibe: lane.vibe,
                 voiceDescription: lane.voiceDescription,
             )
@@ -301,7 +301,7 @@ struct MarvisE2ETests {
                 on: worker,
                 id: lane.createID,
                 profileName: lane.profileName,
-                text: E2EHarness.testingProfileText,
+                text: E2EHarness.testingCloneSourceText,
                 vibe: lane.vibe,
                 voiceDescription: lane.voiceDescription,
             )

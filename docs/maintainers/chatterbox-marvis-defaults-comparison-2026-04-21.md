@@ -38,7 +38,7 @@ Current local package behavior in this repository.
 
 ### `mlx-audio-swift`
 
-Current `Blaizzy/mlx-audio-swift` `main` behavior as checked on 2026-04-21.
+Current `Blaizzy/mlx-audio-swift` `main` behavior as checked on 2026-04-22.
 
 ### `model repo/card`
 
@@ -59,9 +59,9 @@ The model's own public repo and published Hugging Face surfaces:
 | --- | --- | --- | --- |
 | Live generation shape | Runtime-owned chunked live playback over sequential text chunks | Stream-shaped API, but current Chatterbox path still renders one chunk waveform before yielding audio | Public docs describe ordinary `generate(...)` style synthesis, not token-by-token audio streaming |
 | Native incremental audio streaming | No | No, not in the current Chatterbox integration path | Not clearly claimed in the model card or repo usage docs |
-| Text chunking before synthesis | Yes. First chunk target `16` words, later chunks `28`, min `8`, max `40` | No comparable runtime chunk planner in the Chatterbox model path | Not documented as the intended inference path |
-| Streaming cadence | `0.18s` resident interval for standard non-Qwen resident playback | Generic TTS streaming helpers default to `2.0s`, but current Chatterbox behavior is effectively whole-waveform-per-call for each chunk | No authoritative cadence knob documented in the model card |
-| Caller-facing default generation parameters | `maxTokens 4096`, `temperature 0.9`, `topP 1.0`, `repetitionPenalty 1.05` | `ChatterboxModel.defaultGenerationParameters` sets `temperature 0.8` | Model card emphasizes usage and capabilities, not these inference defaults |
+| Text chunking before synthesis | Yes. First chunk `3` sentences, later chunks `2` sentences | No comparable runtime chunk planner in the Chatterbox model path | Not documented as the intended inference path |
+| Streaming cadence | `0.5s` resident interval for standard non-Qwen resident playback | Generic TTS streaming helpers default to `2.0s`, but current Chatterbox behavior is effectively whole-waveform-per-call for each chunk | No authoritative cadence knob documented in the model card |
+| Caller-facing default generation parameters | `temperature 0.8`, `topP 0.8` | `ChatterboxModel.defaultGenerationParameters` sets `temperature 0.8` | Model card emphasizes usage and capabilities, not these inference defaults |
 | Effective Chatterbox Turbo inference parameters | Our `temperature` and `topP` are passed through | Turbo inference uses dynamic `maxTokens`, `topK 1000`, caller `temperature`, caller `topP`, and hardcoded `repetitionPenalty 1.2` | Not described at this level in the repo or card |
 | Max text window | No local hard cap beyond what upstream model path accepts; we reduce risk by pre-chunking | Turbo config uses `max_text_tokens 2048` | HF config also shows `max_text_tokens 2048` |
 | Max speech token window | Local policy says `4096`, but upstream computes this internally for Chatterbox | Turbo config uses `max_speech_tokens 4096`, with fallback cap `min(768, max(200, textLen * 10))` when prompt speech tokens are missing | HF config shows `max_speech_tokens 4096` |
@@ -74,9 +74,9 @@ The model's own public repo and published Hugging Face surfaces:
 - `SpeakSwiftly` gets live playback by turning one request into many smaller Chatterbox calls. That is a runtime orchestration strategy, not a native model-streaming capability.
 - Our local `maxTokens 4096` and `repetitionPenalty 1.05` do not cleanly map to the final Chatterbox Turbo inference path because upstream Chatterbox computes the effective speech-token cap itself and hardcodes `repetitionPenalty 1.2` inside Turbo inference.
 - The most meaningful Chatterbox diffs today are:
-  - runtime-owned chunking
-  - much tighter live cadence
-  - warmer sampling (`temperature 0.9`, `topP 1.0`) than the current `mlx-audio-swift` Chatterbox default surface
+  - runtime-owned sentence chunking
+  - still-live but now less aggressive `0.5s` cadence instead of our older faster local cadence
+  - upstream-aligned `temperature 0.8` and `topP 0.8`
 
 ## Marvis
 
@@ -85,11 +85,11 @@ The model's own public repo and published Hugging Face surfaces:
 | Live generation shape | Native streaming backend plus SpeakSwiftly-specific scheduling and playback heuristics | Native chunked streaming generation path | Model card explicitly describes real-time streaming TTS |
 | Native incremental audio streaming | Yes, via upstream Marvis streaming path | Yes | Yes, that is a headline feature in the model repo and card |
 | Text chunking before synthesis | No local text chunk planner in the Marvis path | No. Marvis processes the full text context passed into the request | Model card explicitly says Marvis processes full text context rather than regex chunking |
-| Streaming cadence | `0.10s` for first drained live Marvis, `0.18s` for overlap follower and standard resident cadence | Core Marvis streaming path uses `0.5s`; generic wrapper defaults to `2.0s` | Model docs emphasize streaming, but do not publish a canonical cadence number |
-| Caller-facing default generation parameters | `maxTokens 4096`, `temperature 0.9`, `topP 1.0`, `repetitionPenalty 1.05` | `defaultGenerationParameters` returns `maxTokens 750`, `temperature 0.9`, `topP 0.8` | Published MLX config includes generic generation metadata like `temperature 1.0`, `top_k 50`, `top_p 1.0`, but that is not the same thing as the current MLX Swift sampling path |
-| Effective Marvis inference parameters | Local policy object exists, but upstream Marvis currently ignores most caller generation parameters | Current Marvis implementation hardcodes `TopPSampler(temperature: 0.9, topP: 0.8)` and computes `maxAudioFrames 750` internally | Model repo shows a `temperature` and `topk` generate surface in Python, but that is a separate implementation surface |
-| Max generated audio frame budget | Local policy says `4096`, but not actually honored by current upstream Marvis wrapper | `maxAudioFrames = Int(60000 / 80.0) = 750` | MLX model config and repo framing align with 12.5 fps audio-token timing and a 24 kHz Mimi codec stack |
-| Input sequence budget | No local extra cap; we rely on upstream model limit and runtime scheduling | Input must stay below `2048 - 750 = 1298` sequence positions in the current MLX Swift Marvis path | HF config for the MLX model shows `max_position_embeddings 2048` |
+| Streaming cadence | `0.5s` for standard resident playback and both Marvis-specific cadence roles | Core Marvis streaming path uses `0.5s`; generic wrapper defaults to `2.0s` | Model docs emphasize streaming, but do not publish a canonical cadence number |
+| Caller-facing default generation parameters | No local Marvis override. `SpeakSwiftly` passes an empty `GenerateParameters()` because upstream ignores caller knobs here | `defaultGenerationParameters` returns `maxTokens 750`, `temperature 0.9`, `topP 0.8` | Published MLX config includes generic generation metadata like `temperature 1.0`, `top_k 50`, `top_p 1.0`, but that is not the same thing as the current MLX Swift sampling path |
+| Effective Marvis inference parameters | We intentionally defer to upstream internal defaults | Current Marvis implementation hardcodes `TopPSampler(temperature: 0.9, topP: 0.8)` and computes `maxAudioFrames 750` internally | Model repo shows a `temperature` and `topk` generate surface in Python, but that is a separate implementation surface |
+| Max generated audio frame budget | No local override | `maxAudioFrames = Int(60000 / 80.0) = 750` | MLX model config and repo framing align with 12.5 fps audio-token timing and a 24 kHz Mimi codec stack |
+| Input sequence budget | No local extra cap; we rely on upstream model limit and runtime scheduling | Input must stay below `2048 - 750 = 1298` sequence positions in the current MLX Swift Marvis path | HF config for the MLX model shows `max_position_embeddings 2048` at the backbone level, with Mimi codec `max_position_embeddings 8000` and `sliding_window 250` in codec metadata |
 | Context window | We preserve full normalized text instead of pre-chunking | Full prompt context is prepended and processed in one contextual sequence | Model card explicitly says this is a core design goal |
 | Codec and sliding-window metadata | No local override | Uses the model artifact as loaded | HF config shows Mimi codec metadata including `sliding_window 250` and `_frame_rate 12.5` |
 | Voice lane behavior | SpeakSwiftly keeps two warm resident Marvis lanes and routes by vibe | One model instance has mutable caches; our runtime compensates with two resident model objects | Model card focuses on conversational voices and cloning behavior, not our dual-lane runtime policy |
@@ -98,23 +98,25 @@ The model's own public repo and published Hugging Face surfaces:
 ### Marvis Notes
 
 - Marvis is the opposite of Chatterbox in one key respect: the upstream `mlx-audio-swift` path really does stream audio progressively.
-- Our largest Marvis diffs are not the nominal generation-parameter values in `GenerationPolicy`. The largest real diffs are:
-  - much tighter streaming cadence
-  - dual-lane resident scheduling
-  - custom playback thresholds for startup and recovery
-- Several local Marvis parameter values are currently more descriptive than operative because upstream `MarvisTTSModel.generate(...)` and `generateStream(...)` ignore the caller-supplied `generationParameters` and use internal sampling values instead.
-- If we want Marvis generation knobs in `SpeakSwiftly` to be real knobs, the first prerequisite is changing the upstream Marvis Swift wrapper so it honors caller parameters.
+- After the 2026-04-22 alignment pass, Marvis no longer differs from `mlx-audio-swift` on the live cadence we request or on nominal caller sampling overrides. Those were explicit local differences before; they are not the main diffs now.
+- The largest real Marvis diffs now are:
+  - dual-lane resident scheduling so we can keep both conversational voices warm
+  - custom playback thresholds for startup and recovery, especially the `firstDrainedLiveMarvis` tuning profile
+  - vibe-based lane routing on top of the upstream model
+- We now intentionally avoid pretending Marvis has local operative sampling knobs. `SpeakSwiftly` passes an empty `GenerateParameters()` for Marvis because upstream `MarvisTTSModel.generate(...)` and `generateStream(...)` still ignore the caller-supplied generation parameters and use internal sampling values instead.
+- If we want Marvis generation knobs in `SpeakSwiftly` to become real knobs, the first prerequisite is still changing the upstream Marvis Swift wrapper so it honors caller parameters.
+- If Marvis still rebuffers more than expected in local audible runs, the most likely remaining local causes are our playback-policy layer and the fact that we keep two resident Marvis model instances warm at once, not our requested streaming cadence.
 
 ## Practical Conclusions
 
 1. Chatterbox Turbo is not currently native-streaming in the `mlx-audio-swift` path we use. `SpeakSwiftly` fakes live behavior by chunking text and yielding completed chunk waveforms as each chunk finishes.
-2. Marvis is currently native-streaming in the `mlx-audio-swift` path we use. `SpeakSwiftly` then layers its own tighter cadence and playback-stability policy on top.
+2. Marvis is currently native-streaming in the `mlx-audio-swift` path we use. `SpeakSwiftly` now matches the upstream `0.5s` streaming cadence, but still layers its own playback-stability and resident-lane policy on top.
 3. "Upstream" must always be split into two labels in future notes:
    - `mlx-audio-swift`
    - model repo/card
 4. The settings that matter most to align next are:
-   - Chatterbox: chunk sizing, cadence, and whether to stay intentionally more aggressive than `mlx-audio-swift`
-   - Marvis: whether we want the wrapper to honor caller generation parameters instead of silently using internal defaults
+   - Chatterbox: sentence chunk sizing and whether to keep runtime-owned chunking at all
+   - Marvis: whether we want to reduce or remove our custom playback-threshold tuning, and whether we want the wrapper to honor caller generation parameters instead of silently using internal defaults
 
 ## Sources
 

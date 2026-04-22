@@ -29,7 +29,7 @@ struct QwenE2ETests {
                 on: worker,
                 id: "req-create-voice-design",
                 profileName: profileName,
-                text: E2EHarness.testingProfileText,
+                text: E2EHarness.testingCloneSourceText,
                 vibe: .masc,
                 voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
@@ -86,7 +86,7 @@ struct QwenE2ETests {
                 on: worker,
                 id: "req-create-prepared-conditioning-profile",
                 profileName: profileName,
-                text: E2EHarness.testingProfileText,
+                text: E2EHarness.testingCloneSourceText,
                 vibe: .masc,
                 voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )

@@ -78,12 +78,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         tuningProfile: .firstDrainedLiveMarvis,
     ).thresholds
 
-    #expect(compact.startupBufferTargetMS == 1440)
-    #expect(compact.lowWaterTargetMS == 640)
-    #expect(compact.resumeBufferTargetMS == 1700)
-    #expect(balanced.startupBufferTargetMS == 2320)
-    #expect(balanced.lowWaterTargetMS == 1040)
-    #expect(balanced.resumeBufferTargetMS == 2700)
+    #expect(compact.startupBufferTargetMS == 2160)
+    #expect(compact.lowWaterTargetMS == 920)
+    #expect(compact.resumeBufferTargetMS == 2520)
+    #expect(balanced.startupBufferTargetMS == 3840)
+    #expect(balanced.lowWaterTargetMS == 1680)
+    #expect(balanced.resumeBufferTargetMS == 4480)
     #expect(extended.startupBufferTargetMS == 13120)
     #expect(extended.lowWaterTargetMS == 5000)
     #expect(extended.resumeBufferTargetMS == 16480)
@@ -225,9 +225,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let afterMoreChunks = controller.thresholds
 
     #expect(controller.phase == .recovery || controller.phase == .steady)
-    #expect(afterMoreChunks.startupBufferTargetMS >= 1660)
-    #expect(afterMoreChunks.lowWaterTargetMS >= 760)
-    #expect(afterMoreChunks.resumeBufferTargetMS >= 2000)
+    #expect(afterMoreChunks.startupBufferTargetMS >= 2600)
+    #expect(afterMoreChunks.lowWaterTargetMS >= 1100)
+    #expect(afterMoreChunks.resumeBufferTargetMS >= 3000)
     #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
     #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
     #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
@@ -252,7 +252,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     #expect(controller.phase == .recovery)
     #expect(hardened.lowWaterTargetMS > adapted.lowWaterTargetMS)
-    #expect(hardened.resumeBufferTargetMS > adapted.resumeBufferTargetMS)
+    #expect(hardened.resumeBufferTargetMS >= adapted.resumeBufferTargetMS)
+    #expect(hardened.startupBufferTargetMS >= adapted.startupBufferTargetMS)
     #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
 }
 
@@ -267,8 +268,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     }
 
     let adapted = controller.thresholds
-    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2600)
-    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 2400)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 6400)
+    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 6000)
 
     #expect(controller.phase == .warmup)
     #expect(controller.thresholds == adapted)
@@ -340,25 +341,25 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     #expect(standardAdmission.concurrentGenerationTargetMS == 2320)
-    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 2800)
+    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 3040)
     #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
 }
 
 @Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
     let configuration = PlaybackController.fragileOverlapWindowConfiguration(
         tuningProfile: .firstDrainedLiveMarvis,
-        concurrentGenerationTargetMS: 2800,
+        concurrentGenerationTargetMS: 3160,
         lowWaterTargetMS: 1040,
     )
 
     #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
-        holdBufferTargetMS: 3120,
+        holdBufferTargetMS: 3680,
         requiredStableBufferEventCount: 2,
     ))
     #expect(
         PlaybackController.fragileOverlapWindowConfiguration(
             tuningProfile: .standard,
-            concurrentGenerationTargetMS: 2800,
+            concurrentGenerationTargetMS: 3160,
             lowWaterTargetMS: 1040,
         ) == nil,
     )
@@ -368,13 +369,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(
         PlaybackController.allowsConcurrentGeneration(
             bufferedAudioMS: 2160,
-            targetMS: 2700,
+            targetMS: 3160,
         ) == false,
     )
     #expect(
         PlaybackController.allowsConcurrentGeneration(
-            bufferedAudioMS: 2720,
-            targetMS: 2700,
+            bufferedAudioMS: 3200,
+            targetMS: 3160,
         ) == true,
     )
 }
@@ -382,7 +383,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 @Test func `fragile overlap window requires a brief healthy hold and re closes when reserve sags`() {
     let progress = PlaybackController.FragileOverlapWindowProgress(
         configuration: .init(
-            holdBufferTargetMS: 3120,
+            holdBufferTargetMS: 3800,
             requiredStableBufferEventCount: 2,
         ),
         stableBufferEventCount: 0,
@@ -390,31 +391,31 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     let firstHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3200,
-        concurrentGenerationTargetMS: 2800,
+        bufferedAudioMS: 3900,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: progress,
     )
     #expect(firstHealthyEvent.allowsConcurrentGeneration == false)
-    #expect(firstHealthyEvent.effectiveTargetMS == 3120)
+    #expect(firstHealthyEvent.effectiveTargetMS == 3800)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 1)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
     let secondHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3250,
-        concurrentGenerationTargetMS: 2800,
+        bufferedAudioMS: 3920,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
     )
     #expect(secondHealthyEvent.allowsConcurrentGeneration == true)
-    #expect(secondHealthyEvent.effectiveTargetMS == 2800)
+    #expect(secondHealthyEvent.effectiveTargetMS == 3160)
     #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
 
     let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
-        bufferedAudioMS: 3000,
-        concurrentGenerationTargetMS: 2800,
+        bufferedAudioMS: 3600,
+        concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
     )
     #expect(collapsingReserveEvent.allowsConcurrentGeneration == false)
-    #expect(collapsingReserveEvent.effectiveTargetMS == 3120)
+    #expect(collapsingReserveEvent.effectiveTargetMS == 3800)
     #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 0)
     #expect(collapsingReserveEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 }

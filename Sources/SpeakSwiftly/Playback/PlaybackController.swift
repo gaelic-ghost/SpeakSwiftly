@@ -78,7 +78,7 @@ actor PlaybackController {
             )
         }
 
-        let additionalReserveMS = min(480, max(320, lowWaterTargetMS / 2))
+        let additionalReserveMS = min(960, max(720, lowWaterTargetMS / 2))
         return ConcurrencyAdmissionThresholds(
             startupBufferTargetMS: startupBufferTargetMS,
             concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
@@ -99,7 +99,7 @@ actor PlaybackController {
     ) -> FragileOverlapWindowConfiguration? {
         guard tuningProfile == .firstDrainedLiveMarvis else { return nil }
 
-        let additionalHoldReserveMS = min(320, max(240, lowWaterTargetMS / 3))
+        let additionalHoldReserveMS = min(640, max(480, lowWaterTargetMS / 2))
         return FragileOverlapWindowConfiguration(
             holdBufferTargetMS: concurrentGenerationTargetMS + additionalHoldReserveMS,
             requiredStableBufferEventCount: 2,
