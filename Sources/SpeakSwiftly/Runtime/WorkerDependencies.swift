@@ -23,12 +23,20 @@ struct WorkerDependencies: @unchecked Sendable {
     let now: @Sendable () -> Date
     let readRuntimeMemory: @Sendable () -> RuntimeMemorySnapshot?
 
-    static func live(fileManager: FileManager = .default) -> WorkerDependencies {
+    static func live(
+        fileManager: FileManager = .default,
+        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+    ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
 
         return WorkerDependencies(
             fileManager: fileManager,
-            loadResidentModels: { backend in try await ModelFactory.loadResidentModels(for: backend) },
+            loadResidentModels: { backend in
+                try await ModelFactory.loadResidentModels(
+                    for: backend,
+                    marvisResidentPolicy: marvisResidentPolicy,
+                )
+            },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
             loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
             makePlaybackController: {

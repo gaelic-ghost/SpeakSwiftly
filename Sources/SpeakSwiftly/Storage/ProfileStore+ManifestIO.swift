@@ -190,7 +190,7 @@ extension ProfileStore {
             return .masc
         }
 
-        return .androgenous
+        return .femme
     }
 
     func writeMaterializationFiles(

@@ -6,7 +6,7 @@ import Testing
 enum MarvisRouteCase: String, CaseIterable {
     case femme
     case mascClone
-    case androgenous
+    case femmeAlternate
 
     var profileName: String {
         switch self {
@@ -14,8 +14,8 @@ enum MarvisRouteCase: String, CaseIterable {
                 "marvis-femme-profile"
             case .mascClone:
                 "marvis-masc-clone-profile"
-            case .androgenous:
-                "marvis-androgenous-profile"
+            case .femmeAlternate:
+                "marvis-femme-alt-profile"
         }
     }
 
@@ -25,8 +25,8 @@ enum MarvisRouteCase: String, CaseIterable {
                 "req-create-marvis-femme"
             case .mascClone:
                 "req-create-marvis-clone"
-            case .androgenous:
-                "req-create-marvis-androgenous"
+            case .femmeAlternate:
+                "req-create-marvis-femme-alt"
         }
     }
 
@@ -36,8 +36,8 @@ enum MarvisRouteCase: String, CaseIterable {
                 "req-live-marvis-femme"
             case .mascClone:
                 "req-live-marvis-masc"
-            case .androgenous:
-                "req-live-marvis-androgenous"
+            case .femmeAlternate:
+                "req-live-marvis-femme-alt"
         }
     }
 
@@ -47,8 +47,8 @@ enum MarvisRouteCase: String, CaseIterable {
                 .femme
             case .mascClone:
                 .masc
-            case .androgenous:
-                .androgenous
+            case .femmeAlternate:
+                .femme
         }
     }
 
@@ -58,8 +58,8 @@ enum MarvisRouteCase: String, CaseIterable {
                 "A warm, bright, feminine narrator voice."
             case .mascClone:
                 E2EHarness.testingProfileVoiceDescription
-            case .androgenous:
-                "A calm, balanced, and gentle speaking voice."
+            case .femmeAlternate:
+                "A polished, airy, feminine speaking voice."
         }
     }
 
@@ -67,7 +67,7 @@ enum MarvisRouteCase: String, CaseIterable {
         switch self {
             case .mascClone:
                 "conversational_b"
-            case .femme, .androgenous:
+            case .femme, .femmeAlternate:
                 "conversational_a"
         }
     }
@@ -103,11 +103,11 @@ private struct MarvisProfileLane {
             expectedVoice: "conversational_b",
         ),
         Self(
-            createID: "req-create-marvis-triplet-androgenous",
-            liveID: "req-live-marvis-triplet-androgenous",
-            profileName: "marvis-triplet-androgenous-profile",
-            vibe: .androgenous,
-            voiceDescription: "A calm, balanced, and gentle speaking voice.",
+            createID: "req-create-marvis-triplet-femme-alt",
+            liveID: "req-live-marvis-triplet-femme-alt",
+            profileName: "marvis-triplet-femme-alt-profile",
+            vibe: .femme,
+            voiceDescription: "A polished, airy, feminine speaking voice.",
             expectedVoice: "conversational_a",
         ),
     ]
@@ -255,7 +255,7 @@ struct MarvisE2ETests {
     }
 
     @Test(.tags(.audible))
-    func `prequeued jobs drain in order`() async throws {
+    func `queued audible playback stays serialized and routes expected voices`() async throws {
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
 
@@ -275,14 +275,6 @@ struct MarvisE2ETests {
                 vibe: .masc,
                 voiceDescription: "A grounded, rich, masculine speaking voice.",
                 expectedVoice: "conversational_b",
-            ),
-            MarvisProfileLane(
-                createID: "req-create-marvis-queued-androgenous",
-                liveID: "req-live-marvis-queued-androgenous",
-                profileName: "marvis-queued-androgenous-profile",
-                vibe: .androgenous,
-                voiceDescription: "A calm, balanced, and gentle speaking voice.",
-                expectedVoice: "conversational_a",
             ),
         ]
 
@@ -329,6 +321,12 @@ struct MarvisE2ETests {
         } != nil)
         #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
             $0["id"] as? String == lanes[1].liveID
+                && $0["event"] as? String == "queued"
+                && (($0["reason"] as? String == "waiting_for_playback_stability")
+                    || ($0["reason"] as? String == "waiting_for_active_request"))
+        } != nil)
+        #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
+            $0["id"] as? String == lanes[1].liveID
                 && $0["event"] as? String == "started"
         } != nil)
 
@@ -365,7 +363,6 @@ struct MarvisE2ETests {
                 && activeMarvisGenerationLanes.contains("\(lanes[0].liveID):\(lanes[0].expectedVoice)")
                 && queuedGenerationRequestIDs.contains(lanes[1].liveID)
                 && parkedGenerationReasons.contains("\(lanes[1].liveID):waiting_for_playback_stability")
-                && queuedGenerationRequestIDs.contains(lanes[2].liveID)
         } != nil)
 
         for lane in lanes {

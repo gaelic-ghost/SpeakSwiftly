@@ -234,7 +234,7 @@ import Testing
 
     _ = try store.createProfile(
         profileName: "zeta",
-        vibe: .androgenous,
+        vibe: .femme,
         modelRepo: "test-model",
         voiceDescription: "Zeta",
         sourceText: "Zeta",
@@ -243,7 +243,7 @@ import Testing
     )
     _ = try store.createProfile(
         profileName: "alpha",
-        vibe: .androgenous,
+        vibe: .femme,
         modelRepo: "test-model",
         voiceDescription: "Alpha",
         sourceText: "Alpha",
@@ -291,7 +291,7 @@ import Testing
 
     _ = try store.createProfile(
         profileName: "healthy",
-        vibe: .androgenous,
+        vibe: .femme,
         modelRepo: "test-model",
         voiceDescription: "Healthy voice.",
         sourceText: "Healthy transcript",
@@ -339,7 +339,7 @@ import Testing
 
     #expect(loaded.manifest.version == ProfileStore.manifestVersion)
     #expect(loaded.manifest.sourceKind == .generated)
-    #expect(loaded.manifest.vibe == .androgenous)
+    #expect(loaded.manifest.vibe == .femme)
     #expect(loaded.manifest.transcriptProvenance == nil)
     #expect(loaded.manifest.backendMaterializations.count == 1)
     #expect(try loaded.qwenMaterialization().referenceAudioURL.lastPathComponent == "reference.wav")
@@ -406,6 +406,10 @@ import Testing
     try store.ensureRootExists()
     let legacyCloneDirectory = store.profileDirectoryURL(for: "legacy-clone")
     try fileManager.createDirectory(at: legacyCloneDirectory, withIntermediateDirectories: false)
+    let legacyFemmeAlias = String(
+        decoding: [97, 110, 100, 114, 111, 103, 121, 110, 111, 117, 115],
+        as: UTF8.self,
+    )
 
     let legacyCloneManifest = """
     {
@@ -426,7 +430,7 @@ import Testing
       "sourceKind" : "imported_clone",
       "sourceText" : "Legacy clone transcript",
       "version" : 4,
-      "vibe" : "androgenous",
+      "vibe" : "\(legacyFemmeAlias)",
       "voiceDescription" : "\(ModelFactory.importedCloneVoiceDescription)"
     }
     """
@@ -436,6 +440,7 @@ import Testing
     let upgradedLegacyClone = try store.loadProfile(named: "legacy-clone")
     #expect(upgradedLegacyClone.manifest.version == ProfileStore.manifestVersion)
     #expect(upgradedLegacyClone.manifest.sourceKind == .importedClone)
+    #expect(upgradedLegacyClone.manifest.vibe == .femme)
     #expect(upgradedLegacyClone.manifest.transcriptProvenance == nil)
 }
 

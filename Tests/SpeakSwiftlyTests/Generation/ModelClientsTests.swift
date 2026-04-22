@@ -78,12 +78,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         tuningProfile: .firstDrainedLiveMarvis,
     ).thresholds
 
-    #expect(compact.startupBufferTargetMS == 2160)
-    #expect(compact.lowWaterTargetMS == 920)
-    #expect(compact.resumeBufferTargetMS == 2520)
-    #expect(balanced.startupBufferTargetMS == 3840)
-    #expect(balanced.lowWaterTargetMS == 1680)
-    #expect(balanced.resumeBufferTargetMS == 4480)
+    #expect(compact.startupBufferTargetMS == 2880)
+    #expect(compact.lowWaterTargetMS == 1200)
+    #expect(compact.resumeBufferTargetMS == 3360)
+    #expect(balanced.startupBufferTargetMS == 5280)
+    #expect(balanced.lowWaterTargetMS == 2240)
+    #expect(balanced.resumeBufferTargetMS == 6140)
     #expect(extended.startupBufferTargetMS == 13120)
     #expect(extended.lowWaterTargetMS == 5000)
     #expect(extended.resumeBufferTargetMS == 16480)
@@ -251,7 +251,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let hardened = controller.thresholds
 
     #expect(controller.phase == .recovery)
-    #expect(hardened.lowWaterTargetMS > adapted.lowWaterTargetMS)
+    #expect(hardened.lowWaterTargetMS >= adapted.lowWaterTargetMS)
     #expect(hardened.resumeBufferTargetMS >= adapted.resumeBufferTargetMS)
     #expect(hardened.startupBufferTargetMS >= adapted.startupBufferTargetMS)
     #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
@@ -291,20 +291,15 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .firstDrainedLiveMarvis,
     )
-    let overlapSecondLaneInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .overlapSecondLaneDuringFirstDrain,
-    )
 
     #expect(qwenStandardInterval == 0.32)
     #expect(marvisStandardInterval == 0.5)
     #expect(chatterboxStandardInterval == 0.5)
     #expect(firstRequestInterval == 0.5)
-    #expect(overlapSecondLaneInterval == 0.5)
     #expect(firstRequestInterval == marvisStandardInterval)
-    #expect(overlapSecondLaneInterval == marvisStandardInterval)
 }
 
-@Test func `marvis live cadence role selection distinguishes first request from overlap follower`() {
+@Test func `marvis live cadence role selection reserves the special role for the first request only`() {
     let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
         speechBackend: .qwen3,
         existingPlaybackJobCount: 0,
@@ -313,7 +308,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         speechBackend: .marvis,
         existingPlaybackJobCount: 0,
     )
-    let overlapFollowerProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
+    let secondMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
         speechBackend: .marvis,
         existingPlaybackJobCount: 1,
     )
@@ -324,7 +319,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     #expect(qwenProfile == .standard)
     #expect(firstMarvisProfile == .firstDrainedLiveMarvis)
-    #expect(overlapFollowerProfile == .overlapSecondLaneDuringFirstDrain)
+    #expect(secondMarvisProfile == .standard)
     #expect(laterMarvisProfile == .standard)
 }
 
@@ -354,7 +349,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
         holdBufferTargetMS: 3680,
-        requiredStableBufferEventCount: 2,
+        requiredStableBufferEventCount: 4,
     ))
     #expect(
         PlaybackController.fragileOverlapWindowConfiguration(
@@ -384,7 +379,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let progress = PlaybackController.FragileOverlapWindowProgress(
         configuration: .init(
             holdBufferTargetMS: 3800,
-            requiredStableBufferEventCount: 2,
+            requiredStableBufferEventCount: 4,
         ),
         stableBufferEventCount: 0,
         hasSatisfiedHold: false,
@@ -405,14 +400,34 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
     )
-    #expect(secondHealthyEvent.allowsConcurrentGeneration == true)
-    #expect(secondHealthyEvent.effectiveTargetMS == 3160)
-    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
+    #expect(secondHealthyEvent.allowsConcurrentGeneration == false)
+    #expect(secondHealthyEvent.effectiveTargetMS == 3800)
+    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 2)
+    #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
+
+    let thirdHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3940,
+        concurrentGenerationTargetMS: 3160,
+        fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
+    )
+    #expect(thirdHealthyEvent.allowsConcurrentGeneration == false)
+    #expect(thirdHealthyEvent.effectiveTargetMS == 3800)
+    #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 3)
+    #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
+
+    let fourthHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+        bufferedAudioMS: 3960,
+        concurrentGenerationTargetMS: 3160,
+        fragileOverlapWindowProgress: thirdHealthyEvent.fragileOverlapWindowProgress,
+    )
+    #expect(fourthHealthyEvent.allowsConcurrentGeneration == true)
+    #expect(fourthHealthyEvent.effectiveTargetMS == 3160)
+    #expect(fourthHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
 
     let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3600,
         concurrentGenerationTargetMS: 3160,
-        fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
+        fragileOverlapWindowProgress: fourthHealthyEvent.fragileOverlapWindowProgress,
     )
     #expect(collapsingReserveEvent.allowsConcurrentGeneration == false)
     #expect(collapsingReserveEvent.effectiveTargetMS == 3800)

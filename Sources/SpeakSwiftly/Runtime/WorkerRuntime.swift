@@ -23,7 +23,6 @@ public extension SpeakSwiftly {
             enum ResidentStreamingCadenceProfile: String, Equatable {
                 case standard
                 case firstDrainedLiveMarvis = "first_drained_live_marvis"
-                case overlapSecondLaneDuringFirstDrain = "overlap_second_lane_during_first_drain"
             }
 
             /// Use a less aggressive resident cadence for Chatterbox and the normal
@@ -36,10 +35,6 @@ public extension SpeakSwiftly {
             /// cadence instead of a SpeakSwiftly-specific faster interval.
             static let firstDrainedLiveMarvisStreamingInterval = 0.5
 
-            /// The overlap follower keeps its own role even when its cadence matches
-            /// the shared resident baseline.
-            static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.5
-
             static func residentStreamingCadenceProfile(
                 speechBackend: SpeakSwiftly.SpeechBackend,
                 existingPlaybackJobCount: Int,
@@ -49,8 +44,6 @@ public extension SpeakSwiftly {
                 return switch existingPlaybackJobCount {
                     case 0:
                         .firstDrainedLiveMarvis
-                    case 1:
-                        .overlapSecondLaneDuringFirstDrain
                     default:
                         .standard
                 }
@@ -65,8 +58,6 @@ public extension SpeakSwiftly {
                         speechBackend == .qwen3 ? qwenResidentStreamingInterval : standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
-                    case .overlapSecondLaneDuringFirstDrain:
-                        overlapSecondLaneDuringFirstDrainStreamingInterval
                 }
             }
 
@@ -78,8 +69,6 @@ public extension SpeakSwiftly {
                         standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
-                    case .overlapSecondLaneDuringFirstDrain:
-                        overlapSecondLaneDuringFirstDrainStreamingInterval
                 }
             }
         }
@@ -184,7 +173,6 @@ public extension SpeakSwiftly {
             case waitingForResidentModels = "waiting_for_resident_models"
             case waitingForActiveRequest = "waiting_for_active_request"
             case waitingForPlaybackStability = "waiting_for_playback_stability"
-            case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
         }
 
         struct GenerationScheduleDecision {
@@ -339,6 +327,7 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let generatedFileStore: GeneratedFileStore
@@ -367,6 +356,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
@@ -376,6 +366,7 @@ public extension SpeakSwiftly {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.marvisResidentPolicy = marvisResidentPolicy
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore

@@ -47,6 +47,7 @@ actor PlaybackController {
 
     struct GenerationAdmissionSnapshot: Equatable {
         let activeRequestID: String?
+        let activeRequestTuningProfile: PlaybackTuningProfile?
         let allowsConcurrentGeneration: Bool
     }
 
@@ -102,7 +103,7 @@ actor PlaybackController {
         let additionalHoldReserveMS = min(640, max(480, lowWaterTargetMS / 2))
         return FragileOverlapWindowConfiguration(
             holdBufferTargetMS: concurrentGenerationTargetMS + additionalHoldReserveMS,
-            requiredStableBufferEventCount: 2,
+            requiredStableBufferEventCount: 4,
         )
     }
 
@@ -244,6 +245,8 @@ actor PlaybackController {
     func generationAdmissionSnapshot() -> GenerationAdmissionSnapshot {
         GenerationAdmissionSnapshot(
             activeRequestID: activePlayback?.requestID,
+            activeRequestTuningProfile: activePlayback
+                .flatMap { jobs[$0.requestID]?.request.playbackTuningProfile },
             allowsConcurrentGeneration: activePlayback == nil || activePlaybackIsStableForConcurrentGeneration,
         )
     }

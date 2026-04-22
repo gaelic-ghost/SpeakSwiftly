@@ -53,10 +53,10 @@ extension SpeakSwiftly.Runtime {
     static func liftoff(
         configuration: SpeakSwiftly.Configuration? = nil,
     ) async -> SpeakSwiftly.Runtime {
-        let dependencies = WorkerDependencies.live()
         let environment = ProcessInfo.processInfo.environment
+        let bootstrapDependencies = WorkerDependencies.live()
         let persistedConfiguration = resolvedPersistedConfiguration(
-            dependencies: dependencies,
+            dependencies: bootstrapDependencies,
             environment: environment,
         )
         let configuredSpeechBackend = resolvedSpeechBackend(
@@ -67,6 +67,13 @@ extension SpeakSwiftly.Runtime {
         let configuredQwenConditioningStrategy = resolvedQwenConditioningStrategy(
             configuration: configuration
                 ?? persistedConfiguration,
+        )
+        let configuredMarvisResidentPolicy = resolvedMarvisResidentPolicy(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
+        let dependencies = WorkerDependencies.live(
+            marvisResidentPolicy: configuredMarvisResidentPolicy,
         )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
@@ -96,6 +103,7 @@ extension SpeakSwiftly.Runtime {
             dependencies: dependencies,
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
+            marvisResidentPolicy: configuredMarvisResidentPolicy,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
@@ -136,6 +144,12 @@ extension SpeakSwiftly.Runtime {
         configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.QwenConditioningStrategy {
         configuration?.qwenConditioningStrategy ?? .preparedConditioning
+    }
+
+    static func resolvedMarvisResidentPolicy(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> SpeakSwiftly.MarvisResidentPolicy {
+        configuration?.marvisResidentPolicy ?? .dualResidentSerialized
     }
 
     private static func resolvedPersistedConfiguration(

@@ -218,8 +218,6 @@ extension SpeakSwiftly.Runtime {
                 .waitingForActiveRequest
             case .waitingForPlaybackStability:
                 .waitingForPlaybackStability
-            case .waitingForMarvisGenerationLane:
-                .waitingForMarvisGenerationLane
         }
     }
 

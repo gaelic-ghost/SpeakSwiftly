@@ -36,7 +36,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [ ] Milestone 18: Package docs and distribution polish
 - [ ] Milestone 20: Per-request event stream observability
 - [ ] Milestone 21: Unified Logging with `Logger`
-- [ ] Milestone 22: First-request Marvis playback tuning
+- [ ] Milestone 22: Marvis MLX generation-path investigation and playback tuning
 - [x] Milestone 23: Playback request coordination flattening
 - [x] Milestone 24: Playback execution ownership split
 - [x] Milestone 25: Playback scheduling boundary and public state review
@@ -264,155 +264,46 @@ Exit criteria:
 - [ ] The JSONL worker contract remains stdout-only and easy to reason about, with logging clearly separated from protocol traffic.
 - [ ] Operator-facing log messages remain specific, readable, and useful in Console as well as local debugging flows.
 
-## Milestone 22: First-Request Marvis Playback Tuning
+## Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning
 
 Scope:
 
-- [ ] Improve the first live Marvis playback in a drained queue without collapsing the restored dual-lane generation scheduler back into blanket serialization.
-- [ ] Keep playback tuning and scheduler correctness clearly separated so later regressions are easier to diagnose.
-- [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning pass.
+- [ ] Keep Marvis behavior simple enough that the runtime policy is easy to reason about and the remaining instability is attributable.
+- [ ] Document whether the remaining Marvis rebuffers are mainly a local playback-policy issue or a throughput limitation in the current `mlx-audio-swift` generation path.
+- [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning or investigation pass.
 
 Tickets:
 
-- [x] Establish a repeatable tuning checklist for the first drained-queue Marvis playback using the existing queued-live Marvis E2E lane plus stderr scheduler and playback metrics.
-- [x] Compare first-request startup-buffer targets, buffered-audio reserve, and rebuffer counts across at least one before-and-after capture for each tuning change.
+- [x] Establish a repeatable Marvis profiling and measurement path using the audible Marvis E2E suite plus stderr scheduler and playback metrics.
+- [x] Simplify Marvis runtime policy to serialized generation with one conservative live-startup profile instead of overlap-specific queue choreography.
 - [x] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
-- [x] Preserve queued-live Marvis overlap in principle, but allow the second lane to start a little later if that materially reduces first-request rebuffering.
-- [x] Take Milestone 22 one stage at a time: ship one bounded tuning pass, benchmark it, record what changed, then decide whether another pass should widen into resident warmup behavior.
-- [x] Investigate whether resident preload is too eager about preparing local playback hardware, especially the `startResidentPreload()` -> `playbackController.prepare(...)` path that rebuilds playback hardware before an active live request exists.
-- [ ] Revisit warmup startup, low-water, and resume thresholds specifically for the first active Marvis playback request.
-- [x] Revisit Marvis resident streaming cadence only if buffer tuning alone cannot reduce first-request rebuffering.
-- [ ] Keep the scheduler snapshot and lane-reservation logs aligned with any playback-tuning changes so queue truth stays obvious.
-- [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful tuning pass.
+- [x] Revisit Marvis resident streaming cadence until it matches the upstream `0.5s` streaming path and can be tested without extra local cadence roles.
+- [x] Keep scheduler snapshots, queue visibility, and voice-routing logs aligned with the simplified serialized runtime so queue truth stays obvious.
+- [x] Add a Marvis resident-policy benchmark that compares `dual_resident_serialized` against `single_resident_dynamic` with the same three-request `femme -> masc -> femme` switch pattern.
+- [ ] Compare the current `mlx-audio-swift` Marvis generation path against Marvis's own reference implementation surface and document differences in chunking, sampler usage, cache behavior, streaming cadence, and throughput expectations.
+- [ ] Confirm whether `dual_resident_serialized` versus `single_resident_dynamic` changes real audible throughput enough to matter on Gale's Apple-silicon machines.
+- [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful Marvis runtime or upstream investigation pass.
 
 Stage notes:
 
-- Stage 1 landed on `2026-04-15` as a bounded first-request warmup-floor pass. The first drained live Marvis request now seeds higher warmup floors before playback begins:
-  - compact: `startup 1440`, `low-water 640`, `resume 1700`
-  - balanced: `startup 2320`, `low-water 1040`, `resume 2700`
-- Baseline artifact: `.local/e2e-runs/2026-04-15T03-14-57Z-166e3f0f-284e-45f9-ab95-618a3ea71e5a-prequeued-jobs-drain-in-order`
-- Stage 1 artifact: `.local/e2e-runs/2026-04-15T17-27-27Z-e8a7db8f-cc3e-44ee-8f35-65266fb949f4-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured before-and-after stderr metrics changed like this:
-  - `time_to_preroll_ready_ms`: `2320` -> `3746`
-  - `startup_buffered_audio_ms`: `1440` -> `2400`
-  - `startup_buffer_target_ms` at playback start: `1381` -> `2320`
-  - `rebuffer_event_count`: `5` -> `4`
-  - `rebuffer_total_duration_ms`: `24279` -> `25188`
-- The restored dual-lane queued-live overlap model stayed intact. The second Marvis lane remained parked on `waiting_for_playback_stability` until the first request reached the stronger preroll target, then resumed and paired cleanly with the first lane.
-- Stage 1 improved the initial reserve and delayed second-lane admission as intended, but it did not make the first drained-queue playback materially steady enough yet. Milestone 22 stays open, and the next pass should bias toward earlier threshold hardening or resident cadence follow-up rather than rolling overlap back into blanket serialization.
-- Stage 2 landed on `2026-04-15` as a bounded first-rebuffer hardening pass. The first drained live Marvis request now keeps its tuning profile active in adaptive recovery and no longer waits for rebuffer number two before applying rebuffer penalties.
-- Stage 2 artifact: `.local/e2e-runs/2026-04-15T17-52-36Z-e575274b-31ec-486f-9ef7-50f080660f33-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-one to stage-two stderr metrics changed like this:
-  - `time_to_preroll_ready_ms`: `3746` -> `3810`
-  - `startup_buffered_audio_ms`: `2400` -> `2400`
-  - `rebuffer_event_count`: `4` -> `4`
-  - `rebuffer_total_duration_ms`: `25188` -> `23991`
-  - `longest_rebuffer_duration_ms`: `7041` -> `9399`
-- The stage-two logs show the intended policy change actually taking effect. On the first active rebuffer, the resumed target rose from the stage-one `3282` range into the `3403` range, and the later repeated-rebuffer recovery ceiling stayed strong at `4980` instead of falling back toward the standard profile.
-- Stage 2 is a real improvement, but still not a full fix. Total rebuffer time dropped by about `1.2s`, yet the first request still suffered four rebuffers and one longer recovery window.
-- Stage 3 landed on `2026-04-15` as a bounded pre-rebuffer distress pass. The first drained live Marvis request now treats repeated schedule-gap warnings inside the low-queue risk band as an early recovery signal instead of waiting for the first rebuffer pause to fully form.
-- Stage 3 artifact: `.local/e2e-runs/2026-04-15T18-02-46Z-16d980ae-1226-4db6-9095-59fdcff155f1-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-two to stage-three stderr metrics changed like this:
-  - `time_to_preroll_ready_ms`: `3810` -> `3760`
-  - `startup_buffered_audio_ms`: `2400` -> `2400`
-  - `rebuffer_event_count`: `4` -> `4`
-  - `rebuffer_total_duration_ms`: `23991` -> `23773`
-  - `longest_rebuffer_duration_ms`: `9399` -> `6678`
-- The stage-three logs show the intended earlier reaction taking effect before the first long pause finishes growing. The first active rebuffer now starts at `queued_audio_ms = 1760` instead of the stage-two `1120`, and the strongest recovery window is shorter even though the run still ends with four rebuffers.
-- The restored dual-lane overlap model still held during stage three. The second Marvis lane remained parked on `waiting_for_playback_stability`, then resumed once playback reported `playback_is_stable_for_concurrency = true` at a `2320 ms` stable buffer target and `2400 ms` buffered reserve.
-- Stage 3 is another real improvement, but still not a full fix. The next decision is whether one more bounded policy pass is likely to keep paying off, or whether Milestone 22 should widen into resident Marvis cadence and warmup behavior now that the obvious first-request threshold work is in place.
-- The widened Milestone 22 investigation checked the resident preload path before changing code. The current evidence says the eager `startResidentPreload()` -> `playbackController.prepare(...)` path is not the leading problem surface, because first-request startup is dominated by slow resident chunk cadence rather than by audio-engine bring-up once a live request begins.
-- Stage 4 landed on `2026-04-15` as the first widened pass. The first drained live Marvis request now uses a tighter resident streaming cadence of `0.12` instead of the standard `0.18`, while later queued requests stay on the ordinary cadence.
-- Stage 4 artifact: `.local/e2e-runs/2026-04-15T18-16-17Z-7b199036-8540-4284-9a84-92dd16e13a30-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-three to stage-four stderr metrics changed like this:
-  - `time_to_first_chunk_ms`: `441` -> `333`
-  - `time_to_preroll_ready_ms`: `3760` -> `3833`
-  - `startup_buffered_audio_ms`: `2400` -> `2320`
-  - `rebuffer_event_count`: `4` -> `5`
-  - `rebuffer_total_duration_ms`: `23773` -> `22758`
-  - `longest_rebuffer_duration_ms`: `6678` -> `4801`
-  - `avg_inter_chunk_gap_ms`: `399` -> `202`
-  - `avg_schedule_gap_ms`: `364` -> `184`
-- Stage 4 improved startup chunk cadence decisively, but it also exposed a new mismatch: the second Marvis lane still reopened at bare preroll reserve, so the first request picked up shorter but more frequent disruptions after overlap resumed. That made stage four useful, but not sufficient to keep on its own.
-- Stage 5 landed on `2026-04-15` as the widened follow-up pass. The first drained live Marvis request now keeps the faster resident cadence from stage four, and playback no longer reopens concurrent generation at plain preroll for that first drained request. Instead, the first request has to build a stronger buffered-audio reserve before the scheduler sees playback as stable enough for the second Marvis lane.
-- Stage 5 artifact: `.local/e2e-runs/2026-04-15T18-24-15Z-95e656cc-c4b4-4e2a-8374-4ef353ac9b2a-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-four to stage-five stderr metrics changed like this:
-  - `time_to_first_chunk_ms`: `333` -> `325`
-  - `time_to_preroll_ready_ms`: `3833` -> `3828`
-  - `startup_buffered_audio_ms`: `2320` -> `2320`
-  - `rebuffer_event_count`: `5` -> `5`
-  - `rebuffer_total_duration_ms`: `22758` -> `18775`
-  - `longest_rebuffer_duration_ms`: `4801` -> `4385`
-  - `avg_inter_chunk_gap_ms`: `202` -> `183`
-  - `avg_schedule_gap_ms`: `184` -> `165`
-- The important stage-five architecture outcome is that overlap stayed intact while moving later in the flow. The second Marvis lane no longer reopened at the first request's bare preroll reserve; it stayed parked on `waiting_for_playback_stability` until the first playback had already recovered into a healthier reserve window, then resumed and kept the dual-lane model alive.
-- Stage 6 landed on `2026-04-15` as the review-and-correctness follow-up pass. The widened stage-five trace exposed one real bug in the overlap gate: after a later rebuffer resume, playback could report `playback_is_stable_for_concurrency = true` even when `playback_stable_buffered_audio_ms` was still below `playback_stable_buffer_target_ms`.
-- Stage 6 artifact: `.local/e2e-runs/2026-04-15T18-32-16Z-69de7141-3485-4788-8ea5-b30a49e87cbc-prequeued-jobs-drain-in-order`
-- The fix kept the admission boundary narrow but made the overlap gate consistent: `PlaybackController` now reuses the same buffered-audio-versus-target check for preroll, rebuffer resume, and buffer-scheduled updates instead of reopening overlap unconditionally on `rebuffer_resumed`.
-- For the first queued femme request, the measured stage-five to stage-six stderr metrics changed like this:
-  - `time_to_first_chunk_ms`: `325` -> `324`
-  - `time_to_preroll_ready_ms`: `3828` -> `3833`
-  - `startup_buffered_audio_ms`: `2320` -> `2320`
-  - `rebuffer_event_count`: `5` -> `5`
-  - `rebuffer_total_duration_ms`: `18775` -> `20055`
-  - `longest_rebuffer_duration_ms`: `4385` -> `4395`
-  - `time_from_preroll_ready_to_drain_ms`: `34617` -> `37107`
-- The important stage-six outcome is correctness, not another performance win. The old bogus state where overlap reopened at `2160 ms` buffered against a `2700 ms` target disappeared from the fresh trace, and the second Marvis lane only resumed once the resumed reserve had actually crossed the reported target again.
-- Stage 7 landed on `2026-04-15` as the next bounded cadence follow-up pass. The truthful overlap gate from stage six stayed in place, and the first drained live Marvis request now asks the resident model for a slightly tighter first-request streaming cadence again.
-- Stage 7 artifact: `.local/e2e-runs/2026-04-15T18-46-12Z-ce51be64-6dd0-4e21-a125-3d1067397266-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-six to stage-seven stderr metrics changed like this:
-  - `streaming_interval`: `0.12` -> `0.10`
-  - `time_to_first_chunk_ms`: `324` -> `324`
-  - `time_to_preroll_ready_ms`: `3833` -> `3951`
-  - `startup_buffered_audio_ms`: `2320` -> `2320`
-  - `rebuffer_event_count`: `5` -> `4`
-  - `rebuffer_total_duration_ms`: `20055` -> `17284`
-  - `longest_rebuffer_duration_ms`: `4395` -> `4897`
-  - `avg_inter_chunk_gap_ms`: `183` -> `180`
-  - `avg_schedule_gap_ms`: `166` -> `162`
-- The important stage-seven outcome is that the smoother first-request result came back without reintroducing the false overlap signal from stage five. The second Marvis lane still stayed parked on `waiting_for_playback_stability`, and every overlap reopen in the fresh trace happened with `playback_stable_buffered_audio_ms` at or above the reported `playback_stable_buffer_target_ms`.
-- Milestone 22 is still open, but the current evidence now points more clearly at two facts: faster first-request cadence helps, and cadence changes need admission-gate changes alongside them or the first request gives the gains back as soon as overlap resumes.
-- Stage 8 landed on `2026-04-15` as a probing pass instead of another tuning pass. The scheduler snapshots, lane reserve and release events, and playback rebuffer start and resume events now all carry the same process and MLX memory details that were previously only available in the final `playback_finished` event.
-- Stage 8 artifact: `.local/e2e-runs/2026-04-15T19-08-53Z-f0de238e-3cf0-477a-ade2-c476ff05b134-prequeued-jobs-drain-in-order`
-- For the first queued femme request, the measured stage-seven to stage-eight stderr metrics changed like this:
-  - `time_to_first_chunk_ms`: `324` -> `340`
-  - `time_to_preroll_ready_ms`: `3951` -> `3926`
-  - `startup_buffered_audio_ms`: `2320` -> `2320`
-  - `rebuffer_event_count`: `4` -> `5`
-  - `rebuffer_total_duration_ms`: `17284` -> `20089`
-  - `longest_rebuffer_duration_ms`: `4897` -> `4469`
-- The important stage-eight finding is not the audible regression. It is the new transition evidence. At the first truthful overlap reopen, `playback_rebuffer_resumed` reported `mlx_active_memory_bytes = 2388309837` and `process_phys_footprint_bytes = 2734345216`, while the immediately following `marvis_generation_lane_reserved` event for the second lane stayed effectively flat at `mlx_active_memory_bytes = 2388309873` and `process_phys_footprint_bytes = 2734377984`.
-- The larger resource rise showed up only after dual-lane overlap had already been active. By the next `playback_rebuffer_started` event, the first request had climbed to `mlx_active_memory_bytes = 2528397332` and `process_phys_footprint_bytes = 2885979136` while still losing refill headroom.
-- That changes the working read on the problem. The current bottleneck looks less like a sharp one-time second-lane startup spike and more like sustained overlap pressure on the first request while it is trying to rebuild reserve.
-- Stage 11 landed on `2026-04-15` as the first explicit overlap-follower cadence experiment. The runtime now has a separate `ResidentStreamingCadenceProfile` role for the second lane during the first drained Marvis overlap window, so future cadence work can tune that follower path without overloading the first-request playback profile.
-- Stage 11 artifact: `.local/e2e-runs/2026-04-15T21-52-43Z-236ce29a-5d5c-470f-a51e-f38dfbc3361d-prequeued-jobs-drain-in-order`
-- The first follower experiment itself is not a keeper as tuning. With the overlap follower slowed to `0.20`, the second lane still reserved before the first playback finished, so overlap remained alive, but the first queued femme request got worse instead of better:
-  - `time_to_first_chunk_ms`: `340` -> `349`
-  - `time_to_preroll_ready_ms`: `3926` -> `3844`
-  - `startup_buffered_audio_ms`: `2320` -> `2320`
-  - `rebuffer_event_count`: `5` -> `6`
-  - `rebuffer_total_duration_ms`: `20089` -> `20769`
-  - `longest_rebuffer_duration_ms`: `4469` -> `4566`
-- The useful outcome is architectural rather than audible. The package now has an explicit follower-cadence role, but the follower interval itself is back on the ordinary `0.18` baseline until a better overlap-pressure experiment earns a real tuning change.
-- A clean rerun of the same stage-eleven follower experiment under lighter machine load landed at `.local/e2e-runs/2026-04-15T22-10-00Z-7ccd26f6-62b6-4117-a4c5-3027d81ebacf-prequeued-jobs-drain-in-order`.
-- That rerun showed the original noisy result was overstating the regression. The same `0.20` follower cadence kept overlap alive and improved modestly over the stage-eight probe:
-  - `time_to_first_chunk_ms`: `340` -> `340`
-  - `time_to_preroll_ready_ms`: `3926` -> `3833`
-  - `rebuffer_event_count`: `5` -> `5`
-  - `rebuffer_total_duration_ms`: `20089` -> `19115`
-  - `longest_rebuffer_duration_ms`: `4469` -> `4490`
-- Even with the cleaner rerun, the first audible request was still subjectively too rough to justify keeping fixed follower slowdown as the main strategy. The working read is now that simultaneous second-lane startup is the unstable part on Gale's machine, so the next pass should move away from fixed follower cadence and into a dynamic fragile-overlap policy.
-- The smallest next dynamic pass should keep the truthful overlap gate, preserve the explicit follower-cadence role, and add one short-lived `fragile first playback` state for the first drained live Marvis request:
-  - lane two stays parked or in a lighter mode until the first request has crossed a stronger reserve target and held it briefly
-  - once the first request has held reserve long enough, lane two can enter overlap
-  - if reserve drops back toward the floor, lane two backs off again instead of staying fully active
-- That gives Milestone 22 a more promising next lever than another fixed `0.19` versus `0.20` follower comparison, because it targets the unstable transition into overlap rather than applying one constant pressure level for the whole follower request.
+- Earlier Milestone 22 work explored overlap-specific thresholds, cadence tweaks, and queue-admission changes in detail.
+- The current 2026-04-22 steady state is intentionally simpler:
+  - Marvis generation is serialized
+  - the default resident policy is `dual_resident_serialized`
+  - a benchmark now exists for `dual_resident_serialized` versus `single_resident_dynamic`
+  - all live Marvis playback uses one conservative startup profile
+  - the current live cadence matches the upstream Marvis `0.5s` path
+- The current read after the latest audible runs is:
+  - local overlap complexity was not the main problem
+  - simplifying the runtime improved consistency, especially for later queued requests
+  - even after that simplification, audible Marvis still tends to rebuffer
+  - the next useful work is upstream and reference-path investigation, not rebuilding the old overlap model
 
 Exit criteria:
 
-- [ ] The first drained-queue Marvis playback is measurably steadier than the current baseline.
-- [ ] The restored dual-lane queued-live Marvis overlap model remains intact and verified.
-- [ ] The repository has a documented before-and-after record for the tuning work that makes later regressions obvious.
+- [ ] The repository documents how the current `mlx-audio-swift` Marvis path differs from Marvis's reference implementation surface and what those differences imply for local playback behavior.
+- [ ] Marvis audible playback is either measurably steadier after upstream-aware changes or explicitly documented as limited by the current MLX path.
+- [ ] The repository has a documented before-and-after record for the simplified serialized policy and the follow-on upstream investigation.
 
 ## Milestone 26: Pre-v1 Release Hardening
 

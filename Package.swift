@@ -26,7 +26,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.18.3"),
+            .upToNextMajor(from: "0.18.5"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",

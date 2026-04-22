@@ -76,7 +76,7 @@ extension SpeakSwiftly.Runtime {
             case let .chatterboxTurbo(model):
                 model.sampleRate
             case let .marvis(models):
-                models.conversationalA.sampleRate
+                models.primaryModel.sampleRate
         }
     }
 

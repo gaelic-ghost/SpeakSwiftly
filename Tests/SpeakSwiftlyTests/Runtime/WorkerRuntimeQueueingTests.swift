@@ -74,7 +74,7 @@ import TextForSpeech
     })
 }
 
-@Test func `marvis queued live generation resumes across resident lanes after playback becomes stable`() async throws {
+@Test func `marvis live generation stays serialized across resident voices`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -121,16 +121,6 @@ import TextForSpeech
         sampleRate: 24000,
         canonicalAudioData: Data([0x03, 0x04]),
     )
-    _ = try store.createProfile(
-        profileName: "lane-a-tertiary",
-        vibe: .androgenous,
-        modelRepo: "test-model",
-        voiceDescription: "Balanced and clear.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x05, 0x06]),
-    )
-
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
@@ -138,7 +128,7 @@ import TextForSpeech
         speechBackend: .marvis,
         residentModelLoader: { _ in
             ResidentSpeechModels.marvis(
-                MarvisResidentModels(
+                .dual(
                     conversationalA: makeLaneModel(laneAGenerationDrain),
                     conversationalB: makeLaneModel(laneBGenerationDrain),
                 ),
@@ -157,7 +147,6 @@ import TextForSpeech
 
     await runtime.accept(line: #"{"id":"req-live-1","op":"generate_speech","text":"Hello there","profile_name":"lane-a-primary"}"#)
     await runtime.accept(line: #"{"id":"req-live-2","op":"generate_speech","text":"Hi there","profile_name":"lane-b-secondary"}"#)
-    await runtime.accept(line: #"{"id":"req-live-3","op":"generate_speech","text":"Hey there","profile_name":"lane-a-tertiary"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -170,28 +159,9 @@ import TextForSpeech
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-live-2"
-                && $0["event"] as? String == "started"
-        }
-    })
-    let req1PrerollReadyIndex = output.firstStdoutJSONObjectIndex {
-        $0["id"] as? String == "req-live-1"
-            && $0["event"] as? String == "progress"
-            && $0["stage"] as? String == "preroll_ready"
-    }
-    let req2StartedIndex = output.firstStdoutJSONObjectIndex {
-        $0["id"] as? String == "req-live-2"
-            && $0["event"] as? String == "started"
-    }
-    #expect(req1PrerollReadyIndex != nil)
-    #expect(req2StartedIndex != nil)
-    if let req1PrerollReadyIndex, let req2StartedIndex {
-        #expect(req1PrerollReadyIndex < req2StartedIndex)
-    }
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-live-3"
                 && $0["event"] as? String == "queued"
-                && $0["reason"] as? String == "waiting_for_marvis_generation_lane"
+                && (($0["reason"] as? String == "waiting_for_playback_stability")
+                    || ($0["reason"] as? String == "waiting_for_active_request"))
         }
     })
     let generationQueueID = await (runtime.jobs.generationQueue()).id
@@ -200,41 +170,46 @@ import TextForSpeech
             guard
                 $0["id"] as? String == generationQueueID,
                 $0["ok"] as? Bool == true,
-                let activeRequests = $0["active_requests"] as? [[String: Any]]
+                let activeRequests = $0["active_requests"] as? [[String: Any]],
+                let queuedRequests = $0["queue"] as? [[String: Any]]
             else {
                 return false
             }
 
             let activeIDs = Set(activeRequests.compactMap { $0["id"] as? String })
-            return activeIDs == Set(["req-live-1", "req-live-2"])
+            let queuedIDs = Set(queuedRequests.compactMap { $0["id"] as? String })
+            return activeIDs == Set(["req-live-1"]) && queuedIDs == Set(["req-live-2"])
         }
     })
     #expect(!output.containsJSONObject {
         $0["id"] as? String == "req-live-2"
-            && $0["event"] as? String == "progress"
-            && $0["stage"] as? String == "playback_finished"
+            && $0["event"] as? String == "started"
+    })
+    #expect(output.containsStderrJSONObject {
+        $0["request_id"] as? String == "req-live-1"
+            && $0["event"] as? String == "marvis_generation_lane_reserved"
+            && (($0["details"] as? [String: Any])?["marvis_lane"] as? String) == "conversational_a"
+    })
+    #expect(output.containsStderrJSONObject {
+        $0["event"] as? String == "marvis_generation_scheduler_snapshot"
+            && (($0["details"] as? [String: Any])?["active_generation_request_ids"] as? String) == "req-live-1"
+    })
+
+    await laneAGenerationDrain.open()
+    await playbackDrain.open()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-2"
+                && $0["event"] as? String == "started"
+        }
     })
     #expect(output.containsStderrJSONObject {
         $0["request_id"] as? String == "req-live-2"
             && $0["event"] as? String == "marvis_generation_lane_reserved"
             && (($0["details"] as? [String: Any])?["marvis_lane"] as? String) == "conversational_b"
-            && (($0["details"] as? [String: Any])?["playback_allows_concurrent_generation"] as? Bool) == true
-    })
-    #expect(output.containsStderrJSONObject {
-        $0["event"] as? String == "marvis_generation_scheduler_snapshot"
-            && (($0["details"] as? [String: Any])?["playback_is_stable_for_concurrency"] as? Bool) == true
-    })
-
-    await laneAGenerationDrain.open()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-live-3"
-                && $0["event"] as? String == "started"
-        }
     })
 
     await laneBGenerationDrain.open()
-    await playbackDrain.open()
 }
 
 @Test func `runtime uses configured speech backend for resident model preload`() async throws {

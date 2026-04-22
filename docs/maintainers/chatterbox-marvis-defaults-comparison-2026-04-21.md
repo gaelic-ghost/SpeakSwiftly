@@ -92,20 +92,27 @@ The model's own public repo and published Hugging Face surfaces:
 | Input sequence budget | No local extra cap; we rely on upstream model limit and runtime scheduling | Input must stay below `2048 - 750 = 1298` sequence positions in the current MLX Swift Marvis path | HF config for the MLX model shows `max_position_embeddings 2048` at the backbone level, with Mimi codec `max_position_embeddings 8000` and `sliding_window 250` in codec metadata |
 | Context window | We preserve full normalized text instead of pre-chunking | Full prompt context is prepended and processed in one contextual sequence | Model card explicitly says this is a core design goal |
 | Codec and sliding-window metadata | No local override | Uses the model artifact as loaded | HF config shows Mimi codec metadata including `sliding_window 250` and `_frame_rate 12.5` |
-| Voice lane behavior | SpeakSwiftly keeps two warm resident Marvis lanes and routes by vibe | One model instance has mutable caches; our runtime compensates with two resident model objects | Model card focuses on conversational voices and cloning behavior, not our dual-lane runtime policy |
-| Playback stabilization | SpeakSwiftly adds a `firstDrainedLiveMarvis` tuning profile with raised startup and resume floors | No comparable playback policy in `mlx-audio-swift` | Not part of the model repo or card surface |
+| Resident voice policy | Configurable. Default is `dual_resident_serialized`, which keeps the `femme` and `masc` resident routes warm while serializing generation. Optional `single_resident_dynamic` reuses one resident model object for whichever route the next request needs | One model instance has mutable caches; upstream does not provide our policy surface | Model card focuses on conversational voices and cloning behavior, not our runtime policy choices |
+| Marvis generation concurrency | Serialized. SpeakSwiftly now allows only one Marvis generation at a time | No equivalent SpeakSwiftly-style scheduler policy | Not part of the model repo or card surface |
+| Playback stabilization | SpeakSwiftly applies one conservative Marvis live-startup profile with raised startup and resume floors across live Marvis playback | No comparable playback policy in `mlx-audio-swift` | Not part of the model repo or card surface |
 
 ### Marvis Notes
 
 - Marvis is the opposite of Chatterbox in one key respect: the upstream `mlx-audio-swift` path really does stream audio progressively.
 - After the 2026-04-22 alignment pass, Marvis no longer differs from `mlx-audio-swift` on the live cadence we request or on nominal caller sampling overrides. Those were explicit local differences before; they are not the main diffs now.
+- After the later 2026-04-22 simplification pass, SpeakSwiftly now serializes Marvis generation outright instead of trying to overlap two Marvis generations across resident lanes.
+- After the follow-up 2026-04-22 playback pass, all live Marvis requests now use the same conservative Marvis startup profile instead of only the first request getting the larger preroll.
 - The largest real Marvis diffs now are:
-  - dual-lane resident scheduling so we can keep both conversational voices warm
-  - custom playback thresholds for startup and recovery, especially the `firstDrainedLiveMarvis` tuning profile
-  - vibe-based lane routing on top of the upstream model
+  - resident loading policy, either `dual_resident_serialized` or `single_resident_dynamic`
+  - serialized Marvis generation on top of the upstream model
+  - custom playback thresholds for startup and recovery, now applied as one Marvis live-startup profile
+  - simple `femme` versus `masc` route selection on top of the upstream model
 - We now intentionally avoid pretending Marvis has local operative sampling knobs. `SpeakSwiftly` passes an empty `GenerateParameters()` for Marvis because upstream `MarvisTTSModel.generate(...)` and `generateStream(...)` still ignore the caller-supplied generation parameters and use internal sampling values instead.
 - If we want Marvis generation knobs in `SpeakSwiftly` to become real knobs, the first prerequisite is still changing the upstream Marvis Swift wrapper so it honors caller parameters.
-- If Marvis still rebuffers more than expected in local audible runs, the most likely remaining local causes are our playback-policy layer and the fact that we keep two resident Marvis model instances warm at once, not our requested streaming cadence.
+- The latest audible Marvis runs after serialization plus unified startup tuning make the remaining bottleneck look more like raw MLX Marvis throughput than overlap policy:
+  - the first serialized request still improves materially
+  - later serialized requests also now start with the same larger preroll instead of falling back to tiny `standard` startup buffering
+  - that reduces the earlier later-request cliff, but it still does not make Marvis playback fully clean end to end
 
 ## Practical Conclusions
 
@@ -116,7 +123,7 @@ The model's own public repo and published Hugging Face surfaces:
    - model repo/card
 4. The settings that matter most to align next are:
    - Chatterbox: sentence chunk sizing and whether to keep runtime-owned chunking at all
-   - Marvis: whether we want to reduce or remove our custom playback-threshold tuning, and whether we want the wrapper to honor caller generation parameters instead of silently using internal defaults
+   - Marvis: whether the remaining audible instability is mostly an `mlx-audio-swift` throughput issue, and whether we want the wrapper to honor caller generation parameters instead of silently using internal defaults
 
 ## Sources
 
