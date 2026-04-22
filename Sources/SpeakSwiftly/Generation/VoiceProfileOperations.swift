@@ -51,7 +51,7 @@ extension SpeakSwiftly.Runtime {
             refAudio: nil,
             refText: nil,
             language: nil,
-            generationParameters: GenerationPolicy.profileParameters(for: text),
+            generationParameters: GenerationPolicy.profileModelParameters(for: text),
         )
         await logRequestEvent(
             "profile_audio_generated",

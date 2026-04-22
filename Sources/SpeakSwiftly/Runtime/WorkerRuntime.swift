@@ -26,24 +26,19 @@ public extension SpeakSwiftly {
                 case overlapSecondLaneDuringFirstDrain = "overlap_second_lane_during_first_drain"
             }
 
-            /// Shorter chunk cadence gives playback a second chunk in reserve before
-            /// the first one drains, which reduces audible shudder from one-chunk starts.
-            static let standardResidentStreamingInterval = 0.18
+            /// Use a less aggressive resident cadence for Chatterbox and the normal
+            /// Marvis path so backend chunk delivery stays closer to upstream timing.
+            static let standardResidentStreamingInterval = 0.5
             static let qwenResidentStreamingInterval = 0.32
 
-            /// The first drained live Marvis request is the only path that has to
-            /// bootstrap audible reserve from nothing. Give it a tighter resident
-            /// streaming cadence so playback can accumulate preroll before overlap
-            /// opens the second generation lane.
-            static let firstDrainedLiveMarvisStreamingInterval = 0.10
+            /// Keep the Marvis-specific cadence roles for scheduling and playback
+            /// policy, but align their timing to the current upstream streaming
+            /// cadence instead of a SpeakSwiftly-specific faster interval.
+            static let firstDrainedLiveMarvisStreamingInterval = 0.5
 
-            /// The queued follower behind that first drained Marvis request has its
-            /// own cadence role so overlap experiments can tune it without
-            /// overloading the first-request playback profile. The current baseline
-            /// keeps it on the ordinary resident cadence because the first `0.20`
-            /// follower experiment only helped modestly under clean conditions and
-            /// still left startup sounding too fragile to keep as the fixed policy.
-            static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.18
+            /// The overlap follower keeps its own role even when its cadence matches
+            /// the shared resident baseline.
+            static let overlapSecondLaneDuringFirstDrainStreamingInterval = 0.5
 
             static func residentStreamingCadenceProfile(
                 speechBackend: SpeakSwiftly.SpeechBackend,

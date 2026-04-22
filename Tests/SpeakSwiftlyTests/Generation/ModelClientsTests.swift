@@ -274,7 +274,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(controller.thresholds == adapted)
 }
 
-@Test func `marvis live cadence roles keep the first request faster without slowing the follower by default`() {
+@Test func `resident cadence aligns chatterbox and marvis with the looser baseline`() {
     let qwenStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .qwen3,
         cadenceProfile: .standard,
@@ -295,11 +295,11 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     #expect(qwenStandardInterval == 0.32)
-    #expect(marvisStandardInterval == 0.18)
-    #expect(chatterboxStandardInterval == 0.18)
-    #expect(firstRequestInterval == 0.10)
-    #expect(overlapSecondLaneInterval == 0.18)
-    #expect(firstRequestInterval < marvisStandardInterval)
+    #expect(marvisStandardInterval == 0.5)
+    #expect(chatterboxStandardInterval == 0.5)
+    #expect(firstRequestInterval == 0.5)
+    #expect(overlapSecondLaneInterval == 0.5)
+    #expect(firstRequestInterval == marvisStandardInterval)
     #expect(overlapSecondLaneInterval == marvisStandardInterval)
 }
 
@@ -1251,6 +1251,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         toProfile: logs.profileID,
     )
     await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
 
     await runtime.accept(
         line: #"""
@@ -1289,6 +1295,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
 
     await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
 
     await runtime.accept(
         line: #"""
@@ -1303,7 +1315,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(normalized.contains("sample Rate"))
 }
 
-@Test func `live speech chunk planner keeps the first chunk short and packs later chunks`() {
+@Test func `live speech chunk planner groups three sentences first and two sentences thereafter`() {
     let text = """
     Please read this first sentence slowly and clearly for testing.
     Please read this second sentence slowly and clearly for testing.
@@ -1313,29 +1325,24 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let chunks = LiveSpeechChunkPlanner.chunks(for: text)
 
-    #expect(chunks.count == 3)
+    #expect(chunks.count == 2)
     #expect(chunks.map(\.text) == [
-        "Please read this first sentence slowly and clearly for testing.",
-        "Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
+        "Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
         "Please read this fourth sentence slowly and clearly for testing.",
     ])
-    #expect(chunks[0].wordCount < chunks[1].wordCount)
-    #expect(chunks[1].wordCount > chunks[2].wordCount)
+    #expect(chunks[0].wordCount > chunks[1].wordCount)
 }
 
-@Test func `live speech chunk planner splits oversized single sentences at clause boundaries`() {
+@Test func `live speech chunk planner keeps oversized sentences intact when chunking by sentence`() {
     let text = longPlaybackPlannerFixtureText
 
     let chunks = LiveSpeechChunkPlanner.chunks(for: text)
 
-    #expect(chunks.count == 3)
+    #expect(chunks.count == 1)
     #expect(chunks.map(\.text) == [
-        "Hello from the real resident SpeakSwiftly playback path.",
-        "This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing,",
-        "and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.",
+        "Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.",
     ])
-    #expect(chunks[0].wordCount < chunks[1].wordCount)
-    #expect(chunks[1].wordCount >= chunks[2].wordCount)
+    #expect(chunks[0].wordCount > 0)
 }
 
 @Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
@@ -1398,7 +1405,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedChunkTexts.count })
 
     #expect(residentRecorder.recordedTexts == expectedChunkTexts)
-    #expect(residentRecorder.recordedTexts.count == 3)
+    #expect(residentRecorder.recordedTexts.count == 2)
     #expect(residentRecorder.lastRefAudioWasProvided == true)
     #expect(residentRecorder.lastRefText == nil)
 }
