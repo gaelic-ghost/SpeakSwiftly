@@ -227,7 +227,7 @@ extension SpeakSwiftly.Runtime {
         if speechBackend == .qwen3 {
             let plannedChunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
-                strategy: .paragraphPairs(),
+                strategy: .smartParagraphGroups(),
             )
             let normalizedChunks = plannedChunks.compactMap { plannedChunk -> LiveSpeechTextChunk? in
                 let normalizedChunkText = normalizeSpeechText(
@@ -244,6 +244,7 @@ extension SpeakSwiftly.Runtime {
                     index: plannedChunk.index,
                     text: normalizedChunkText,
                     wordCount: max(SpeakSwiftly.DeepTrace.words(in: normalizedChunkText).count, 1),
+                    segmentation: plannedChunk.segmentation,
                 )
             }
 

@@ -298,10 +298,15 @@ extension SpeakSwiftly.Runtime {
         playbackState.execution.sampleRate = Double(residentModel.sampleRate)
         await playbackController.startNextIfPossible()
         try? await startNextGenerationIfPossible()
+        if speechBackend == .qwen3 {
+            await logQwenLiveChunkPlan(for: playbackState.request)
+        }
 
         await emitProgress(id: id, stage: .startingPlayback)
         let stream = residentLiveGenerationStream(
             requestID: id,
+            op: op,
+            profileName: profileName,
             text: playbackState.request.normalizedText,
             plannedTextChunks: playbackState.request.normalizedLiveChunks,
             inputs: residentInputs,

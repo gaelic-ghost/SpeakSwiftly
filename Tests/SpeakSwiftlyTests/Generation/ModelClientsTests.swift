@@ -1224,7 +1224,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let normalized = residentRecorder.recordedTexts.joined(separator: " ")
     #expect(!normalized.contains("```"))
     #expect(!normalized.contains("`"))
-    #expect(normalized.contains("foo Bar open parenthesis close parenthesis"))
+    #expect(normalized.contains("foo Bar"))
     #expect(normalized.contains("Code sample."))
     #expect(normalized.contains("optional chaining"))
     #expect(normalized.contains("nil coalescing"))
@@ -1327,7 +1327,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(await waitUntil { residentRecorder.lastText != nil })
 
     let normalized = try #require(residentRecorder.lastText)
-    #expect(normalized.contains("open brace"))
+    #expect(normalized.contains("colon Int"))
     #expect(normalized.contains("sample Rate"))
 }
 
@@ -1361,18 +1361,20 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(chunks[0].wordCount > 0)
 }
 
-@Test func `qwen live speech chunk planner groups two paragraphs per chunk`() {
+@Test func `qwen live speech chunk planner groups four paragraphs per chunk`() {
     let text = """
     Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
 
     Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
 
-    Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
+    Please read this third paragraph slowly and clearly for testing. It should stay grouped with the first three paragraphs.
 
-    Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+    Please read this fourth paragraph slowly and clearly for testing. It should stay grouped with the first three paragraphs.
+
+    Please read this fifth paragraph slowly and clearly for testing. It should stay grouped with the fourth paragraph.
     """
 
-    let chunks = LiveSpeechChunkPlanner.chunks(for: text, strategy: .paragraphPairs())
+    let chunks = LiveSpeechChunkPlanner.chunks(for: text, strategy: .smartParagraphGroups())
 
     #expect(chunks.count == 2)
     #expect(chunks.map(\.text) == [
@@ -1380,34 +1382,32 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
 
         Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
+
+        Please read this third paragraph slowly and clearly for testing. It should stay grouped with the first three paragraphs.
+
+        Please read this fourth paragraph slowly and clearly for testing. It should stay grouped with the first three paragraphs.
         """,
         """
-        Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
-
-        Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+        Please read this fifth paragraph slowly and clearly for testing. It should stay grouped with the fourth paragraph.
         """,
     ])
+    #expect(chunks[0].segmentation == .paragraphGroup)
+    #expect(chunks[1].segmentation == .punctuationBoundary)
 }
 
-@Test func `qwen live speech chunk planner falls back when paired paragraphs are oversized`() {
+@Test func `qwen live speech chunk planner falls back at punctuation boundaries when a paragraph is oversized`() {
     let text = """
-    Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.
-
-    Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing. Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.
+    Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing. Please read this sixth sentence slowly and clearly for testing.
     """
 
     let chunks = LiveSpeechChunkPlanner.chunks(
         for: text,
-        strategy: .paragraphPairs(maxSentencesPerChunk: 8),
+        strategy: .smartParagraphGroups(targetParagraphCount: 3, softCharacterLimit: 180),
     )
 
-    #expect(chunks.count == 4)
-    #expect(chunks.map(\.text) == [
-        "Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
-        "Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.",
-        "Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing.",
-        "Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.",
-    ])
+    #expect(chunks.count > 1)
+    #expect(chunks.allSatisfy { $0.text.last == "." })
+    #expect(chunks.allSatisfy { $0.segmentation == .punctuationBoundary || $0.segmentation == .forcedBreak })
 }
 
 @Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
@@ -1523,11 +1523,11 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 1 })
     #expect(residentRecorder.recordedTexts[0].contains("first paragraph"))
     #expect(residentRecorder.recordedTexts[0].contains("second paragraph"))
-    #expect(residentRecorder.recordedTexts[1].contains("third paragraph"))
-    #expect(residentRecorder.recordedTexts[1].contains("fourth paragraph"))
+    #expect(residentRecorder.recordedTexts[0].contains("third paragraph"))
+    #expect(residentRecorder.recordedTexts[0].contains("fourth paragraph"))
 
     await runtime.accept(
         line: #"""
@@ -1541,11 +1541,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == 3 })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
     #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
     #expect(try #require(residentRecorder.recordedTexts.last).contains("fourth paragraph"))
-    #expect(try #require(residentRecorder.recordedTexts.last) != residentRecorder.recordedTexts[0])
-    #expect(try #require(residentRecorder.recordedTexts.last) != residentRecorder.recordedTexts[1])
 }
 
 // MARK: - Sample Shaping

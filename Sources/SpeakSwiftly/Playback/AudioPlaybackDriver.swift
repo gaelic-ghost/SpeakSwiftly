@@ -264,7 +264,7 @@ final class AudioPlaybackDriver {
                             ),
                         )
                     }
-                    if !state.generationFinished, currentQueuedAudioMS <= 0 {
+                    if !state.generationFinished, !state.currentChunkFinished, currentQueuedAudioMS <= 0 {
                         state.starvationEventCount += 1
                         state.thresholdsController.recordStarvation()
                         if !state.isRebuffering {
@@ -284,6 +284,7 @@ final class AudioPlaybackDriver {
                     }
 
                     if !state.generationFinished,
+                       !state.currentChunkFinished,
                        currentQueuedAudioMS <= state.thresholdsController.thresholds.lowWaterTargetMS,
                        !state.isRebuffering {
                         state.isRebuffering = true
@@ -353,7 +354,47 @@ final class AudioPlaybackDriver {
         do {
             for try await chunk in stream {
                 try throwIfActivePlaybackInterrupted()
-                guard !chunk.isEmpty else { continue }
+                if chunk.isEmpty {
+                    state.currentChunkFinished = true
+
+                    let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
+                    if traceEnabled {
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
+                                    name: "generation_chunk_finished",
+                                    chunkIndex: chunkCount,
+                                    bufferIndex: nil,
+                                    sampleCount: 0,
+                                    durationMS: 0,
+                                    queuedAudioBeforeMS: currentQueuedAudioMS,
+                                    queuedAudioAfterMS: currentQueuedAudioMS,
+                                    gapMS: nil,
+                                    isRebuffering: state.isRebuffering,
+                                    fadeInApplied: false,
+                                ),
+                            ),
+                        )
+                    }
+
+                    if state.isRebuffering, currentQueuedAudioMS > 0 {
+                        if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
+                            playerNode?.play()
+                        }
+                        state.isRebuffering = false
+                        if let rebufferStartedAt = state.rebufferStartedAt {
+                            let durationMS = milliseconds(since: rebufferStartedAt)
+                            state.rebufferTotalDurationMS += durationMS
+                            state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
+                            state.rebufferStartedAt = nil
+                        }
+                        await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
+                    }
+                    continue
+                }
+
+                let resumesAfterFinishedChunkDrain = state.currentChunkFinished && state.queuedAudioMS(sampleRate: sampleRate) == 0
+                state.currentChunkFinished = false
 
                 let now = Date()
                 let chunkDurationMS = Int((Double(chunk.count) / sampleRate * 1000).rounded())
@@ -410,6 +451,12 @@ final class AudioPlaybackDriver {
                     )
                     if startedPlayback {
                         try await scheduleQueuedBuffersIfPossible()
+                        if resumesAfterFinishedChunkDrain,
+                           !state.isRebuffering,
+                           !isPlaybackPausedManually,
+                           !isPlaybackRecoveryActive {
+                            playerNode?.play()
+                        }
                         if state.isRebuffering {
                             let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
                             if currentQueuedAudioMS >= state.thresholdsController.thresholds.resumeBufferTargetMS {

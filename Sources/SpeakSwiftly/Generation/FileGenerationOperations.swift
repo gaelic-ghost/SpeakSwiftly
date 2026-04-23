@@ -181,6 +181,8 @@ extension SpeakSwiftly.Runtime {
 
     func residentLiveGenerationStream(
         requestID: String,
+        op: String?,
+        profileName: String,
         text: String,
         plannedTextChunks: [LiveSpeechTextChunk]?,
         inputs: ResidentSpeechInputs,
@@ -191,6 +193,8 @@ extension SpeakSwiftly.Runtime {
             case let .qwenRaw(model, _, materialization, refAudio):
                 qwenLiveGenerationStream(
                     requestID: requestID,
+                    op: op,
+                    profileName: profileName,
                     model: model,
                     text: text,
                     plannedChunks: plannedTextChunks,
@@ -202,6 +206,8 @@ extension SpeakSwiftly.Runtime {
             case let .qwenPrepared(model, _, conditioning):
                 qwenLiveGenerationStream(
                     requestID: requestID,
+                    op: op,
+                    profileName: profileName,
                     model: model,
                     text: text,
                     plannedChunks: plannedTextChunks,
