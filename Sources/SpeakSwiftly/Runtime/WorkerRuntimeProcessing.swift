@@ -300,9 +300,10 @@ extension SpeakSwiftly.Runtime {
         try? await startNextGenerationIfPossible()
 
         await emitProgress(id: id, stage: .startingPlayback)
-        let stream = residentGenerationStream(
+        let stream = residentLiveGenerationStream(
             requestID: id,
             text: playbackState.request.normalizedText,
+            plannedTextChunks: playbackState.request.normalizedLiveChunks,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(
                 for: speechBackend,

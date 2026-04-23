@@ -13,6 +13,17 @@ enum E2EHarness {
     static let testingPlaybackText = """
     Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
     """
+    static let qwenLongFormPlaybackText = """
+    The first paragraph opens in a calm, steady voice and describes an ordinary evening with enough detail to feel lived in rather than rushed. The room is quiet, the windows are dark, and a lamp throws just enough light across the desk to make the paper and keyboard edges feel clean and deliberate. Nothing dramatic is happening here. The point is simply to give the voice time to settle into a natural speaking rhythm while the text stays ordinary and easy to follow.
+
+    The second paragraph continues with a more reflective cadence about finishing a long task that took patience, repeated checking, and a willingness to revise small details until they finally aligned. There is relief in the scene, but not triumph. It feels more like a careful exhale after a difficult piece of work has finally become stable enough to trust. The language stays plain so the test stresses duration and continuity rather than exotic wording.
+
+    The third paragraph shifts toward a gentle description of a night walk through a familiar neighborhood where the air has cooled off and the sound of distant traffic has flattened into a soft background wash. Porch lights are on, the sidewalk is empty, and every block feels a little more spacious than it did during the day. This section should still sound like one connected thought instead of a sequence of isolated lines.
+
+    The fourth paragraph moves into a slightly denser explanation of a technical cleanup that looked small at first but turned out to depend on a few subtle decisions about boundaries, defaults, and what should remain unchanged. The speaker is not lecturing. They are just talking through the logic in the same patient tone as before, letting the clauses stay connected long enough to reveal whether volume or presence starts to sag over time.
+
+    The fifth paragraph closes the request with a quieter ending about putting the last notes in order, saving the final changes, and noticing that the room feels easier to inhabit once the work is no longer hanging open in the background. It should sound complete, unhurried, and consistent with the earlier paragraphs, so the end of the request still carries the same presence as the beginning instead of fading away.
+    """
     static let deepTracePlaybackText = """
     Deep trace playback probe begins now. Please read this exactly once and do not repeat yourself.
     The path `/Users/galew/Workspace/speak-to-user-mcp/src/speak_to_user_mcp/speakswiftly.py` contains a helper named `SpeakSwiftlyOwner.speak_live`.

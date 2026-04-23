@@ -10,6 +10,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let sourceFormat: TextForSpeech.SourceFormat?
     let requestContext: SpeakSwiftly.RequestContext?
     let normalizedText: String
+    let normalizedLiveChunks: [LiveSpeechTextChunk]?
     let textFeatures: SpeechTextDeepTraceFeatures
     let textSections: [SpeechTextDeepTraceSection]
     let playbackTuningProfile: PlaybackTuningProfile
@@ -31,6 +32,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     init(
         request: WorkerRequest,
         normalizedText: String,
+        normalizedLiveChunks: [LiveSpeechTextChunk]?,
         textFeatures: SpeechTextDeepTraceFeatures,
         textSections: [SpeechTextDeepTraceSection],
         playbackTuningProfile: PlaybackTuningProfile,
@@ -59,6 +61,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         sourceFormat = inputTextContext?.sourceFormat
         self.requestContext = requestContext
         self.normalizedText = normalizedText
+        self.normalizedLiveChunks = normalizedLiveChunks
         self.textFeatures = textFeatures
         self.textSections = textSections
         self.playbackTuningProfile = playbackTuningProfile

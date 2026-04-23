@@ -52,6 +52,7 @@ Suite names:
   chatterbox | ChatterboxE2ETests
   marvis | MarvisE2ETests
   qwen | QwenE2ETests
+  qwen-longform | QwenLongFormE2ETests
   trace | TraceCaptureE2ETests
   deep-trace | DeepTraceE2ETests
   qwen-benchmark | QwenBenchmarkE2ETests
@@ -82,6 +83,7 @@ resolve_suite_name() {
     chatterbox|ChatterboxE2ETests) printf '%s\n' "ChatterboxE2ETests" ;;
     marvis|MarvisE2ETests) printf '%s\n' "MarvisE2ETests" ;;
     qwen|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
+    qwen-longform|QwenLongFormE2ETests) printf '%s\n' "QwenLongFormE2ETests" ;;
     trace|TraceCaptureE2ETests) printf '%s\n' "TraceCaptureE2ETests" ;;
     deep-trace|DeepTraceE2ETests) printf '%s\n' "DeepTraceE2ETests" ;;
     qwen-benchmark|QwenBenchmarkE2ETests) printf '%s\n' "QwenBenchmarkE2ETests" ;;
@@ -96,7 +98,7 @@ suite_name=$(resolve_suite_name "$suite_arg") \
   || die "Unsupported E2E suite '$suite_arg'. Use --help to see the supported top-level suite names."
 
 case "$suite_name" in
-  QuickE2ETests|GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
+  QuickE2ETests|GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
     ;;
   *)
     die "Refusing to run '$suite_name' because only one top-level E2E suite may run per invocation."
@@ -123,6 +125,10 @@ fi
 
 if [ "$benchmark" = "true" ] || [ "$suite_name" = "QwenBenchmarkE2ETests" ]; then
   export SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1
+fi
+
+if [ "$suite_name" = "QwenLongFormE2ETests" ]; then
+  export SPEAKSWIFTLY_QWEN_LONGFORM_E2E=1
 fi
 
 if [ -n "$benchmark_iterations" ]; then

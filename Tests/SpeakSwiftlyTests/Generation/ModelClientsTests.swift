@@ -1221,7 +1221,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     #expect(await waitUntil { residentRecorder.lastText != nil })
 
-    let normalized = try #require(residentRecorder.lastText)
+    let normalized = residentRecorder.recordedTexts.joined(separator: " ")
     #expect(!normalized.contains("```"))
     #expect(!normalized.contains("`"))
     #expect(normalized.contains("foo Bar open parenthesis close parenthesis"))
@@ -1361,6 +1361,55 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(chunks[0].wordCount > 0)
 }
 
+@Test func `qwen live speech chunk planner groups two paragraphs per chunk`() {
+    let text = """
+    Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
+
+    Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
+
+    Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
+
+    Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+    """
+
+    let chunks = LiveSpeechChunkPlanner.chunks(for: text, strategy: .paragraphPairs())
+
+    #expect(chunks.count == 2)
+    #expect(chunks.map(\.text) == [
+        """
+        Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
+
+        Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
+        """,
+        """
+        Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
+
+        Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+        """,
+    ])
+}
+
+@Test func `qwen live speech chunk planner falls back when paired paragraphs are oversized`() {
+    let text = """
+    Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.
+
+    Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing. Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.
+    """
+
+    let chunks = LiveSpeechChunkPlanner.chunks(
+        for: text,
+        strategy: .paragraphPairs(maxSentencesPerChunk: 8),
+    )
+
+    #expect(chunks.count == 4)
+    #expect(chunks.map(\.text) == [
+        "Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
+        "Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.",
+        "Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing.",
+        "Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.",
+    ])
+}
+
 @Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
@@ -1424,6 +1473,79 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(residentRecorder.recordedTexts.count == 2)
     #expect(residentRecorder.lastRefAudioWasProvided == true)
     #expect(residentRecorder.lastRefText == nil)
+}
+
+@Test func `qwen generated audio files stay single pass while live playback chunks paragraphs`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let residentRecorder = ResidentModelRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        audioLoadRecorder: residentRecorder,
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: residentRecorder, chunkCount: 1)
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-qwen-live","op":"generate_speech","text":"Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.\n\nPlease read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.\n\nPlease read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.\n\nPlease read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.","profile_name":"default-femme","text_format":"plain_text"}
+        """#,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-qwen-live"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
+    #expect(residentRecorder.recordedTexts[0].contains("first paragraph"))
+    #expect(residentRecorder.recordedTexts[0].contains("second paragraph"))
+    #expect(residentRecorder.recordedTexts[1].contains("third paragraph"))
+    #expect(residentRecorder.recordedTexts[1].contains("fourth paragraph"))
+
+    await runtime.accept(
+        line: #"""
+        {"id":"req-qwen-file","op":"generate_audio_file","text":"Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.\n\nPlease read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.\n\nPlease read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.\n\nPlease read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.","profile_name":"default-femme","text_format":"plain_text"}
+        """#,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-qwen-file"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 3 })
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("fourth paragraph"))
+    #expect(try #require(residentRecorder.recordedTexts.last) != residentRecorder.recordedTexts[0])
+    #expect(try #require(residentRecorder.recordedTexts.last) != residentRecorder.recordedTexts[1])
 }
 
 // MARK: - Sample Shaping
