@@ -45,7 +45,7 @@ struct GeneratedBatchE2ETests {
         )
 
         #expect(generatedBatch["batch_id"] as? String == "req-generated-batch-e2e")
-        #expect(generatedBatch["profile_name"] as? String == E2EHarness.testingProfileName)
+        #expect(generatedBatch["voice_profile"] as? String == E2EHarness.testingProfileName)
         #expect(generatedBatch["state"] as? String == "completed")
 
         let artifacts = try #require(generatedBatch["artifacts"] as? [[String: Any]])

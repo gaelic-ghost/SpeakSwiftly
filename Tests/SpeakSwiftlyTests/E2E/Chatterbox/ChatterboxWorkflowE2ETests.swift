@@ -45,7 +45,7 @@ struct ChatterboxE2ETests {
             text: E2EHarness.testingPlaybackText,
             profileName: profileName,
         )
-        #expect(generatedFile["profile_name"] as? String == profileName)
+        #expect(generatedFile["voice_profile"] as? String == profileName)
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))
     }

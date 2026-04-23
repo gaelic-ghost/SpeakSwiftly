@@ -40,7 +40,7 @@ struct GeneratedFileE2ETests {
         )
         let artifactID = "req-generated-file-e2e-artifact-1"
         #expect(generatedFile["artifact_id"] as? String == artifactID)
-        #expect(generatedFile["profile_name"] as? String == E2EHarness.testingProfileName)
+        #expect(generatedFile["voice_profile"] as? String == E2EHarness.testingProfileName)
 
         let generatedFilePath = try #require(generatedFile["file_path"] as? String)
         #expect(FileManager.default.fileExists(atPath: generatedFilePath))
