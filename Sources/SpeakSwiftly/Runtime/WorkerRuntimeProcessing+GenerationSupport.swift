@@ -4,6 +4,31 @@ import TextForSpeech
 // MARK: - Worker Runtime Generation Support
 
 extension SpeakSwiftly.Runtime {
+    private func normalizeSpeechText(
+        _ text: String,
+        sourceFormat: TextForSpeech.SourceFormat?,
+        textContext: TextForSpeech.Context?,
+        textProfile: TextForSpeech.Profile,
+        textProfileStyle: TextForSpeech.BuiltInProfileStyle,
+    ) -> String {
+        if let sourceFormat {
+            TextForSpeech.Normalize.source(
+                text,
+                as: sourceFormat,
+                context: textContext,
+                customProfile: textProfile,
+                style: textProfileStyle,
+            )
+        } else {
+            TextForSpeech.Normalize.text(
+                text,
+                context: textContext,
+                customProfile: textProfile,
+                style: textProfileStyle,
+            )
+        }
+    }
+
     func loadGeneratedBatch(id batchID: String) throws -> SpeakSwiftly.GeneratedBatch {
         try loadGeneratedBatch(from: generationJobStore.loadGenerationJob(id: batchID))
     }
@@ -191,21 +216,40 @@ extension SpeakSwiftly.Runtime {
                 replacements: details.replacements,
             )
         }
-        let normalizedText = if let sourceFormat {
-            TextForSpeech.Normalize.source(
-                text,
-                as: sourceFormat,
-                context: textContext,
-                customProfile: textProfile,
-                style: textProfileStyle,
+        let normalizedText = normalizeSpeechText(
+            text,
+            sourceFormat: sourceFormat,
+            textContext: textContext,
+            textProfile: textProfile,
+            textProfileStyle: textProfileStyle,
+        )
+        let normalizedLiveChunks: [LiveSpeechTextChunk]?
+        if speechBackend == .qwen3 {
+            let plannedChunks = LiveSpeechChunkPlanner.chunks(
+                for: text,
+                strategy: .paragraphPairs(),
             )
+            let normalizedChunks = plannedChunks.compactMap { plannedChunk -> LiveSpeechTextChunk? in
+                let normalizedChunkText = normalizeSpeechText(
+                    plannedChunk.text,
+                    sourceFormat: sourceFormat,
+                    textContext: textContext,
+                    textProfile: textProfile,
+                    textProfileStyle: textProfileStyle,
+                ).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+                guard !normalizedChunkText.isEmpty else { return nil }
+
+                return LiveSpeechTextChunk(
+                    index: plannedChunk.index,
+                    text: normalizedChunkText,
+                    wordCount: max(SpeakSwiftly.DeepTrace.words(in: normalizedChunkText).count, 1),
+                )
+            }
+
+            normalizedLiveChunks = normalizedChunks.isEmpty ? nil : normalizedChunks
         } else {
-            TextForSpeech.Normalize.text(
-                text,
-                context: textContext,
-                customProfile: textProfile,
-                style: textProfileStyle,
-            )
+            normalizedLiveChunks = nil
         }
         let textFeatures = SpeakSwiftly.DeepTrace.features(
             originalText: text,
@@ -230,6 +274,7 @@ extension SpeakSwiftly.Runtime {
         return LiveSpeechRequestState(
             request: request,
             normalizedText: normalizedText,
+            normalizedLiveChunks: normalizedLiveChunks,
             textFeatures: textFeatures,
             textSections: textSections,
             playbackTuningProfile: playbackTuningProfile,

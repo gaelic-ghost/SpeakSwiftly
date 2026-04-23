@@ -178,4 +178,54 @@ extension SpeakSwiftly.Runtime {
                 )
         }
     }
+
+    func residentLiveGenerationStream(
+        requestID: String,
+        text: String,
+        plannedTextChunks: [LiveSpeechTextChunk]?,
+        inputs: ResidentSpeechInputs,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double,
+    ) -> AsyncThrowingStream<[Float], Error> {
+        switch inputs {
+            case let .qwenRaw(model, _, materialization, refAudio):
+                qwenLiveGenerationStream(
+                    requestID: requestID,
+                    model: model,
+                    text: text,
+                    plannedChunks: plannedTextChunks,
+                    materialization: materialization,
+                    refAudio: refAudio,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+            case let .qwenPrepared(model, _, conditioning):
+                qwenLiveGenerationStream(
+                    requestID: requestID,
+                    model: model,
+                    text: text,
+                    plannedChunks: plannedTextChunks,
+                    conditioning: conditioning,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+            case let .chatterboxTurbo(model, _, refAudio):
+                chatterboxGenerationStream(
+                    requestID: requestID,
+                    model: model,
+                    text: text,
+                    refAudio: refAudio,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+            case let .marvis(model, _, voice):
+                marvisGenerationStream(
+                    model: model,
+                    text: text,
+                    voice: voice,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+        }
+    }
 }

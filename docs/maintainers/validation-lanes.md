@@ -132,6 +132,7 @@ wrappers instead of the older Xcode `.xctestrun` dance for ordinary E2E work:
 ```bash
 sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e.sh --suite qwen
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen-longform
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 

@@ -26,28 +26,97 @@ extension SpeakSwiftly.Runtime {
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
-        let eventStream = model.generateEventStream(
-            text: text,
-            voice: nil,
-            refAudio: refAudio,
-            refText: materialization.manifest.referenceText,
-            language: nil,
-            generationParameters: generationParameters,
-            streamingInterval: streamingInterval,
-        )
+        let plannedChunks = {
+            let chunks = LiveSpeechChunkPlanner.chunks(
+                for: text,
+                strategy: .paragraphPairs(),
+            )
+            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+        }()
 
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    for try await event in eventStream {
-                        switch event {
-                            case let .token(token):
-                                recordGenerationEvent(.token(token), for: requestID)
-                            case let .info(info):
-                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
-                            case let .audio(samples):
-                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                                continuation.yield(samples)
+                    for plannedChunk in plannedChunks {
+                        try Task.checkCancellation()
+
+                        let eventStream = model.generateEventStream(
+                            text: plannedChunk.text,
+                            voice: nil,
+                            refAudio: refAudio,
+                            refText: materialization.manifest.referenceText,
+                            language: nil,
+                            generationParameters: generationParameters,
+                            streamingInterval: streamingInterval,
+                        )
+
+                        for try await event in eventStream {
+                            switch event {
+                                case let .token(token):
+                                    recordGenerationEvent(.token(token), for: requestID)
+                                case let .info(info):
+                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                case let .audio(samples):
+                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    continuation.yield(samples)
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func qwenLiveGenerationStream(
+        requestID: String,
+        model: AnySpeechModel,
+        text: String,
+        plannedChunks: [LiveSpeechTextChunk]?,
+        materialization: StoredProfileMaterialization,
+        refAudio: MLXArray?,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double,
+    ) -> AsyncThrowingStream<[Float], Error> {
+        let plannedChunks = plannedChunks ?? {
+            let chunks = LiveSpeechChunkPlanner.chunks(
+                for: text,
+                strategy: .paragraphPairs(),
+            )
+            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+        }()
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for plannedChunk in plannedChunks {
+                        try Task.checkCancellation()
+
+                        let eventStream = model.generateEventStream(
+                            text: plannedChunk.text,
+                            voice: nil,
+                            refAudio: refAudio,
+                            refText: materialization.manifest.referenceText,
+                            language: nil,
+                            generationParameters: generationParameters,
+                            streamingInterval: streamingInterval,
+                        )
+
+                        for try await event in eventStream {
+                            switch event {
+                                case let .token(token):
+                                    recordGenerationEvent(.token(token), for: requestID)
+                                case let .info(info):
+                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                case let .audio(samples):
+                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    continuation.yield(samples)
+                            }
                         }
                     }
                     continuation.finish()
@@ -69,25 +138,90 @@ extension SpeakSwiftly.Runtime {
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
-        let eventStream = model.generateConditionedEventStream(
-            text: text,
-            conditioning: conditioning,
-            generationParameters: generationParameters,
-            streamingInterval: streamingInterval,
-        )
+        let plannedChunks = {
+            let chunks = LiveSpeechChunkPlanner.chunks(
+                for: text,
+                strategy: .paragraphPairs(),
+            )
+            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+        }()
 
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    for try await event in eventStream {
-                        switch event {
-                            case let .token(token):
-                                recordGenerationEvent(.token(token), for: requestID)
-                            case let .info(info):
-                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
-                            case let .audio(samples):
-                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                                continuation.yield(samples)
+                    for plannedChunk in plannedChunks {
+                        try Task.checkCancellation()
+
+                        let eventStream = model.generateConditionedEventStream(
+                            text: plannedChunk.text,
+                            conditioning: conditioning,
+                            generationParameters: generationParameters,
+                            streamingInterval: streamingInterval,
+                        )
+
+                        for try await event in eventStream {
+                            switch event {
+                                case let .token(token):
+                                    recordGenerationEvent(.token(token), for: requestID)
+                                case let .info(info):
+                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                case let .audio(samples):
+                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    continuation.yield(samples)
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func qwenLiveGenerationStream(
+        requestID: String,
+        model: AnySpeechModel,
+        text: String,
+        plannedChunks: [LiveSpeechTextChunk]?,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double,
+    ) -> AsyncThrowingStream<[Float], Error> {
+        let plannedChunks = plannedChunks ?? {
+            let chunks = LiveSpeechChunkPlanner.chunks(
+                for: text,
+                strategy: .paragraphPairs(),
+            )
+            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+        }()
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for plannedChunk in plannedChunks {
+                        try Task.checkCancellation()
+
+                        let eventStream = model.generateConditionedEventStream(
+                            text: plannedChunk.text,
+                            conditioning: conditioning,
+                            generationParameters: generationParameters,
+                            streamingInterval: streamingInterval,
+                        )
+
+                        for try await event in eventStream {
+                            switch event {
+                                case let .token(token):
+                                    recordGenerationEvent(.token(token), for: requestID)
+                                case let .info(info):
+                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                case let .audio(samples):
+                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    continuation.yield(samples)
+                            }
                         }
                     }
                     continuation.finish()

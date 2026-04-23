@@ -282,13 +282,13 @@ When JSONL naming changes, update this file and `README.md` in the same pass so 
 
 Current live-playback behavior:
 
-- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
+- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, but now bounds live long-form requests by synthesizing two blank-line-separated paragraphs at a time, with a smaller sentence-group fallback only when one paired chunk is still too large. `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
 - The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_active_text_profile_style`, inspect the available choices with `list_text_profile_styles`, and update it with `set_active_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
-- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback.
+- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback. The Qwen bounded paragraph chunking applies only to live playback; generated audio files stay on the single-pass Qwen rendering path.
 - Marvis defaults to `dual_resident_serialized`, which keeps both `conversational_a` and `conversational_b` resident while still allowing only one active Marvis generation at a time. Configuration can also switch to `single_resident_dynamic` if one reusable resident model is preferred over two always-warm voices.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.masc` -> `conversational_b`.
-- Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. Marvis now requests the upstream-aligned `0.5` streaming cadence, Chatterbox live synthesis also uses `0.5`, and the ordinary non-Qwen resident baseline stays `0.5`.
+- Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. For live playback, the runtime keeps long Qwen requests bounded by paragraph-paired chunk planning before each generation call. Marvis now requests the upstream-aligned `0.5` streaming cadence, Chatterbox live synthesis also uses `0.5`, and the ordinary non-Qwen resident baseline stays `0.5`.
 - Playback uses adaptive duration-based startup and low-water thresholds rather than a fixed one-chunk gate.
 
 Current generated-file behavior:
@@ -570,6 +570,13 @@ One-shot qwen resident `generate_speech` verification:
 
 ```bash
 sh scripts/repo-maintenance/run-e2e.sh --suite qwen
+```
+
+Dedicated long-form qwen live-playback verification with one five-paragraph
+request:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen-longform
 ```
 
 Prepared-conditioning qwen verification. This boots the worker in `prepared_conditioning` mode, confirms the first request persists a stored Qwen conditioning artifact on the profile, then restarts the worker and confirms the second request reloads that stored artifact instead of rebuilding it from raw reference inputs:

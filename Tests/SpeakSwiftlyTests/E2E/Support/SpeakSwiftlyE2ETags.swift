@@ -6,6 +6,7 @@ extension Tag {
     @Tag static var quick: Self
     @Tag static var artifacts: Self
     @Tag static var qwen: Self
+    @Tag static var longForm: Self
     @Tag static var chatterbox: Self
     @Tag static var marvis: Self
     @Tag static var trace: Self
