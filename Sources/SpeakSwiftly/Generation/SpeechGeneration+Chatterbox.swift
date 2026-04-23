@@ -15,7 +15,14 @@ extension SpeakSwiftly.Runtime {
     ) -> AsyncThrowingStream<[Float], Error> {
         let plannedChunks = {
             let chunks = LiveSpeechChunkPlanner.chunks(for: text)
-            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+            return chunks.isEmpty ? [
+                LiveSpeechTextChunk(
+                    index: 1,
+                    text: text,
+                    wordCount: 1,
+                    segmentation: .sentenceGroup,
+                ),
+            ] : chunks
         }()
 
         return AsyncThrowingStream { continuation in

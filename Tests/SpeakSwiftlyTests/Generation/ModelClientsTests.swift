@@ -1361,18 +1361,20 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(chunks[0].wordCount > 0)
 }
 
-@Test func `qwen live speech chunk planner groups two paragraphs per chunk`() {
+@Test func `qwen live speech chunk planner groups three paragraphs per chunk`() {
     let text = """
     Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
 
     Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
 
-    Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
+    Please read this third paragraph slowly and clearly for testing. It should stay grouped with the first two paragraphs.
 
-    Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+    Please read this fourth paragraph slowly and clearly for testing. It should stay grouped with the fifth paragraph.
+
+    Please read this fifth paragraph slowly and clearly for testing. It should stay grouped with the fourth paragraph.
     """
 
-    let chunks = LiveSpeechChunkPlanner.chunks(for: text, strategy: .paragraphPairs())
+    let chunks = LiveSpeechChunkPlanner.chunks(for: text, strategy: .smartParagraphGroups())
 
     #expect(chunks.count == 2)
     #expect(chunks.map(\.text) == [
@@ -1380,34 +1382,31 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.
 
         Please read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.
+
+        Please read this third paragraph slowly and clearly for testing. It should stay grouped with the first two paragraphs.
         """,
         """
-        Please read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.
+        Please read this fourth paragraph slowly and clearly for testing. It should stay grouped with the fifth paragraph.
 
-        Please read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.
+        Please read this fifth paragraph slowly and clearly for testing. It should stay grouped with the fourth paragraph.
         """,
     ])
+    #expect(chunks.allSatisfy { $0.segmentation == .paragraphGroup })
 }
 
-@Test func `qwen live speech chunk planner falls back when paired paragraphs are oversized`() {
+@Test func `qwen live speech chunk planner falls back at punctuation boundaries when a paragraph is oversized`() {
     let text = """
-    Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.
-
-    Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing. Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.
+    Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing. Please read this sixth sentence slowly and clearly for testing.
     """
 
     let chunks = LiveSpeechChunkPlanner.chunks(
         for: text,
-        strategy: .paragraphPairs(maxSentencesPerChunk: 8),
+        strategy: .smartParagraphGroups(targetParagraphCount: 3, softCharacterLimit: 180),
     )
 
-    #expect(chunks.count == 4)
-    #expect(chunks.map(\.text) == [
-        "Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing.",
-        "Please read this fourth sentence slowly and clearly for testing. Please read this fifth sentence slowly and clearly for testing.",
-        "Please read this sixth sentence slowly and clearly for testing. Please read this seventh sentence slowly and clearly for testing.",
-        "Please read this eighth sentence slowly and clearly for testing. Please read this ninth sentence slowly and clearly for testing.",
-    ])
+    #expect(chunks.count > 1)
+    #expect(chunks.allSatisfy { $0.text.last == "." })
+    #expect(chunks.allSatisfy { $0.segmentation == .punctuationBoundary || $0.segmentation == .forcedBreak })
 }
 
 @Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {

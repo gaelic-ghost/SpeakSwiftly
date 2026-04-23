@@ -29,9 +29,16 @@ extension SpeakSwiftly.Runtime {
         let plannedChunks = {
             let chunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
-                strategy: .paragraphPairs(),
+                strategy: .smartParagraphGroups(),
             )
-            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+            return chunks.isEmpty ? [
+                LiveSpeechTextChunk(
+                    index: 1,
+                    text: text,
+                    wordCount: 1,
+                    segmentation: .sentenceGroup,
+                ),
+            ] : chunks
         }()
 
         return AsyncThrowingStream { continuation in
@@ -75,6 +82,8 @@ extension SpeakSwiftly.Runtime {
 
     func qwenLiveGenerationStream(
         requestID: String,
+        op: String?,
+        profileName: String,
         model: AnySpeechModel,
         text: String,
         plannedChunks: [LiveSpeechTextChunk]?,
@@ -86,9 +95,16 @@ extension SpeakSwiftly.Runtime {
         let plannedChunks = plannedChunks ?? {
             let chunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
-                strategy: .paragraphPairs(),
+                strategy: .smartParagraphGroups(),
             )
-            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+            return chunks.isEmpty ? [
+                LiveSpeechTextChunk(
+                    index: 1,
+                    text: text,
+                    wordCount: 1,
+                    segmentation: .sentenceGroup,
+                ),
+            ] : chunks
         }()
 
         return AsyncThrowingStream { continuation in
@@ -96,6 +112,20 @@ extension SpeakSwiftly.Runtime {
                 do {
                     for plannedChunk in plannedChunks {
                         try Task.checkCancellation()
+
+                        let startedAt = Date()
+                        var sawFirstAudio = false
+                        var audioChunkCount = 0
+                        var sampleCount = 0
+
+                        await logQwenLiveChunkStarted(
+                            requestID: requestID,
+                            op: op,
+                            profileName: profileName,
+                            chunk: plannedChunk,
+                            totalChunkCount: plannedChunks.count,
+                            streamingInterval: streamingInterval,
+                        )
 
                         let eventStream = model.generateEventStream(
                             text: plannedChunk.text,
@@ -114,10 +144,35 @@ extension SpeakSwiftly.Runtime {
                                 case let .info(info):
                                     recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
                                 case let .audio(samples):
+                                    audioChunkCount += 1
+                                    sampleCount += samples.count
                                     recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    if !sawFirstAudio {
+                                        sawFirstAudio = true
+                                        await logQwenLiveChunkFirstAudio(
+                                            requestID: requestID,
+                                            op: op,
+                                            profileName: profileName,
+                                            chunk: plannedChunk,
+                                            totalChunkCount: plannedChunks.count,
+                                            timeToFirstAudioMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
+                                            sampleCount: samples.count,
+                                        )
+                                    }
                                     continuation.yield(samples)
                             }
                         }
+
+                        await logQwenLiveChunkFinished(
+                            requestID: requestID,
+                            op: op,
+                            profileName: profileName,
+                            chunk: plannedChunk,
+                            totalChunkCount: plannedChunks.count,
+                            elapsedMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
+                            audioChunkCount: audioChunkCount,
+                            sampleCount: sampleCount,
+                        )
                     }
                     continuation.finish()
                 } catch is CancellationError {
@@ -141,9 +196,16 @@ extension SpeakSwiftly.Runtime {
         let plannedChunks = {
             let chunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
-                strategy: .paragraphPairs(),
+                strategy: .smartParagraphGroups(),
             )
-            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+            return chunks.isEmpty ? [
+                LiveSpeechTextChunk(
+                    index: 1,
+                    text: text,
+                    wordCount: 1,
+                    segmentation: .sentenceGroup,
+                ),
+            ] : chunks
         }()
 
         return AsyncThrowingStream { continuation in
@@ -184,6 +246,8 @@ extension SpeakSwiftly.Runtime {
 
     func qwenLiveGenerationStream(
         requestID: String,
+        op: String?,
+        profileName: String,
         model: AnySpeechModel,
         text: String,
         plannedChunks: [LiveSpeechTextChunk]?,
@@ -194,9 +258,16 @@ extension SpeakSwiftly.Runtime {
         let plannedChunks = plannedChunks ?? {
             let chunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
-                strategy: .paragraphPairs(),
+                strategy: .smartParagraphGroups(),
             )
-            return chunks.isEmpty ? [LiveSpeechTextChunk(index: 1, text: text, wordCount: 1)] : chunks
+            return chunks.isEmpty ? [
+                LiveSpeechTextChunk(
+                    index: 1,
+                    text: text,
+                    wordCount: 1,
+                    segmentation: .sentenceGroup,
+                ),
+            ] : chunks
         }()
 
         return AsyncThrowingStream { continuation in
@@ -204,6 +275,20 @@ extension SpeakSwiftly.Runtime {
                 do {
                     for plannedChunk in plannedChunks {
                         try Task.checkCancellation()
+
+                        let startedAt = Date()
+                        var sawFirstAudio = false
+                        var audioChunkCount = 0
+                        var sampleCount = 0
+
+                        await logQwenLiveChunkStarted(
+                            requestID: requestID,
+                            op: op,
+                            profileName: profileName,
+                            chunk: plannedChunk,
+                            totalChunkCount: plannedChunks.count,
+                            streamingInterval: streamingInterval,
+                        )
 
                         let eventStream = model.generateConditionedEventStream(
                             text: plannedChunk.text,
@@ -219,11 +304,37 @@ extension SpeakSwiftly.Runtime {
                                 case let .info(info):
                                     recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
                                 case let .audio(samples):
+                                    audioChunkCount += 1
+                                    sampleCount += samples.count
                                     recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    if !sawFirstAudio {
+                                        sawFirstAudio = true
+                                        await logQwenLiveChunkFirstAudio(
+                                            requestID: requestID,
+                                            op: op,
+                                            profileName: profileName,
+                                            chunk: plannedChunk,
+                                            totalChunkCount: plannedChunks.count,
+                                            timeToFirstAudioMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
+                                            sampleCount: samples.count,
+                                        )
+                                    }
                                     continuation.yield(samples)
                             }
                         }
+
+                        await logQwenLiveChunkFinished(
+                            requestID: requestID,
+                            op: op,
+                            profileName: profileName,
+                            chunk: plannedChunk,
+                            totalChunkCount: plannedChunks.count,
+                            elapsedMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
+                            audioChunkCount: audioChunkCount,
+                            sampleCount: sampleCount,
+                        )
                     }
+
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
@@ -231,6 +342,7 @@ extension SpeakSwiftly.Runtime {
                     continuation.finish(throwing: error)
                 }
             }
+
             continuation.onTermination = { _ in task.cancel() }
         }
     }

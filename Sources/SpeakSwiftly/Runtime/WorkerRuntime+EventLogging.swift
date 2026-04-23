@@ -3,6 +3,98 @@ import Foundation
 // MARK: - Event Logging
 
 extension SpeakSwiftly.Runtime {
+    func logQwenLiveChunkPlan(for speechRequest: LiveSpeechRequestState) async {
+        guard let plannedChunks = speechRequest.normalizedLiveChunks, !plannedChunks.isEmpty else { return }
+
+        await logRequestEvent(
+            "qwen_live_chunk_plan",
+            requestID: speechRequest.id,
+            op: speechRequest.op,
+            profileName: speechRequest.profileName,
+            details: [
+                "chunk_count": .int(plannedChunks.count),
+                "streaming_cadence_profile": .string(speechRequest.residentStreamingCadenceProfile.rawValue),
+                "streaming_interval": .double(speechRequest.residentStreamingInterval),
+            ],
+        )
+
+        for chunk in plannedChunks {
+            await logRequestEvent(
+                "qwen_live_chunk_planned",
+                requestID: speechRequest.id,
+                op: speechRequest.op,
+                profileName: speechRequest.profileName,
+                details: qwenLiveChunkDetails(
+                    chunk,
+                    totalChunkCount: plannedChunks.count,
+                ),
+            )
+        }
+    }
+
+    func logQwenLiveChunkStarted(
+        requestID: String,
+        op: String?,
+        profileName: String,
+        chunk: LiveSpeechTextChunk,
+        totalChunkCount: Int,
+        streamingInterval: Double,
+    ) async {
+        var details = qwenLiveChunkDetails(chunk, totalChunkCount: totalChunkCount)
+        details["streaming_interval"] = .double(streamingInterval)
+        await logRequestEvent(
+            "qwen_live_chunk_started",
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            details: details,
+        )
+    }
+
+    func logQwenLiveChunkFirstAudio(
+        requestID: String,
+        op: String?,
+        profileName: String,
+        chunk: LiveSpeechTextChunk,
+        totalChunkCount: Int,
+        timeToFirstAudioMS: Int,
+        sampleCount: Int,
+    ) async {
+        var details = qwenLiveChunkDetails(chunk, totalChunkCount: totalChunkCount)
+        details["time_to_first_audio_ms"] = .int(timeToFirstAudioMS)
+        details["first_audio_sample_count"] = .int(sampleCount)
+        await logRequestEvent(
+            "qwen_live_chunk_first_audio",
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            details: details,
+        )
+    }
+
+    func logQwenLiveChunkFinished(
+        requestID: String,
+        op: String?,
+        profileName: String,
+        chunk: LiveSpeechTextChunk,
+        totalChunkCount: Int,
+        elapsedMS: Int,
+        audioChunkCount: Int,
+        sampleCount: Int,
+    ) async {
+        var details = qwenLiveChunkDetails(chunk, totalChunkCount: totalChunkCount)
+        details["elapsed_ms"] = .int(elapsedMS)
+        details["audio_chunk_count"] = .int(audioChunkCount)
+        details["sample_count"] = .int(sampleCount)
+        await logRequestEvent(
+            "qwen_live_chunk_finished",
+            requestID: requestID,
+            op: op,
+            profileName: profileName,
+            details: details,
+        )
+    }
+
     func logPlaybackEngineReady(
         for speechRequest: LiveSpeechRequestState,
         sampleRate: Double,
@@ -233,5 +325,20 @@ extension SpeakSwiftly.Runtime {
 
     func elapsedMS(since startedAt: Date) -> Int {
         Int((dependencies.now().timeIntervalSince(startedAt) * 1000).rounded())
+    }
+
+    private func qwenLiveChunkDetails(
+        _ chunk: LiveSpeechTextChunk,
+        totalChunkCount: Int,
+    ) -> [String: LogValue] {
+        [
+            "chunk_index": .int(chunk.index),
+            "chunk_total": .int(totalChunkCount),
+            "segmentation": .string(chunk.segmentation.rawValue),
+            "word_count": .int(chunk.wordCount),
+            "character_count": .int(chunk.text.count),
+            "sentence_count": .int(LiveSpeechChunkPlanner.sentenceCount(in: chunk.text)),
+            "paragraph_count": .int(LiveSpeechChunkPlanner.paragraphCount(in: chunk.text)),
+        ]
     }
 }
