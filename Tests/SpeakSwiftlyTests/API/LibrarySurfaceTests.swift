@@ -18,6 +18,20 @@ import Darwin
     _ = normalizer
 }
 
+@Test func `public request context aliases the TextForSpeech model`() throws {
+    let requestContext = SpeakSwiftly.RequestContext(
+        source: "codex",
+        app: "SpeakSwiftlyServer",
+        project: "SpeakSwiftly",
+        attributes: ["surface": "mcp"],
+    )
+    let encoded = try JSONEncoder().encode(requestContext)
+    let decoded = try JSONDecoder().decode(TextForSpeech.RequestContext.self, from: encoded)
+
+    #expect(decoded == requestContext)
+    #expect(decoded.attributes == ["surface": "mcp"])
+}
+
 @Test func `public library surface constructs configuration`() {
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,

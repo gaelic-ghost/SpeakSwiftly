@@ -138,6 +138,7 @@ let requestHandle = await runtime.generate.audio(
 ```
 
 The typed Swift surface uses `voiceProfile`, `textProfile`, `inputTextContext`, and `requestContext`.
+`SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so the same request-origin metadata shape can move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
 The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 The runtime is organized around stored concern handles that callers can keep and reuse:

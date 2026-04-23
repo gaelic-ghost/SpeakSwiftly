@@ -40,7 +40,7 @@ struct QuickE2ETests {
         )
 
         #expect(generatedFile["artifact_id"] as? String == "req-quick-generated-file-artifact-1")
-        #expect(generatedFile["profile_name"] as? String == E2EHarness.testingProfileName)
+        #expect(generatedFile["voice_profile"] as? String == E2EHarness.testingProfileName)
 
         let generatedFilePath = try #require(generatedFile["file_path"] as? String)
         #expect(FileManager.default.fileExists(atPath: generatedFilePath))
