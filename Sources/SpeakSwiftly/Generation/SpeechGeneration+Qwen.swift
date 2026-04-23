@@ -173,6 +173,10 @@ extension SpeakSwiftly.Runtime {
                             audioChunkCount: audioChunkCount,
                             sampleCount: sampleCount,
                         )
+
+                        if plannedChunk.index < plannedChunks.count {
+                            continuation.yield([])
+                        }
                     }
                     continuation.finish()
                 } catch is CancellationError {
@@ -333,6 +337,10 @@ extension SpeakSwiftly.Runtime {
                             audioChunkCount: audioChunkCount,
                             sampleCount: sampleCount,
                         )
+
+                        if plannedChunk.index < plannedChunks.count {
+                            continuation.yield([])
+                        }
                     }
 
                     continuation.finish()

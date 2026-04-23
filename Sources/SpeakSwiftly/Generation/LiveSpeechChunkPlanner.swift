@@ -19,7 +19,7 @@ struct LiveSpeechTextChunk: Equatable {
 enum LiveSpeechChunkPlanner {
     enum Strategy: Equatable {
         case sentenceGroups
-        case smartParagraphGroups(targetParagraphCount: Int = 3, softCharacterLimit: Int = 1400)
+        case smartParagraphGroups(targetParagraphCount: Int = 4, softCharacterLimit: Int = 1400)
     }
 
     private static let firstChunkSentenceCount = 3

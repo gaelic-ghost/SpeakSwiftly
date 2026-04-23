@@ -19,15 +19,17 @@ extension SpeakSwiftly.Runtime {
         )
 
         for chunk in plannedChunks {
+            var details = qwenLiveChunkDetails(
+                chunk,
+                totalChunkCount: plannedChunks.count,
+            )
+            details.merge(qwenLiveChunkTextDetails(chunk), uniquingKeysWith: { _, new in new })
             await logRequestEvent(
                 "qwen_live_chunk_planned",
                 requestID: speechRequest.id,
                 op: speechRequest.op,
                 profileName: speechRequest.profileName,
-                details: qwenLiveChunkDetails(
-                    chunk,
-                    totalChunkCount: plannedChunks.count,
-                ),
+                details: details,
             )
         }
     }
@@ -42,6 +44,7 @@ extension SpeakSwiftly.Runtime {
     ) async {
         var details = qwenLiveChunkDetails(chunk, totalChunkCount: totalChunkCount)
         details["streaming_interval"] = .double(streamingInterval)
+        details.merge(qwenLiveChunkTextDetails(chunk), uniquingKeysWith: { _, new in new })
         await logRequestEvent(
             "qwen_live_chunk_started",
             requestID: requestID,
@@ -339,6 +342,19 @@ extension SpeakSwiftly.Runtime {
             "character_count": .int(chunk.text.count),
             "sentence_count": .int(LiveSpeechChunkPlanner.sentenceCount(in: chunk.text)),
             "paragraph_count": .int(LiveSpeechChunkPlanner.paragraphCount(in: chunk.text)),
+        ]
+    }
+
+    private func qwenLiveChunkTextDetails(
+        _ chunk: LiveSpeechTextChunk,
+    ) -> [String: LogValue] {
+        [
+            "text": .string(chunk.text),
+            "text_visible_breaks": .string(
+                chunk.text
+                    .replacingOccurrences(of: "\r\n", with: "\\r\\n")
+                    .replacingOccurrences(of: "\n", with: "\\n"),
+            ),
         ]
     }
 }

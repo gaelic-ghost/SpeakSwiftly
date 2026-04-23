@@ -22,7 +22,15 @@ enum E2EHarness {
 
     The fourth paragraph moves into a slightly denser explanation of a technical cleanup that looked small at first but turned out to depend on a few subtle decisions about boundaries, defaults, and what should remain unchanged. The speaker is not lecturing. They are just talking through the logic in the same patient tone as before, letting the clauses stay connected long enough to reveal whether volume or presence starts to sag over time.
 
-    The fifth paragraph closes the request with a quieter ending about putting the last notes in order, saving the final changes, and noticing that the room feels easier to inhabit once the work is no longer hanging open in the background. It should sound complete, unhurried, and consistent with the earlier paragraphs, so the end of the request still carries the same presence as the beginning instead of fading away.
+    The fifth paragraph lingers on a softer scene in which someone rinses a cup, straightens a stack of papers, and notices that the room feels gently reordered now that the largest task has already been finished. The pace should stay calm and connected, with no abrupt lunge forward and no fading retreat into the background while the thought unfolds.
+
+    The sixth paragraph turns back toward the outside world and describes a street after light rain, where the pavement holds a dim reflection of signs and windows without becoming dramatic or cinematic. Cars pass occasionally, voices blur at a distance, and the whole setting stays ordinary enough that the voice itself remains the real subject of the test.
+
+    The seventh paragraph adds another sustained stretch of plain prose about reviewing a long piece of writing one more time, not because something is badly wrong, but because the final pass is where awkward edges, repeated phrases, and uneven pacing often become obvious. The wording stays natural so that continuity matters more than novelty.
+
+    The eighth paragraph narrows in on a quieter, more interior note about noticing tiredness without panic, closing a notebook, and letting the body finally understand that there is no further urgent work waiting just beyond the current sentence. It should still sound like the same speaker with the same presence, not a weaker or more distant version.
+
+    The ninth paragraph closes the request by returning to the lamp, the desk, and the settled feeling that comes after a demanding evening has finally become still. It should sound complete, unhurried, and consistent with the earlier paragraphs, so the end of the request still carries the same presence as the beginning instead of fading away.
     """
     static let deepTracePlaybackText = """
     Deep trace playback probe begins now. Please read this exactly once and do not repeat yourself.

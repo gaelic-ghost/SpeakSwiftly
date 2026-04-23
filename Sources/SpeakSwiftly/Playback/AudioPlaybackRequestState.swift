@@ -17,6 +17,7 @@ final class AudioPlaybackRequestState {
     let requestID: UInt64
     var thresholdsController: PlaybackThresholdController
     var generationFinished = false
+    var currentChunkFinished = false
     var isRebuffering = false
     var queuedBuffers = [QueuedBuffer]()
     var queuedSampleCount = 0

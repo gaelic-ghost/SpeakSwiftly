@@ -16,7 +16,7 @@ import Testing
     ),
 )
 struct QwenLongFormE2ETests {
-    @Test func `voice design live speech spans five prose paragraphs`() async throws {
+    @Test func `voice design live speech spans nine prose paragraphs`() async throws {
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
         let profileName = "qwen-longform-profile"
