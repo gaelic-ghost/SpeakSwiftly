@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -21,6 +21,7 @@ extension SpeakSwiftly.Runtime {
                 jobType: .file,
                 inputTextContext: let inputTextContext,
                 requestContext: let requestContext,
+                qwenPreModelTextChunking: _,
             ):
                     let generatedFile = try await handleQueueSpeechFileGeneration(
                         requestID: id,

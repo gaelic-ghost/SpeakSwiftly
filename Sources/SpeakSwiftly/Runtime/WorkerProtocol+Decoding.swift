@@ -44,6 +44,7 @@ extension WorkerRequest {
                     jobType: .live,
                     inputTextContext: resolved.inputTextContext,
                     requestContext: raw.requestContext,
+                    qwenPreModelTextChunking: raw.qwenPreModelTextChunking ?? false,
                 )
 
             case "generate_audio_file":
@@ -66,6 +67,7 @@ extension WorkerRequest {
                     jobType: .file,
                     inputTextContext: resolved.inputTextContext,
                     requestContext: raw.requestContext,
+                    qwenPreModelTextChunking: nil,
                 )
 
             case "generate_batch":

@@ -720,6 +720,7 @@ import TextForSpeech
             jobType: .live,
             inputTextContext: nil,
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
     var activeIterator = activeHandle.events.makeAsyncIterator()

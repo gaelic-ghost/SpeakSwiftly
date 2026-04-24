@@ -47,6 +47,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
             jobType: .live,
             inputTextContext: inputTextContext,
             requestContext: requestContext,
+            qwenPreModelTextChunking: _,
         ) = request else {
             fatalError(
                 "SpeakSwiftly attempted to create live speech request state for request '\(request.id)' (\(request.opName)), but that request does not require live playback. This indicates a runtime queueing bug.",

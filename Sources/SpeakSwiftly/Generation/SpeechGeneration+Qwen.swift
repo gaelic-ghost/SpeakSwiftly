@@ -75,20 +75,14 @@ extension SpeakSwiftly.Runtime {
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
-        let plannedChunks = plannedChunks ?? {
-            let chunks = LiveSpeechChunkPlanner.chunks(
-                for: text,
-                strategy: .smartParagraphGroups(),
-            )
-            return chunks.isEmpty ? [
-                LiveSpeechTextChunk(
-                    index: 1,
-                    text: text,
-                    wordCount: 1,
-                    segmentation: .sentenceGroup,
-                ),
-            ] : chunks
-        }()
+        let plannedChunks = plannedChunks ?? [
+            LiveSpeechTextChunk(
+                index: 1,
+                text: text,
+                wordCount: max(SpeakSwiftly.DeepTrace.words(in: text).count, 1),
+                segmentation: .sentenceGroup,
+            ),
+        ]
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -225,20 +219,14 @@ extension SpeakSwiftly.Runtime {
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
-        let plannedChunks = plannedChunks ?? {
-            let chunks = LiveSpeechChunkPlanner.chunks(
-                for: text,
-                strategy: .smartParagraphGroups(),
-            )
-            return chunks.isEmpty ? [
-                LiveSpeechTextChunk(
-                    index: 1,
-                    text: text,
-                    wordCount: 1,
-                    segmentation: .sentenceGroup,
-                ),
-            ] : chunks
-        }()
+        let plannedChunks = plannedChunks ?? [
+            LiveSpeechTextChunk(
+                index: 1,
+                text: text,
+                wordCount: max(SpeakSwiftly.DeepTrace.words(in: text).count, 1),
+                segmentation: .sentenceGroup,
+            ),
+        ]
 
         return AsyncThrowingStream { continuation in
             let task = Task {

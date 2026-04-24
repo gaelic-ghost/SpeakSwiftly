@@ -1475,7 +1475,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(residentRecorder.lastRefText == nil)
 }
 
-@Test func `qwen generated audio files stay single pass while live playback chunks paragraphs`() async throws {
+@Test func `qwen pre-model text chunking is opt in for live playback`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -1542,8 +1542,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count })
-    #expect(residentRecorder.recordedTexts == expectedLiveChunkTexts)
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 1 })
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("fifth paragraph"))
 
     await runtime.accept(
         line: """
@@ -1557,9 +1558,25 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count + 1 })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
     #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
     #expect(try #require(residentRecorder.recordedTexts.last).contains("fifth paragraph"))
+
+    await runtime.accept(
+        line: """
+        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text","qwen_pre_model_text_chunking":true}
+        """,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-qwen-live-chunked"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 + expectedLiveChunkTexts.count })
+    #expect(Array(residentRecorder.recordedTexts.suffix(expectedLiveChunkTexts.count)) == expectedLiveChunkTexts)
 }
 
 // MARK: - Sample Shaping

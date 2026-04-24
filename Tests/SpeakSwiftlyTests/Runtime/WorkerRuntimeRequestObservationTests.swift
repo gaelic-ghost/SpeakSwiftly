@@ -518,6 +518,7 @@ import TextForSpeech
             jobType: .live,
             inputTextContext: nil,
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
     var iterator = handle.events.makeAsyncIterator()

@@ -32,7 +32,7 @@ Every request includes an `id` and an `op`:
 {"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}
 ```
 
-For generation requests, the current worker keys are `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
+For generation requests, the current worker keys are `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Qwen live playback can also opt into pre-model text chunking with `qwen_pre_model_text_chunking: true`; when omitted, Qwen live playback remains single-pass. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 Representative operations include:
 

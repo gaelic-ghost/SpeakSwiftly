@@ -30,6 +30,7 @@ public extension SpeakSwiftly.Generate {
     ///   - textProfile: An optional text-normalization profile override.
     ///   - inputTextContext: Optional metadata that describes how the input text should be interpreted.
     ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
+    ///   - qwenPreModelTextChunking: Whether Qwen live playback should split text before model generation.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
@@ -37,6 +38,7 @@ public extension SpeakSwiftly.Generate {
         textProfile: SpeakSwiftly.TextProfileID? = nil,
         inputTextContext: SpeakSwiftly.InputTextContext? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
+        qwenPreModelTextChunking: Bool = false,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
             .queueSpeech(
@@ -47,6 +49,7 @@ public extension SpeakSwiftly.Generate {
                 jobType: .live,
                 inputTextContext: inputTextContext,
                 requestContext: requestContext,
+                qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
         )
     }
@@ -71,6 +74,7 @@ public extension SpeakSwiftly.Generate {
                 jobType: .file,
                 inputTextContext: inputTextContext,
                 requestContext: requestContext,
+                qwenPreModelTextChunking: nil,
             ),
         )
     }
