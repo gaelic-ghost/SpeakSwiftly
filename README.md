@@ -76,11 +76,11 @@ swift build
 swift test
 ```
 
-The current `mlx-audio-swift` `0.7.0` fork pin restores the ordinary SwiftPM
-build and test path. If a future toolchain regression brings back the old
-`EnglishG2P.swift` parser failure, use the documented fallback lane in
-[CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same
-plain `swift build` / `swift test` commands.
+The current `mlx-audio-swift` `69.2.1` fork release restores the ordinary
+SwiftPM build and test path. If a future toolchain regression brings back the
+old `EnglishG2P.swift` parser failure, use the documented fallback lane in
+[CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same plain
+`swift build` / `swift test` commands.
 
 Use the Xcode-backed deterministic runtime only for standalone worker runs or
 for fallback validation when a future SwiftPM parser regression actually blocks

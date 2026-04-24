@@ -165,7 +165,7 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 `SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend`, the Qwen conditioning strategy, and an optional startup `textNormalizer`.
 
-The current prepared-conditioning integration depends on a temporary frozen `mlx-audio-swift` fork pin while the matching `Qwen3TTS` API is being upstreamed. Keep that pin exact and intentional; do not loosen it back to a moving branch dependency.
+The current prepared-conditioning integration depends on `mlx-audio-swift` `69.2.1`, the latest tagged release on the `gaelic-ghost/mlx-audio-swift` fork's `main` branch. Keep this dependency version-based so downstream Xcode package consumers do not inherit a branch dependency.
 
 Default persisted configuration path:
 
@@ -538,10 +538,10 @@ swift build
 swift test
 ```
 
-The current `mlx-audio-swift` `0.7.0` fork pin restores the ordinary SwiftPM
-lane for this repository, including the worker-backed `QuickE2ETests` path.
-Treat plain `swift build` and `swift test` as the default verification story
-again.
+The current `mlx-audio-swift` `69.2.1` fork release restores the ordinary
+SwiftPM lane for this repository, including the worker-backed `QuickE2ETests`
+path. Treat plain `swift build` and `swift test` as the default verification
+story again.
 
 For MLX-backed package tests, the plain `swift test` lane now works because the
 `SpeakSwiftlyTests` target carries a bundled `default.metallib` resource and

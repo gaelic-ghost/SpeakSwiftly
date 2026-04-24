@@ -30,7 +30,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            exact: "0.7.0",
+            exact: "69.2.1",
         ),
         .package(
             url: "https://github.com/ml-explore/mlx-swift.git",
