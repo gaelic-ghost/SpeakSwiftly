@@ -3,6 +3,7 @@ import Foundation
 import MLXAudioCore
 import MLXAudioTTS
 import SpeakSwiftly
+import SpeakSwiftlyTestingSupport
 
 @main
 struct SpeakSwiftlyTestingMain {
@@ -29,39 +30,56 @@ struct SpeakSwiftlyTestingMain {
         var textFile: String?
         var repeatCount = 10
         var windowSeconds = 2.0
+        var matchedDurationMode = MatchedDurationMode.refuse
     }
 
-    struct VolumeWindow {
-        let index: Int
-        let startSeconds: Double
-        let durationSeconds: Double
-        let rms: Double
-        let peak: Double
-    }
-
-    struct VolumeSummary {
-        let firstRMS: Double
-        let lastRMS: Double
-        let rmsDropPercent: Double
-        let slopePerWindow: Double
-        let firstPeak: Double
-        let lastPeak: Double
-    }
-
-    struct ProbeAnalysis {
-        let sampleRate: Int
-        let windows: [VolumeWindow]
-        let summary: VolumeSummary?
+    enum MatchedDurationMode: String, Codable {
+        case refuse
+        case trimToShorter = "trim-to-shorter"
     }
 
     struct CompareRun {
         let generatedFilePath: String
-        let analysis: ProbeAnalysis
+        let fullAnalysis: ProbeAnalysis
+        let comparedAnalysis: ProbeAnalysis
     }
 
     struct ComparisonResult {
         let streamed: CompareRun
         let direct: CompareRun
+        let matchedDurationMode: MatchedDurationMode
+        let comparisonSampleCount: Int
+    }
+
+    struct VolumeProbeArtifact: Codable {
+        let schemaVersion: Int
+        let toolName: String
+        let sourceSurface: String
+        let profileName: String
+        let profileRoot: String?
+        let textCharacters: Int
+        let textWords: Int
+        let textFingerprint: String
+        let generatedFilePath: String
+        let analysis: ProbeAnalysis
+    }
+
+    struct CompareVolumeArtifact: Codable {
+        let schemaVersion: Int
+        let toolName: String
+        let profileName: String
+        let profileRoot: String?
+        let textCharacters: Int
+        let textWords: Int
+        let textFingerprint: String
+        let matchedDurationMode: MatchedDurationMode
+        let comparisonSampleCount: Int
+        let streamedGeneratedFilePath: String
+        let directGeneratedFilePath: String
+        let streamedFullAnalysis: ProbeAnalysis
+        let directFullAnalysis: ProbeAnalysis
+        let streamedComparedAnalysis: ProbeAnalysis
+        let directComparedAnalysis: ProbeAnalysis
     }
 
     struct ProbeProfileManifest: Decodable {
@@ -248,6 +266,14 @@ struct SpeakSwiftlyTestingMain {
                     }
 
                     options.windowSeconds = windowSeconds
+                case "--matched-duration":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let mode = MatchedDurationMode(rawValue: value) else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.matchedDurationMode = mode
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -326,10 +352,25 @@ struct SpeakSwiftlyTestingMain {
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
         print("generated_file: \(result.generatedFilePath)")
-        print("sample_rate: \(result.analysis.sampleRate)")
-        print("window_seconds: \(options.windowSeconds)")
+        print("sample_rate: \(result.fullAnalysis.sampleRate)")
+        print("window_seconds: \(result.fullAnalysis.windowSeconds)")
 
-        printAnalysis(result.analysis, prefix: "window", summaryLabel: "summary")
+        printAnalysis(result.fullAnalysis, prefix: "window", summaryLabel: "summary")
+
+        let artifact = VolumeProbeArtifact(
+            schemaVersion: 1,
+            toolName: "volume-probe",
+            sourceSurface: "retained-file",
+            profileName: options.profileName,
+            profileRoot: options.profileRoot,
+            textCharacters: text.count,
+            textWords: text.split(whereSeparator: \.isWhitespace).count,
+            textFingerprint: fingerprint(text),
+            generatedFilePath: result.generatedFilePath,
+            analysis: result.fullAnalysis,
+        )
+        let artifactPath = try writeProbeArtifact(artifact, stem: "volume-probe")
+        print("artifact_file: \(artifactPath)")
     }
 
     static func runCreateDesignProfile(options: CreateDesignProfileOptions) async throws {
@@ -374,36 +415,58 @@ struct SpeakSwiftlyTestingMain {
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
         print("window_seconds: \(options.windowSeconds)")
         print("streamed_generated_file: \(comparison.streamed.generatedFilePath)")
-        print("streamed_sample_rate: \(comparison.streamed.analysis.sampleRate)")
+        print("streamed_sample_rate: \(comparison.streamed.fullAnalysis.sampleRate)")
         print("direct_generated_file: \(comparison.direct.generatedFilePath)")
-        print("direct_sample_rate: \(comparison.direct.analysis.sampleRate)")
+        print("direct_sample_rate: \(comparison.direct.fullAnalysis.sampleRate)")
+        print("matched_duration_mode: \(comparison.matchedDurationMode.rawValue)")
+        print("comparison_sample_count: \(comparison.comparisonSampleCount)")
 
         printAnalysis(
-            comparison.streamed.analysis,
+            comparison.streamed.comparedAnalysis,
             prefix: "streamed_window",
             summaryLabel: "streamed_summary",
         )
         printAnalysis(
-            comparison.direct.analysis,
+            comparison.direct.comparedAnalysis,
             prefix: "direct_window",
             summaryLabel: "direct_summary",
         )
 
-        if let streamedSummary = comparison.streamed.analysis.summary,
-           let directSummary = comparison.direct.analysis.summary {
+        if let streamedSummary = comparison.streamed.comparedAnalysis.summary,
+           let directSummary = comparison.direct.comparedAnalysis.summary {
             print(
                 String(
-                    format: "comparison: streamed_last_rms=%.5f direct_last_rms=%.5f streamed_drop_pct=%.2f direct_drop_pct=%.2f drop_delta_pct=%.2f streamed_slope=%.6f direct_slope=%.6f",
+                    format: "comparison: streamed_last_rms=%.5f direct_last_rms=%.5f streamed_endpoint_rms_delta_pct=%.2f direct_endpoint_rms_delta_pct=%.2f endpoint_delta_gap_pct=%.2f streamed_slope=%.6f direct_slope=%.6f",
                     streamedSummary.lastRMS,
                     directSummary.lastRMS,
-                    streamedSummary.rmsDropPercent,
-                    directSummary.rmsDropPercent,
-                    streamedSummary.rmsDropPercent - directSummary.rmsDropPercent,
+                    streamedSummary.endpointRMSDeltaPercent,
+                    directSummary.endpointRMSDeltaPercent,
+                    streamedSummary.endpointRMSDeltaPercent - directSummary.endpointRMSDeltaPercent,
                     streamedSummary.slopePerWindow,
                     directSummary.slopePerWindow,
                 ),
             )
         }
+
+        let artifact = CompareVolumeArtifact(
+            schemaVersion: 1,
+            toolName: "compare-volume",
+            profileName: options.profileName,
+            profileRoot: options.profileRoot,
+            textCharacters: text.count,
+            textWords: text.split(whereSeparator: \.isWhitespace).count,
+            textFingerprint: fingerprint(text),
+            matchedDurationMode: comparison.matchedDurationMode,
+            comparisonSampleCount: comparison.comparisonSampleCount,
+            streamedGeneratedFilePath: comparison.streamed.generatedFilePath,
+            directGeneratedFilePath: comparison.direct.generatedFilePath,
+            streamedFullAnalysis: comparison.streamed.fullAnalysis,
+            directFullAnalysis: comparison.direct.fullAnalysis,
+            streamedComparedAnalysis: comparison.streamed.comparedAnalysis,
+            directComparedAnalysis: comparison.direct.comparedAnalysis,
+        )
+        let artifactPath = try writeProbeArtifact(artifact, stem: "compare-volume")
+        print("artifact_file: \(artifactPath)")
     }
 
     static func loadVolumeProbeText(options: VolumeProbeOptions) throws -> String {
@@ -482,13 +545,13 @@ struct SpeakSwiftlyTestingMain {
         let generatedFile = try await awaitGeneratedFile(from: handle)
         let analysis = try analyzeVolume(
             at: generatedFile.filePath,
-            sampleRate: generatedFile.sampleRate,
             windowSeconds: windowSeconds,
         )
 
         return CompareRun(
             generatedFilePath: generatedFile.filePath,
-            analysis: analysis,
+            fullAnalysis: analysis,
+            comparedAnalysis: analysis,
         )
     }
 
@@ -512,7 +575,72 @@ struct SpeakSwiftlyTestingMain {
             profileDirectoryURL: profileDirectoryURL,
             windowSeconds: options.windowSeconds,
         )
-        return ComparisonResult(streamed: streamed, direct: direct)
+        return try alignComparison(
+            streamed: streamed,
+            direct: direct,
+            mode: options.matchedDurationMode,
+            windowSeconds: options.windowSeconds,
+        )
+    }
+
+    static func alignComparison(
+        streamed: CompareRun,
+        direct: CompareRun,
+        mode: MatchedDurationMode,
+        windowSeconds: Double,
+    ) throws -> ComparisonResult {
+        guard streamed.fullAnalysis.sampleRate == direct.fullAnalysis.sampleRate else {
+            throw UsageError.comparisonSampleRateMismatch(
+                streamed.fullAnalysis.sampleRate,
+                direct.fullAnalysis.sampleRate,
+            )
+        }
+
+        let streamedCount = streamed.fullAnalysis.sampleCount
+        let directCount = direct.fullAnalysis.sampleCount
+        guard streamedCount == directCount else {
+            switch mode {
+                case .refuse:
+                    throw UsageError.comparisonDurationMismatch(
+                        streamedCount,
+                        directCount,
+                        streamed.fullAnalysis.sampleRate,
+                    )
+                case .trimToShorter:
+                    let comparisonSampleCount = min(streamedCount, directCount)
+                    let streamedAnalysis = try analyzeVolume(
+                        at: streamed.generatedFilePath,
+                        windowSeconds: windowSeconds,
+                        maxSampleCount: comparisonSampleCount,
+                    )
+                    let directAnalysis = try analyzeVolume(
+                        at: direct.generatedFilePath,
+                        windowSeconds: windowSeconds,
+                        maxSampleCount: comparisonSampleCount,
+                    )
+                    return ComparisonResult(
+                        streamed: CompareRun(
+                            generatedFilePath: streamed.generatedFilePath,
+                            fullAnalysis: streamed.fullAnalysis,
+                            comparedAnalysis: streamedAnalysis,
+                        ),
+                        direct: CompareRun(
+                            generatedFilePath: direct.generatedFilePath,
+                            fullAnalysis: direct.fullAnalysis,
+                            comparedAnalysis: directAnalysis,
+                        ),
+                        matchedDurationMode: mode,
+                        comparisonSampleCount: comparisonSampleCount,
+                    )
+            }
+        }
+
+        return ComparisonResult(
+            streamed: streamed,
+            direct: direct,
+            matchedDurationMode: mode,
+            comparisonSampleCount: streamedCount,
+        )
     }
 
     static func runDirectProbe(
@@ -573,7 +701,8 @@ struct SpeakSwiftlyTestingMain {
 
         return CompareRun(
             generatedFilePath: directOutputURL.path,
-            analysis: analysis,
+            fullAnalysis: analysis,
+            comparedAnalysis: analysis,
         )
     }
 
@@ -671,62 +800,24 @@ struct SpeakSwiftlyTestingMain {
         withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
     }
 
-    static func analyzeVolume(
-        at path: String,
-        sampleRate: Int,
-        windowSeconds: Double,
-    ) throws -> ProbeAnalysis {
-        let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        let wav = try parseFloatWAV(data)
-        return analyzeVolume(
-            samples: wav.samples,
-            sampleRate: sampleRate,
-            windowSeconds: windowSeconds,
-        )
-    }
-
-    static func analyzeVolume(
-        samples: [Float],
-        sampleRate: Int,
-        windowSeconds: Double,
-    ) -> ProbeAnalysis {
-        let framesPerWindow = max(1, Int((Double(sampleRate) * windowSeconds).rounded()))
-        var windows = [VolumeWindow]()
-        windows.reserveCapacity(max(1, samples.count / framesPerWindow))
-
-        var index = 0
-        var start = 0
-        while start < samples.count {
-            let end = min(start + framesPerWindow, samples.count)
-            let segment = Array(samples[start..<end])
-            let durationSeconds = Double(segment.count) / Double(sampleRate)
-            let rms = rootMeanSquare(segment)
-            let peak = segment.map { abs($0) }.max() ?? 0
-            windows.append(
-                VolumeWindow(
-                    index: index + 1,
-                    startSeconds: Double(start) / Double(sampleRate),
-                    durationSeconds: durationSeconds,
-                    rms: rms,
-                    peak: Double(peak),
-                ),
-            )
-            index += 1
-            start = end
-        }
-
-        return ProbeAnalysis(
-            sampleRate: sampleRate,
-            windows: windows,
-            summary: summarizeWindows(windows),
-        )
-    }
-
     static func printAnalysis(
         _ analysis: ProbeAnalysis,
         prefix: String,
         summaryLabel: String,
     ) {
+        print(
+            String(
+                format: "%@: duration=%.3fs analyzed_duration=%.3fs sample_count=%d analyzed_sample_count=%d window_seconds=%.3f window_count=%d",
+                summaryLabel,
+                analysis.durationSeconds,
+                Double(analysis.analyzedSampleCount) / Double(analysis.sampleRate),
+                analysis.sampleCount,
+                analysis.analyzedSampleCount,
+                analysis.windowSeconds,
+                analysis.windows.count,
+            ),
+        )
+
         for window in analysis.windows {
             print(
                 String(
@@ -744,152 +835,66 @@ struct SpeakSwiftlyTestingMain {
         if let summary = analysis.summary {
             print(
                 String(
-                    format: "%@: first_rms=%.5f last_rms=%.5f rms_drop_pct=%.2f slope_per_window=%.6f first_peak=%.5f last_peak=%.5f",
+                    format: "%@: first_rms=%.5f last_rms=%.5f endpoint_rms_delta_pct=%.2f slope_per_window=%.6f head_rms=%.5f tail_rms=%.5f tail_head_ratio=%.5f last_%d_window_avg_rms=%.5f first_peak=%.5f last_peak=%.5f",
                     summaryLabel,
                     summary.firstRMS,
                     summary.lastRMS,
-                    summary.rmsDropPercent,
+                    summary.endpointRMSDeltaPercent,
                     summary.slopePerWindow,
+                    summary.headRMS,
+                    summary.tailRMS,
+                    summary.tailHeadRatio,
+                    summary.lastWindowAverageCount,
+                    summary.lastWindowAverageRMS,
                     summary.firstPeak,
                     summary.lastPeak,
                 ),
             )
+            for bucket in summary.buckets {
+                print(
+                    String(
+                        format: "%@_%@: windows=%d-%d average_rms=%.5f average_peak=%.5f",
+                        summaryLabel,
+                        bucket.label,
+                        bucket.startWindow,
+                        bucket.endWindow,
+                        bucket.averageRMS,
+                        bucket.averagePeak,
+                    ),
+                )
+            }
         }
     }
 
-    static func rootMeanSquare(_ samples: [Float]) -> Double {
-        guard !samples.isEmpty else { return 0 }
-
-        let sum = samples.reduce(into: 0.0) { partialResult, sample in
-            let value = Double(sample)
-            partialResult += value * value
-        }
-        return Foundation.sqrt(sum / Double(samples.count))
+    static func writeProbeArtifact(_ artifact: some Encodable, stem: String) throws -> String {
+        let directory = try probeArtifactDirectory()
+        let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let artifactURL = directory.appendingPathComponent("\(stem)-\(timestamp).json", isDirectory: false)
+        let latestURL = directory.appendingPathComponent("\(stem)-latest.json", isDirectory: false)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(artifact)
+        try data.write(to: artifactURL, options: .atomic)
+        try data.write(to: latestURL, options: .atomic)
+        return artifactURL.path
     }
 
-    static func summarizeWindows(_ windows: [VolumeWindow]) -> VolumeSummary? {
-        guard let first = windows.first, let last = windows.last else { return nil }
-
-        let firstRMS = first.rms
-        let lastRMS = last.rms
-        let rmsDropPercent = firstRMS == 0 ? 0 : ((lastRMS - firstRMS) / firstRMS) * 100.0
-
-        let xValues = windows.map { Double($0.index - 1) }
-        let yValues = windows.map(\.rms)
-        let xMean = xValues.reduce(0, +) / Double(xValues.count)
-        let yMean = yValues.reduce(0, +) / Double(yValues.count)
-        let numerator = zip(xValues, yValues).reduce(into: 0.0) { partialResult, pair in
-            partialResult += (pair.0 - xMean) * (pair.1 - yMean)
-        }
-        let denominator = xValues.reduce(into: 0.0) { partialResult, x in
-            let offset = x - xMean
-            partialResult += offset * offset
-        }
-        let slopePerWindow = denominator == 0 ? 0 : numerator / denominator
-
-        return VolumeSummary(
-            firstRMS: firstRMS,
-            lastRMS: lastRMS,
-            rmsDropPercent: rmsDropPercent,
-            slopePerWindow: slopePerWindow,
-            firstPeak: first.peak,
-            lastPeak: last.peak,
-        )
+    static func probeArtifactDirectory() throws -> URL {
+        let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(".local", isDirectory: true)
+            .appendingPathComponent("volume-probes", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
-    static func parseFloatWAV(_ data: Data) throws -> (sampleRate: Int, channelCount: Int, samples: [Float]) {
-        func uint16(at offset: Int) -> UInt16 {
-            data.withUnsafeBytes { rawBuffer in
-                rawBuffer.load(fromByteOffset: offset, as: UInt16.self)
-            }
-            .littleEndian
+    static func fingerprint(_ text: String) -> String {
+        let bytes = Array(text.utf8)
+        let offset: UInt64 = 14_695_981_039_346_656_037
+        let prime: UInt64 = 1_099_511_628_211
+        let value = bytes.reduce(offset) { partialResult, byte in
+            (partialResult ^ UInt64(byte)) &* prime
         }
-
-        func uint32(at offset: Int) -> UInt32 {
-            data.withUnsafeBytes { rawBuffer in
-                rawBuffer.load(fromByteOffset: offset, as: UInt32.self)
-            }
-            .littleEndian
-        }
-
-        guard data.count >= 12 else {
-            throw UsageError.invalidWAV("The generated file is too small to be a valid WAV container.")
-        }
-        guard String(decoding: data[0..<4], as: UTF8.self) == "RIFF",
-              String(decoding: data[8..<12], as: UTF8.self) == "WAVE" else {
-            throw UsageError.invalidWAV("The generated file is not a RIFF/WAVE container.")
-        }
-
-        var formatTag: UInt16?
-        var channelCount: UInt16?
-        var sampleRate: UInt32?
-        var bitsPerSample: UInt16?
-        var audioPayload: Data?
-        var offset = 12
-
-        while offset + 8 <= data.count {
-            let chunkID = String(decoding: data[offset..<(offset + 4)], as: UTF8.self)
-            let chunkSize = Int(uint32(at: offset + 4))
-            let chunkStart = offset + 8
-            let chunkEnd = chunkStart + chunkSize
-            guard chunkEnd <= data.count else {
-                throw UsageError.invalidWAV("A WAV chunk overruns the file boundary.")
-            }
-
-            if chunkID == "fmt " {
-                guard chunkSize >= 16 else {
-                    throw UsageError.invalidWAV("The WAV fmt chunk is too small.")
-                }
-
-                formatTag = uint16(at: chunkStart)
-                channelCount = uint16(at: chunkStart + 2)
-                sampleRate = uint32(at: chunkStart + 4)
-                bitsPerSample = uint16(at: chunkStart + 14)
-            } else if chunkID == "data" {
-                audioPayload = data[chunkStart..<chunkEnd]
-            }
-
-            offset = chunkEnd + (chunkSize % 2)
-        }
-
-        guard formatTag == 3 else {
-            throw UsageError.invalidWAV("SpeakSwiftlyTesting expected 32-bit float WAV output, but found format tag \(formatTag ?? 0).")
-        }
-        guard bitsPerSample == 32 else {
-            throw UsageError.invalidWAV("SpeakSwiftlyTesting expected 32-bit float WAV output, but found \(bitsPerSample ?? 0) bits per sample.")
-        }
-        guard let resolvedChannelCount = channelCount, let resolvedSampleRate = sampleRate, let payload = audioPayload else {
-            throw UsageError.invalidWAV("The WAV file is missing required fmt or data chunks.")
-        }
-        guard payload.count % 4 == 0 else {
-            throw UsageError.invalidWAV("The WAV float payload is not aligned to 32-bit samples.")
-        }
-
-        let interleaved = payload.withUnsafeBytes { rawBuffer in
-            Array(rawBuffer.bindMemory(to: Float.self))
-        }
-
-        if resolvedChannelCount == 1 {
-            return (
-                sampleRate: Int(resolvedSampleRate),
-                channelCount: Int(resolvedChannelCount),
-                samples: interleaved,
-            )
-        }
-
-        var mono = [Float]()
-        mono.reserveCapacity(interleaved.count / Int(resolvedChannelCount))
-        var sampleIndex = 0
-        while sampleIndex < interleaved.count {
-            mono.append(interleaved[sampleIndex])
-            sampleIndex += Int(resolvedChannelCount)
-        }
-
-        return (
-            sampleRate: Int(resolvedSampleRate),
-            channelCount: Int(resolvedChannelCount),
-            samples: mono,
-        )
+        return String(format: "%016llx", value)
     }
 
     static func formatStatus(_ status: SpeakSwiftly.StatusEvent?) -> String {
@@ -913,10 +918,11 @@ extension SpeakSwiftlyTestingMain {
         case volumeProbeEndedWithoutGeneratedFile
         case createProfileEndedWithoutProfilePayload
         case emptyProbeText
-        case invalidWAV(String)
         case profileMissingQwenMaterialization(String)
         case profileModelIsNotQwen(String)
         case referenceAudioLoadFailed(String)
+        case comparisonSampleRateMismatch(Int, Int)
+        case comparisonDurationMismatch(Int, Int, Int)
 
         var errorDescription: String? {
             switch self {
@@ -940,14 +946,16 @@ extension SpeakSwiftlyTestingMain {
                     "SpeakSwiftlyTesting submitted a voice-design profile creation request, but the request stream ended before a created profile payload arrived."
                 case .emptyProbeText:
                     "SpeakSwiftlyTesting could not run the volume probe because the selected text input was empty after trimming whitespace."
-                case let .invalidWAV(message):
-                    message
                 case let .profileMissingQwenMaterialization(path):
                     "SpeakSwiftlyTesting could not find a stored qwen3 backend materialization in '\(path)/profile.json'."
                 case let .profileModelIsNotQwen(modelRepo):
                     "SpeakSwiftlyTesting expected model repo '\(modelRepo)' to load as Qwen3TTSModel for the direct comparison path, but it resolved to a different speech model type."
                 case let .referenceAudioLoadFailed(path):
                     "SpeakSwiftlyTesting could not decode any audio samples from '\(path)' for the direct Qwen comparison path."
+                case let .comparisonSampleRateMismatch(streamed, direct):
+                    "SpeakSwiftlyTesting refused compare-volume because the retained-file path used sample rate \(streamed), but the direct path used sample rate \(direct). The two runs are not like-for-like."
+                case let .comparisonDurationMismatch(streamed, direct, sampleRate):
+                    "SpeakSwiftlyTesting refused compare-volume because the retained-file path analyzed \(streamed) samples and the direct path analyzed \(direct) samples at \(sampleRate) Hz. Use '--matched-duration trim-to-shorter' only when you explicitly want both sides trimmed to the same analyzed span."
             }
         }
 
@@ -959,7 +967,7 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting smoke
               swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--profile-root PATH]
               swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
-              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
+              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
             """
         }
     }

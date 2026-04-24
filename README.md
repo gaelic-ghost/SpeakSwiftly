@@ -201,9 +201,20 @@ swift run SpeakSwiftlyTesting smoke
 swift run SpeakSwiftlyTesting create-design-profile --profile probe-fresh-a --voice "A steady, intimate, softly spoken feminine voice with even projection."
 swift run SpeakSwiftlyTesting volume-probe --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
 swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
 ```
 
-`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, `smoke` runs both checks in sequence, `create-design-profile` creates and stores a fresh voice-design profile through the typed runtime, `volume-probe` generates a retained file then prints per-window RMS and peak measurements so long-form loudness drift can be inspected against a real stored profile, and `compare-volume` runs that retained-file path against a direct non-stream Qwen decode using the same stored profile conditioning so the drift can be compared side by side.
+`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, `smoke` runs both checks in sequence, `create-design-profile` creates and stores a fresh voice-design profile through the typed runtime, `volume-probe` generates a retained file then prints per-window RMS and peak measurements so long-form loudness drift can be inspected against a real stored profile, and `compare-volume` runs that retained-file path against a direct non-stream Qwen decode using the same stored profile conditioning, refusing to compare when the analyzed spans do not match.
+
+The volume tools also write versioned JSON artifacts under `.local/volume-probes/`.
+`volume-probe` is a single-output profiler: its summary records duration,
+sample count, fixed-duration window count, quarter-bucket RMS, averaged head and
+tail RMS, tail/head ratio, last-window average RMS, and an explicitly named
+`endpoint_rms_delta_pct`. `compare-volume` refuses mismatched durations by
+default; use `--matched-duration trim-to-shorter` only when you intentionally
+want both outputs trimmed to the same analyzed sample count. The detailed
+measurement contract is maintained in
+[`docs/maintainers/volume-probe-instrument-contract-2026-04-24.md`](docs/maintainers/volume-probe-instrument-contract-2026-04-24.md).
 
 ## API Notes
 
