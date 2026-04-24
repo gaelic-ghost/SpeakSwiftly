@@ -201,9 +201,29 @@ swift run SpeakSwiftlyTesting smoke
 swift run SpeakSwiftlyTesting create-design-profile --profile probe-fresh-a --voice "A steady, intimate, softly spoken feminine voice with even projection."
 swift run SpeakSwiftlyTesting volume-probe --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
 swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
 ```
 
-`resources` prints the packaged bundle and metallib paths, `status` constructs the typed runtime and prints the first terminal status payload it sees, `smoke` runs both checks in sequence, `create-design-profile` creates and stores a fresh voice-design profile through the typed runtime, `volume-probe` generates a retained file then prints per-window RMS and peak measurements so long-form loudness drift can be inspected against a real stored profile, and `compare-volume` runs that retained-file path against a direct non-stream Qwen decode using the same stored profile conditioning so the drift can be compared side by side.
+`resources` prints the packaged bundle and metallib paths, `status` constructs
+the typed runtime and prints the first terminal status payload it sees, `smoke`
+runs both checks in sequence, and `create-design-profile` creates and stores a
+fresh voice-design profile through the typed runtime.
+
+The two volume commands are investigation tools. `volume-probe` profiles one
+retained generated file and reports the exact analyzed span, fixed-duration
+windows, RMS, peak, slope, quarter-bucket summaries, head/tail averages, and
+last-window averages. `compare-volume` runs the retained-file path against a
+direct non-stream Qwen decode using the same stored profile conditioning, but it
+refuses to compare by default when the analyzed sample counts differ. Use
+`--matched-duration trim-to-shorter` only when the question can tolerate
+trimming both outputs to the same shorter span.
+
+Both commands write versioned JSON artifacts under `.local/volume-probes/`. The
+console table is only a readable summary; the artifact records the durable
+measurement contract, including `endpoint_rms_delta_pct` as an explicit
+first-window-vs-last-window endpoint metric rather than a whole-run degradation
+score. The detailed contract is maintained in
+[`docs/maintainers/volume-probe-instrument-contract-2026-04-24.md`](docs/maintainers/volume-probe-instrument-contract-2026-04-24.md).
 
 ## API Notes
 

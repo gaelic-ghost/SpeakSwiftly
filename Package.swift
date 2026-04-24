@@ -59,16 +59,21 @@ let package = Package(
             name: "SpeakSwiftlyTests",
             dependencies: [
                 "SpeakSwiftly",
+                "SpeakSwiftlyTestingSupport",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
             resources: [
                 .copy("Resources/default.metallib"),
             ],
         ),
+        .target(
+            name: "SpeakSwiftlyTestingSupport",
+        ),
         .executableTarget(
             name: "SpeakSwiftlyTesting",
             dependencies: [
                 "SpeakSwiftly",
+                "SpeakSwiftlyTestingSupport",
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLX", package: "mlx-swift"),

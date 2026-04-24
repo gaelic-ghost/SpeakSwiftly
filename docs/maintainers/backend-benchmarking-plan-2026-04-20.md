@@ -340,9 +340,12 @@ older retained runs.
 Investigate the Qwen long-form volume-decay regression soon as a dedicated
 follow-up pass.
 
-- Re-run the retained-file `volume-probe` and direct-vs-stream
-  `compare-volume` paths after dependency updates, profile rerolls, and any
-  upstream `mlx-audio-swift` changes that could affect Qwen decode behavior.
+- Re-run the retained-file `volume-probe` path after dependency updates, profile
+  rerolls, and any upstream `mlx-audio-swift` changes that could affect Qwen
+  decode behavior.
+- Use `compare-volume` only when its artifact proves matched analyzed spans, or
+  when `--matched-duration trim-to-shorter` was explicitly selected and the
+  shortened comparison span is acceptable for the question being asked.
 - Keep comparing saved profiles against fresh voice-design profiles so prompt
   content and profile materialization changes can be separated from model-side
   drift.
