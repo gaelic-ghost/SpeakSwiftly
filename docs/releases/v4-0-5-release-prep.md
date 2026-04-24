@@ -42,7 +42,6 @@ Included work on the current branch:
 Not included:
 
 - a Qwen generation-default change
-- a `mlx-audio-swift` dependency update
 - real-model Qwen decay conclusions from the new probes
 - tagging or publishing the release before the branch lands on `main`
 
