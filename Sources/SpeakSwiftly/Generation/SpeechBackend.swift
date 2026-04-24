@@ -62,6 +62,29 @@ public extension SpeakSwiftly.SpeechBackend {
     }
 }
 
+public extension SpeakSwiftly.QwenResidentModel {
+    // MARK: Environment
+
+    static let environmentVariable = "SPEAKSWIFTLY_QWEN_RESIDENT_MODEL"
+
+    static func configured(in environment: [String: String]) -> Self? {
+        guard let rawValue = environment[environmentVariable], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        return Self(rawValue: rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    internal var modelRepo: String {
+        switch self {
+            case .base06B8Bit:
+                ModelFactory.qwen06B8BitResidentModelRepo
+            case .base17B8Bit:
+                ModelFactory.qwen17B8BitResidentModelRepo
+        }
+    }
+}
+
 public extension SpeakSwiftly.SpeechBackend {
     init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()

@@ -25,6 +25,7 @@ struct WorkerDependencies: @unchecked Sendable {
 
     static func live(
         fileManager: FileManager = .default,
+        qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
@@ -34,6 +35,7 @@ struct WorkerDependencies: @unchecked Sendable {
             loadResidentModels: { backend in
                 try await ModelFactory.loadResidentModels(
                     for: backend,
+                    qwenResidentModel: qwenResidentModel,
                     marvisResidentPolicy: marvisResidentPolicy,
                 )
             },

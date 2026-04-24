@@ -232,4 +232,13 @@ struct StoredProfile: Equatable {
     ) -> StoredQwenConditioningArtifact? {
         conditioningArtifacts.first(where: { $0.manifest.backend == backend })
     }
+
+    func qwenConditioningArtifact(
+        for backend: SpeakSwiftly.SpeechBackend,
+        modelRepo: String,
+    ) -> StoredQwenConditioningArtifact? {
+        conditioningArtifacts.first {
+            $0.manifest.backend == backend && $0.manifest.modelRepo == modelRepo
+        }
+    }
 }

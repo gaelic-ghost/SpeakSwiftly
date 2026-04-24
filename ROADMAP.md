@@ -157,6 +157,7 @@ Tickets:
 - [x] Add a first-class chunked live-generation path for non-streaming backends, so `SpeakSwiftly` can segment text up front, synthesize chunk waveforms sequentially, and feed completed audio chunks into playback without waiting for full-request synthesis to finish.
 - [ ] Evaluate whether the current resident backend defaults are still the right MLX choices on current Apple Silicon, and record the latency, memory, and audible tradeoffs explicitly.
 - [ ] Generalize stored Qwen materializations so profiles can load backend-appropriate conditioning material without assuming one hard-coded shape forever.
+- [ ] Evaluate `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-6bit` after the 1.7B 8-bit resident path has enough local latency, memory, and audible-quality evidence.
 - [ ] Make clone auto-transcription available to every cloning-capable backend instead of treating transcript inference as a Qwen-only implementation detail.
 - [ ] Re-run resident playback, profile-generation, and typed-library integration checks against a candidate upgrade in an isolated branch.
 - [ ] Record any concrete reasons to upgrade, defer, or stay pinned, including behavior changes that affect playback stability or generation length.

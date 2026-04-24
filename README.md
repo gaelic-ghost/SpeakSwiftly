@@ -161,14 +161,15 @@ import SpeakSwiftly
 
 let configuration = SpeakSwiftly.Configuration(
     speechBackend: .qwen3,
-    qwenConditioningStrategy: .preparedConditioning
+    qwenConditioningStrategy: .preparedConditioning,
+    qwenResidentModel: .base17B8Bit
 )
 try configuration.save(to: URL(fileURLWithPath: "/tmp/speakswiftly-configuration.json"))
 
 let runtime = await SpeakSwiftly.liftoff(configuration: configuration)
 ```
 
-For Qwen generation, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile. The default configuration now uses `.preparedConditioning`, legacy serialized `qwen3_custom_voice` backend values are normalized onto `qwen3` during load, and resident Qwen generation now leaves language selection to the upstream model's auto-detection instead of hardcoding a spoken language override. Qwen live playback uses single-pass generation by default. Callers that want SpeakSwiftly to bound long Qwen live requests before model generation can opt in per request with `qwenPreModelTextChunking: true`; the matching JSONL key is `qwen_pre_model_text_chunking`. Generated audio files still keep the original single-pass Qwen rendering path.
+For Qwen generation, `qwenConditioningStrategy` controls whether the runtime keeps using raw `refAudio` and `refText` on each request or persists reusable prepared conditioning on the voice profile. The default configuration now uses `.preparedConditioning`, legacy serialized `qwen3_custom_voice` backend values are normalized onto `qwen3` during load, and resident Qwen generation now leaves language selection to the upstream model's auto-detection instead of hardcoding a spoken language override. `qwenResidentModel` selects the resident Qwen base model; `.base06B8Bit` remains the default, and `.base17B8Bit` selects `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit`. When prepared conditioning is enabled, voice-profile creation prepares conditioning for the selected Qwen model, and later generation lazily prepares and stores any missing conditioning artifact for the active Qwen model before synthesis. Qwen live playback uses single-pass generation by default. Callers that want SpeakSwiftly to bound long Qwen live requests before model generation can opt in per request with `qwenPreModelTextChunking: true`; the matching JSONL key is `qwen_pre_model_text_chunking`. Generated audio files still keep the original single-pass Qwen rendering path.
 
 `chatterbox_turbo` uses the resident 8-bit Chatterbox Turbo model, is currently English-only, and reuses the stored profile reference audio when one is available. When no profile-specific clone audio is needed, the resident model falls back to Chatterbox Turbo's built-in default conditioning. For live playback, SpeakSwiftly now segments normalized text into speakable chunks up front and synthesizes those chunks sequentially, so Chatterbox can start feeding completed audio into playback without waiting for one full-request waveform.
 

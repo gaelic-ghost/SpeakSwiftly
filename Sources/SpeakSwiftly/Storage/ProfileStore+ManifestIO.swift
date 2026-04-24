@@ -161,11 +161,21 @@ extension ProfileStore {
 
         return QwenConditioningArtifactManifest(
             backend: .qwen3,
-            modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+            modelRepo: normalizedQwenConditioningModelRepo(manifest.modelRepo),
             createdAt: manifest.createdAt,
             artifactVersion: manifest.artifactVersion,
             artifactFile: manifest.artifactFile,
         )
+    }
+
+    func normalizedQwenConditioningModelRepo(_ modelRepo: String) -> String {
+        switch modelRepo {
+            case ModelFactory.qwen06B8BitResidentModelRepo,
+                 ModelFactory.qwen17B8BitResidentModelRepo:
+                modelRepo
+            default:
+                ModelFactory.qwenResidentModelRepo
+        }
     }
 
     func inferredLegacyVibe(

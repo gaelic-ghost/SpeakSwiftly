@@ -142,7 +142,12 @@ extension SpeakSwiftly.Runtime {
         profile: StoredProfile,
         model: AnySpeechModel,
     ) async throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
-        if let storedArtifact = profile.qwenConditioningArtifact(for: speechBackend) {
+        let activeModelRepo = ModelFactory.residentModelRepo(
+            for: speechBackend,
+            qwenResidentModel: qwenResidentModel,
+        )
+
+        if let storedArtifact = profile.qwenConditioningArtifact(for: speechBackend, modelRepo: activeModelRepo) {
             let cacheKey = qwenConditioningCacheKey(
                 for: profile.manifest.profileName,
                 artifact: storedArtifact,
@@ -228,13 +233,13 @@ extension SpeakSwiftly.Runtime {
         let updatedProfile = try profileStore.storeQwenConditioningArtifact(
             named: profile.manifest.profileName,
             backend: speechBackend,
-            modelRepo: ModelFactory.residentModelRepo(for: speechBackend),
+            modelRepo: activeModelRepo,
             conditioning: preparedConditioning,
         )
-        guard let storedArtifact = updatedProfile.qwenConditioningArtifact(for: speechBackend) else {
+        guard let storedArtifact = updatedProfile.qwenConditioningArtifact(for: speechBackend, modelRepo: activeModelRepo) else {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profile.manifest.profileName)' was updated after Qwen conditioning preparation, but SpeakSwiftly could not find the stored conditioning artifact for the '\(speechBackend.rawValue)' backend. This indicates a profile-store bug.",
+                message: "Profile '\(profile.manifest.profileName)' was updated after Qwen conditioning preparation, but SpeakSwiftly could not find the stored conditioning artifact for the '\(speechBackend.rawValue)' backend and '\(activeModelRepo)' model. This indicates a profile-store bug.",
             )
         }
 

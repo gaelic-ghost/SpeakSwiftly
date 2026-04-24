@@ -371,6 +371,7 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let qwenResidentModel: SpeakSwiftly.QwenResidentModel
         let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
@@ -400,6 +401,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
@@ -410,6 +412,7 @@ public extension SpeakSwiftly {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
