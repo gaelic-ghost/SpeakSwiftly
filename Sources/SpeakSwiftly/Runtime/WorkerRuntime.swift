@@ -292,6 +292,7 @@ public extension SpeakSwiftly {
                 case sourceFormat = "source_format"
                 case requestID = "request_id"
                 case speechBackend = "speech_backend"
+                case qwenPreModelTextChunking = "qwen_pre_model_text_chunking"
                 case vibe
                 case voiceDescription = "voice_description"
                 case outputPath = "output_path"
@@ -322,6 +323,7 @@ public extension SpeakSwiftly {
             let sourceFormat: TextForSpeech.SourceFormat?
             let requestID: String?
             let speechBackend: SpeakSwiftly.SpeechBackend?
+            let qwenPreModelTextChunking: Bool?
             let vibe: SpeakSwiftly.Vibe?
             let voiceDescription: String?
             let outputPath: String?
@@ -353,6 +355,7 @@ public extension SpeakSwiftly {
                 try container.encodeIfPresent(sourceFormat, forKey: .sourceFormat)
                 try container.encodeIfPresent(requestID, forKey: .requestID)
                 try container.encodeIfPresent(speechBackend, forKey: .speechBackend)
+                try container.encodeIfPresent(qwenPreModelTextChunking, forKey: .qwenPreModelTextChunking)
                 try container.encodeIfPresent(vibe, forKey: .vibe)
                 try container.encodeIfPresent(voiceDescription, forKey: .voiceDescription)
                 try container.encodeIfPresent(outputPath, forKey: .outputPath)
@@ -368,6 +371,7 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        let qwenResidentModel: SpeakSwiftly.QwenResidentModel
         let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
@@ -377,7 +381,7 @@ public extension SpeakSwiftly {
         let playbackController: PlaybackController
         let generationController = SpeechGenerationController()
         let logTimestampFormatter = ISO8601DateFormatter()
-        let maxAcceptedSpeechJobs = 8
+        let maxAcceptedSpeechJobs = 24
 
         var residentState: ResidentState = .warming
         var isShuttingDown = false
@@ -397,6 +401,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
@@ -407,6 +412,7 @@ public extension SpeakSwiftly {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore

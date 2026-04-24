@@ -13,6 +13,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 @Test func `resident backend repos include chatterbox turbo 8bit`() {
     #expect(ModelFactory.residentModelRepo(for: .qwen3) == ModelFactory.qwenResidentModelRepo)
+    #expect(
+        ModelFactory.residentModelRepo(
+            for: .qwen3,
+            qwenResidentModel: .base17B8Bit,
+        ) == ModelFactory.qwen17B8BitResidentModelRepo,
+    )
     #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
 }
@@ -1071,7 +1077,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     })
 
     let storedAfterFirstRun = try store.loadProfile(named: "default-femme")
-    #expect(storedAfterFirstRun.qwenConditioningArtifact(for: .qwen3) != nil)
+    #expect(
+        storedAfterFirstRun.qwenConditioningArtifact(
+            for: .qwen3,
+            modelRepo: ModelFactory.qwenResidentModelRepo,
+        ) != nil,
+    )
     #expect(firstRecorder.prepareConditioningCallCount == 1)
     #expect(firstRecorder.conditionedGenerationCallCount == 1)
     #expect(firstRecorder.audioLoadCallCount == 1)
@@ -1109,6 +1120,205 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(secondRecorder.prepareConditioningCallCount == 0)
     #expect(secondRecorder.conditionedGenerationCallCount == 1)
     #expect(secondRecorder.audioLoadCallCount == 0)
+}
+
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `prepared qwen conditioning is lazy per resident model repo`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+    _ = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3,
+        modelRepo: ModelFactory.qwenResidentModelRepo,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+            speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+            referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
+            referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
+            resolvedLanguage: "English",
+            codecLanguageID: 7,
+        ),
+    )
+
+    let recorder = ResidentModelRecorder()
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        qwenResidentModel: .base17B8Bit,
+        audioLoadRecorder: recorder,
+        loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: recorder)
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-17b","op":"generate_speech","text":"Hello on the larger model","profile_name":"default-femme"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-17b"
+                && $0["ok"] as? Bool == true
+        }
+    })
+    #expect(await waitUntil {
+        recorder.conditionedGenerationCallCount == 1
+    })
+
+    let storedAfterGeneration = try store.loadProfile(named: "default-femme")
+    #expect(storedAfterGeneration.manifest.qwenConditioningArtifacts.count == 2)
+    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo) != nil)
+    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(recorder.prepareConditioningCallCount == 1)
+    #expect(recorder.audioLoadCallCount == 1)
+}
+
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `create profile prepares qwen conditioning for selected resident model`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let recorder = ResidentModelRecorder()
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        qwenResidentModel: .base17B8Bit,
+        audioLoadRecorder: recorder,
+        loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: recorder)
+        },
+        profileModelLoader: {
+            makeProfileModel()
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-create","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello there","vibe":"femme","voice_description":"Warm and bright"}"#,
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-create"
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let storedProfile = try store.loadProfile(named: "bright-guide")
+    #expect(storedProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(recorder.prepareConditioningCallCount == 1)
+    #expect(recorder.audioLoadCallCount == 1)
+}
+
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `reroll profile prepares qwen conditioning for selected resident model`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "bright-guide",
+        vibe: .femme,
+        modelRepo: ModelFactory.profileModelRepo,
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+    _ = try store.storeQwenConditioningArtifact(
+        named: "bright-guide",
+        backend: .qwen3,
+        modelRepo: ModelFactory.qwenResidentModelRepo,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+            speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+            referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
+            referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
+            resolvedLanguage: "English",
+            codecLanguageID: 7,
+        ),
+    )
+
+    let recorder = ResidentModelRecorder()
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        qwenResidentModel: .base17B8Bit,
+        audioLoadRecorder: recorder,
+        loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
+        residentModelLoader: { _ in
+            makeResidentModel(recorder: recorder)
+        },
+        profileModelLoader: {
+            makeProfileModel()
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let rerollID = await runtime.voices.reroll("bright-guide").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == rerollID
+                && $0["ok"] as? Bool == true
+        }
+    })
+
+    let rerolledProfile = try store.loadProfile(named: "bright-guide")
+    #expect(rerolledProfile.manifest.qwenConditioningArtifacts.count == 1)
+    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo) == nil)
+    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(recorder.prepareConditioningCallCount == 1)
+    #expect(recorder.audioLoadCallCount == 1)
 }
 
 @Test(
@@ -1475,7 +1685,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(residentRecorder.lastRefText == nil)
 }
 
-@Test func `qwen generated audio files stay single pass while live playback chunks paragraphs`() async throws {
+@Test func `qwen pre-model text chunking is opt in for live playback`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -1542,8 +1752,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count })
-    #expect(residentRecorder.recordedTexts == expectedLiveChunkTexts)
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 1 })
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("fifth paragraph"))
 
     await runtime.accept(
         line: """
@@ -1557,9 +1768,25 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count + 1 })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
     #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
     #expect(try #require(residentRecorder.recordedTexts.last).contains("fifth paragraph"))
+
+    await runtime.accept(
+        line: """
+        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text","qwen_pre_model_text_chunking":true}
+        """,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-qwen-live-chunked"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 + expectedLiveChunkTexts.count })
+    #expect(Array(residentRecorder.recordedTexts.suffix(expectedLiveChunkTexts.count)) == expectedLiveChunkTexts)
 }
 
 // MARK: - Sample Shaping

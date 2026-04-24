@@ -277,6 +277,28 @@ import TextForSpeech
     #expect(resolved == .marvis)
 }
 
+@Test func `resolved qwen resident model prefers explicit configuration over environment`() {
+    let resolved = WorkerRuntime.resolvedQwenResidentModel(
+        environment: [
+            SpeakSwiftly.QwenResidentModel.environmentVariable: SpeakSwiftly.QwenResidentModel.base17B8Bit.rawValue,
+        ],
+        configuration: SpeakSwiftly.Configuration(qwenResidentModel: .base06B8Bit),
+    )
+
+    #expect(resolved == .base06B8Bit)
+}
+
+@Test func `resolved qwen resident model falls back to environment`() {
+    let resolved = WorkerRuntime.resolvedQwenResidentModel(
+        environment: [
+            SpeakSwiftly.QwenResidentModel.environmentVariable: SpeakSwiftly.QwenResidentModel.base17B8Bit.rawValue,
+        ],
+        configuration: nil,
+    )
+
+    #expect(resolved == .base17B8Bit)
+}
+
 @Test func `resident model preload failure fails queued requests`() async throws {
     let output = OutputRecorder()
     let preloadGate = AsyncGate()

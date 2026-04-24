@@ -90,6 +90,10 @@ struct QwenE2ETests {
                 vibe: .masc,
                 voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+                $0["event"] as? String == "qwen_reference_conditioning_persisted"
+                    && $0["request_id"] as? String == "req-create-prepared-conditioning-profile"
+            } != nil)
             try await E2EHarness.runSilentSpeech(
                 on: worker,
                 id: "req-live-prepared-conditioning-first-pass",
@@ -97,7 +101,7 @@ struct QwenE2ETests {
                 profileName: profileName,
             )
             #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
-                $0["event"] as? String == "qwen_reference_conditioning_persisted"
+                $0["event"] as? String == "qwen_reference_conditioning_loaded"
                     && $0["request_id"] as? String == "req-live-prepared-conditioning-first-pass"
             } != nil)
             try worker.closeInput()
@@ -132,12 +136,12 @@ struct QwenE2ETests {
         }
     }
 
-    @Test func `clone with provided transcript`() async throws {
+    @Test func `clone with provided and inferred transcripts`() async throws {
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
         let fixtureProfileName = "clone-source-profile"
         let cloneProfileName = "provided-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/provided-clone-reference.wav")
+        let inferredCloneProfileName = "inferred-transcript-clone-profile"
 
         do {
             let worker = try WorkerProcess(
@@ -147,15 +151,8 @@ struct QwenE2ETests {
             defer { Task { await worker.stop() } }
 
             try await E2EHarness.awaitWorkerReady(worker)
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-clone-fixture",
-                profileName: fixtureProfileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: .masc,
-                voiceDescription: E2EHarness.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL,
-            )
+            try sandbox.seedProfileFixture(.mascDesign, as: fixtureProfileName)
+            let referenceAudioURL = sandbox.referenceAudioURL(for: fixtureProfileName)
             #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
 
             try await E2EHarness.createCloneProfile(
@@ -175,11 +172,38 @@ struct QwenE2ETests {
             #expect(storedProfile.manifest.transcriptProvenance?.source == .provided)
             #expect(storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
 
+            try await E2EHarness.createCloneProfile(
+                on: worker,
+                id: "req-create-clone-inferred-transcript",
+                profileName: inferredCloneProfileName,
+                referenceAudioURL: referenceAudioURL,
+                vibe: .masc,
+                transcript: nil,
+                expectTranscription: true,
+            )
+
+            let inferredProfile = try store.loadProfile(named: inferredCloneProfileName)
+            let inferredTranscript = inferredProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+            #expect(inferredProfile.manifest.vibe == .masc)
+            #expect(inferredProfile.manifest.transcriptProvenance?.source == .inferred)
+            #expect(
+                inferredProfile.manifest.transcriptProvenance?.transcriptionModelRepo
+                    == ModelFactory.cloneTranscriptionModelRepo,
+            )
+            #expect(!inferredTranscript.isEmpty)
+            #expect(E2EHarness.transcriptLooksCloseToCloneSource(inferredTranscript))
+
             try await E2EHarness.runSilentSpeech(
                 on: worker,
                 id: "req-live-clone-provided-transcript-silent",
                 text: E2EHarness.testingPlaybackText,
                 profileName: cloneProfileName,
+            )
+            try await E2EHarness.runSilentSpeech(
+                on: worker,
+                id: "req-live-clone-inferred-transcript-silent",
+                text: E2EHarness.testingPlaybackText,
+                profileName: inferredCloneProfileName,
             )
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
@@ -200,83 +224,11 @@ struct QwenE2ETests {
                 text: E2EHarness.testingPlaybackText,
                 profileName: cloneProfileName,
             )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-    }
-
-    @Test func `clone with inferred transcript`() async throws {
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-        let fixtureProfileName = "inferred-clone-source-profile"
-        let cloneProfileName = "inferred-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/inferred-clone-reference.wav")
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: true,
-            )
-            defer { Task { await worker.stop() } }
-
-            try await E2EHarness.awaitWorkerReady(worker)
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-inferred-clone-fixture",
-                profileName: fixtureProfileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: .masc,
-                voiceDescription: E2EHarness.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL,
-            )
-            #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
-
-            try await E2EHarness.createCloneProfile(
-                on: worker,
-                id: "req-create-clone-inferred-transcript",
-                profileName: cloneProfileName,
-                referenceAudioURL: referenceAudioURL,
-                vibe: .masc,
-                transcript: nil,
-                expectTranscription: true,
-            )
-
-            let store = ProfileStore(rootURL: sandbox.profileRootURL)
-            let storedProfile = try store.loadProfile(named: cloneProfileName)
-            let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-            #expect(storedProfile.manifest.vibe == .masc)
-            #expect(storedProfile.manifest.transcriptProvenance?.source == .inferred)
-            #expect(
-                storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo
-                    == ModelFactory.cloneTranscriptionModelRepo,
-            )
-            #expect(!inferredTranscript.isEmpty)
-            #expect(E2EHarness.transcriptLooksCloseToCloneSource(inferredTranscript))
-
-            try await E2EHarness.runSilentSpeech(
-                on: worker,
-                id: "req-live-clone-inferred-transcript-silent",
-                text: E2EHarness.testingPlaybackText,
-                profileName: cloneProfileName,
-            )
-            try worker.closeInput()
-            try await worker.waitForExit(timeout: .seconds(30))
-        }
-
-        do {
-            let worker = try WorkerProcess(
-                profileRootURL: sandbox.profileRootURL,
-                silentPlayback: false,
-                playbackTrace: speakSwiftlyPlaybackTraceE2ETestsEnabled(),
-            )
-            defer { Task { await worker.stop() } }
-
-            try await E2EHarness.awaitWorkerReady(worker)
             try await E2EHarness.runAudibleSpeech(
                 on: worker,
                 id: "req-live-clone-inferred-transcript-audible",
                 text: E2EHarness.testingPlaybackText,
-                profileName: cloneProfileName,
+                profileName: inferredCloneProfileName,
             )
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))

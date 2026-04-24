@@ -17,6 +17,7 @@ import TextForSpeech
             jobType: .live,
             inputTextContext: nil,
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -35,6 +36,7 @@ import TextForSpeech
             jobType: .file,
             inputTextContext: nil,
             requestContext: nil,
+            qwenPreModelTextChunking: nil,
         ),
     )
 }
@@ -89,6 +91,7 @@ import TextForSpeech
                 sourceFormat: nil,
             ),
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -113,6 +116,7 @@ import TextForSpeech
                 sourceFormat: nil,
             ),
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -131,6 +135,7 @@ import TextForSpeech
             jobType: .live,
             inputTextContext: .init(sourceFormat: .swift),
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -153,6 +158,26 @@ import TextForSpeech
                 app: "SpeakSwiftlyOperator",
                 project: "SpeakSwiftly",
             ),
+            qwenPreModelTextChunking: false,
+        ),
+    )
+}
+
+@Test func `decodes qwen pre-model text chunking opt in`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-qwen-chunking","op":"generate_speech","text":"Hello","profile_name":"default-femme","qwen_pre_model_text_chunking":true}"#,
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-qwen-chunking",
+            text: "Hello",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .live,
+            inputTextContext: nil,
+            requestContext: nil,
+            qwenPreModelTextChunking: true,
         ),
     )
 }
@@ -171,6 +196,7 @@ import TextForSpeech
             jobType: .live,
             inputTextContext: .init(sourceFormat: .swift),
             requestContext: nil,
+            qwenPreModelTextChunking: false,
         ),
     )
 }

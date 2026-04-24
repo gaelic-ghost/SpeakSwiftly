@@ -30,7 +30,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
-            exact: "69.2.1",
+            exact: "0.79.0",
         ),
         .package(
             url: "https://github.com/ml-explore/mlx-swift.git",
@@ -64,6 +64,7 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources/default.metallib"),
+                .copy("Resources/E2EProfiles"),
             ],
         ),
         .target(

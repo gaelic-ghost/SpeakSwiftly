@@ -163,9 +163,9 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 ## Runtime Configuration
 
-`SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend`, the Qwen conditioning strategy, and an optional startup `textNormalizer`.
+`SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend`, the Qwen conditioning strategy, the resident Qwen model selection, and an optional startup `textNormalizer`.
 
-The current prepared-conditioning integration depends on `mlx-audio-swift` `69.2.1`, the latest tagged release on the `gaelic-ghost/mlx-audio-swift` fork's `main` branch. Keep this dependency version-based so downstream Xcode package consumers do not inherit a branch dependency.
+The current prepared-conditioning integration depends on `mlx-audio-swift` `0.79.0`, the latest validated tagged release on the `gaelic-ghost/mlx-audio-swift` fork's `main` branch. Keep this dependency version-based so downstream Xcode package consumers do not inherit a branch dependency.
 
 Default persisted configuration path:
 
@@ -185,9 +185,21 @@ Backend resolution precedence is:
 
 Legacy serialized or environment `qwen3_custom_voice` backend values are still accepted and normalized onto `.qwen3` so existing runtime config and stored profile manifests keep loading cleanly after the backend collapse.
 
+Qwen resident model resolution uses the same startup shape:
+
+1. explicit `configuration.qwenResidentModel` passed to `SpeakSwiftly.liftoff(...)`
+2. persisted `configuration.json`
+3. `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL`
+4. fallback `.base06B8Bit`
+
+Current Qwen resident model values are:
+
+- `.base06B8Bit`: default, `mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit`
+- `.base17B8Bit`: larger 8-bit base model, `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit`
+
 `chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact, and relies on runtime-owned text chunking for live playback because upstream Chatterbox synthesis is still one waveform per chunk rather than truly incremental.
 
-The current Chatterbox end-to-end workflow coverage lives in `ChatterboxE2ETests`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
+The current Chatterbox end-to-end workflow coverage lives in `ChatterboxE2ETests`, with design-profile, provided-transcript clone, and inferred-transcript clone checks. The two clone cases share one generated reference fixture and one backend worker pass so the suite still covers both clone paths without paying for duplicate setup. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
 Qwen conditioning strategy values are:
 
@@ -195,6 +207,8 @@ Qwen conditioning strategy values are:
 - `.preparedConditioning`: prepare Qwen reference conditioning once, persist it on the profile, cache it in memory after load, and reuse it on later requests
 
 The default runtime configuration now uses `.preparedConditioning`.
+
+Prepared Qwen conditioning is stored per resident model repo. New profiles prepare conditioning for the selected Qwen resident model when the runtime is using `.preparedConditioning`, and generation lazily prepares and persists any missing conditioning artifact for the active Qwen model before synthesis. That lets one profile accumulate both 0.6B and 1.7B Qwen conditioning over time without overwriting the older artifact.
 
 The runtime currently reads `qwenConditioningStrategy` only from the explicit or persisted `SpeakSwiftly.Configuration` surface. There is no separate environment-variable override for that setting.
 
@@ -242,6 +256,7 @@ Representative request shapes:
 {"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","voice_profile":"default-femme","text_profile":"logs","input_text_context":{"context":{"cwd":"./","repo_root":"./","text_format":"cli_output"}}}
 {"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","voice_profile":"default-femme","input_text_context":{"context":{"text_format":"markdown","nested_source_format":"swift_source"}}}
 {"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","voice_profile":"default-femme","input_text_context":{"source_format":"swift_source"}}
+{"id":"req-1e-qwen-chunked","op":"generate_speech","text":"First paragraph.\n\nSecond paragraph.","voice_profile":"default-femme","qwen_pre_model_text_chunking":true}
 {"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback.","voice_profile":"default-femme"}
 {"id":"req-1g","op":"generate_batch","voice_profile":"default-femme","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile":"logs","request_context":{"source":"batch_export","topic":"follow-up"}}]}
 {"id":"req-1h","op":"get_generated_file","artifact_id":"req-1f-artifact-1"}
@@ -303,13 +318,13 @@ When JSONL naming changes, update this file and `README.md` in the same pass so 
 
 Current live-playback behavior:
 
-- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, but now bounds live long-form requests by synthesizing two blank-line-separated paragraphs at a time, with a smaller sentence-group fallback only when one paired chunk is still too large. `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
+- `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, prepares missing per-model conditioning lazily when `.preparedConditioning` is active, and keeps Qwen live playback single-pass by default. A request can opt into SpeakSwiftly's pre-model Qwen text chunking with `qwen_pre_model_text_chunking: true`, which bounds long live requests by paragraph-group chunks before each model call. `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
 - The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_active_text_profile_style`, inspect the available choices with `list_text_profile_styles`, and update it with `set_active_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
-- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback. The Qwen bounded paragraph chunking applies only to live playback; generated audio files stay on the single-pass Qwen rendering path.
+- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback. The Qwen pre-model text chunking flag applies only to live playback; generated audio files stay on the single-pass Qwen rendering path.
 - Marvis defaults to `dual_resident_serialized`, which keeps both `conversational_a` and `conversational_b` resident while still allowing only one active Marvis generation at a time. Configuration can also switch to `single_resident_dynamic` if one reusable resident model is preferred over two always-warm voices.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.masc` -> `conversational_b`.
-- Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. For live playback, the runtime keeps long Qwen requests bounded by paragraph-paired chunk planning before each generation call. Marvis now requests the upstream-aligned `0.5` streaming cadence, Chatterbox live synthesis also uses `0.5`, and the ordinary non-Qwen resident baseline stays `0.5`.
+- Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. For live playback, Qwen request text is handed to the model in one pass unless the caller opts into pre-model text chunking for that request. Marvis now requests the upstream-aligned `0.5` streaming cadence, Chatterbox live synthesis also uses `0.5`, and the ordinary non-Qwen resident baseline stays `0.5`.
 - Playback uses adaptive duration-based startup and low-water thresholds rather than a fixed one-chunk gate.
 
 Current generated-file behavior:
@@ -538,10 +553,10 @@ swift build
 swift test
 ```
 
-The current `mlx-audio-swift` `69.2.1` fork release restores the ordinary
-SwiftPM lane for this repository, including the worker-backed `QuickE2ETests`
-path. Treat plain `swift build` and `swift test` as the default verification
-story again.
+The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary
+SwiftPM lane for this repository, including the worker-backed generated-file
+smoke path. Treat plain `swift build` and `swift test` as the default
+verification story again.
 
 For MLX-backed package tests, the plain `swift test` lane now works because the
 `SpeakSwiftlyTests` target carries a bundled `default.metallib` resource and
@@ -579,12 +594,27 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
-`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `QuickE2ETests`, `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`.
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 
 ```bash
 sh scripts/repo-maintenance/run-e2e.sh --suite quick
+```
+
+Bundled e2e profile fixtures live under
+`Tests/SpeakSwiftlyTests/Resources/E2EProfiles`. They are immutable test
+profile-store directories copied into each `E2ESandbox` before worker startup,
+so repeated generation, artifact, routing, and playback suites can skip
+real-model profile generation while keeping per-test profile-store isolation.
+Refresh them only through the explicit maintainer command below because it runs
+real models and mutates repository resources; do not make fixture refresh an
+ordinary `swift build` side effect. Keep the Qwen workflow suite creating
+profiles from scratch so the `create_voice_profile_from_description` and
+`create_voice_profile_from_audio` worker paths remain covered.
+
+```bash
+sh scripts/repo-maintenance/refresh-e2e-profile-fixtures.sh
 ```
 
 One-shot qwen resident `generate_speech` verification:

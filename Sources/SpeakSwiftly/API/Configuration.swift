@@ -9,6 +9,12 @@ public extension SpeakSwiftly {
         case preparedConditioning = "prepared_conditioning"
     }
 
+    /// Selects the resident Qwen model loaded for Qwen-backed speech generation.
+    enum QwenResidentModel: String, Codable, Sendable, Equatable, CaseIterable {
+        case base06B8Bit = "base_0_6b_8bit"
+        case base17B8Bit = "base_1_7b_8bit"
+    }
+
     /// Selects how resident Marvis model instances are kept warm.
     enum MarvisResidentPolicy: String, Codable, Sendable, Equatable, CaseIterable {
         /// Keep both conversational resident model objects warm, but serialize
@@ -48,6 +54,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case speechBackend
             case qwenConditioningStrategy
+            case qwenResidentModel
             case marvisResidentPolicy
         }
 
@@ -55,6 +62,8 @@ public extension SpeakSwiftly {
         public let speechBackend: SpeakSwiftly.SpeechBackend
         /// The Qwen conditioning strategy to use for Qwen-backed generation.
         public let qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
+        /// The resident Qwen model to load for Qwen-backed generation.
+        public let qwenResidentModel: SpeakSwiftly.QwenResidentModel
         /// The resident Marvis loading policy to use for Marvis-backed generation.
         public let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         /// An optional text normalizer to reuse instead of creating the default one.
@@ -64,11 +73,13 @@ public extension SpeakSwiftly {
         public init(
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
+            qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
+            self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
             self.textNormalizer = textNormalizer
         }
@@ -80,6 +91,10 @@ public extension SpeakSwiftly {
                 SpeakSwiftly.QwenConditioningStrategy.self,
                 forKey: .qwenConditioningStrategy,
             ) ?? .preparedConditioning
+            qwenResidentModel = try container.decodeIfPresent(
+                SpeakSwiftly.QwenResidentModel.self,
+                forKey: .qwenResidentModel,
+            ) ?? .base06B8Bit
             marvisResidentPolicy = try container.decodeIfPresent(
                 SpeakSwiftly.MarvisResidentPolicy.self,
                 forKey: .marvisResidentPolicy,
@@ -153,6 +168,7 @@ public extension SpeakSwiftly {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(speechBackend, forKey: .speechBackend)
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
+            try container.encode(qwenResidentModel, forKey: .qwenResidentModel)
             try container.encode(marvisResidentPolicy, forKey: .marvisResidentPolicy)
         }
 

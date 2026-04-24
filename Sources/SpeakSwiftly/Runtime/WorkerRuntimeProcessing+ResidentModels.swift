@@ -6,7 +6,9 @@ import TextForSpeech
 extension SpeakSwiftly.Runtime {
     func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
         switch speechBackend {
-            case .qwen3, .chatterboxTurbo:
+            case .qwen3:
+                [ModelFactory.residentModelRepo(for: speechBackend, qwenResidentModel: qwenResidentModel)]
+            case .chatterboxTurbo:
                 [ModelFactory.residentModelRepo(for: speechBackend)]
             case .marvis:
                 [ModelFactory.marvisResidentModelRepo]
@@ -197,6 +199,7 @@ extension SpeakSwiftly.Runtime {
             jobType: _,
             inputTextContext: _,
             requestContext: _,
+            qwenPreModelTextChunking: _,
         ):
                 profileName
             case .queueBatch(id: _, profileName: let profileName, items: _):

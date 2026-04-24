@@ -121,6 +121,7 @@ struct RawWorkerRequest: Decodable {
         case referenceAudioPath = "reference_audio_path"
         case transcript
         case speechBackend = "speech_backend"
+        case qwenPreModelTextChunking = "qwen_pre_model_text_chunking"
     }
 
     private struct LegacyReplacementPayload: Decodable {
@@ -288,6 +289,7 @@ struct RawWorkerRequest: Decodable {
     let referenceAudioPath: String?
     let transcript: String?
     let speechBackend: SpeakSwiftly.SpeechBackend?
+    let qwenPreModelTextChunking: Bool?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -327,6 +329,7 @@ struct RawWorkerRequest: Decodable {
         referenceAudioPath = try container.decodeIfPresent(String.self, forKey: .referenceAudioPath)
         transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
         speechBackend = try container.decodeIfPresent(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
+        qwenPreModelTextChunking = try container.decodeIfPresent(Bool.self, forKey: .qwenPreModelTextChunking)
 
         let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
         let explicitNestedSourceFormat = try Self.decodeSourceFormat(

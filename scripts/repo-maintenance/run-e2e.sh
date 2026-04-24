@@ -46,7 +46,7 @@ Usage:
   run-e2e.sh --suite <name>
 
 Suite names:
-  quick | QuickE2ETests
+  quick | GeneratedFileE2ETests
   generated-file | GeneratedFileE2ETests
   generated-batch | GeneratedBatchE2ETests
   chatterbox | ChatterboxE2ETests
@@ -77,7 +77,7 @@ done
 
 resolve_suite_name() {
   case "$1" in
-    quick|QuickE2ETests) printf '%s\n' "QuickE2ETests" ;;
+    quick|QuickE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-file|GeneratedFileE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-batch|GeneratedBatchE2ETests) printf '%s\n' "GeneratedBatchE2ETests" ;;
     chatterbox|ChatterboxE2ETests) printf '%s\n' "ChatterboxE2ETests" ;;
@@ -98,7 +98,7 @@ suite_name=$(resolve_suite_name "$suite_arg") \
   || die "Unsupported E2E suite '$suite_arg'. Use --help to see the supported top-level suite names."
 
 case "$suite_name" in
-  QuickE2ETests|GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
+  GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
     ;;
   *)
     die "Refusing to run '$suite_name' because only one top-level E2E suite may run per invocation."

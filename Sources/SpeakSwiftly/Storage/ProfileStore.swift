@@ -143,8 +143,19 @@ struct ProfileStore: @unchecked Sendable {
 
     private static func qwenConditioningArtifactFileName(
         for backend: SpeakSwiftly.SpeechBackend,
+        modelRepo: String,
     ) -> String {
-        "qwen-conditioning-\(backend.rawValue).json"
+        if backend == .qwen3, modelRepo == ModelFactory.qwenResidentModelRepo {
+            return "qwen-conditioning-\(backend.rawValue).json"
+        }
+
+        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let safeModelRepo = modelRepo.unicodeScalars
+            .map { scalar in
+                allowedCharacters.contains(scalar) ? String(scalar) : "_"
+            }
+            .joined()
+        return "qwen-conditioning-\(backend.rawValue)-\(safeModelRepo).json"
     }
 
     func ensureRootExists() throws {
@@ -603,7 +614,7 @@ struct ProfileStore: @unchecked Sendable {
         createdAt: Date = Date(),
     ) throws -> StoredProfile {
         let storedProfile = try loadProfile(named: profileName)
-        let artifactFile = Self.qwenConditioningArtifactFileName(for: backend)
+        let artifactFile = Self.qwenConditioningArtifactFileName(for: backend, modelRepo: modelRepo)
         let persistedArtifact = PersistedQwenConditioningArtifact(conditioning: conditioning)
         let updatedArtifactManifest = QwenConditioningArtifactManifest(
             backend: backend,
@@ -613,9 +624,17 @@ struct ProfileStore: @unchecked Sendable {
             artifactFile: artifactFile,
         )
         let updatedArtifacts = (
-            storedProfile.manifest.qwenConditioningArtifacts.filter { $0.backend != backend } + [updatedArtifactManifest],
+            storedProfile.manifest.qwenConditioningArtifacts.filter {
+                $0.backend != backend || $0.modelRepo != modelRepo
+            } + [updatedArtifactManifest],
         )
-        .sorted { $0.backend.rawValue < $1.backend.rawValue }
+        .sorted {
+            if $0.backend.rawValue == $1.backend.rawValue {
+                return $0.modelRepo < $1.modelRepo
+            }
+
+            return $0.backend.rawValue < $1.backend.rawValue
+        }
         let updatedManifest = ProfileManifest(
             version: Self.manifestVersion,
             profileName: storedProfile.manifest.profileName,

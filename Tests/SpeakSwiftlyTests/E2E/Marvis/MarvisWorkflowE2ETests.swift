@@ -19,17 +19,6 @@ enum MarvisRouteCase: String, CaseIterable {
         }
     }
 
-    var createRequestID: String {
-        switch self {
-            case .femme:
-                "req-create-marvis-femme"
-            case .mascClone:
-                "req-create-marvis-clone"
-            case .femmeAlternate:
-                "req-create-marvis-femme-alt"
-        }
-    }
-
     var liveRequestID: String {
         switch self {
             case .femme:
@@ -52,14 +41,12 @@ enum MarvisRouteCase: String, CaseIterable {
         }
     }
 
-    var voiceDescription: String {
+    var fixture: E2EProfileFixture {
         switch self {
-            case .femme:
-                "A warm, bright, feminine narrator voice."
+            case .femme, .femmeAlternate:
+                .femmeDesign
             case .mascClone:
-                E2EHarness.testingProfileVoiceDescription
-            case .femmeAlternate:
-                "A polished, airy, feminine speaking voice."
+                .mascCloneProvided
         }
     }
 
@@ -71,44 +58,36 @@ enum MarvisRouteCase: String, CaseIterable {
                 "conversational_a"
         }
     }
-
-    var usesCloneFixture: Bool {
-        self == .mascClone
-    }
 }
 
 private struct MarvisProfileLane {
-    let createID: String
     let liveID: String
     let profileName: String
     let vibe: SpeakSwiftly.Vibe
-    let voiceDescription: String
     let expectedVoice: String
+    let fixture: E2EProfileFixture
 
     static let all: [Self] = [
         Self(
-            createID: "req-create-marvis-triplet-femme",
             liveID: "req-live-marvis-triplet-femme",
             profileName: "marvis-triplet-femme-profile",
             vibe: .femme,
-            voiceDescription: "A warm, bright, feminine narrator voice.",
             expectedVoice: "conversational_a",
+            fixture: .femmeDesign,
         ),
         Self(
-            createID: "req-create-marvis-triplet-masc",
             liveID: "req-live-marvis-triplet-masc",
             profileName: "marvis-triplet-masc-profile",
             vibe: .masc,
-            voiceDescription: "A grounded, rich, masculine speaking voice.",
             expectedVoice: "conversational_b",
+            fixture: .mascDesign,
         ),
         Self(
-            createID: "req-create-marvis-triplet-femme-alt",
             liveID: "req-live-marvis-triplet-femme-alt",
             profileName: "marvis-triplet-femme-alt-profile",
             vibe: .femme,
-            voiceDescription: "A polished, airy, feminine speaking voice.",
             expectedVoice: "conversational_a",
+            fixture: .femmeDesign,
         ),
     ]
 }
@@ -135,40 +114,7 @@ struct MarvisE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-
-        if testCase.usesCloneFixture {
-            let fixtureProfileName = "marvis-clone-source"
-            let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/marvis-clone-reference.wav")
-
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-marvis-clone-fixture",
-                profileName: fixtureProfileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: .masc,
-                voiceDescription: E2EHarness.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL,
-            )
-
-            try await E2EHarness.createCloneProfile(
-                on: worker,
-                id: testCase.createRequestID,
-                profileName: testCase.profileName,
-                referenceAudioURL: referenceAudioURL,
-                vibe: testCase.vibe,
-                transcript: E2EHarness.testingCloneSourceText,
-                expectTranscription: false,
-            )
-        } else {
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: testCase.createRequestID,
-                profileName: testCase.profileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: testCase.vibe,
-                voiceDescription: testCase.voiceDescription,
-            )
-        }
+        try sandbox.seedProfileFixture(testCase.fixture, as: testCase.profileName)
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
         let storedProfile = try store.loadProfile(named: testCase.profileName)
@@ -220,14 +166,7 @@ struct MarvisE2ETests {
         try await E2EHarness.awaitWorkerReady(worker)
 
         for lane in MarvisProfileLane.all {
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: lane.createID,
-                profileName: lane.profileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: lane.vibe,
-                voiceDescription: lane.voiceDescription,
-            )
+            try sandbox.seedProfileFixture(lane.fixture, as: lane.profileName)
         }
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
@@ -261,20 +200,18 @@ struct MarvisE2ETests {
 
         let lanes = [
             MarvisProfileLane(
-                createID: "req-create-marvis-queued-femme",
                 liveID: "req-live-marvis-queued-femme",
                 profileName: "marvis-queued-femme-profile",
                 vibe: .femme,
-                voiceDescription: "A warm, bright, feminine narrator voice.",
                 expectedVoice: "conversational_a",
+                fixture: .femmeDesign,
             ),
             MarvisProfileLane(
-                createID: "req-create-marvis-queued-masc",
                 liveID: "req-live-marvis-queued-masc",
                 profileName: "marvis-queued-masc-profile",
                 vibe: .masc,
-                voiceDescription: "A grounded, rich, masculine speaking voice.",
                 expectedVoice: "conversational_b",
+                fixture: .mascDesign,
             ),
         ]
 
@@ -289,14 +226,7 @@ struct MarvisE2ETests {
         try await E2EHarness.awaitWorkerReady(worker)
 
         for lane in lanes {
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: lane.createID,
-                profileName: lane.profileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: lane.vibe,
-                voiceDescription: lane.voiceDescription,
-            )
+            try sandbox.seedProfileFixture(lane.fixture, as: lane.profileName)
         }
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)

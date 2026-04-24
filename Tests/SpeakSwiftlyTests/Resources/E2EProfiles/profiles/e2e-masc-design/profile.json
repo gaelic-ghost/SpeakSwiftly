@@ -1,0 +1,30 @@
+{
+  "backendMaterializations" : [
+    {
+      "backend" : "qwen3",
+      "createdAt" : "2026-04-24T18:49:13Z",
+      "modelRepo" : "mlx-community\/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+      "referenceAudioFile" : "reference.wav",
+      "referenceText" : "This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.",
+      "sampleRate" : 24000
+    }
+  ],
+  "createdAt" : "2026-04-24T18:49:13Z",
+  "modelRepo" : "mlx-community\/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+  "profileName" : "e2e-masc-design",
+  "qwenConditioningArtifacts" : [
+    {
+      "artifactFile" : "qwen-conditioning-qwen3.json",
+      "artifactVersion" : 1,
+      "backend" : "qwen3",
+      "createdAt" : "2026-04-24T18:49:14Z",
+      "modelRepo" : "mlx-community\/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    }
+  ],
+  "sampleRate" : 24000,
+  "sourceKind" : "generated",
+  "sourceText" : "This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.",
+  "version" : 5,
+  "vibe" : "masc",
+  "voiceDescription" : "A generic, warm, masculine, slow speaking voice."
+}

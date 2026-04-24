@@ -112,6 +112,7 @@ extension SpeakSwiftly.Runtime {
             jobType: .file,
             inputTextContext: let inputTextContext,
             requestContext: let requestContext,
+            qwenPreModelTextChunking: _,
         ):
                 try generationJobStore.createFileJob(
                     jobID: id,
@@ -151,6 +152,7 @@ extension SpeakSwiftly.Runtime {
             jobType: .file,
             inputTextContext: _,
             requestContext: _,
+            qwenPreModelTextChunking: _,
         ),
         .queueBatch(id: let id, profileName: _, items: _):
                 _ = try generationJobStore.markRunning(
@@ -176,6 +178,7 @@ extension SpeakSwiftly.Runtime {
             jobType: .file,
             inputTextContext: _,
             requestContext: _,
+            qwenPreModelTextChunking: _,
         ),
         .queueBatch(id: let id, profileName: _, items: _):
                 _ = try? generationJobStore.markFailed(
@@ -190,7 +193,7 @@ extension SpeakSwiftly.Runtime {
 
     func makeSpeechJobState(for request: WorkerRequest) async -> LiveSpeechRequestState {
         let text = switch request {
-            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _):
+            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _):
                 text
             default:
                 ""
@@ -224,7 +227,7 @@ extension SpeakSwiftly.Runtime {
             textProfileStyle: textProfileStyle,
         )
         let normalizedLiveChunks: [LiveSpeechTextChunk]?
-        if speechBackend == .qwen3 {
+        if speechBackend == .qwen3, request.qwenPreModelTextChunking == true {
             let plannedChunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
                 strategy: .smartParagraphGroups(),
@@ -286,7 +289,7 @@ extension SpeakSwiftly.Runtime {
 
     func fileArtifactID(for request: WorkerRequest) -> String {
         switch request {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, inputTextContext: _, requestContext: _):
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _):
                 "\(id)-artifact-1"
             default:
                 request.id
@@ -386,6 +389,7 @@ extension SpeakSwiftly.Runtime {
                     jobType: .file,
                     inputTextContext: _,
                     requestContext: _,
+                    qwenPreModelTextChunking: _,
                 ):
                         if payload.generationJob != nil {
                             return

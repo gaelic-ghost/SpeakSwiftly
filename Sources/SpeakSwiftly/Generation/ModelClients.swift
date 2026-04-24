@@ -69,7 +69,9 @@ enum GenerationPolicy {
 }
 
 enum ModelFactory {
-    static let qwenResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let qwen06B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let qwen17B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
+    static let qwenResidentModelRepo = qwen06B8BitResidentModelRepo
     static let chatterboxResidentModelRepo = "mlx-community/chatterbox-turbo-8bit"
     static let legacyQwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
     static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
@@ -82,11 +84,12 @@ enum ModelFactory {
 
     static func loadResidentModels(
         for backend: SpeakSwiftly.SpeechBackend,
+        qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy,
     ) async throws -> ResidentSpeechModels {
         switch backend {
             case .qwen3:
-                return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
+                return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend, qwenResidentModel: qwenResidentModel)))
             case .chatterboxTurbo:
                 return try await .chatterboxTurbo(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .marvis:
@@ -112,6 +115,18 @@ enum ModelFactory {
 
     static func residentModelRepo(for backend: SpeakSwiftly.SpeechBackend) -> String {
         backend.residentModelRepo
+    }
+
+    static func residentModelRepo(
+        for backend: SpeakSwiftly.SpeechBackend,
+        qwenResidentModel: SpeakSwiftly.QwenResidentModel,
+    ) -> String {
+        switch backend {
+            case .qwen3:
+                qwenResidentModel.modelRepo
+            case .chatterboxTurbo, .marvis:
+                residentModelRepo(for: backend)
+        }
     }
 
     static func loadProfileModel() async throws -> AnySpeechModel {

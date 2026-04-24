@@ -58,7 +58,7 @@ extension SpeakSwiftly.Runtime {
                 await self.processGeneration(job.request, token: job.token)
             }
             activeGenerations[job.token] = ActiveRequest(token: job.token, request: job.request, task: task)
-            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _) = job.request {
+            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _) = job.request {
                 await playbackController.setGenerationTask(task, for: id)
             }
             await logMarvisGenerationLaneReservedIfNeeded(
@@ -186,6 +186,7 @@ extension SpeakSwiftly.Runtime {
             jobType: .live,
             inputTextContext: _,
             requestContext: _,
+            qwenPreModelTextChunking: _,
         ) = request {
             return true
         }
@@ -197,7 +198,7 @@ extension SpeakSwiftly.Runtime {
         activeJobs: [SpeechGenerationController.Job],
         queuedJobs: [SpeechGenerationController.Job],
     ) -> Bool {
-        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _) = job.request else {
+        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _) = job.request else {
             return false
         }
 

@@ -275,6 +275,7 @@ extension SpeakSwiftly.Runtime {
         replacementID: String? = nil,
         requestID: String? = nil,
         speechBackend: SpeakSwiftly.SpeechBackend? = nil,
+        qwenPreModelTextChunking: Bool? = nil,
         vibe: SpeakSwiftly.Vibe? = nil,
         voiceDescription: String? = nil,
         outputPath: String? = nil,
@@ -306,6 +307,7 @@ extension SpeakSwiftly.Runtime {
             sourceFormat: inputTextContext?.sourceFormat,
             requestID: requestID,
             speechBackend: speechBackend,
+            qwenPreModelTextChunking: qwenPreModelTextChunking,
             vibe: vibe,
             voiceDescription: voiceDescription,
             outputPath: outputPath,
@@ -330,7 +332,7 @@ extension SpeakSwiftly.Runtime {
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-            case let .queueSpeech(id, text, profileName, textProfileID, _, inputTextContext, requestContext):
+            case let .queueSpeech(id, text, profileName, textProfileID, _, inputTextContext, requestContext, qwenPreModelTextChunking):
                 await submitRequest(
                     id: id,
                     op: request.opName,
@@ -339,6 +341,7 @@ extension SpeakSwiftly.Runtime {
                     textProfile: textProfileID,
                     inputTextContext: inputTextContext,
                     requestContext: requestContext,
+                    qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
             case let .queueBatch(id, profileName, items):
                 await submitRequest(

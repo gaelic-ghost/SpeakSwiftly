@@ -39,6 +39,7 @@ import Darwin
     )
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.textNormalizer == nil)
 }
@@ -48,6 +49,7 @@ import Darwin
 
     #expect(configuration.speechBackend == .qwen3)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
 }
 
@@ -56,6 +58,7 @@ import Darwin
 
     #expect(configuration.speechBackend == .chatterboxTurbo)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
+    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
 }
 
@@ -68,6 +71,7 @@ import Darwin
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         qwenConditioningStrategy: .preparedConditioning,
+        qwenResidentModel: .base17B8Bit,
         marvisResidentPolicy: .singleResidentDynamic,
     )
 
@@ -76,6 +80,7 @@ import Darwin
 
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
+    #expect(loaded.qwenResidentModel == configuration.qwenResidentModel)
     #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
     #expect(loaded.textNormalizer == nil)
 }
@@ -110,6 +115,7 @@ import Darwin
 
     #expect(loaded.speechBackend == .qwen3)
     #expect(loaded.qwenConditioningStrategy == .legacyRaw)
+    #expect(loaded.qwenResidentModel == .base06B8Bit)
     #expect(loaded.marvisResidentPolicy == .dualResidentSerialized)
 }
 
@@ -124,6 +130,7 @@ import Darwin
 
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .legacyRaw)
+    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .singleResidentDynamic)
     #expect(configuration.textNormalizer != nil)
 }

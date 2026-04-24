@@ -483,7 +483,7 @@ import Testing
         createdAt: Date(timeIntervalSince1970: 1_712_800_000),
     )
 
-    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3))
+    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo))
     #expect(stored.manifest.qwenConditioningArtifacts.count == 1)
     #expect(fileManager.fileExists(atPath: artifact.artifactURL.path))
 
@@ -496,6 +496,65 @@ import Testing
     #expect(reloadedConditioning.referenceTextTokenIDs.asArray(Int32.self) == [101, 102, 103])
     #expect(reloadedConditioning.referenceTextTokenIDs.shape == [1, 3])
     #expect(reloadedConditioning.speakerEmbedding?.asArray(Float.self) == [0.25, 0.5])
+}
+
+@Test(
+    .enabled(
+        if: mlxConditioningPersistenceTestsEnabled(),
+        "This persistence round-trip test is opt-in and requires SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1.",
+    ),
+) func `stores prepared qwen conditioning per model repo`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Hello there",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+    )
+
+    let defaultConditioning = Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+        speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+        referenceSpeechCodes: MLXArray([Int32(10), 11]).reshaped([1, 1, 2]),
+        referenceTextTokenIDs: MLXArray([Int32(101), 102]).reshaped([1, 2]),
+        resolvedLanguage: "English",
+        codecLanguageID: 7,
+    )
+    let largerConditioning = Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+        speakerEmbedding: MLXArray([Float(0.75), 1.0]).reshaped([1, 2]),
+        referenceSpeechCodes: MLXArray([Int32(20), 21]).reshaped([1, 1, 2]),
+        referenceTextTokenIDs: MLXArray([Int32(201), 202]).reshaped([1, 2]),
+        resolvedLanguage: "English",
+        codecLanguageID: 7,
+    )
+
+    _ = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3,
+        modelRepo: ModelFactory.qwenResidentModelRepo,
+        conditioning: defaultConditioning,
+    )
+    let stored = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3,
+        modelRepo: ModelFactory.qwen17B8BitResidentModelRepo,
+        conditioning: largerConditioning,
+    )
+
+    let defaultArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo))
+    let largerArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo))
+
+    #expect(stored.manifest.qwenConditioningArtifacts.count == 2)
+    #expect(defaultArtifact.manifest.artifactFile == "qwen-conditioning-qwen3.json")
+    #expect(largerArtifact.manifest.artifactFile.contains("Qwen3-TTS-12Hz-1_7B-Base-8bit"))
+    #expect(fileManager.fileExists(atPath: defaultArtifact.artifactURL.path))
+    #expect(fileManager.fileExists(atPath: largerArtifact.artifactURL.path))
 }
 
 @Test func `loads and normalizes legacy custom voice qwen artifact metadata`() throws {

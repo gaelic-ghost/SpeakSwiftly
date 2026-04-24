@@ -87,7 +87,7 @@ extension SpeakSwiftly.Runtime {
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
         let profileStore = profileStore
-        let storedProfile = try await runBlockingFilesystemOperation {
+        var storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,
                 vibe: vibe,
@@ -110,6 +110,11 @@ extension SpeakSwiftly.Runtime {
             ],
         )
         try Task.checkCancellation()
+        storedProfile = try await prepareInitialQwenConditioningIfNeeded(
+            requestID: id,
+            op: op,
+            profile: storedProfile,
+        )
 
         if let outputPath {
             try Task.checkCancellation()
@@ -122,8 +127,9 @@ extension SpeakSwiftly.Runtime {
                 fieldName: "output_path",
                 purpose: "profile export audio",
             )
+            let profileForExport = storedProfile
             try await runBlockingFilesystemOperation {
-                try profileStore.exportCanonicalAudio(for: storedProfile, to: resolvedOutputURL)
+                try profileStore.exportCanonicalAudio(for: profileForExport, to: resolvedOutputURL)
             }
             try Task.checkCancellation()
             await logRequestEvent(
@@ -217,7 +223,7 @@ extension SpeakSwiftly.Runtime {
 
         let profileWriteStartedAt = dependencies.now()
         let profileStore = profileStore
-        let storedProfile = try await runBlockingFilesystemOperation {
+        var storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,
                 vibe: vibe,
@@ -241,8 +247,52 @@ extension SpeakSwiftly.Runtime {
             ],
         )
         try Task.checkCancellation()
+        storedProfile = try await prepareInitialQwenConditioningIfNeeded(
+            requestID: id,
+            op: op,
+            profile: storedProfile,
+        )
 
         return storedProfile
+    }
+
+    func prepareInitialQwenConditioningIfNeeded(
+        requestID id: String,
+        op: String,
+        profile: StoredProfile,
+    ) async throws -> StoredProfile {
+        guard speechBackend == .qwen3, qwenConditioningStrategy == .preparedConditioning else {
+            return profile
+        }
+
+        if case .warming = residentState {
+            await preloadTask?.value
+        }
+
+        let model = try residentQwenModelOrThrow()
+        _ = try await loadPreparedQwenConditioning(
+            requestID: id,
+            op: op,
+            profile: profile,
+            model: model,
+        )
+        try Task.checkCancellation()
+
+        let updatedProfile = try profileStore.loadProfile(named: profile.manifest.profileName)
+        await logRequestEvent(
+            "qwen_initial_conditioning_ready",
+            requestID: id,
+            op: op,
+            profileName: profile.manifest.profileName,
+            details: [
+                "speech_backend": .string(speechBackend.rawValue),
+                "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
+                "model_repo": .string(ModelFactory.residentModelRepo(for: speechBackend, qwenResidentModel: qwenResidentModel)),
+                "qwen_conditioning_artifact_count": .int(updatedProfile.manifest.qwenConditioningArtifacts.count),
+            ],
+        )
+
+        return updatedProfile
     }
 
     func handleRerollProfile(

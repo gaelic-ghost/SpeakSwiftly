@@ -577,6 +577,13 @@ enum E2EHarness {
     }
 }
 
+enum E2EProfileFixture: String, CaseIterable {
+    case mascDesign = "e2e-masc-design"
+    case femmeDesign = "e2e-femme-design"
+    case mascCloneProvided = "e2e-masc-clone-provided"
+    case mascCloneInferred = "e2e-masc-clone-inferred"
+}
+
 struct E2ESandbox {
     let rootURL: URL
     let profileRootURL: URL
@@ -591,6 +598,86 @@ struct E2ESandbox {
 
     func cleanup() {
         try? FileManager.default.removeItem(at: rootURL)
+    }
+
+    @discardableResult
+    func seedProfileFixture(
+        _ fixture: E2EProfileFixture,
+        as profileName: String? = nil,
+    ) throws -> String {
+        let targetProfileName = profileName ?? fixture.rawValue
+        let sourceURL = try fixtureProfileURL(fixture)
+        let destinationURL = profileRootURL.appendingPathComponent(targetProfileName, isDirectory: true)
+        let fileManager = FileManager.default
+
+        guard !fileManager.fileExists(atPath: destinationURL.path) else {
+            throw WorkerProcessError(
+                "The E2E profile fixture '\(targetProfileName)' could not be seeded because '\(destinationURL.path)' already exists in this sandbox.",
+            )
+        }
+
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        try rewriteProfileFixtureManifest(at: destinationURL, profileName: targetProfileName)
+
+        return targetProfileName
+    }
+
+    func referenceAudioURL(for profileName: String) -> URL {
+        profileRootURL
+            .appendingPathComponent(profileName, isDirectory: true)
+            .appendingPathComponent(ProfileStore.audioFileName, isDirectory: false)
+    }
+
+    private func fixtureProfileURL(_ fixture: E2EProfileFixture) throws -> URL {
+        guard let resourceURL = Bundle.module.resourceURL else {
+            throw WorkerProcessError(
+                "The SpeakSwiftly E2E test bundle does not expose a resource root, so profile fixture '\(fixture.rawValue)' cannot be loaded.",
+            )
+        }
+
+        let fixtureURL = resourceURL
+            .appendingPathComponent("E2EProfiles", isDirectory: true)
+            .appendingPathComponent("profiles", isDirectory: true)
+            .appendingPathComponent(fixture.rawValue, isDirectory: true)
+
+        guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
+            throw WorkerProcessError(
+                "The SpeakSwiftly E2E profile fixture '\(fixture.rawValue)' was not found at '\(fixtureURL.path)'. Run `sh scripts/repo-maintenance/refresh-e2e-profile-fixtures.sh` to regenerate bundled fixtures.",
+            )
+        }
+
+        return fixtureURL
+    }
+
+    private func rewriteProfileFixtureManifest(
+        at profileDirectoryURL: URL,
+        profileName: String,
+    ) throws {
+        let manifestURL = profileDirectoryURL.appendingPathComponent(ProfileStore.manifestFileName, isDirectory: false)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        let data = try Data(contentsOf: manifestURL)
+        let manifest = try decoder.decode(ProfileManifest.self, from: data)
+        let renamedManifest = ProfileManifest(
+            version: manifest.version,
+            profileName: profileName,
+            vibe: manifest.vibe,
+            createdAt: manifest.createdAt,
+            sourceKind: manifest.sourceKind,
+            modelRepo: manifest.modelRepo,
+            voiceDescription: manifest.voiceDescription,
+            sourceText: manifest.sourceText,
+            transcriptProvenance: manifest.transcriptProvenance,
+            sampleRate: manifest.sampleRate,
+            backendMaterializations: manifest.backendMaterializations,
+            qwenConditioningArtifacts: manifest.qwenConditioningArtifacts,
+        )
+
+        try encoder.encode(renamedManifest).write(to: manifestURL, options: .atomic)
     }
 }
 
