@@ -1,8 +1,8 @@
 import SpeakSwiftlyTestingSupport
 import Testing
 
-@Test func `volume analysis slices samples into fixed duration windows`() {
-    let analysis = analyzeVolume(
+@Test func `volume analysis slices samples into fixed duration windows`() throws {
+    let analysis = try analyzeVolume(
         samples: [1, -1, 1, -1, 2, -2, 3, -3, 4],
         sampleRate: 4,
         windowSeconds: 0.5,
@@ -19,7 +19,7 @@ import Testing
 }
 
 @Test func `volume summary reports averaged head tail and last windows`() throws {
-    let analysis = analyzeVolume(
+    let analysis = try analyzeVolume(
         samples: [
             1, 1,
             2, 2,
@@ -50,8 +50,8 @@ import Testing
     #expect(summary.buckets[3].averageRMS == 7.5)
 }
 
-@Test func `volume analysis can trim to a matched sample count`() {
-    let analysis = analyzeVolume(
+@Test func `volume analysis can trim to a matched sample count`() throws {
+    let analysis = try analyzeVolume(
         samples: [1, 1, 2, 2, 10, 10],
         sampleRate: 2,
         windowSeconds: 1,
@@ -63,4 +63,16 @@ import Testing
     #expect(analysis.durationSeconds == 3)
     #expect(analysis.summary?.durationSeconds == 2)
     #expect(analysis.windows.map(\.rms) == [1, 2])
+}
+
+@Test func `volume analysis rejects invalid input before slicing`() {
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because sampleRate must be greater than zero.")) {
+        try analyzeVolume(samples: [1], sampleRate: 0, windowSeconds: 1)
+    }
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because windowSeconds must be greater than zero.")) {
+        try analyzeVolume(samples: [1], sampleRate: 1, windowSeconds: 0)
+    }
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because maxSampleCount must be zero or greater.")) {
+        try analyzeVolume(samples: [1], sampleRate: 1, windowSeconds: 1, maxSampleCount: -1)
+    }
 }

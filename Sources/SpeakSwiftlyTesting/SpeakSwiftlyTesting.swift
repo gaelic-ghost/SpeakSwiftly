@@ -693,7 +693,7 @@ struct SpeakSwiftlyTestingMain {
             sampleRate: qwenModel.sampleRate,
             name: "qwen-direct-volume-probe.wav",
         )
-        let analysis = analyzeVolume(
+        let analysis = try analyzeVolume(
             samples: directSamples,
             sampleRate: qwenModel.sampleRate,
             windowSeconds: windowSeconds,

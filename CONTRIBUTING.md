@@ -37,6 +37,27 @@ Treat SwiftFormat as the primary style tool in this repository. Keep SwiftLint f
 
 The repository-managed `pre-commit` hook is now the intended local enforcement path. Run `sh scripts/repo-maintenance/install-hooks.sh` after cloning, and Git will use `scripts/repo-maintenance/hooks/pre-commit` for this clone. That hook applies `swiftformat`, restages tracked changes, and then runs the same validation entry point as release preflight and CI.
 
+## Test Harness Probes
+
+The `SpeakSwiftlyTesting` executable is a package-local smoke and investigation
+harness. Keep it small, explicit, and honest about what each command measures.
+
+The volume commands have separate jobs:
+
+- `volume-probe` profiles one retained generated file and writes a versioned
+  JSON artifact under `.local/volume-probes/`.
+- `compare-volume` compares retained streamed output against direct Qwen decode
+  only after it proves the analyzed spans are compatible.
+- `compare-volume --matched-duration trim-to-shorter` is the explicit mode for
+  trimming both outputs to the shorter sample count before comparing them.
+
+Do not use `compare-volume` output for streamed-vs-direct conclusions unless the
+artifact proves matched spans or explicitly records the trim mode. Keep
+generated-code capture and replay investigations separate from waveform volume
+probing; they answer different questions. The detailed volume measurement
+contract lives in
+[docs/maintainers/volume-probe-instrument-contract-2026-04-24.md](docs/maintainers/volume-probe-instrument-contract-2026-04-24.md).
+
 ## Runtime Shape
 
 The current intended runtime shape is:

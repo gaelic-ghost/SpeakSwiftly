@@ -54,10 +54,13 @@ public struct ParsedFloatWAV: Equatable {
 }
 
 public enum VolumeProbeAnalysisError: LocalizedError, Equatable {
+    case invalidAnalysisInput(String)
     case invalidWAV(String)
 
     public var errorDescription: String? {
         switch self {
+            case let .invalidAnalysisInput(message):
+                message
             case let .invalidWAV(message):
                 message
         }
@@ -69,7 +72,18 @@ public func analyzeVolume(
     sampleRate: Int,
     windowSeconds: Double,
     maxSampleCount: Int? = nil,
-) -> ProbeAnalysis {
+) throws -> ProbeAnalysis {
+    guard sampleRate > 0 else {
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because sampleRate must be greater than zero.")
+    }
+    guard windowSeconds > 0 else {
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because windowSeconds must be greater than zero.")
+    }
+
+    if let maxSampleCount, maxSampleCount < 0 {
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because maxSampleCount must be zero or greater.")
+    }
+
     let analyzedSampleCount = min(maxSampleCount ?? samples.count, samples.count)
     let analyzedSamples = Array(samples.prefix(analyzedSampleCount))
     let durationSeconds = Double(analyzedSampleCount) / Double(sampleRate)
@@ -123,7 +137,7 @@ public func analyzeVolume(
 ) throws -> ProbeAnalysis {
     let data = try Data(contentsOf: URL(fileURLWithPath: path))
     let wav = try parseFloatWAV(data)
-    return analyzeVolume(
+    return try analyzeVolume(
         samples: wav.samples,
         sampleRate: wav.sampleRate,
         windowSeconds: windowSeconds,

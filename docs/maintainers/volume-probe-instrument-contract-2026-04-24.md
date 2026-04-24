@@ -21,6 +21,11 @@ explicit `--matched-duration trim-to-shorter` mode trims both outputs to the
 shorter sample count and records both the full analyses and the compared
 analyses in the JSON artifact.
 
+The analysis support code rejects invalid measurement inputs before it slices
+audio. `sampleRate`, `windowSeconds`, and any requested trim count must describe
+a real nonnegative span; otherwise the tool should fail with a descriptive
+operator-facing error instead of writing an artifact with meaningless numbers.
+
 Generated-code capture, replay, and code-stream comparison remain separate from
 volume probing. Those tools answer whether Qwen generated different acoustic
 codes or decode inputs before waveform-level loudness analysis begins.
@@ -31,6 +36,8 @@ codes or decode inputs before waveform-level loudness analysis begins.
   comparison trimming.
 - `analyzed_sample_count`: the number of mono samples actually included in the
   reported windows and summary.
+- `analyzed_sample_start`: the start of the analyzed span. It is currently `0`
+  because trimming keeps the prefix of each output.
 - `duration_seconds`: the full WAV sample count divided by the sample rate.
 - `window`: a fixed sample-count slice, calculated as
   `sampleRate * windowSeconds`, rounded to the nearest integer. The final window
@@ -69,6 +76,7 @@ refresh a `*-latest.json` pointer.
 - the same command context fields
 - `matchedDurationMode`
 - `comparisonSampleCount`
+- full and compared sample metadata for both sides
 - streamed and direct generated file paths
 - full streamed and direct analyses
 - compared streamed and direct analyses
