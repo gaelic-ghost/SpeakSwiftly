@@ -50,11 +50,12 @@ struct ChatterboxE2ETests {
         try await worker.waitForExit(timeout: .seconds(30))
     }
 
-    @Test func `clone with provided transcript`() async throws {
+    @Test func `clone with provided and inferred transcripts`() async throws {
         let sandbox = try E2ESandbox()
         defer { sandbox.cleanup() }
         let fixtureProfileName = "chatterbox-clone-source-profile"
         let cloneProfileName = "chatterbox-provided-transcript-clone-profile"
+        let inferredCloneProfileName = "chatterbox-inferred-transcript-clone-profile"
         let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/chatterbox-provided-clone-reference.wav")
 
         let worker = try WorkerProcess(
@@ -93,59 +94,22 @@ struct ChatterboxE2ETests {
         #expect(storedProfile.manifest.transcriptProvenance?.source == .provided)
         #expect(storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
 
-        try await E2EHarness.runLiveSpeechForCurrentE2EMode(
-            on: worker,
-            id: "req-live-chatterbox-clone-provided-transcript",
-            text: E2EHarness.testingPlaybackText,
-            profileName: cloneProfileName,
-        )
-        try worker.closeInput()
-        try await worker.waitForExit(timeout: .seconds(30))
-    }
-
-    @Test func `clone with inferred transcript`() async throws {
-        let sandbox = try E2ESandbox()
-        defer { sandbox.cleanup() }
-        let fixtureProfileName = "chatterbox-inferred-clone-source-profile"
-        let cloneProfileName = "chatterbox-inferred-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/chatterbox-inferred-clone-reference.wav")
-
-        let worker = try WorkerProcess(
-            profileRootURL: sandbox.profileRootURL,
-            silentPlayback: true,
-            speechBackend: .chatterboxTurbo,
-        )
-        defer { Task { await worker.stop() } }
-
-        try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-chatterbox-inferred-clone-fixture",
-            profileName: fixtureProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-            outputURL: referenceAudioURL,
-        )
-        #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
-
         try await E2EHarness.createCloneProfile(
             on: worker,
             id: "req-create-chatterbox-clone-inferred-transcript",
-            profileName: cloneProfileName,
+            profileName: inferredCloneProfileName,
             referenceAudioURL: referenceAudioURL,
             vibe: .masc,
             transcript: nil,
             expectTranscription: true,
         )
 
-        let store = ProfileStore(rootURL: sandbox.profileRootURL)
-        let storedProfile = try store.loadProfile(named: cloneProfileName)
-        let inferredTranscript = storedProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        #expect(storedProfile.manifest.vibe == .masc)
-        #expect(storedProfile.manifest.transcriptProvenance?.source == .inferred)
+        let inferredProfile = try store.loadProfile(named: inferredCloneProfileName)
+        let inferredTranscript = inferredProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(inferredProfile.manifest.vibe == .masc)
+        #expect(inferredProfile.manifest.transcriptProvenance?.source == .inferred)
         #expect(
-            storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo
+            inferredProfile.manifest.transcriptProvenance?.transcriptionModelRepo
                 == ModelFactory.cloneTranscriptionModelRepo,
         )
         #expect(!inferredTranscript.isEmpty)
@@ -153,9 +117,15 @@ struct ChatterboxE2ETests {
 
         try await E2EHarness.runLiveSpeechForCurrentE2EMode(
             on: worker,
-            id: "req-live-chatterbox-clone-inferred-transcript",
+            id: "req-live-chatterbox-clone-provided-transcript",
             text: E2EHarness.testingPlaybackText,
             profileName: cloneProfileName,
+        )
+        try await E2EHarness.runLiveSpeechForCurrentE2EMode(
+            on: worker,
+            id: "req-live-chatterbox-clone-inferred-transcript",
+            text: E2EHarness.testingPlaybackText,
+            profileName: inferredCloneProfileName,
         )
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))

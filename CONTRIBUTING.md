@@ -199,7 +199,7 @@ Current Qwen resident model values are:
 
 `chatterbox_turbo` is the current resident Chatterbox backend surface. It points at the 8-bit Chatterbox Turbo model, stays English-only for now, uses stored profile reference audio directly instead of creating a separate backend-native persisted conditioning artifact, and relies on runtime-owned text chunking for live playback because upstream Chatterbox synthesis is still one waveform per chunk rather than truly incremental.
 
-The current Chatterbox end-to-end workflow coverage lives in `ChatterboxE2ETests`, with sequential design-profile, provided-transcript clone, and inferred-transcript clone checks. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
+The current Chatterbox end-to-end workflow coverage lives in `ChatterboxE2ETests`, with design-profile, provided-transcript clone, and inferred-transcript clone checks. The two clone cases share one generated reference fixture and one backend worker pass so the suite still covers both clone paths without paying for duplicate setup. By default those live checks stay silent so the release lane remains safe to run on Gale's machine, and the same suite automatically switches to audible playback when `SPEAKSWIFTLY_AUDIBLE_E2E=1` is set.
 
 Qwen conditioning strategy values are:
 
@@ -554,9 +554,9 @@ swift test
 ```
 
 The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary
-SwiftPM lane for this repository, including the worker-backed `QuickE2ETests`
-path. Treat plain `swift build` and `swift test` as the default verification
-story again.
+SwiftPM lane for this repository, including the worker-backed generated-file
+smoke path. Treat plain `swift build` and `swift test` as the default
+verification story again.
 
 For MLX-backed package tests, the plain `swift test` lane now works because the
 `SpeakSwiftlyTests` target carries a bundled `default.metallib` resource and
@@ -594,13 +594,24 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
-`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `QuickE2ETests`, `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`.
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers the worker-boot, design-profile, generated-file, artifact-read, and artifact-list smoke path without running a second duplicate worker pass.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 
 ```bash
 sh scripts/repo-maintenance/run-e2e.sh --suite quick
 ```
+
+Future e2e profile fixture direction: prefer bundled, immutable test profile
+fixtures over a shared mutable profile root for the full e2e lane. The profile
+store shape is directory-copy friendly, so a fixture set can live under the
+test target resources and be copied into each `E2ESandbox` before worker
+startup. That keeps every test isolated while skipping repeated real-model
+profile generation. Do not make profile fixture generation an ordinary
+`swift build` side effect; refresh fixtures through an explicit maintainer
+command because it runs real models and mutates repository resources. Keep at
+least one narrow e2e suite creating a profile from scratch so the
+`create_voice_profile_from_description` worker path remains covered.
 
 One-shot qwen resident `generate_speech` verification:
 

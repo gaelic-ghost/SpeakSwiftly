@@ -26,7 +26,6 @@ Usage:
   run-e2e-full.sh [--audible] [--playback-trace]
 
 Runs the default release-safe top-level E2E suite list sequentially:
-  QuickE2ETests
   GeneratedFileE2ETests
   GeneratedBatchE2ETests
   ChatterboxE2ETests
@@ -58,7 +57,6 @@ run_suite() {
   sh "$SELF_DIR/run-e2e.sh" --suite "$suite_name" $suite_args
 }
 
-run_suite QuickE2ETests
 run_suite GeneratedFileE2ETests
 run_suite GeneratedBatchE2ETests
 run_suite ChatterboxE2ETests
