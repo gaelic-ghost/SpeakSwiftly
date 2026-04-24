@@ -29,14 +29,7 @@ struct QwenLongFormE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-qwen-longform-profile",
-            profileName: profileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: profileName)
         try await E2EHarness.runLiveSpeechForCurrentE2EMode(
             on: worker,
             id: "req-qwen-longform-live",

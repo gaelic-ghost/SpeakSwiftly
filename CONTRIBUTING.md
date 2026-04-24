@@ -594,7 +594,7 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
-`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers the worker-boot, design-profile, generated-file, artifact-read, and artifact-list smoke path without running a second duplicate worker pass.
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 
@@ -602,16 +602,20 @@ For a deliberately small worker-backed smoke lane after narrow changes, run the 
 sh scripts/repo-maintenance/run-e2e.sh --suite quick
 ```
 
-Future e2e profile fixture direction: prefer bundled, immutable test profile
-fixtures over a shared mutable profile root for the full e2e lane. The profile
-store shape is directory-copy friendly, so a fixture set can live under the
-test target resources and be copied into each `E2ESandbox` before worker
-startup. That keeps every test isolated while skipping repeated real-model
-profile generation. Do not make profile fixture generation an ordinary
-`swift build` side effect; refresh fixtures through an explicit maintainer
-command because it runs real models and mutates repository resources. Keep at
-least one narrow e2e suite creating a profile from scratch so the
-`create_voice_profile_from_description` worker path remains covered.
+Bundled e2e profile fixtures live under
+`Tests/SpeakSwiftlyTests/Resources/E2EProfiles`. They are immutable test
+profile-store directories copied into each `E2ESandbox` before worker startup,
+so repeated generation, artifact, routing, and playback suites can skip
+real-model profile generation while keeping per-test profile-store isolation.
+Refresh them only through the explicit maintainer command below because it runs
+real models and mutates repository resources; do not make fixture refresh an
+ordinary `swift build` side effect. Keep the Qwen workflow suite creating
+profiles from scratch so the `create_voice_profile_from_description` and
+`create_voice_profile_from_audio` worker paths remain covered.
+
+```bash
+sh scripts/repo-maintenance/refresh-e2e-profile-fixtures.sh
+```
 
 One-shot qwen resident `generate_speech` verification:
 

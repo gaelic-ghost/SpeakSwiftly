@@ -64,6 +64,7 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources/default.metallib"),
+                .copy("Resources/E2EProfiles"),
             ],
         ),
         .target(

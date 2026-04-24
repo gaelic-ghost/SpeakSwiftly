@@ -138,7 +138,6 @@ struct QwenE2ETests {
         let fixtureProfileName = "clone-source-profile"
         let cloneProfileName = "provided-transcript-clone-profile"
         let inferredCloneProfileName = "inferred-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/provided-clone-reference.wav")
 
         do {
             let worker = try WorkerProcess(
@@ -148,15 +147,8 @@ struct QwenE2ETests {
             defer { Task { await worker.stop() } }
 
             try await E2EHarness.awaitWorkerReady(worker)
-            try await E2EHarness.createVoiceDesignProfile(
-                on: worker,
-                id: "req-create-clone-fixture",
-                profileName: fixtureProfileName,
-                text: E2EHarness.testingCloneSourceText,
-                vibe: .masc,
-                voiceDescription: E2EHarness.testingProfileVoiceDescription,
-                outputURL: referenceAudioURL,
-            )
+            try sandbox.seedProfileFixture(.mascDesign, as: fixtureProfileName)
+            let referenceAudioURL = sandbox.referenceAudioURL(for: fixtureProfileName)
             #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
 
             try await E2EHarness.createCloneProfile(

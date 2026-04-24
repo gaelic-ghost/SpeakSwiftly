@@ -1,0 +1,35 @@
+{
+  "backendMaterializations": [
+    {
+      "backend": "qwen3",
+      "createdAt": "2026-04-24T18:49:13Z",
+      "modelRepo": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+      "referenceAudioFile": "reference.wav",
+      "referenceText": "This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.",
+      "sampleRate": 24000
+    }
+  ],
+  "createdAt": "2026-04-24T18:49:13Z",
+  "modelRepo": "SpeakSwiftly/imported-reference-audio",
+  "profileName": "e2e-masc-clone-inferred",
+  "qwenConditioningArtifacts": [
+    {
+      "artifactFile": "qwen-conditioning-qwen3.json",
+      "artifactVersion": 1,
+      "backend": "qwen3",
+      "createdAt": "2026-04-24T18:49:14Z",
+      "modelRepo": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    }
+  ],
+  "sampleRate": 24000,
+  "sourceKind": "imported_clone",
+  "sourceText": "This imported reference audio should let SpeakSwiftly build a clone profile for end to end coverage with a clean transcript and steady speech.",
+  "version": 5,
+  "vibe": "masc",
+  "voiceDescription": "Imported reference audio clone.",
+  "transcriptProvenance": {
+    "source": "inferred",
+    "createdAt": "2026-04-24T18:49:13Z",
+    "transcriptionModelRepo": "mlx-community/GLM-ASR-Nano-2512-4bit"
+  }
+}

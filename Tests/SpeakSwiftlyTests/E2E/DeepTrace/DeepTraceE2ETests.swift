@@ -28,14 +28,7 @@ struct DeepTraceE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-deep-trace",
-            profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: E2EHarness.testingProfileName)
 
         try worker.sendJSON(
             """
@@ -98,14 +91,7 @@ struct DeepTraceE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-segmented",
-            profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: E2EHarness.testingProfileName)
 
         try worker.sendJSON(
             """
@@ -178,14 +164,7 @@ struct DeepTraceE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-reversed-segmented",
-            profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: E2EHarness.testingProfileName)
 
         try worker.sendJSON(
             """
@@ -258,14 +237,7 @@ struct DeepTraceE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-conversational",
-            profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: E2EHarness.testingProfileName)
 
         try worker.sendJSON(
             """
@@ -337,14 +309,7 @@ struct DeepTraceE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-reversed-conversational",
-            profileName: E2EHarness.testingProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: E2EHarness.testingProfileName)
 
         try worker.sendJSON(
             """

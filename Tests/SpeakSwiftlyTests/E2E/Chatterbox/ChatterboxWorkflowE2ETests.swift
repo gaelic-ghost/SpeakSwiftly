@@ -25,14 +25,7 @@ struct ChatterboxE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-chatterbox-voice-design",
-            profileName: profileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-        )
+        try sandbox.seedProfileFixture(.mascDesign, as: profileName)
         try await E2EHarness.runLiveSpeechForCurrentE2EMode(
             on: worker,
             id: "req-live-chatterbox-voice-design",
@@ -56,7 +49,6 @@ struct ChatterboxE2ETests {
         let fixtureProfileName = "chatterbox-clone-source-profile"
         let cloneProfileName = "chatterbox-provided-transcript-clone-profile"
         let inferredCloneProfileName = "chatterbox-inferred-transcript-clone-profile"
-        let referenceAudioURL = sandbox.rootURL.appendingPathComponent("fixtures/chatterbox-provided-clone-reference.wav")
 
         let worker = try WorkerProcess(
             profileRootURL: sandbox.profileRootURL,
@@ -66,26 +58,10 @@ struct ChatterboxE2ETests {
         defer { Task { await worker.stop() } }
 
         try await E2EHarness.awaitWorkerReady(worker)
-        try await E2EHarness.createVoiceDesignProfile(
-            on: worker,
-            id: "req-create-chatterbox-clone-fixture",
-            profileName: fixtureProfileName,
-            text: E2EHarness.testingCloneSourceText,
-            vibe: .masc,
-            voiceDescription: E2EHarness.testingProfileVoiceDescription,
-            outputURL: referenceAudioURL,
-        )
-        #expect(FileManager.default.fileExists(atPath: referenceAudioURL.path))
+        try sandbox.seedProfileFixture(.mascDesign, as: fixtureProfileName)
+        #expect(FileManager.default.fileExists(atPath: sandbox.referenceAudioURL(for: fixtureProfileName).path))
 
-        try await E2EHarness.createCloneProfile(
-            on: worker,
-            id: "req-create-chatterbox-clone-provided-transcript",
-            profileName: cloneProfileName,
-            referenceAudioURL: referenceAudioURL,
-            vibe: .masc,
-            transcript: E2EHarness.testingCloneSourceText,
-            expectTranscription: false,
-        )
+        try sandbox.seedProfileFixture(.mascCloneProvided, as: cloneProfileName)
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
         let storedProfile = try store.loadProfile(named: cloneProfileName)
@@ -94,15 +70,7 @@ struct ChatterboxE2ETests {
         #expect(storedProfile.manifest.transcriptProvenance?.source == .provided)
         #expect(storedProfile.manifest.transcriptProvenance?.transcriptionModelRepo == nil)
 
-        try await E2EHarness.createCloneProfile(
-            on: worker,
-            id: "req-create-chatterbox-clone-inferred-transcript",
-            profileName: inferredCloneProfileName,
-            referenceAudioURL: referenceAudioURL,
-            vibe: .masc,
-            transcript: nil,
-            expectTranscription: true,
-        )
+        try sandbox.seedProfileFixture(.mascCloneInferred, as: inferredCloneProfileName)
 
         let inferredProfile = try store.loadProfile(named: inferredCloneProfileName)
         let inferredTranscript = inferredProfile.manifest.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
