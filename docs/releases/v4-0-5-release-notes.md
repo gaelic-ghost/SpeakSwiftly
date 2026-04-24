@@ -9,10 +9,13 @@
   `endpoint_rms_delta_pct`, making clear that it compares only the first and
   last windows
 - added versioned JSON artifacts for `volume-probe` and `compare-volume` under
-  `.local/volume-probes/`
+  `.local/volume-probes/`, with unique per-run filenames for fast repeated
+  probes
 - made `compare-volume` refuse mismatched sample rates or sample counts by
   default, with `--matched-duration trim-to-shorter` as the explicit opt-in
   comparison mode
+- made direct Qwen comparison WAV filenames unique so overlapping runs cannot
+  overwrite another run before trimmed metrics are recomputed
 - moved reusable probe math into `SpeakSwiftlyTestingSupport` and added cheap
   synthetic tests for window slicing, tail/head summaries, matched-span
   trimming, and invalid analysis inputs

@@ -25,11 +25,13 @@ Included work on the current branch:
   tail/head ratio, last-window average RMS, and an explicit
   `endpoint_rms_delta_pct`
 - write versioned `volume-probe` and `compare-volume` JSON artifacts under
-  `.local/volume-probes/`
+  `.local/volume-probes/` with unique per-run filenames
 - make `compare-volume` refuse mismatched sample rates or sample counts by
   default
 - add `--matched-duration trim-to-shorter` as the explicit opt-in path for
   comparing the same prefix span from both outputs
+- write direct Qwen comparison WAVs to unique temporary filenames so overlapping
+  probe runs cannot contaminate trimmed metrics
 - reject invalid analysis inputs before writing artifacts with meaningless
   values
 - document the probe contract in

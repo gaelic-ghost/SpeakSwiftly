@@ -691,7 +691,7 @@ struct SpeakSwiftlyTestingMain {
         let directOutputURL = try writeProbeWAV(
             samples: directSamples,
             sampleRate: qwenModel.sampleRate,
-            name: "qwen-direct-volume-probe.wav",
+            name: "qwen-direct-volume-probe-\(UUID().uuidString).wav",
         )
         let analysis = try analyzeVolume(
             samples: directSamples,
@@ -869,7 +869,7 @@ struct SpeakSwiftlyTestingMain {
     static func writeProbeArtifact(_ artifact: some Encodable, stem: String) throws -> String {
         let directory = try probeArtifactDirectory()
         let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let artifactURL = directory.appendingPathComponent("\(stem)-\(timestamp).json", isDirectory: false)
+        let artifactURL = directory.appendingPathComponent("\(stem)-\(timestamp)-\(UUID().uuidString).json", isDirectory: false)
         let latestURL = directory.appendingPathComponent("\(stem)-latest.json", isDirectory: false)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

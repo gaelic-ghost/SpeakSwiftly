@@ -58,7 +58,9 @@ codes or decode inputs before waveform-level loudness analysis begins.
 ## Artifact Contract
 
 Both probe commands write versioned JSON under `.local/volume-probes/` and also
-refresh a `*-latest.json` pointer.
+refresh a `*-latest.json` pointer. Per-run artifact filenames include a
+timestamp plus a unique suffix so fast repeated runs do not overwrite one
+another.
 
 `volume-probe` artifacts include:
 
@@ -80,6 +82,10 @@ refresh a `*-latest.json` pointer.
 - streamed and direct generated file paths
 - full streamed and direct analyses
 - compared streamed and direct analyses
+
+Direct Qwen comparison WAVs use unique temporary filenames for the same reason:
+overlapping comparison runs must not be able to overwrite another run's direct
+decode output before trimmed metrics are recomputed.
 
 The JSON is the durable source for future comparisons. Console output is a
 human-readable summary of the same measurement contract.
