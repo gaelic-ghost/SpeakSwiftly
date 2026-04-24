@@ -23,7 +23,7 @@ extension AudioPlaybackDriver {
                 )
             }
             group.addTask {
-                try await Task.sleep(for: drainTimeout)
+                try await playbackDelay(for: drainTimeout)
                 throw WorkerError(
                     code: .audioPlaybackTimeout,
                     message: "Live playback timed out after generated audio finished because the local audio player did not report drain completion within \(drainTimeout.components.seconds) seconds.",
@@ -36,7 +36,7 @@ extension AudioPlaybackDriver {
                 var lastProgressAt = Date()
 
                 while true {
-                    try await Task.sleep(for: .milliseconds(AudioPlaybackConfiguration.drainProgressCheckIntervalMS))
+                    try await playbackDelay(for: .milliseconds(AudioPlaybackConfiguration.drainProgressCheckIntervalMS))
                     let snapshot = await MainActor.run {
                         (
                             playedBackCallbackCount: state.playedBackCallbackCount,
@@ -260,7 +260,7 @@ extension AudioPlaybackDriver {
         defer { playbackTask.cancel() }
 
         let timeoutTask = Task {
-            try await Task.sleep(for: AudioPlaybackConfiguration.interJobBoopTimeout)
+            try await playbackDelay(for: AudioPlaybackConfiguration.interJobBoopTimeout)
             throw WorkerError(
                 code: .audioPlaybackTimeout,
                 message: "SpeakSwiftly timed out while trying to play the short inter-job playback boop before the next live request could begin.",

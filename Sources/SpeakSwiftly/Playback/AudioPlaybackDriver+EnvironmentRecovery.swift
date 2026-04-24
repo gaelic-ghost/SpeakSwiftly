@@ -176,7 +176,7 @@ extension AudioPlaybackDriver {
             )
 
             do {
-                try await Task.sleep(for: .milliseconds(AudioPlaybackConfiguration.recoveryStabilizationDelayMS))
+                try await playbackDelay(for: .milliseconds(AudioPlaybackConfiguration.recoveryStabilizationDelayMS))
                 try Task.checkCancellation()
                 try await rebuildEngine(sampleRate: sampleRate)
                 activeRequestState.markQueuedBuffersForReschedule()
