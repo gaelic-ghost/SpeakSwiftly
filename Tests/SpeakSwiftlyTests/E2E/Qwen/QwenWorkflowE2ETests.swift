@@ -90,6 +90,10 @@ struct QwenE2ETests {
                 vibe: .masc,
                 voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
+            #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+                $0["event"] as? String == "qwen_reference_conditioning_persisted"
+                    && $0["request_id"] as? String == "req-create-prepared-conditioning-profile"
+            } != nil)
             try await E2EHarness.runSilentSpeech(
                 on: worker,
                 id: "req-live-prepared-conditioning-first-pass",
@@ -97,7 +101,7 @@ struct QwenE2ETests {
                 profileName: profileName,
             )
             #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
-                $0["event"] as? String == "qwen_reference_conditioning_persisted"
+                $0["event"] as? String == "qwen_reference_conditioning_loaded"
                     && $0["request_id"] as? String == "req-live-prepared-conditioning-first-pass"
             } != nil)
             try worker.closeInput()
