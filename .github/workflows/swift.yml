@@ -163,9 +163,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        configuration:
-          - Debug
-          - Release
+        include:
+          - configuration: Debug
+            runtime_root: .local/derived-data/runtime-debug
+          - configuration: Release
+            runtime_root: .local/derived-data/runtime-release
 
     steps:
       - name: Check out repository
@@ -188,6 +190,5 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: speakswiftly-runtime-${{ matrix.configuration }}
-          path: |
-            .local/xcode/${{ matrix.configuration }}
-            .local/xcode/SpeakSwiftly.*.json
+          path: ${{ matrix.runtime_root }}
+          if-no-files-found: error
