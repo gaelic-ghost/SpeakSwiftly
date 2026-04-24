@@ -1510,10 +1510,29 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         }
     })
 
+    let text = """
+    Please read this first paragraph slowly and clearly for testing. It should stay grouped with the next paragraph.
+
+    Please read this second paragraph slowly and clearly for testing. It should stay grouped with the first paragraph.
+
+    Please read this third paragraph slowly and clearly for testing. It should stay grouped with the fourth paragraph.
+
+    Please read this fourth paragraph slowly and clearly for testing. It should stay grouped with the third paragraph.
+
+    Please read this fifth paragraph slowly and clearly for testing. It should force live playback to use a second Qwen generation call.
+    """
+    let escapedText = text.replacingOccurrences(of: "\n", with: "\\n")
+    let expectedLiveChunkTexts = LiveSpeechChunkPlanner.chunks(
+        for: text,
+        strategy: .smartParagraphGroups(),
+    )
+    .map(\.text)
+    #expect(expectedLiveChunkTexts.count > 1)
+
     await runtime.accept(
-        line: #"""
-        {"id":"req-qwen-live","op":"generate_speech","text":"Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.\n\nPlease read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.\n\nPlease read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.\n\nPlease read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.","profile_name":"default-femme","text_format":"plain_text"}
-        """#,
+        line: """
+        {"id":"req-qwen-live","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text"}
+        """,
     )
 
     #expect(await waitUntil {
@@ -1523,16 +1542,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["stage"] as? String == "preroll_ready"
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == 1 })
-    #expect(residentRecorder.recordedTexts[0].contains("first paragraph"))
-    #expect(residentRecorder.recordedTexts[0].contains("second paragraph"))
-    #expect(residentRecorder.recordedTexts[0].contains("third paragraph"))
-    #expect(residentRecorder.recordedTexts[0].contains("fourth paragraph"))
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count })
+    #expect(residentRecorder.recordedTexts == expectedLiveChunkTexts)
 
     await runtime.accept(
-        line: #"""
-        {"id":"req-qwen-file","op":"generate_audio_file","text":"Please read this first paragraph slowly and clearly for testing. It should stay paired with the next paragraph.\n\nPlease read this second paragraph slowly and clearly for testing. It should stay paired with the first paragraph.\n\nPlease read this third paragraph slowly and clearly for testing. It should stay paired with the fourth paragraph.\n\nPlease read this fourth paragraph slowly and clearly for testing. It should stay paired with the third paragraph.","profile_name":"default-femme","text_format":"plain_text"}
-        """#,
+        line: """
+        {"id":"req-qwen-file","op":"generate_audio_file","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text"}
+        """,
     )
 
     #expect(await waitUntil {
@@ -1541,9 +1557,9 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
                 && $0["ok"] as? Bool == true
         }
     })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == 2 })
+    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedLiveChunkTexts.count + 1 })
     #expect(try #require(residentRecorder.recordedTexts.last).contains("first paragraph"))
-    #expect(try #require(residentRecorder.recordedTexts.last).contains("fourth paragraph"))
+    #expect(try #require(residentRecorder.recordedTexts.last).contains("fifth paragraph"))
 }
 
 // MARK: - Sample Shaping
