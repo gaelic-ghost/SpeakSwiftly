@@ -30,6 +30,24 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
+    func gainNormalizedProfileReferenceAudio(_ audio: [Float]) -> [Float] {
+        let sanitizedAudio = audio.map { sample in
+            sample.isFinite ? sample : 0
+        }
+        let peakMagnitude = sanitizedAudio.reduce(Float.zero) { currentPeak, sample in
+            max(currentPeak, abs(sample))
+        }
+
+        guard peakMagnitude > 0 else {
+            return sanitizedAudio
+        }
+
+        let gain = ModelFactory.profileReferenceTargetPeakAmplitude / peakMagnitude
+        return sanitizedAudio.map { sample in
+            min(max(sample * gain, -1), 1)
+        }
+    }
+
     func resolvedCloneTranscript(
         requestID id: String,
         op: String,

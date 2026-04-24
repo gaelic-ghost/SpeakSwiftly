@@ -245,7 +245,110 @@ import TextForSpeech
     #expect(rerolledProfile.manifest.profileName == "bright-guide")
     #expect(rerolledProfile.manifest.sourceText == "Hello there")
     #expect(rerolledProfile.manifest.voiceDescription == "Warm and bright.")
-    #expect(try Data(contentsOf: rerolledProfile.referenceAudioURL) == rawTestAudioData(for: rerolledSamples))
+    try expectAudioSamples(
+        rawTestAudioSamples(from: Data(contentsOf: rerolledProfile.referenceAudioURL)),
+        approximatelyEqualTo: [0.738_888_9, 0.844_444_45, 0.95],
+    )
+}
+
+@Test func `voice design profile creation gain normalizes reference audio`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let generatedSamples: [Float] = [0.05, -0.1, 0.2]
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        profileModelLoader: {
+            AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in generatedSamples },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                },
+            )
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.voices
+        .create(design: "bright-guide",
+                from: "Hello there",
+                vibe: .femme,
+                voice: "Warm and bright",
+                outputPath: nil)
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == createID
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "bright-guide"
+        }
+    })
+
+    let profile = try store.loadProfile(named: "bright-guide")
+    #expect(try Data(contentsOf: profile.referenceAudioURL) == rawTestAudioData(for: [0.2375, -0.475, 0.95]))
+}
+
+@Test func `clone profile creation gain normalizes imported reference audio`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    let referenceDirectory = makeTempDirectoryURL()
+    defer {
+        try? FileManager.default.removeItem(at: storeRoot)
+        try? FileManager.default.removeItem(at: referenceDirectory)
+    }
+
+    let referenceAudioURL = referenceDirectory.appendingPathComponent("reference.wav")
+    try FileManager.default.createDirectory(at: referenceDirectory, withIntermediateDirectories: true)
+    try Data([0x52, 0x49, 0x46, 0x46]).write(to: referenceAudioURL)
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        loadedCloneAudioSamples: [0.05, -0.1, 0.2],
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let createID = await runtime.voices
+        .create(clone: "imported-guide",
+                from: referenceAudioURL,
+                vibe: .femme,
+                transcript: "Hello there")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == createID
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "imported-guide"
+        }
+    })
+
+    let profile = try store.loadProfile(named: "imported-guide")
+    #expect(try Data(contentsOf: profile.referenceAudioURL) == rawTestAudioData(for: [0.2375, -0.475, 0.95]))
 }
 
 @Test func `create profile resolves relative output path against explicit caller working directory`() async throws {

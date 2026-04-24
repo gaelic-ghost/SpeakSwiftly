@@ -78,6 +78,7 @@ enum ModelFactory {
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
     static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
     static let canonicalProfileSampleRate = 24000
+    static let profileReferenceTargetPeakAmplitude: Float = 0.95
     static let cloneTranscriptionSampleRate = 16000
     static let importedCloneModelRepo = "SpeakSwiftly/imported-reference-audio"
     static let importedCloneVoiceDescription = "Imported reference audio clone."
