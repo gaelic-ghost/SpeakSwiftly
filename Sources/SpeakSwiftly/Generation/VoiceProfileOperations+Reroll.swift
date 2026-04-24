@@ -54,7 +54,7 @@ extension SpeakSwiftly.Runtime {
         await emitProgress(id: id, stage: .writingProfileAssets)
         let replaceStartedAt = dependencies.now()
         let profileStore = profileStore
-        let rerolledProfile = try await runBlockingFilesystemOperation {
+        var rerolledProfile = try await runBlockingFilesystemOperation {
             try profileStore.replaceProfile(
                 named: storedProfile.manifest.profileName,
                 vibe: storedProfile.manifest.vibe,
@@ -78,6 +78,12 @@ extension SpeakSwiftly.Runtime {
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
             ],
         )
+        try Task.checkCancellation()
+        rerolledProfile = try await prepareInitialQwenConditioningIfNeeded(
+            requestID: id,
+            op: op,
+            profile: rerolledProfile,
+        )
         return rerolledProfile
     }
 
@@ -94,7 +100,7 @@ extension SpeakSwiftly.Runtime {
         await emitProgress(id: id, stage: .writingProfileAssets)
         let replaceStartedAt = dependencies.now()
         let profileStore = profileStore
-        let rerolledProfile = try await runBlockingFilesystemOperation {
+        var rerolledProfile = try await runBlockingFilesystemOperation {
             try profileStore.replaceProfile(
                 named: storedProfile.manifest.profileName,
                 vibe: storedProfile.manifest.vibe,
@@ -117,6 +123,12 @@ extension SpeakSwiftly.Runtime {
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
             ],
+        )
+        try Task.checkCancellation()
+        rerolledProfile = try await prepareInitialQwenConditioningIfNeeded(
+            requestID: id,
+            op: op,
+            profile: rerolledProfile,
         )
         return rerolledProfile
     }

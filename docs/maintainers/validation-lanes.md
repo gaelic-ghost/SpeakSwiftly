@@ -27,7 +27,7 @@ reason to jump straight to `xcodebuild`.
 
 ## Historical SwiftPM Snag
 
-The current `mlx-audio-swift` `69.2.1` fork release restores the ordinary
+The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary
 SwiftPM lane for this repository. The notes below are retained because earlier
 pins could fail under plain SwiftPM with parser errors in `EnglishG2P.swift`,
 and we may need the same fallback again if a future toolchain regression
