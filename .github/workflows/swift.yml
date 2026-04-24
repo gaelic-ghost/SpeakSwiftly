@@ -10,8 +10,8 @@ on:
 
 jobs:
   build-and-test:
-    name: Swift on macOS 15
-    runs-on: macos-15
+    name: Swift on macOS 26
+    runs-on: macos-26
     env:
       SPEAKSWIFTLY_CI_DERIVED_DATA: .local/xcode/derived-data/ci
       SPEAKSWIFTLY_CI_SOURCE_PACKAGES: .local/xcode/source-packages
@@ -85,8 +85,8 @@ jobs:
             -only-testing:'SpeakSwiftlyTests/ModelClientsTests'
 
   ios-compile-and-smoke:
-    name: iOS compile and smoke on macOS 15
-    runs-on: macos-15
+    name: iOS compile and smoke on macOS 26
+    runs-on: macos-26
     env:
       SPEAKSWIFTLY_IOS_CI_DERIVED_DATA: .local/xcode/derived-data/ios-ci
       SPEAKSWIFTLY_IOS_CI_SOURCE_PACKAGES: .local/xcode/source-packages
@@ -159,7 +159,7 @@ jobs:
   tagged-runtime-publication:
     name: Tagged Runtime Publication (${{ matrix.configuration }})
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: macos-15
+    runs-on: macos-26
     strategy:
       fail-fast: false
       matrix:
