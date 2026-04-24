@@ -25,7 +25,7 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .generatingProfileAudio)
         let generationStartedAt = dependencies.now()
-        let audio = try await profileModel.generate(
+        let rawAudio = try await profileModel.generate(
             text: storedProfile.manifest.sourceText,
             voice: storedProfile.manifest.voiceDescription,
             refAudio: nil,
@@ -33,6 +33,7 @@ extension SpeakSwiftly.Runtime {
             language: nil,
             generationParameters: GenerationPolicy.profileModelParameters(for: storedProfile.manifest.sourceText),
         )
+        let audio = gainNormalizedProfileReferenceAudio(rawAudio)
         await logRequestEvent(
             "profile_audio_rerolled",
             requestID: id,
@@ -40,7 +41,7 @@ extension SpeakSwiftly.Runtime {
             profileName: storedProfile.manifest.profileName,
             details: [
                 "duration_ms": .int(elapsedMS(since: generationStartedAt)),
-                "sample_count": .int(audio.count),
+                "sample_count": .int(rawAudio.count),
             ],
         )
         try Task.checkCancellation()

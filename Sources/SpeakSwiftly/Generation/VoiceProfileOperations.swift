@@ -45,7 +45,7 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .generatingProfileAudio)
         let generationStartedAt = dependencies.now()
-        let audio = try await profileModel.generate(
+        let rawAudio = try await profileModel.generate(
             text: text,
             voice: voiceDescription,
             refAudio: nil,
@@ -53,6 +53,7 @@ extension SpeakSwiftly.Runtime {
             language: nil,
             generationParameters: GenerationPolicy.profileModelParameters(for: text),
         )
+        let audio = gainNormalizedProfileReferenceAudio(rawAudio)
         await logRequestEvent(
             "profile_audio_generated",
             requestID: id,
@@ -60,7 +61,7 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             details: [
                 "duration_ms": .int(elapsedMS(since: generationStartedAt)),
-                "sample_count": .int(audio.count),
+                "sample_count": .int(rawAudio.count),
             ],
         )
         try Task.checkCancellation()
@@ -172,13 +173,14 @@ extension SpeakSwiftly.Runtime {
         )
 
         let sourceAudioLoadStartedAt = dependencies.now()
-        let canonicalAudio = try requireLoadedCloneAudio(
+        let rawCanonicalAudio = try requireLoadedCloneAudio(
             from: referenceAudioURL,
             sampleRate: ModelFactory.canonicalProfileSampleRate,
             requestID: id,
             pathLabel: "clone source audio",
             op: op,
         )
+        let canonicalAudio = gainNormalizedProfileReferenceAudio(rawCanonicalAudio)
         await logRequestEvent(
             "clone_source_audio_loaded",
             requestID: id,
