@@ -46,15 +46,12 @@ extension GenerationJobStore {
             options: [.skipsHiddenFiles],
         )
 
-        let jobs = try urls.map { directoryURL in
+        let jobs = urls.compactMap { directoryURL in
             do {
                 let data = try Data(contentsOf: manifestURL(for: directoryURL))
                 return try decoder.decode(SpeakSwiftly.GenerationJob.self, from: data)
             } catch {
-                throw WorkerError(
-                    code: .filesystemError,
-                    message: "SpeakSwiftly could not list generation jobs because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)",
-                )
+                return nil
             }
         }
 

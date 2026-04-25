@@ -205,9 +205,9 @@ struct GeneratedFileStore {
             options: [.skipsHiddenFiles],
         )
 
-        return try urls
+        return urls
             .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
-            .map { directoryURL in
+            .compactMap { directoryURL in
                 do {
                     let manifestData = try Data(contentsOf: manifestURL(for: directoryURL))
                     let manifest = try decoder.decode(GeneratedFileManifest.self, from: manifestData)
@@ -217,10 +217,7 @@ struct GeneratedFileStore {
                         audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile),
                     ).summary
                 } catch {
-                    throw WorkerError(
-                        code: .filesystemError,
-                        message: "SpeakSwiftly could not list generated files because the manifest in '\(directoryURL.path)' is unreadable or corrupt. \(error.localizedDescription)",
-                    )
+                    return nil
                 }
             }
     }
