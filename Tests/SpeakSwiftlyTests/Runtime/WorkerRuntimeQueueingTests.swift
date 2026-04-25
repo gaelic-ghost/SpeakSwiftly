@@ -212,6 +212,90 @@ import TextForSpeech
     await laneBGenerationDrain.open()
 }
 
+@Test func `resident generation stays serialized while playback is already stable`() async throws {
+    let output = OutputRecorder()
+    let generationDrain = AsyncGate()
+    let playbackDrain = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        speechBackend: .chatterboxTurbo,
+        residentModelLoader: { _ in
+            AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in
+                    [0.1, 0.2]
+                },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        for _ in 0..<14 {
+                            continuation.yield(Array(repeating: 0.1, count: 24000))
+                        }
+                        Task {
+                            await generationDrain.wait()
+                            continuation.finish()
+                        }
+                    }
+                },
+            )
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+                && $0["speech_backend"] as? String == "chatterbox_turbo"
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-live-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-live-2","op":"generate_speech","text":"Hi there","profile_name":"default-femme"}"#)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-1"
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-2"
+                && $0["event"] as? String == "queued"
+                && $0["reason"] as? String == "waiting_for_active_request"
+        }
+    })
+    #expect(!output.containsJSONObject {
+        $0["id"] as? String == "req-live-2"
+            && $0["event"] as? String == "started"
+    })
+
+    await generationDrain.open()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-live-2"
+                && $0["event"] as? String == "started"
+        }
+    })
+    await playbackDrain.open()
+}
+
 @Test func `runtime uses configured speech backend for resident model preload`() async throws {
     let output = OutputRecorder()
     let recorder = LoadedBackendRecorder()
