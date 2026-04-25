@@ -294,10 +294,12 @@ actor PlaybackController {
         }
     }
 
-    func cancel(requestID: String) async -> LiveSpeechPlaybackState? {
+    func cancel(requestID: String, cancelGenerationTask: Bool = true) async -> LiveSpeechPlaybackState? {
         guard let playbackState = jobs[requestID] else { return nil }
 
-        playbackState.execution.generationTask?.cancel()
+        if cancelGenerationTask {
+            playbackState.execution.generationTask?.cancel()
+        }
         playbackState.execution.playbackTask?.cancel()
         queue.removeAll { $0 == requestID }
         jobs.removeValue(forKey: requestID)

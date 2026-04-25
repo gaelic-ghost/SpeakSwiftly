@@ -81,10 +81,9 @@ extension SpeakSwiftly.Runtime {
         )
 
         if queueType == nil || queueType == .playback,
-           let playbackState = await playbackController.cancel(requestID: targetRequestID) {
+           let playbackState = await playbackController.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
             playbackState.execution.continuation.finish(throwing: cancellation)
             await completePlaybackJob(playbackState.request, result: .failure(cancellation))
-            try? await startNextGenerationIfPossible()
             await playbackController.startNextIfPossible()
             return targetRequestID
         }
@@ -93,25 +92,16 @@ extension SpeakSwiftly.Runtime {
             throw requestNotFoundError(targetRequestID, queueType: queueType, cancelledByRequestID: cancelledByRequestID)
         }
 
-        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID)
+        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID, removeActive: false)
 
         switch cancelledGenerationTarget {
             case let .active(job):
-                activeGenerations.removeValue(forKey: job.token)?.task.cancel()
+                activeGenerationCancellations[job.request.id] = cancellation
                 if job.request.requiresPlayback,
-                   let playbackState = await playbackController.cancel(requestID: targetRequestID) {
+                   let playbackState = await playbackController.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
                     playbackState.execution.continuation.finish(throwing: cancellation)
                     await completePlaybackJob(playbackState.request, result: .failure(cancellation))
                 }
-                markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
-                failRequestStream(for: targetRequestID, error: cancellation)
-                await logError(
-                    cancellation.message,
-                    requestID: targetRequestID,
-                    details: ["failure_code": .string(cancellation.code.rawValue)],
-                )
-                await emitFailure(id: targetRequestID, error: cancellation)
-                try? await startNextGenerationIfPossible()
                 return targetRequestID
             case let .queued(job):
                 if job.request.requiresPlayback {

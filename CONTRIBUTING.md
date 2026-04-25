@@ -603,7 +603,7 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
-`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `QueueControlE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 
