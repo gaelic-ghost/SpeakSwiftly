@@ -494,9 +494,9 @@ extension SpeakSwiftly.Runtime {
                 await submitRequest(id: id, op: request.opName)
             case let .playback(id, _):
                 await submitRequest(id: id, op: request.opName)
-            case let .clearQueue(id):
+            case let .clearQueue(id, _):
                 await submitRequest(id: id, op: request.opName)
-            case let .cancelRequest(id, requestID):
+            case let .cancelRequest(id, requestID, _):
                 await submitRequest(id: id, op: request.opName, requestID: requestID)
         }
     }

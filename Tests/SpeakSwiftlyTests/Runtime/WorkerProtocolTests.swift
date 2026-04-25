@@ -479,12 +479,32 @@ import TextForSpeech
 
 @Test func `decodes clear queue request`() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-6","op":"clear_queue"}"#)
-    #expect(request == .clearQueue(id: "req-6"))
+    #expect(request == .clearQueue(id: "req-6", queueType: nil))
+}
+
+@Test func `decodes queue scoped clear requests`() throws {
+    let generation = try WorkerRequest.decode(from: #"{"id":"req-clear-generation","op":"clear_generation_queue"}"#)
+    let playback = try WorkerRequest.decode(from: #"{"id":"req-clear-playback","op":"clear_playback_queue"}"#)
+
+    #expect(generation == .clearQueue(id: "req-clear-generation", queueType: .generation))
+    #expect(playback == .clearQueue(id: "req-clear-playback", queueType: .playback))
 }
 
 @Test func `decodes cancel request`() throws {
     let request = try WorkerRequest.decode(from: #"{"id":"req-7","op":"cancel_request","request_id":"req-target"}"#)
-    #expect(request == .cancelRequest(id: "req-7", requestID: "req-target"))
+    #expect(request == .cancelRequest(id: "req-7", requestID: "req-target", queueType: nil))
+}
+
+@Test func `decodes queue scoped cancel requests`() throws {
+    let generation = try WorkerRequest.decode(
+        from: #"{"id":"req-cancel-generation","op":"cancel_generation","request_id":"req-target"}"#,
+    )
+    let playback = try WorkerRequest.decode(
+        from: #"{"id":"req-cancel-playback","op":"cancel_playback","request_id":"req-target"}"#,
+    )
+
+    #expect(generation == .cancelRequest(id: "req-cancel-generation", requestID: "req-target", queueType: .generation))
+    #expect(playback == .cancelRequest(id: "req-cancel-playback", requestID: "req-target", queueType: .playback))
 }
 
 @Test func `rejects malformed JSON`() throws {

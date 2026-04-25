@@ -656,7 +656,7 @@ import TextForSpeech
         ),
     )
 
-    let clearID = await runtime.player.clearQueue().id
+    let clearID = await runtime.clearQueue(.generation).id
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -684,6 +684,90 @@ import TextForSpeech
         $0["id"] as? String == activeCreateID
             && $0["ok"] as? Bool == false
     })
+    await profileGate.open()
+}
+
+@Test func `playback clear does not clear waiting generation work`() async throws {
+    let output = OutputRecorder()
+    let profileGate = AsyncGate()
+
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        profileModelLoader: {
+            makeProfileModel {
+                await profileGate.wait()
+            }
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeCreateID = await runtime.voices
+        .create(design: "bright-guide",
+                from: "Hello there",
+                vibe: .femme,
+                voice: "Warm and bright")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == activeCreateID
+                && $0["event"] as? String == "started"
+        }
+    })
+
+    let queuedHandle = await runtime.submit(.listProfiles(id: "req-generation-queued"))
+    var iterator = queuedHandle.events.makeAsyncIterator()
+    let queued = try await iterator.next()
+    #expect(
+        queued == .queued(
+            WorkerQueuedEvent(
+                id: "req-generation-queued",
+                reason: .waitingForActiveRequest,
+                queuePosition: 1,
+            ),
+        ),
+    )
+
+    let playbackClearID = await runtime.clearQueue(.playback).id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == playbackClearID
+                && $0["ok"] as? Bool == true
+                && $0["cleared_count"] as? Int == 0
+        }
+    })
+
+    let generationClearID = await runtime.clearQueue(.generation).id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == generationClearID
+                && $0["ok"] as? Bool == true
+                && $0["cleared_count"] as? Int == 1
+        }
+    })
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-generation-queued"
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "request_cancelled"
+        }
+    })
+
+    do {
+        while let _ = try await iterator.next() {}
+        Issue.record("The queued request stream should have thrown after generation clear removed it.")
+    } catch let error as WorkerError {
+        #expect(error.code == .requestCancelled)
+    }
+
     await profileGate.open()
 }
 
@@ -816,7 +900,7 @@ import TextForSpeech
         ),
     )
 
-    let cancelID = await runtime.player.cancelRequest("req-queued").id
+    let cancelID = await runtime.cancel(.generation, requestID: "req-queued").id
 
     #expect(await waitUntil {
         output.containsJSONObject {

@@ -339,16 +339,18 @@ extension SpeakSwiftly.Runtime {
                         ),
                     )
 
-                case let .clearQueue(id):
+                case let .clearQueue(id, queueType):
                     let clearedCount = await clearQueuedRequests(
+                        queueType: queueType,
                         cancelledByRequestID: id,
                         reason: "queued work was cleared from the SpeakSwiftly queue",
                     )
                     result = .success(WorkerSuccessPayload(id: id, clearedCount: clearedCount))
 
-                case let .cancelRequest(id, targetRequestID):
+                case let .cancelRequest(id, targetRequestID, queueType):
                     let cancelledRequestID = try await cancelRequestNow(
                         targetRequestID,
+                        queueType: queueType,
                         cancelledByRequestID: id,
                     )
                     result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))

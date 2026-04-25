@@ -5,11 +5,23 @@ import Foundation
 extension SpeakSwiftly.Runtime {
     // MARK: - Queue Management
 
-    func clearQueuedRequests(cancelledByRequestID: String, reason: String) async -> Int {
-        let queuedJobs = await generationController.clearQueued()
+    func clearQueuedRequests(
+        queueType: WorkerQueueType?,
+        cancelledByRequestID: String,
+        reason: String,
+    ) async -> Int {
+        let queuedJobs = if queueType == nil || queueType == .generation {
+            await generationController.clearQueued()
+        } else {
+            [SpeechGenerationController.Job]()
+        }
         let activePlaybackRequestID = await playbackController.activeRequestSummary()?.id
         let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
-        let waitingPlaybackJobs = await playbackController.clearQueued(excluding: protectedRequestIDs)
+        let waitingPlaybackJobs = if queueType == nil || queueType == .playback {
+            await playbackController.clearQueued(excluding: protectedRequestIDs)
+        } else {
+            [LiveSpeechPlaybackState]()
+        }
 
         let cancellation = WorkerError(
             code: .requestCancelled,
@@ -58,15 +70,18 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func cancelRequestNow(_ targetRequestID: String, cancelledByRequestID: String) async throws -> String {
+    func cancelRequestNow(
+        _ targetRequestID: String,
+        queueType: WorkerQueueType?,
+        cancelledByRequestID: String,
+    ) async throws -> String {
         let cancellation = WorkerError(
             code: .requestCancelled,
             message: "Request '\(targetRequestID)' was cancelled by control request '\(cancelledByRequestID)'.",
         )
 
-        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID)
-
-        if let playbackState = await playbackController.cancel(requestID: targetRequestID) {
+        if queueType == nil || queueType == .playback,
+           let playbackState = await playbackController.cancel(requestID: targetRequestID) {
             playbackState.execution.continuation.finish(throwing: cancellation)
             await completePlaybackJob(playbackState.request, result: .failure(cancellation))
             try? await startNextGenerationIfPossible()
@@ -74,9 +89,20 @@ extension SpeakSwiftly.Runtime {
             return targetRequestID
         }
 
+        guard queueType == nil || queueType == .generation else {
+            throw requestNotFoundError(targetRequestID, queueType: queueType, cancelledByRequestID: cancelledByRequestID)
+        }
+
+        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID)
+
         switch cancelledGenerationTarget {
             case let .active(job):
                 activeGenerations.removeValue(forKey: job.token)?.task.cancel()
+                if job.request.requiresPlayback,
+                   let playbackState = await playbackController.cancel(requestID: targetRequestID) {
+                    playbackState.execution.continuation.finish(throwing: cancellation)
+                    await completePlaybackJob(playbackState.request, result: .failure(cancellation))
+                }
                 markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
                 failRequestStream(for: targetRequestID, error: cancellation)
                 await logError(
@@ -88,6 +114,9 @@ extension SpeakSwiftly.Runtime {
                 try? await startNextGenerationIfPossible()
                 return targetRequestID
             case let .queued(job):
+                if job.request.requiresPlayback {
+                    _ = await playbackController.discard(requestID: job.request.id)
+                }
                 markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
                 failRequestStream(for: targetRequestID, error: cancellation)
                 await logError(
@@ -101,9 +130,18 @@ extension SpeakSwiftly.Runtime {
                 break
         }
 
-        throw WorkerError(
+        throw requestNotFoundError(targetRequestID, queueType: queueType, cancelledByRequestID: cancelledByRequestID)
+    }
+
+    private func requestNotFoundError(
+        _ targetRequestID: String,
+        queueType: WorkerQueueType?,
+        cancelledByRequestID: String,
+    ) -> WorkerError {
+        let scope = queueType.map { " in the \($0.rawValue) queue" } ?? " in the active or queued SpeakSwiftly work set"
+        return WorkerError(
             code: .requestNotFound,
-            message: "Control request '\(cancelledByRequestID)' could not find request '\(targetRequestID)' in the active or queued SpeakSwiftly work set.",
+            message: "Control request '\(cancelledByRequestID)' could not find request '\(targetRequestID)'\(scope).",
         )
     }
 

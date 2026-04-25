@@ -426,6 +426,23 @@ import Darwin
     let generationQueue: @Sendable (SpeakSwiftly.Jobs) async -> SpeakSwiftly.RequestHandle = { jobs in
         await jobs.generationQueue()
     }
+    let clearGenerationQueue: @Sendable (SpeakSwiftly.Jobs) async -> SpeakSwiftly.RequestHandle = { jobs in
+        await jobs.clearQueue()
+    }
+    let cancelGeneration: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, requestID in
+        await jobs.cancel(requestID)
+    }
+    let clearRuntimeQueue: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.QueueType) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        queueType in
+        await runtime.clearQueue(queueType)
+    }
+    let cancelRuntimeQueue: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.QueueType, String) async -> SpeakSwiftly.RequestHandle = {
+        runtime,
+        queueType,
+        requestID in
+        await runtime.cancel(queueType, requestID: requestID)
+    }
     let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.status()
     }
@@ -467,6 +484,15 @@ import Darwin
     }
     let cancelRequest: @Sendable (SpeakSwiftly.Player, String) async -> SpeakSwiftly.RequestHandle = { player, requestID in
         await player.cancelRequest(requestID)
+    }
+    let clearScopedQueue: @Sendable (SpeakSwiftly.Player, SpeakSwiftly.QueueType) async -> SpeakSwiftly.RequestHandle = { player, queueType in
+        await player.clearQueue(queueType)
+    }
+    let cancelScopedQueue: @Sendable (SpeakSwiftly.Player, SpeakSwiftly.QueueType, String) async -> SpeakSwiftly.RequestHandle = {
+        player,
+        queueType,
+        requestID in
+        await player.cancel(queueType, requestID: requestID)
     }
     let statusEvents: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.StatusEvent> = { runtime in
         await runtime.statusEvents()
@@ -527,6 +553,10 @@ import Darwin
     _ = requestSnapshot
     _ = updates
     _ = generationEvents
+    _ = clearGenerationQueue
+    _ = cancelGeneration
+    _ = clearRuntimeQueue
+    _ = cancelRuntimeQueue
     _ = switchSpeechBackend
     _ = reloadModels
     _ = unloadModels
@@ -534,6 +564,8 @@ import Darwin
     _ = playbackPause
     _ = clearQueue
     _ = cancelRequest
+    _ = clearScopedQueue
+    _ = cancelScopedQueue
     _ = statusEvents
 }
 
