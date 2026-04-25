@@ -392,6 +392,7 @@ public extension SpeakSwiftly {
         var requestBrokers = [String: RequestBroker]()
         var terminalRequestBrokerOrder = [String]()
         var activeGenerations = [UUID: ActiveRequest]()
+        var activeGenerationCancellations = [String: WorkerError]()
         var lastLoggedMarvisSchedulerState: String?
         var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
 

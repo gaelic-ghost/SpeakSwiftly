@@ -310,7 +310,10 @@ extension SpeakSwiftly.Runtime {
             activeJobs: generationController.activeJobsOrdered(),
             disposition: disposition,
         )
-        let finalDisposition: GenerationCompletionDisposition = if isShuttingDown {
+        let cancellation = activeGenerationCancellations.removeValue(forKey: request.id)
+        let finalDisposition: GenerationCompletionDisposition = if let cancellation {
+            .requestCompleted(.failure(cancellation))
+        } else if isShuttingDown {
             switch disposition {
                 case .requestCompleted(.success):
                     .requestCompleted(.failure(cancellationError(for: request.id)))

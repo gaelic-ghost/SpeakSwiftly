@@ -71,8 +71,8 @@ enum WorkerRequest: Equatable {
     case reloadModels(id: String)
     case unloadModels(id: String)
     case playback(id: String, action: PlaybackAction)
-    case clearQueue(id: String)
-    case cancelRequest(id: String, requestID: String)
+    case clearQueue(id: String, queueType: WorkerQueueType?)
+    case cancelRequest(id: String, requestID: String, queueType: WorkerQueueType?)
 
     var id: String {
         switch self {
@@ -117,8 +117,8 @@ enum WorkerRequest: Equatable {
                  let .reloadModels(id),
                  let .unloadModels(id),
                  let .playback(id, _),
-                 let .clearQueue(id),
-                 let .cancelRequest(id, _):
+                 let .clearQueue(id, _),
+                 let .cancelRequest(id, _, _):
                 id
         }
     }
@@ -215,10 +215,18 @@ enum WorkerRequest: Equatable {
                 "playback_resume"
             case .playback(_, .state):
                 "get_playback_state"
-            case .clearQueue:
+            case .clearQueue(_, nil):
                 "clear_queue"
-            case .cancelRequest:
+            case .clearQueue(_, .generation):
+                "clear_generation_queue"
+            case .clearQueue(_, .playback):
+                "clear_playback_queue"
+            case .cancelRequest(_, _, nil):
                 "cancel_request"
+            case .cancelRequest(_, _, .generation):
+                "cancel_generation"
+            case .cancelRequest(_, _, .playback):
+                "cancel_playback"
         }
     }
 

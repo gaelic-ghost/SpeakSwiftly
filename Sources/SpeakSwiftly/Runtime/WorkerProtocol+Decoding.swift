@@ -267,11 +267,25 @@ extension WorkerRequest {
                 return .playback(id: id, action: .state)
 
             case "clear_queue":
-                return .clearQueue(id: id)
+                return .clearQueue(id: id, queueType: nil)
+
+            case "clear_generation_queue":
+                return .clearQueue(id: id, queueType: .generation)
+
+            case "clear_playback_queue":
+                return .clearQueue(id: id, queueType: .playback)
 
             case "cancel_request":
                 let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
-                return .cancelRequest(id: id, requestID: requestID)
+                return .cancelRequest(id: id, requestID: requestID, queueType: nil)
+
+            case "cancel_generation":
+                let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
+                return .cancelRequest(id: id, requestID: requestID, queueType: .generation)
+
+            case "cancel_playback":
+                let requestID = try requireNonEmpty(raw.requestID, field: "request_id", id: id)
+                return .cancelRequest(id: id, requestID: requestID, queueType: .playback)
 
             default:
                 throw WorkerError(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")

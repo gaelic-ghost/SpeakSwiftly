@@ -106,6 +106,8 @@ Current typed-surface conventions:
 - live playback and file rendering are separate generation calls, with `Generate.speech(...)` and `Generate.audio(...)`
 - generation-queue inspection lives under `Jobs`
 - playback-queue inspection lives under `Player.list(...)`
+- queue-specific controls live on `Runtime` as `clearQueue(.generation)`, `clearQueue(.playback)`, `cancel(.generation, requestID:)`, and `cancel(.playback, requestID:)`
+- the `Jobs` and `Player` handles may expose same-queue convenience methods, but cross-queue behavior should stay explicit on `Runtime`
 - resident runtime controls use `status()`, `switchSpeechBackend(to:)`, `reloadModels()`, and `unloadModels()`
 - decode/result model memberwise initializers should stay internal unless callers have a concrete need to construct those values themselves
 - `BatchItem` remains public only because batch submission is still intentionally caller-authored at that layer
@@ -290,6 +292,12 @@ Representative request shapes:
 {"id":"req-switch","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}
 {"id":"req-reload","op":"reload_models"}
 {"id":"req-unload","op":"unload_models"}
+{"id":"req-generation-queue","op":"list_generation_queue"}
+{"id":"req-playback-queue","op":"list_playback_queue"}
+{"id":"req-clear-generation","op":"clear_generation_queue"}
+{"id":"req-clear-playback","op":"clear_playback_queue"}
+{"id":"req-cancel-generation","op":"cancel_generation","request_id":"req-1"}
+{"id":"req-cancel-playback","op":"cancel_playback","request_id":"req-1"}
 ```
 
 Representative response and event shapes:
@@ -363,7 +371,8 @@ The main entry points into the playback layer are:
 
 - typed Swift submission through `Generate.speech(...)`
 - JSONL submission through `generate_speech`
-- playback control reads and writes through `runtime.player` and the wire control ops such as `playback_pause`, `playback_resume`, `get_playback_state`, `list_playback_queue`, `clear_queue`, and `cancel_request`
+- playback control reads and writes through `runtime.player` and the wire control ops such as `playback_pause`, `playback_resume`, `get_playback_state`, `list_playback_queue`, `clear_playback_queue`, and `cancel_playback`
+- generation queue control reads and writes through `runtime.jobs`, `runtime.clearQueue(.generation)`, `runtime.cancel(.generation, requestID:)`, and the wire control ops `list_generation_queue`, `clear_generation_queue`, and `cancel_generation`
 
 The runtime accepts a live speech request as a generation request first. It then creates the playback-side job state that will receive streamed audio and complete only after playback finishes.
 
@@ -594,7 +603,7 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
-`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
+`run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `QueueControlE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
 For a deliberately small worker-backed smoke lane after narrow changes, run the dedicated quick suite:
 

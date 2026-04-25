@@ -137,16 +137,17 @@ public enum SpeakSwiftly {
         }
     }
 
+    /// Identifies a runtime work queue for queue-specific controls.
+    public enum QueueType: String, Sendable, Equatable {
+        case generation
+        case playback
+    }
+
     // MARK: Internal Request Helpers
 
     enum SpeechJobType: Equatable {
         case live
         case file
-    }
-
-    enum WorkerQueueType: String, Equatable {
-        case generation
-        case playback
     }
 
     enum PlaybackAction: Equatable {
@@ -170,7 +171,7 @@ public enum SpeakSwiftly {
 // MARK: - Internal Compatibility
 
 typealias SpeechJobType = SpeakSwiftly.SpeechJobType
-typealias WorkerQueueType = SpeakSwiftly.WorkerQueueType
+typealias WorkerQueueType = SpeakSwiftly.QueueType
 typealias PlaybackAction = SpeakSwiftly.PlaybackAction
 typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent

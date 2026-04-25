@@ -194,6 +194,7 @@ xcodebuild test-without-building -quiet \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
   -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/QueueControlE2ETests' \
   -only-testing:'SpeakSwiftlyTests/MarvisE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QwenE2ETests'
 ```

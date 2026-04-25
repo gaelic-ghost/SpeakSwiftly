@@ -41,6 +41,10 @@ Representative operations include:
 - `generate_batch` for grouped retained artifacts.
 - `create_voice_profile_from_description`, `create_voice_profile_from_audio`, `list_voice_profiles`, and related voice-management operations.
 - `get_status`, `reload_models`, and `unload_models` for runtime control.
+- `list_generation_queue`, `clear_generation_queue`, and `cancel_generation` for generation-queue inspection and control.
+- `list_playback_queue`, `clear_playback_queue`, and `cancel_playback` for playback-queue inspection and control.
+
+The broad compatibility operations `clear_queue` and `cancel_request` still exist for hosts that intentionally want to affect any queued work, but new operators should prefer the queue-specific operations when the target queue is known.
 
 ## Read Events And Results
 

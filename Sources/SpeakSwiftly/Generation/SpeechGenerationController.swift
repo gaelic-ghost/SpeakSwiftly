@@ -41,9 +41,11 @@ actor SpeechGenerationController {
         activeJobs.removeValue(forKey: token)
     }
 
-    func cancel(requestID: String) -> CancellationTarget? {
+    func cancel(requestID: String, removeActive: Bool = true) -> CancellationTarget? {
         if let active = activeJobs.values.first(where: { $0.request.id == requestID }) {
-            activeJobs.removeValue(forKey: active.token)
+            if removeActive {
+                activeJobs.removeValue(forKey: active.token)
+            }
             return .active(active)
         }
 

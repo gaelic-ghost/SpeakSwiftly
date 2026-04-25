@@ -251,6 +251,12 @@ Key typed runtime entry points include:
 - `runtime.player.state()`
 - `runtime.player.clearQueue()`
 - `runtime.player.cancelRequest(_:)`
+- `runtime.clearQueue(.generation)`
+- `runtime.clearQueue(.playback)`
+- `runtime.cancel(.generation, requestID:)`
+- `runtime.cancel(.playback, requestID:)`
+- `runtime.jobs.clearQueue()`
+- `runtime.jobs.cancel(_:)`
 - `runtime.jobs.expire(id:)`
 - `runtime.jobs.generationQueue()`
 - `runtime.jobs.job(id:)`
@@ -275,6 +281,10 @@ Resident runtime controls currently map like this:
 | `switchSpeechBackend(to:)` | `"set_speech_backend"` | Requires a `"speech_backend"` field on the JSONL request. |
 | `reloadModels()` | `"reload_models"` | Re-warms the currently selected resident backend. |
 | `unloadModels()` | `"unload_models"` | Drops resident models from memory and parks later resident-dependent generation until residency returns. |
+| `clearQueue(.generation)` | `"clear_generation_queue"` | Cancels queued generation work that has not started. |
+| `clearQueue(.playback)` | `"clear_playback_queue"` | Cancels queued playback work that has not started. |
+| `cancel(.generation, requestID:)` | `"cancel_generation"` | Cancels one queued or active generation request by `request_id`. |
+| `cancel(.playback, requestID:)` | `"cancel_playback"` | Cancels one queued or active playback request by `request_id`. |
 
 For the full JSONL worker contract, request and event examples, naming rules, and queue semantics, see:
 

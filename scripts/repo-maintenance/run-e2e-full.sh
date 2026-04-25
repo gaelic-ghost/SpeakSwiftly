@@ -29,6 +29,7 @@ Runs the default release-safe top-level E2E suite list sequentially:
   GeneratedFileE2ETests
   GeneratedBatchE2ETests
   ChatterboxE2ETests
+  QueueControlE2ETests
   MarvisE2ETests
   QwenE2ETests
 USAGE
@@ -60,6 +61,7 @@ run_suite() {
 run_suite GeneratedFileE2ETests
 run_suite GeneratedBatchE2ETests
 run_suite ChatterboxE2ETests
+run_suite QueueControlE2ETests
 run_suite MarvisE2ETests
 run_suite QwenE2ETests
 

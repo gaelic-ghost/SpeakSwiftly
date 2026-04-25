@@ -239,6 +239,16 @@ public extension SpeakSwiftly.Jobs {
         await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .generation))
     }
 
+    /// Clears queued generation work that has not started yet.
+    func clearQueue() async -> SpeakSwiftly.RequestHandle {
+        await runtime.clearQueue(.generation)
+    }
+
+    /// Cancels one queued or active generation request by identifier.
+    func cancel(_ requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.cancel(.generation, requestID: requestID)
+    }
+
     /// Expires one retained generation job.
     func expire(id jobID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.expireGenerationJob(id: UUID().uuidString, jobID: jobID))
