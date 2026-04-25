@@ -5,14 +5,20 @@ Local text-to-speech for Swift apps and local toolchains, with a typed Swift API
 ## Table of Contents
 
 - [Overview](#overview)
-- [Setup](#setup)
+- [Quick Start](#quick-start)
 - [Usage](#usage)
-- [API Notes](#api-notes)
 - [Development](#development)
-- [Verification](#verification)
+- [Repo Structure](#repo-structure)
+- [Release Notes](#release-notes)
 - [License](#license)
 
 ## Overview
+
+### Status
+
+SpeakSwiftly is actively available as a local Swift text-to-speech package, with macOS-first worker and release validation surfaces.
+
+### What This Project Is
 
 SpeakSwiftly ships two public surfaces from one Swift package:
 
@@ -36,7 +42,7 @@ SpeakSwiftly currently includes:
 
 For contributor-facing architecture notes, repository workflow, runtime behavior details, and extended verification paths, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Setup
+## Quick Start
 
 SpeakSwiftly is a standard Swift package with two direct dependencies:
 
@@ -68,31 +74,6 @@ stages it into the direct MLX probe path inside the SwiftPM test product before
 the first MLX-backed test model is created. In this repository, that means the
 plain `swift test` lane can exercise MLX-backed package tests without falling
 back to Xcode just to find the metallib.
-
-For package-local validation:
-
-```bash
-swift build
-swift test
-```
-
-The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary
-SwiftPM build and test path. If a future toolchain regression brings back the
-old `EnglishG2P.swift` parser failure, use the documented fallback lane in
-[CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same plain
-`swift build` / `swift test` commands.
-
-Use the Xcode-backed deterministic runtime only for standalone worker runs or
-for fallback validation when a future SwiftPM parser regression actually blocks
-the ordinary package lane:
-
-```bash
-sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
-```
-
-That builds the worker into `.local/derived-data/runtime-debug` or
-`.local/derived-data/runtime-release` and writes a matching
-`run-speakswiftly` launcher at that runtime root.
 
 ## Usage
 
@@ -226,7 +207,7 @@ first-window-vs-last-window endpoint metric rather than a whole-run degradation
 score. The detailed contract is maintained in
 [`docs/maintainers/volume-probe-instrument-contract-2026-04-24.md`](docs/maintainers/volume-probe-instrument-contract-2026-04-24.md).
 
-## API Notes
+### API Notes
 
 The package publishes:
 
@@ -293,7 +274,19 @@ For the full JSONL worker contract, request and event examples, naming rules, an
 
 ## Development
 
+### Setup
+
 Use this repository as the source-of-truth development home for SpeakSwiftly. Keep the README focused on product and usage information, and keep contributor-facing architecture notes, repository workflow, and deep operational guidance in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Use the Xcode-backed deterministic runtime only for standalone worker runs or for fallback validation when a future SwiftPM parser regression actually blocks the ordinary package lane:
+
+```bash
+sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
+```
+
+That builds the worker into `.local/derived-data/runtime-debug` or `.local/derived-data/runtime-release` and writes a matching `run-speakswiftly` launcher at that runtime root.
+
+### Workflow
 
 For package-focused development, prefer:
 
@@ -304,7 +297,9 @@ swift test
 
 For formatter, lint, maintainer workflow, deterministic Xcode runtime guidance, and deeper operator guidance, use [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Verification
+The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary SwiftPM build and test path. If a future toolchain regression brings back the old `EnglishG2P.swift` parser failure, use the documented fallback lane in [CONTRIBUTING.md](CONTRIBUTING.md) instead of repeatedly retrying the same plain `swift build` / `swift test` commands.
+
+### Validation
 
 Baseline package verification:
 
@@ -324,6 +319,22 @@ If a future toolchain regression blocks the ordinary SwiftPM lane again, or if
 you specifically need the Xcode-backed package, simulator, or real-runtime
 lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/maintainers/validation-lanes.md](docs/maintainers/validation-lanes.md).
+
+## Repo Structure
+
+```text
+.
+|-- Package.swift
+|-- Sources/SpeakSwiftly/
+|-- Tests/SpeakSwiftlyTests/
+|-- Sources/SpeakSwiftly/SpeakSwiftly.docc/
+|-- docs/maintainers/
+`-- scripts/repo-maintenance/
+```
+
+## Release Notes
+
+Release workflow and release-grade validation are maintained through `scripts/repo-maintenance/release.sh` and the release notes attached to tagged GitHub releases. See [CONTRIBUTING.md](CONTRIBUTING.md) for maintainer workflow details before cutting a release.
 
 ## License
 

@@ -2,6 +2,7 @@
 set -eu
 
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export REPO_MAINTENANCE_COMMON_DIR="$SELF_DIR/../lib"
 . "$SELF_DIR/../lib/common.sh"
 
 vendored_metallib_path="$REPO_ROOT/Sources/SpeakSwiftly/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
