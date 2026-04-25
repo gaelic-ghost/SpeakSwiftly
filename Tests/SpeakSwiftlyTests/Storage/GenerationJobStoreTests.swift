@@ -66,6 +66,51 @@ import Testing
     #expect(listed == [completed])
 }
 
+@Test func `generation job store lists readable jobs when stale retained manifests exist`() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = try makeGenerationJobStore(rootURL: rootURL)
+    let queued = try store.createFileJob(
+        jobID: "job-file-readable",
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        speechBackend: .qwen3,
+        item: SpeakSwiftly.GenerationJobItem(
+            artifactID: "artifact-readable",
+            text: "Readable retained job.",
+            textProfile: nil,
+            inputTextContext: nil,
+            requestContext: nil,
+        ),
+        createdAt: Date(timeIntervalSince1970: 3000),
+    )
+
+    let staleJobID = "job-file-stale"
+    let staleDirectoryURL = store.generationJobDirectoryURL(for: staleJobID)
+    try FileManager.default.createDirectory(at: staleDirectoryURL, withIntermediateDirectories: false)
+    let staleManifest = """
+    {
+      "artifacts" : [],
+      "created_at" : "2026-04-16T17:46:21Z",
+      "items" : [],
+      "job_id" : "\(staleJobID)",
+      "job_kind" : "file",
+      "profile_name" : "default-femme",
+      "retention_policy" : "manual",
+      "speech_backend" : "qwen3",
+      "state" : "failed",
+      "updated_at" : "2026-04-16T17:46:21Z"
+    }
+    """
+    try Data(staleManifest.utf8).write(to: store.manifestURL(for: staleDirectoryURL))
+
+    #expect(try store.listGenerationJobs() == [queued])
+    #expect(throws: WorkerError.self) {
+        _ = try store.loadGenerationJob(id: staleJobID)
+    }
+}
+
 @Test func `generation job store rejects missing jobs`() throws {
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
