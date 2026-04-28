@@ -127,6 +127,7 @@ Use `scripts/repo-maintenance/sync-shared.sh` for repo-local shared sync tasks, 
 - Use Swift Testing (`import Testing`) as the default package test framework, and keep XCTest only when an external dependency or platform constraint requires it.
 - Treat `SPEAKSWIFTLY_E2E=1 swift test --filter SpeakSwiftlyE2ETests` as the opt-in real-model e2e path for this package.
 - For release-grade standalone-worker validation, Marvis overlap investigation, or any validation pass that is actually blocked by a renewed SwiftPM parser regression, prefer running `xcodebuild build-for-testing` from the repo root with `-scheme SpeakSwiftly-Package`, then follow it with targeted `xcodebuild test-without-building` runs instead of ad hoc retries through plain SwiftPM.
+- Before worker-backed E2E, use the repo-maintenance wrappers so `scripts/repo-maintenance/unload-live-service-resident-models.sh` can ask the live `SpeakSwiftlyServer` service to unload resident models without uninstalling or stopping the LaunchAgent-backed service. The helper uses `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` when set and only skips deliberately when `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1`.
 - Keep the shared test profile convention stable unless Gale explicitly changes it:
   - `profile_name`: `testing-profile`
   - `voice_description`: `A generic, warm, masculine, slow speaking voice.`

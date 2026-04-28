@@ -147,6 +147,8 @@ if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$audible" = "true" ]; th
   export SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1
 fi
 
+sh "$SELF_DIR/unload-live-service-resident-models.sh"
+
 log "Running SpeakSwiftly E2E suite '$suite_name' through plain SwiftPM."
 log "This wrapper intentionally runs exactly one top-level suite per invocation."
 (

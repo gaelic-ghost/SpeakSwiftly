@@ -315,6 +315,13 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
+Those wrappers first ask the live `SpeakSwiftlyServer` service to unload resident
+models through its HTTP runtime-control surface, leaving the installed service in
+place while the test-owned worker gets memory headroom. Set
+`SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` when the live service is not on
+`http://127.0.0.1:7337`, or set `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` only
+when you deliberately want to skip that local preflight.
+
 If a future toolchain regression blocks the ordinary SwiftPM lane again, or if
 you specifically need the Xcode-backed package, simulator, or real-runtime
 lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and

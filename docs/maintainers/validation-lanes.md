@@ -140,6 +140,14 @@ The wrappers intentionally run one top-level worker-backed suite per process so
 Xcode or Swift Testing cannot freeze Gale's machine by launching multiple model
 loading suites at once.
 
+Each wrapper invocation also runs the live-service resident-model unload
+preflight before `swift test`. The preflight posts to the
+LaunchAgent-backed `SpeakSwiftlyServer` `/runtime/models/unload` endpoint when
+that service is reachable, leaving the service installed and only freeing
+resident model memory for the package-owned E2E worker. Set
+`SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` for a non-default live-service URL, or
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` for a deliberate skip.
+
 Plain `swift test` remains the execution engine under those wrappers. Keep the
 Xcode-backed lane as a fallback only if a future toolchain regression breaks the
 ordinary SwiftPM path again.
