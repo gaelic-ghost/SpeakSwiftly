@@ -62,7 +62,7 @@ surfaces.
 Library consumers can add the package from GitHub:
 
 ```swift
-    .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "3.0.0")
+    .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "4.0.0")
 ```
 
 Then add `SpeakSwiftly` to the target that will own the runtime.
@@ -342,6 +342,8 @@ lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## Release Notes
 
 Release workflow and release-grade validation are maintained through `scripts/repo-maintenance/release.sh` and the release notes attached to tagged GitHub releases. See [CONTRIBUTING.md](CONTRIBUTING.md) for maintainer workflow details before cutting a release.
+
+The checked-in files under `docs/releases/` are selected historical release-prep and release-note snapshots, not a complete list of every published tag. Use GitHub releases and repository tags for the authoritative release history.
 
 ## License
 

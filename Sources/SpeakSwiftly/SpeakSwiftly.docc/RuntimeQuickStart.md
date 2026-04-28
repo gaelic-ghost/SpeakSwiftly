@@ -17,7 +17,7 @@ If you do not need custom startup behavior, liftoff with the default configurati
 ```swift
 import SpeakSwiftly
 
-let runtime = try await SpeakSwiftly.liftoff()
+let runtime = await SpeakSwiftly.liftoff()
 ```
 
 When you do need a specific backend or a custom normalizer, build a ``SpeakSwiftly/Configuration`` first and then pass it to liftoff:
@@ -25,12 +25,11 @@ When you do need a specific backend or a custom normalizer, build a ``SpeakSwift
 ```swift
 import SpeakSwiftly
 
-let normalizer = try await SpeakSwiftly.Normalizer(
-    builtInStyle: .balanced,
-    profile: nil
+let normalizer = try SpeakSwiftly.Normalizer(
+    builtInStyle: .balanced
 )
 
-let runtime = try await SpeakSwiftly.liftoff(
+let runtime = await SpeakSwiftly.liftoff(
     configuration: .init(
         speechBackend: .qwen3,
         textNormalizer: normalizer
@@ -40,21 +39,21 @@ let runtime = try await SpeakSwiftly.liftoff(
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:with:textProfileID:textContext:sourceFormat:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:inputTextContext:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
 
 ```swift
-let handle = try await runtime.generate.speech(
+let handle = await runtime.generate.speech(
     text: "Hello from SpeakSwiftly.",
-    with: "default-femme"
+    voiceProfile: "default-femme"
 )
 ```
 
-Use ``SpeakSwiftly/Generate/audio(text:with:textProfileID:textContext:sourceFormat:)`` when you want retained file output instead:
+Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`` when you want retained file output instead:
 
 ```swift
-let handle = try await runtime.generate.audio(
+let handle = await runtime.generate.audio(
     text: "Keep this as a generated artifact.",
-    with: "default-femme"
+    voiceProfile: "default-femme"
 )
 ```
 

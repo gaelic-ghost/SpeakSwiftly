@@ -94,4 +94,4 @@ Use ``SpeakSwiftly/Normalizer/Persistence/url()`` when you need the configured p
 
 ## Where To Look Next
 
-Once a normalizer is configured the way you want, pass its profile identifiers into generation calls with the `textProfileID` parameter so speech or file generation uses that stored normalization behavior.
+Once a normalizer is configured the way you want, pass its profile identifiers into generation calls with the `textProfile` parameter so speech or file generation uses that stored normalization behavior.
