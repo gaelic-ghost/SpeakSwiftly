@@ -609,11 +609,20 @@ checks the LaunchAgent-backed `SpeakSwiftlyServer` HTTP surface, posts to
 `/runtime/models/unload` when the live service is reachable, and leaves the
 service installed. This is the memory-saving path shared with
 `SpeakSwiftlyServer`: the live service releases resident model memory while the
-test-owned helper process keeps using its own random ports. If the live service
-is not reachable, the helper logs a warning and continues so CI and non-live
-developer machines do not fail for missing LaunchAgent state. Override the base
-URL with `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL`, or deliberately skip the preflight
-with `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1`.
+test-owned helper process keeps using its own random ports. The wrapper then
+runs `scripts/repo-maintenance/reload-live-service-resident-models.sh` after the
+test invocation so the live service restores resident models when testing is
+complete. If the live service is not reachable, the helpers log a warning and
+continue so CI and non-live developer machines do not fail for missing
+LaunchAgent state. Override the base URL with `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL`,
+or deliberately skip the service-control flow with
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1`.
+
+`run-e2e-full.sh` owns one outer live-service unload/reload pair around the full
+release-safe suite sequence. Its child `run-e2e.sh` invocations inherit that
+ownership, so the live service is not repeatedly reloaded between top-level
+suites.
 
 `run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `QueueControlE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
