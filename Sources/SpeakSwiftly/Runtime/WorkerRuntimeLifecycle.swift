@@ -252,6 +252,29 @@ extension SpeakSwiftly.Runtime {
             await emitFailure(id: request.id, error: workerError)
             return
         }
+        let speechJob: LiveSpeechRequestState?
+        if request.requiresPlayback {
+            do {
+                speechJob = try await makeSpeechJobState(for: request)
+            } catch let workerError as WorkerError {
+                failRequestStream(for: request.id, error: workerError)
+                await emitFailure(id: request.id, error: workerError)
+                return
+            } catch {
+                let workerError = WorkerError(
+                    code: .modelGenerationFailed,
+                    message: "Request '\(request.id)' could not normalize text before queueing live playback. \(error.localizedDescription)",
+                )
+                failRequestStream(for: request.id, error: workerError)
+                await emitFailure(id: request.id, error: workerError)
+                return
+            }
+            if let speechJob {
+                await playbackController.enqueue(speechJob)
+            }
+        } else {
+            speechJob = nil
+        }
         let job = await generationController.enqueue(request)
         await logRequestEvent(
             "request_accepted",
@@ -260,10 +283,6 @@ extension SpeakSwiftly.Runtime {
             profileName: request.voiceProfile,
             queueDepth: generationQueueDepth(),
         )
-        if request.requiresPlayback {
-            let speechJob = await makeSpeechJobState(for: request)
-            await playbackController.enqueue(speechJob)
-        }
         if let queuedEvent = await makeQueuedEvent(for: job) {
             await emit(queuedEvent)
             yieldRequestEvent(.queued(queuedEvent), for: request.id)

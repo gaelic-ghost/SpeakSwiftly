@@ -17,11 +17,11 @@ public enum SpeakSwiftly {
 
     /// Describes how one input text payload should be interpreted before generation.
     public struct InputTextContext: Codable, Sendable, Equatable {
-        public let context: TextForSpeech.Context?
+        public let context: TextForSpeech.InputContext?
         public let sourceFormat: TextForSpeech.SourceFormat?
 
         public init(
-            context: TextForSpeech.Context? = nil,
+            context: TextForSpeech.InputContext? = nil,
             sourceFormat: TextForSpeech.SourceFormat? = nil,
         ) {
             self.context = context
@@ -177,7 +177,7 @@ typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent
 typealias WorkerRequestHandle = SpeakSwiftly.RequestHandle
 typealias WorkerRuntime = SpeakSwiftly.Runtime
-typealias SpeechNormalizationContext = TextForSpeech.Context
+typealias SpeechNormalizationContext = TextForSpeech.InputContext
 typealias SpeechTextDeepTraceFeatures = SpeakSwiftly.DeepTrace.Features
 typealias SpeechTextDeepTraceSection = SpeakSwiftly.DeepTrace.Section
 typealias SpeechTextDeepTraceSectionWindow = SpeakSwiftly.DeepTrace.SectionWindow

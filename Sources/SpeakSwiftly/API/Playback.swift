@@ -53,7 +53,7 @@ public extension SpeakSwiftly.Player {
 
     /// Cancels one queued or active request by identifier.
     func cancelRequest(_ requestID: String) async -> SpeakSwiftly.RequestHandle {
-        await runtime.cancel(.playback, requestID: requestID)
+        await runtime.submit(.cancelRequest(id: UUID().uuidString, requestID: requestID, queueType: nil))
     }
 
     /// Cancels one queued or active request in one runtime queue.

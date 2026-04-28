@@ -7,26 +7,15 @@ extension SpeakSwiftly.Runtime {
     private func normalizeSpeechText(
         _ text: String,
         sourceFormat: TextForSpeech.SourceFormat?,
-        textContext: TextForSpeech.Context?,
-        textProfile: TextForSpeech.Profile,
-        textProfileStyle: TextForSpeech.BuiltInProfileStyle,
-    ) -> String {
-        if let sourceFormat {
-            TextForSpeech.Normalize.source(
-                text,
-                as: sourceFormat,
-                context: textContext,
-                customProfile: textProfile,
-                style: textProfileStyle,
-            )
-        } else {
-            TextForSpeech.Normalize.text(
-                text,
-                context: textContext,
-                customProfile: textProfile,
-                style: textProfileStyle,
-            )
-        }
+        textContext: TextForSpeech.InputContext?,
+        textProfileID: SpeakSwiftly.TextProfileID?,
+    ) async throws -> String {
+        try await normalizerRef.speechText(
+            text,
+            sourceFormat: sourceFormat,
+            context: textContext,
+            textProfileID: textProfileID,
+        )
     }
 
     func loadGeneratedBatch(id batchID: String) throws -> SpeakSwiftly.GeneratedBatch {
@@ -191,7 +180,7 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func makeSpeechJobState(for request: WorkerRequest) async -> LiveSpeechRequestState {
+    func makeSpeechJobState(for request: WorkerRequest) async throws -> LiveSpeechRequestState {
         let text = switch request {
             case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _):
                 text
@@ -202,29 +191,11 @@ extension SpeakSwiftly.Runtime {
         let inputTextContext = request.inputTextContext
         let textContext = inputTextContext?.context
         let sourceFormat = inputTextContext?.sourceFormat
-        let textProfileStyle = await normalizerRef.style.getActive()
-        let textProfile: TextForSpeech.Profile
-        if let textProfileID,
-           let details = try? await normalizerRef.profiles.get(id: textProfileID) {
-            textProfile = TextForSpeech.Profile(
-                id: details.profileID,
-                name: details.summary.name,
-                replacements: details.replacements,
-            )
-        } else {
-            let details = await normalizerRef.profiles.getActive()
-            textProfile = TextForSpeech.Profile(
-                id: details.profileID,
-                name: details.summary.name,
-                replacements: details.replacements,
-            )
-        }
-        let normalizedText = normalizeSpeechText(
+        let normalizedText = try await normalizeSpeechText(
             text,
             sourceFormat: sourceFormat,
             textContext: textContext,
-            textProfile: textProfile,
-            textProfileStyle: textProfileStyle,
+            textProfileID: textProfileID,
         )
         let normalizedLiveChunks: [LiveSpeechTextChunk]?
         if speechBackend == .qwen3, request.qwenPreModelTextChunking == true {
@@ -232,23 +203,24 @@ extension SpeakSwiftly.Runtime {
                 for: text,
                 strategy: .smartParagraphGroups(),
             )
-            let normalizedChunks = plannedChunks.compactMap { plannedChunk -> LiveSpeechTextChunk? in
-                let normalizedChunkText = normalizeSpeechText(
+            var normalizedChunks = [LiveSpeechTextChunk]()
+            normalizedChunks.reserveCapacity(plannedChunks.count)
+            for plannedChunk in plannedChunks {
+                let normalizedChunkText = try await normalizeSpeechText(
                     plannedChunk.text,
                     sourceFormat: sourceFormat,
                     textContext: textContext,
-                    textProfile: textProfile,
-                    textProfileStyle: textProfileStyle,
+                    textProfileID: textProfileID,
                 ).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 
-                guard !normalizedChunkText.isEmpty else { return nil }
+                guard !normalizedChunkText.isEmpty else { continue }
 
-                return LiveSpeechTextChunk(
+                normalizedChunks.append(LiveSpeechTextChunk(
                     index: plannedChunk.index,
                     text: normalizedChunkText,
                     wordCount: max(SpeakSwiftly.DeepTrace.words(in: normalizedChunkText).count, 1),
                     segmentation: plannedChunk.segmentation,
-                )
+                ))
             }
 
             normalizedLiveChunks = normalizedChunks.isEmpty ? nil : normalizedChunks

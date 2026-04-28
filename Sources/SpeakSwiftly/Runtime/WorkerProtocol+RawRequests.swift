@@ -386,7 +386,7 @@ struct RawWorkerRequest: Decodable {
                 message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`).",
             )
         }
-        let textContext = TextForSpeech.Context(
+        let textContext = TextForSpeech.InputContext(
             cwd: cwd,
             repoRoot: repoRoot,
             textFormat: textFormat,
@@ -508,7 +508,7 @@ private extension String {
     }
 }
 
-private extension TextForSpeech.Context {
+private extension TextForSpeech.InputContext {
     var isEmpty: Bool {
         cwd == nil && repoRoot == nil && textFormat == nil && nestedSourceFormat == nil
     }
