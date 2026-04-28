@@ -21,24 +21,24 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:with:textProfileID:textContext:sourceFormat:)``:
+The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)``:
 
 ```swift
-let handle = try await runtime.generate.audio(
+let handle = await runtime.generate.audio(
     text: "Persist this clip for later use.",
-    with: "default-femme"
+    voiceProfile: "default-femme"
 )
 ```
 
-You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:with:)`` when the work belongs together as one generated batch:
+You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:voiceProfile:)`` when the work belongs together as one generated batch:
 
 ```swift
-let batchHandle = try await runtime.generate.batch(
+let batchHandle = await runtime.generate.batch(
     [
         .text("Intro clip"),
         .text("Outro clip")
     ],
-    with: "default-femme"
+    voiceProfile: "default-femme"
 )
 ```
 

@@ -167,7 +167,7 @@ The wire shape is intentionally more literal and transport-oriented than the Swi
 
 `SpeakSwiftly.Configuration` is the typed runtime-startup surface. It now carries the preferred resident `speechBackend`, the Qwen conditioning strategy, the resident Qwen model selection, and an optional startup `textNormalizer`.
 
-The current prepared-conditioning integration depends on `mlx-audio-swift` `0.79.0`, the latest validated tagged release on the `gaelic-ghost/mlx-audio-swift` fork's `main` branch. Keep this dependency version-based so downstream Xcode package consumers do not inherit a branch dependency.
+The current prepared-conditioning integration depends on the pinned `mlx-audio-swift` `0.79.0` fork release. Keep this dependency version-based so downstream Xcode package consumers do not inherit a branch dependency.
 
 Default persisted configuration path:
 
@@ -540,7 +540,7 @@ The intended ownership model is:
 - the larger [`speak-to-user`](https://github.com/gaelic-ghost/speak-to-user) repository consumes SpeakSwiftly as a Git submodule under `packages/SpeakSwiftly`
 - feature work lands here first, and the consuming repository updates its submodule pointer when it is ready to adopt a newer revision
 
-Older adjacent hosts such as [`speak-to-user-mcp`](https://github.com/gaelic-ghost/speak-to-user-mcp) and [`speak-to-user-server`](https://github.com/gaelic-ghost/speak-to-user-server) should launch one deterministic Xcode build root instead of relying on copy hooks or ad hoc raw DerivedData guesses. Linked Swift package consumers should resolve the vendored `mlx-swift_Cmlx.bundle` through the package resource bundle.
+Active downstream hosts such as [`SpeakSwiftlyServer`](https://github.com/gaelic-ghost/SpeakSwiftlyServer) and the [`speak-to-user`](https://github.com/gaelic-ghost/speak-to-user) integration repository should consume tagged SpeakSwiftly package releases instead of relying on copy hooks or ad hoc raw DerivedData guesses. Linked Swift package consumers should resolve the vendored `mlx-swift_Cmlx.bundle` through the package resource bundle.
 
 ## Development Guidance
 
@@ -602,6 +602,27 @@ Use the repo-maintenance wrappers first so the runner shape stays consistent and
 sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
+
+Before each worker-backed E2E invocation, the wrapper runs
+`scripts/repo-maintenance/unload-live-service-resident-models.sh`. That preflight
+checks the LaunchAgent-backed `SpeakSwiftlyServer` HTTP surface, posts to
+`/runtime/models/unload` when the live service is reachable, and leaves the
+service installed. This is the memory-saving path shared with
+`SpeakSwiftlyServer`: the live service releases resident model memory while the
+test-owned helper process keeps using its own random ports. The wrapper then
+runs `scripts/repo-maintenance/reload-live-service-resident-models.sh` after the
+test invocation so the live service restores resident models when testing is
+complete. If the live service is not reachable, the helpers log a warning and
+continue so CI and non-live developer machines do not fail for missing
+LaunchAgent state. Override the base URL with `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL`,
+or deliberately skip the service-control flow with
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1`.
+
+`run-e2e-full.sh` owns one outer live-service unload/reload pair around the full
+release-safe suite sequence. Its child `run-e2e.sh` invocations inherit that
+ownership, so the live service is not repeatedly reloaded between top-level
+suites.
 
 `run-e2e.sh` intentionally runs exactly one top-level suite per invocation. `run-e2e-full.sh` runs the default release-safe suite list sequentially: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, `ChatterboxE2ETests`, `QueueControlE2ETests`, `MarvisE2ETests`, and `QwenE2ETests`. The `quick` alias points at `GeneratedFileE2ETests` because that suite covers worker boot, seeded profile loading, generated-file output, artifact read, and artifact listing without running a second duplicate worker pass.
 
@@ -693,10 +714,11 @@ validation when SwiftPM is blocked:
 2. Reuse the generated `.xctestrun` file for one targeted `xcodebuild test-without-building` run at a time.
 3. Prefer targeted reruns over broad shotgun retries so the failure surface stays readable.
 
-GitHub Actions should follow that same fallback lane for package compilation and
-tests only when the ordinary SwiftPM lane regresses again. Keep
-`swift package dump-package` as the manifest sanity check. The normal CI story
-should stay SwiftPM-first unless the parser failure returns.
+GitHub Actions currently keeps package compilation and targeted test coverage on
+the Xcode-backed package lane, while local ordinary package work starts with
+SwiftPM. Keep `swift package dump-package` as the manifest sanity check, and
+keep the checked-in workflow target set aligned with this section when CI
+changes.
 
 The current CI split is:
 

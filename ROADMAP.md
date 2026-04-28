@@ -34,7 +34,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [ ] Milestone 16: `mlx-audio-swift` upgrade review
 - [ ] Milestone 17: Notification-linked priority playback
 - [ ] Milestone 18: Package docs and distribution polish
-- [ ] Milestone 20: Per-request event stream observability
+- [x] Milestone 20: Per-request event stream observability
 - [ ] Milestone 21: Unified Logging with `Logger`
 - [ ] Milestone 22: Marvis MLX generation-path investigation and playback tuning
 - [x] Milestone 23: Playback request coordination flattening
@@ -105,13 +105,13 @@ Tickets:
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as hidden conventions.
 - [ ] Persist a little more voice-profile source provenance from creation flows so rerolls, diagnostics, and later profile introspection have stable grounding.
 - [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
-- [ ] Document the current tag-time runtime publication flow for adjacent consumers such as `speak-to-user-mcp` and `speak-to-user-server`, including what is automatic and what remains explicit follow-up.
+- [ ] Document the current tag-time adoption flow for active downstream consumers such as `SpeakSwiftlyServer` and the `speak-to-user` integration repository, including what is automatic and what remains explicit follow-up.
 
 Exit criteria:
 
 - [ ] Parent processes can inspect worker state and reason about service health without log scraping alone.
 - [ ] Path resolution and profile-store behavior are predictable across different launch environments.
-- [ ] The standalone release workflow clearly describes which adjacent local consumers are updated automatically and which still require explicit follow-up.
+- [ ] The standalone release workflow clearly describes which downstream consumers are updated automatically and which still require explicit follow-up.
 
 ## Milestone 13: Swift Package Distribution
 
@@ -217,31 +217,30 @@ Exit criteria:
 
 Scope:
 
-- [ ] Make per-request event streaming a first-class documented part of the Swift package surface instead of an incidental detail of `RequestHandle`.
-- [ ] Add an explicit in-process per-request observation surface for callers that only have a request ID and need to reconnect later.
-- [ ] Keep request correlation and event observation readable without forcing callers down into JSONL worker internals.
+- [x] Make per-request event streaming a first-class documented part of the Swift package surface instead of an incidental detail of `RequestHandle`.
+- [x] Add an explicit in-process per-request observation surface for callers that only have a request ID and need to reconnect later.
+- [x] Keep request correlation and event observation readable without forcing callers down into JSONL worker internals.
 
 Tickets:
 
-- [ ] Replace the current single-continuation request-stream bookkeeping with a runtime-owned per-request event broker that supports multiple in-process subscribers.
-- [ ] Add a public `runtime.request(id:)` snapshot API for callers that need current per-request state before attaching to live updates.
-- [ ] Add a public `runtime.updates(for:)` API for callers that only know a request ID and need on-demand in-process observation.
-- [ ] Decide whether the new on-demand stream should replay a bounded recent window on attach or start at the live tail only, and make that behavior explicit in the API contract.
-- [ ] Introduce a data-first per-request update payload that can represent terminal failure as data for late subscribers, while keeping `RequestHandle.events` source-compatible for existing callers.
-- [ ] Audit `RequestHandle` and `RequestEvent` for missing lifecycle guarantees or mismatches between docs and implementation.
-- [ ] Tighten tests around event ordering, terminal completion semantics, cancellation semantics, multiple subscribers, late subscribers, replay behavior, and stream teardown.
-- [ ] Keep the in-process boundary explicit. This milestone does not promise durable cross-process subscriptions or persisted request-event history.
+- [x] Replace the current single-continuation request-stream bookkeeping with a runtime-owned per-request event broker that supports multiple in-process subscribers.
+- [x] Add a public `runtime.request(id:)` snapshot API for callers that need current per-request state before attaching to live updates.
+- [x] Add a public `runtime.updates(for:)` API for callers that only know a request ID and need on-demand in-process observation.
+- [x] Decide whether the new on-demand stream should replay a bounded recent window on attach or start at the live tail only, and make that behavior explicit in the API contract.
+- [x] Introduce a data-first per-request update payload that can represent terminal failure as data for late subscribers, while keeping `RequestHandle.events` source-compatible for existing callers.
+- [x] Audit `RequestHandle` and `RequestEvent` for missing lifecycle guarantees or mismatches between docs and implementation.
+- [x] Tighten tests around event ordering, terminal completion semantics, cancellation semantics, multiple subscribers, late subscribers, replay behavior, and stream teardown.
+- [x] Keep the in-process boundary explicit. This milestone does not promise durable cross-process subscriptions or persisted request-event history.
 
 Implementation notes:
 
-- Detailed design and sequencing live in `docs/maintainers/per-request-update-stream-plan-2026-04-09.md`.
-- The preferred implementation shape is a runtime-owned request-event broker plus additive `request(id:)` and `updates(for:)` APIs, not a second ad-hoc observer map.
+- The landed implementation shape is a runtime-owned request-event broker plus additive `request(id:)`, `updates(for:)`, and `generationEvents(for:)` APIs, not a second ad-hoc observer map.
 
 Exit criteria:
 
-- [ ] The package documents one clear per-request observation story for Swift callers.
-- [ ] In-process callers can reconnect to per-request state and live updates using only a request ID.
-- [ ] Streamed request events and request snapshots have explicit lifecycle guarantees backed by tests.
+- [x] The package documents one clear per-request observation story for Swift callers.
+- [x] In-process callers can reconnect to per-request state and live updates using only a request ID.
+- [x] Streamed request events and request snapshots have explicit lifecycle guarantees backed by tests.
 
 ## Milestone 21: Unified Logging With `Logger`
 

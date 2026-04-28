@@ -81,9 +81,9 @@ For GitHub Actions, keep the manifest sanity check as:
 swift package dump-package
 ```
 
-Then use the same Xcode-backed package lane for build-and-test coverage only
-while the SwiftPM parser regression is actually present.
-The current macOS CI target set is:
+GitHub Actions currently keeps build-and-test coverage on the Xcode-backed
+package lane even though local ordinary package work starts with SwiftPM. The
+current macOS CI target set is:
 
 - `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
 - `SpeakSwiftlyTests/LibrarySurfaceTests`
@@ -140,6 +140,18 @@ The wrappers intentionally run one top-level worker-backed suite per process so
 Xcode or Swift Testing cannot freeze Gale's machine by launching multiple model
 loading suites at once.
 
+Each wrapper invocation also runs the live-service resident-model unload
+preflight before `swift test`. The preflight posts to the
+LaunchAgent-backed `SpeakSwiftlyServer` `/runtime/models/unload` endpoint when
+that service is reachable, leaving the service installed and only freeing
+resident model memory for the package-owned E2E worker. The wrapper reloads the
+live service resident models after the test invocation completes. The full-lane
+wrapper owns one outer unload/reload pair around the full release-safe sequence,
+so child suite invocations do not repeatedly reload the live service between
+suites. Set `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` for a non-default live-service
+URL, or set `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1` for a deliberate skip.
+
 Plain `swift test` remains the execution engine under those wrappers. Keep the
 Xcode-backed lane as a fallback only if a future toolchain regression breaks the
 ordinary SwiftPM path again.
@@ -190,7 +202,6 @@ PY
 xcodebuild test-without-building -quiet \
   -xctestrun "$(find .local/derived-data/e2e-full/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
   -destination 'platform=macOS' \
-  -only-testing:'SpeakSwiftlyTests/QuickE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
   -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
@@ -242,4 +253,4 @@ For Marvis profiling, throughput investigation, and trace work, prefer the dedic
 - Never run multiple heavy validation commands at the same time.
 - Never run multiple SwiftPM or Xcode build or test processes concurrently.
 - Prefer one clean targeted rerun over broad shotgun retries.
-- If the failure is clearly the older vendored parser snag, document that lane choice in your notes instead of treating it as an unexplained flake.
+- If a failure clearly matches the older vendored parser snag, document that fallback-lane choice in your notes instead of treating it as an unexplained flake.

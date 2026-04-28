@@ -147,9 +147,41 @@ if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$audible" = "true" ]; th
   export SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1
 fi
 
+restore_status=0
+restore_needed="false"
+restore_live_service() {
+  if [ "$restore_needed" = "true" ]; then
+    restore_needed="false"
+    sh "$SELF_DIR/reload-live-service-resident-models.sh" || restore_status=$?
+  fi
+}
+
+if [ "${SPEAKSWIFTLY_E2E_LIVE_SERVICE_MANAGED:-}" != "1" ]; then
+  sh "$SELF_DIR/unload-live-service-resident-models.sh"
+  restore_needed="true"
+  trap 'restore_live_service' EXIT
+  trap 'restore_live_service; exit 129' HUP
+  trap 'restore_live_service; exit 130' INT
+  trap 'restore_live_service; exit 143' TERM
+fi
+
 log "Running SpeakSwiftly E2E suite '$suite_name' through plain SwiftPM."
 log "This wrapper intentionally runs exactly one top-level suite per invocation."
+set +e
 (
   cd "$REPO_ROOT"
   swift test --filter "$suite_name"
 )
+test_status=$?
+set -e
+
+if [ "${SPEAKSWIFTLY_E2E_LIVE_SERVICE_MANAGED:-}" != "1" ]; then
+  restore_live_service
+  trap - EXIT HUP INT TERM
+fi
+
+if [ "$test_status" -ne 0 ]; then
+  exit "$test_status"
+fi
+
+exit "$restore_status"

@@ -62,7 +62,7 @@ surfaces.
 Library consumers can add the package from GitHub:
 
 ```swift
-    .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "3.0.0")
+    .package(url: "https://github.com/gaelic-ghost/SpeakSwiftly.git", from: "4.0.0")
 ```
 
 Then add `SpeakSwiftly` to the target that will own the runtime.
@@ -315,6 +315,15 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
+Those wrappers first ask the live `SpeakSwiftlyServer` service to unload resident
+models through its HTTP runtime-control surface, leaving the installed service in
+place while the test-owned worker gets memory headroom. They ask the live service
+to reload resident models after the test invocation completes. Set
+`SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` when the live service is not on
+`http://127.0.0.1:7337`, or set `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
+`SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1` only when you deliberately want to skip
+that local service-control flow.
+
 If a future toolchain regression blocks the ordinary SwiftPM lane again, or if
 you specifically need the Xcode-backed package, simulator, or real-runtime
 lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and
@@ -335,6 +344,8 @@ lanes, use [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## Release Notes
 
 Release workflow and release-grade validation are maintained through `scripts/repo-maintenance/release.sh` and the release notes attached to tagged GitHub releases. See [CONTRIBUTING.md](CONTRIBUTING.md) for maintainer workflow details before cutting a release.
+
+The checked-in files under `docs/releases/` are selected historical release-prep and release-note snapshots, not a complete list of every published tag. Use GitHub releases and repository tags for the authoritative release history.
 
 ## License
 
