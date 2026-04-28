@@ -3,6 +3,11 @@ import Foundation
 // MARK: - Generation Queue
 
 actor SpeechGenerationController {
+    enum QueueReadiness: Equatable {
+        case preparing
+        case ready
+    }
+
     struct Job: Equatable {
         let token: UUID
         let request: WorkerRequest
@@ -20,10 +25,21 @@ actor SpeechGenerationController {
 
     private var queue = [Job]()
     private var activeJobs = [UUID: Job]()
+    private var preparingTokens = Set<UUID>()
 
-    func enqueue(_ request: WorkerRequest) -> Job {
+    func enqueue(_ request: WorkerRequest, readiness: QueueReadiness = .ready) -> Job {
         let job = Job(request: request)
         queue.append(job)
+        if readiness == .preparing {
+            preparingTokens.insert(job.token)
+        }
+        return job
+    }
+
+    func markReady(token: UUID) -> Job? {
+        guard let job = queue.first(where: { $0.token == token }) else { return nil }
+
+        preparingTokens.remove(token)
         return job
     }
 
@@ -31,6 +47,7 @@ actor SpeechGenerationController {
         let tokenSet = Set(tokens)
         let reserved = queue.filter { tokenSet.contains($0.token) }
         queue.removeAll { tokenSet.contains($0.token) }
+        preparingTokens.subtract(tokenSet)
         for job in reserved {
             activeJobs[job.token] = job
         }
@@ -50,7 +67,9 @@ actor SpeechGenerationController {
         }
 
         if let index = queue.firstIndex(where: { $0.request.id == requestID }) {
-            return .queued(queue.remove(at: index))
+            let job = queue.remove(at: index)
+            preparingTokens.remove(job.token)
+            return .queued(job)
         }
 
         return nil
@@ -59,11 +78,16 @@ actor SpeechGenerationController {
     func clearQueued() -> [Job] {
         let queued = queue
         queue.removeAll()
+        preparingTokens.removeAll()
         return queued
     }
 
     func activeJobsOrdered() -> [Job] {
         activeJobs.values.sorted { $0.request.id < $1.request.id }
+    }
+
+    func readyQueuedJobsOrdered() -> [Job] {
+        orderedWaitingQueue(in: queue.filter { !preparingTokens.contains($0.token) })
     }
 
     func queuedJobsOrdered() -> [Job] {

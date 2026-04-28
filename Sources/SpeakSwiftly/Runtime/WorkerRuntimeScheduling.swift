@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
         guard !isShuttingDown else { return }
 
         let activeJobs = await generationController.activeJobsOrdered()
-        let queuedJobs = await generationController.queuedJobsOrdered()
+        let queuedJobs = await generationController.readyQueuedJobsOrdered()
         let playbackAdmission = await playbackController.generationAdmissionSnapshot()
         let playbackTelemetry = await playbackController.coordinationTelemetrySnapshot()
         let decision = try evaluateGenerationSchedule(
