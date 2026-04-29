@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-This note explains the current post-`TextForSpeech 0.18.0` model in maintainer terms.
+This note explains the current post-`TextForSpeech 0.18.9` model in maintainer terms.
 
 The three concepts that most often get conflated are:
 
@@ -23,7 +23,7 @@ Those now live in three different places on purpose.
 - `persistence`
   The persisted runtime state on disk or in memory.
 
-That split is the whole simplification.
+That split is the public simplification. Generation then uses one shared `SpeakSwiftly.Normalizer.speechText(...)` entry point to call the async `TextForSpeech.Normalize` APIs, so live playback, retained files, source-format handling, custom profiles, built-in style, and summarization-provider selection all pass through the same package-owned path.
 
 We no longer expose a mixed bag of “style plus active profile plus stored profiles plus raw replacement list” helpers on one surface, and we no longer support whole-profile replace/store/use workflows through `SpeakSwiftly`.
 
@@ -61,7 +61,7 @@ The important point is that stored profiles are now addressed by stable identifi
 
 Each stored profile has:
 
-- a stable `profileID`
+- a stable identifier exposed as `profileID` in `SpeakSwiftly.TextProfileDetails` and `profile_id` in JSONL payloads
 - a mutable human-facing `name`
 - a `replacements` array
 
@@ -148,9 +148,9 @@ The optional `text_profile_id` on those JSONL operations means:
 For any single generation request, the mental model is:
 
 1. pick the built-in style
-2. pick the active custom profile
-3. compute the effective merged profile for that job
-4. normalize the input text with request-local context
+2. pick the requested stored custom profile, or the active custom profile when the request does not name one
+3. snapshot the active TextForSpeech summarization provider
+4. normalize the input text with request-local source format and `TextForSpeech.InputContext`
 
 That is why the generation APIs now carry `textProfile` rather than `textProfileName`.
 

@@ -252,7 +252,10 @@ extension SpeakSwiftly.Runtime {
             await emitFailure(id: request.id, error: workerError)
             return
         }
-        let job = await generationController.enqueue(request)
+        let job = await generationController.enqueue(
+            request,
+            readiness: request.requiresPlayback ? .preparing : .ready,
+        )
         await logRequestEvent(
             "request_accepted",
             requestID: request.id,
@@ -260,10 +263,6 @@ extension SpeakSwiftly.Runtime {
             profileName: request.voiceProfile,
             queueDepth: generationQueueDepth(),
         )
-        if request.requiresPlayback {
-            let speechJob = await makeSpeechJobState(for: request)
-            await playbackController.enqueue(speechJob)
-        }
         if let queuedEvent = await makeQueuedEvent(for: job) {
             await emit(queuedEvent)
             yieldRequestEvent(.queued(queuedEvent), for: request.id)
@@ -294,6 +293,33 @@ extension SpeakSwiftly.Runtime {
                 queueDepth: generationQueueDepth(),
             )
             await emit(acknowledgement)
+        }
+        if request.requiresPlayback {
+            let speechJob: LiveSpeechRequestState
+            do {
+                speechJob = try await makeSpeechJobState(for: request)
+            } catch let workerError as WorkerError {
+                guard await generationController.cancel(requestID: request.id) != nil else { return }
+
+                failRequestStream(for: request.id, error: workerError)
+                await emitFailure(id: request.id, error: workerError)
+                return
+            } catch {
+                let workerError = WorkerError(
+                    code: .modelGenerationFailed,
+                    message: "Request '\(request.id)' could not normalize text before queueing live playback. \(error.localizedDescription)",
+                )
+                guard await generationController.cancel(requestID: request.id) != nil else { return }
+
+                failRequestStream(for: request.id, error: workerError)
+                await emitFailure(id: request.id, error: workerError)
+                return
+            }
+            await playbackController.enqueue(speechJob)
+            guard await generationController.markReady(token: job.token) != nil else {
+                _ = await playbackController.discard(requestID: request.id)
+                return
+            }
         }
         try? await startNextGenerationIfPossible()
         await playbackController.startNextIfPossible()

@@ -595,7 +595,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 // MARK: - Deep Trace and Normalization
 
-@Test func `speech text deep trace features capture code heavy and weird text shapes`() {
+@Test func `speech text deep trace features capture code heavy and weird text shapes`() async throws {
     let original = """
     # Header
 
@@ -611,7 +611,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     Also say chrommmaticallly and qqqwweerrtyy once.
     """
 
-    let normalized = TextForSpeech.Normalize.text(original)
+    let normalized = try await TextForSpeech.Normalize.text(original)
     let features = SpeakSwiftly.DeepTrace.features(
         originalText: original,
         normalizedText: normalized,
@@ -677,12 +677,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(windowsAreContiguous)
 }
 
-@Test func `speech text normalization makes paths and identifiers more speakable`() {
+@Test func `speech text normalization makes paths and identifiers more speakable`() async throws {
     let original = """
     Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
     """
 
-    let normalized = TextForSpeech.Normalize.text(original)
+    let normalized = try await TextForSpeech.Normalize.text(original)
 
     #expect(normalized.contains("gale wumbo Workspace Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
@@ -1466,7 +1466,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let logs = try await runtime.normalizer.profiles.create(name: "Logs")
     _ = try await runtime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error"),
-        toProfile: logs.profileID,
+        toProfile: logs.id,
     )
     _ = try await runtime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement(
@@ -1474,7 +1474,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
             with: "settings token",
             during: .afterBuiltIns,
         ),
-        toProfile: logs.profileID,
+        toProfile: logs.id,
     )
     await runtime.start()
     #expect(await waitUntil {

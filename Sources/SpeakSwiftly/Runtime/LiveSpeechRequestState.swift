@@ -6,7 +6,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let text: String
     let profileName: String
     let textProfileID: String?
-    let textContext: TextForSpeech.Context?
+    let textContext: TextForSpeech.InputContext?
     let sourceFormat: TextForSpeech.SourceFormat?
     let requestContext: SpeakSwiftly.RequestContext?
     let normalizedText: String

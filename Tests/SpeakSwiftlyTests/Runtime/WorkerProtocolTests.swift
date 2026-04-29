@@ -83,7 +83,7 @@ import TextForSpeech
             textProfileID: "logs",
             jobType: .live,
             inputTextContext: .init(
-                context: TextForSpeech.Context(
+                context: TextForSpeech.InputContext(
                     cwd: "/Users/galew/Workspace/SpeakSwiftly",
                     repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
                     textFormat: .cli,
@@ -109,7 +109,7 @@ import TextForSpeech
             textProfileID: nil,
             jobType: .live,
             inputTextContext: .init(
-                context: TextForSpeech.Context(
+                context: TextForSpeech.InputContext(
                     textFormat: .markdown,
                     nestedSourceFormat: .swift,
                 ),

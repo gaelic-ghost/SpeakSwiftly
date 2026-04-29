@@ -82,8 +82,13 @@ extension SpeakSwiftly.Runtime {
 
         if queueType == nil || queueType == .playback,
            let playbackState = await playbackController.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
+            let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID, removeActive: false)
+            if case let .active(job) = cancelledGenerationTarget {
+                activeGenerationCancellations[job.request.id] = cancellation
+            }
             playbackState.execution.continuation.finish(throwing: cancellation)
             await completePlaybackJob(playbackState.request, result: .failure(cancellation))
+            try? await startNextGenerationIfPossible()
             await playbackController.startNextIfPossible()
             return targetRequestID
         }

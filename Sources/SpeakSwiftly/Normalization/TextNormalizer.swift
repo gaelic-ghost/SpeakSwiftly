@@ -6,7 +6,7 @@ import TextForSpeech
 private extension SpeakSwiftly.Normalizer {
     func profile(from details: TextForSpeech.Runtime.Profiles.Details) -> TextForSpeech.Profile {
         TextForSpeech.Profile(
-            id: details.profileID,
+            id: details.id,
             name: details.summary.name,
             replacements: details.replacements,
         )
@@ -34,10 +34,6 @@ private extension SpeakSwiftly.Normalizer {
 
     func storedTextProfile(id: String) throws -> TextForSpeech.Profile {
         try profile(from: textProfileDetails(id: id))
-    }
-
-    func effectiveTextProfile() -> TextForSpeech.Profile {
-        profile(from: effectiveTextProfileDetails())
     }
 
     func activeTextProfileStyle() -> TextForSpeech.BuiltInProfileStyle {
@@ -126,6 +122,41 @@ private extension SpeakSwiftly.Normalizer {
         fromProfile profileID: String,
     ) throws -> TextForSpeech.Runtime.Profiles.Details {
         try textRuntime.profiles.removeReplacement(id: replacementID, fromProfile: profileID)
+    }
+
+    func normalizeSpeechText(
+        _ text: String,
+        sourceFormat: TextForSpeech.SourceFormat?,
+        context: TextForSpeech.InputContext?,
+        textProfileID: SpeakSwiftly.TextProfileID?,
+    ) async throws -> String {
+        let textProfile = if let textProfileID,
+                             let storedProfile = try? storedTextProfile(id: textProfileID) {
+            storedProfile
+        } else {
+            activeTextProfile()
+        }
+        let style = textRuntime.builtInStyle
+        let summarizationProvider = textRuntime.activeSummarizationProvider
+
+        if let sourceFormat {
+            return try await TextForSpeech.Normalize.source(
+                text,
+                as: sourceFormat,
+                withContext: context,
+                customProfile: textProfile,
+                style: style,
+                summarizationProvider: summarizationProvider,
+            )
+        }
+
+        return try await TextForSpeech.Normalize.text(
+            text,
+            withContext: context,
+            customProfile: textProfile,
+            style: style,
+            summarizationProvider: summarizationProvider,
+        )
     }
 }
 
@@ -263,5 +294,22 @@ public extension SpeakSwiftly.Normalizer.Profiles {
         fromProfile profileID: String,
     ) async throws -> TextForSpeech.Runtime.Profiles.Details {
         try await normalizer.removeTextReplacement(id: replacementID, fromProfile: profileID)
+    }
+}
+
+public extension SpeakSwiftly.Normalizer {
+    /// Normalizes generation text through the shared TextForSpeech runtime.
+    func speechText(
+        _ text: String,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
+        context: TextForSpeech.InputContext? = nil,
+        textProfileID: SpeakSwiftly.TextProfileID? = nil,
+    ) async throws -> String {
+        try await normalizeSpeechText(
+            text,
+            sourceFormat: sourceFormat,
+            context: context,
+            textProfileID: textProfileID,
+        )
     }
 }

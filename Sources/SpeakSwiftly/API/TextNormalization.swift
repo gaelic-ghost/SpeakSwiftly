@@ -46,7 +46,7 @@ public extension SpeakSwiftly {
         public var id: String { profileID }
 
         init(_ details: TextForSpeech.Runtime.Profiles.Details) {
-            profileID = details.profileID
+            profileID = details.id
             summary = TextProfileSummary(details.summary)
             replacements = details.replacements
         }

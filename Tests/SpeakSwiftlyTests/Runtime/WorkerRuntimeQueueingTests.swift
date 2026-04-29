@@ -296,6 +296,43 @@ import TextForSpeech
     await playbackDrain.open()
 }
 
+@Test func `preparing live speech blocks later resident control barriers`() async throws {
+    let runtime = try await makeRuntime(
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    let preparingLiveJob = SpeechGenerationController.Job(
+        request: .queueSpeech(
+            id: "req-preparing-live",
+            text: "Hello while playback state is still preparing.",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .live,
+            inputTextContext: nil,
+            requestContext: nil,
+            qwenPreModelTextChunking: nil,
+        ),
+    )
+    let reloadJob = SpeechGenerationController.Job(
+        request: .reloadModels(id: "req-reload-models"),
+    )
+
+    let decision = try await runtime.evaluateGenerationSchedule(
+        activeJobs: [],
+        queuedJobs: [preparingLiveJob, reloadJob],
+        preparingJobTokens: [preparingLiveJob.token],
+        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot(
+            activeRequestID: nil,
+            activeRequestTuningProfile: nil,
+            allowsConcurrentGeneration: true,
+        ),
+    )
+
+    #expect(decision.runnableJobs.isEmpty)
+    #expect(decision.parkReasons == [preparingLiveJob.token: .waitingForActiveRequest])
+}
+
 @Test func `runtime uses configured speech backend for resident model preload`() async throws {
     let output = OutputRecorder()
     let recorder = LoadedBackendRecorder()
@@ -471,14 +508,14 @@ import TextForSpeech
     let logs = try await firstRuntime.normalizer.profiles.create(name: "Logs")
     _ = try await firstRuntime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
-        toProfile: logs.profileID,
+        toProfile: logs.id,
     )
     let ops = try await firstRuntime.normalizer.profiles.create(name: "Ops")
     _ = try await firstRuntime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule"),
-        toProfile: ops.profileID,
+        toProfile: ops.id,
     )
-    try await firstRuntime.normalizer.profiles.setActive(id: ops.profileID)
+    try await firstRuntime.normalizer.profiles.setActive(id: ops.id)
 
     let secondRuntime = try await makeRuntime(
         rootURL: rootURL,
@@ -487,12 +524,12 @@ import TextForSpeech
         residentModelLoader: { _ in makeResidentModel() },
     )
 
-    let storedLogs = try await secondRuntime.normalizer.profiles.get(id: logs.profileID)
+    let storedLogs = try await secondRuntime.normalizer.profiles.get(id: logs.id)
     let activeProfile = await secondRuntime.normalizer.profiles.getActive()
     let effectiveProfile = await secondRuntime.normalizer.profiles.getEffective()
 
     #expect(storedLogs.replacements.map(\.id) == ["logs-rule"])
-    #expect(activeProfile.profileID == ops.profileID)
+    #expect(activeProfile.id == ops.id)
     #expect(activeProfile.replacements.map(\.id) == ["ops-rule"])
     #expect(effectiveProfile.replacements.map(\.id).contains("ops-rule"))
     #expect(effectiveProfile.replacements.map(\.id).contains("base-url"))
@@ -514,20 +551,20 @@ import TextForSpeech
 
     let added = try await runtime.normalizer.profiles.addReplacement(
         TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
-        toProfile: created.profileID,
+        toProfile: created.id,
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
     let replaced = try await runtime.normalizer.profiles.patchReplacement(
         TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
-        inProfile: created.profileID,
+        inProfile: created.id,
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
-    #expect(try await runtime.normalizer.profiles.get(id: created.profileID).replacements.map(\.id) == ["stderr-rule"])
+    #expect(try await runtime.normalizer.profiles.get(id: created.id).replacements.map(\.id) == ["stderr-rule"])
 
     let emptied = try await runtime.normalizer.profiles.removeReplacement(
         id: "stderr-rule",
-        fromProfile: created.profileID,
+        fromProfile: created.id,
     )
     #expect(emptied.replacements.isEmpty)
 
@@ -537,7 +574,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    #expect(try await reloaded.normalizer.profiles.get(id: created.profileID).replacements.isEmpty == true)
+    #expect(try await reloaded.normalizer.profiles.get(id: created.id).replacements.isEmpty == true)
 }
 
 @Test func `active text profile editing helpers mutate and persist custom profile`() async throws {

@@ -26,39 +26,12 @@ extension SpeakSwiftly.Runtime {
 
         let textContext = inputTextContext?.context
         let sourceFormat = inputTextContext?.sourceFormat
-        let textProfileStyle = await normalizerRef.style.getActive()
-        let normalizationProfile: TextForSpeech.Profile
-        if let textProfile,
-           let details = try? await normalizerRef.profiles.get(id: textProfile) {
-            normalizationProfile = TextForSpeech.Profile(
-                id: details.profileID,
-                name: details.summary.name,
-                replacements: details.replacements,
-            )
-        } else {
-            let details = await normalizerRef.profiles.getActive()
-            normalizationProfile = TextForSpeech.Profile(
-                id: details.profileID,
-                name: details.summary.name,
-                replacements: details.replacements,
-            )
-        }
-        let normalizedText = if let sourceFormat {
-            TextForSpeech.Normalize.source(
-                text,
-                as: sourceFormat,
-                context: textContext,
-                customProfile: normalizationProfile,
-                style: textProfileStyle,
-            )
-        } else {
-            TextForSpeech.Normalize.text(
-                text,
-                context: textContext,
-                customProfile: normalizationProfile,
-                style: textProfileStyle,
-            )
-        }
+        let normalizedText = try await normalizerRef.speechText(
+            text,
+            sourceFormat: sourceFormat,
+            context: textContext,
+            textProfileID: textProfile,
+        )
 
         await emitProgress(id: id, stage: .generatingFileAudio)
         let generationStartedAt = dependencies.now()

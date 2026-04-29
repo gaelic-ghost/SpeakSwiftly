@@ -119,7 +119,7 @@ let requestHandle = await runtime.generate.audio(
 ```
 
 The typed Swift surface uses `voiceProfile`, `textProfile`, `inputTextContext`, and `requestContext`.
-`SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so the same request-origin metadata shape can move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
+`SpeakSwiftly.InputTextContext.context` is the shared `TextForSpeech.InputContext` model, and `SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so the same text-shaping and request-origin metadata shapes can move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
 The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 The runtime is organized around stored concern handles that callers can keep and reuse:
@@ -132,6 +132,8 @@ The runtime is organized around stored concern handles that callers can keep and
 - `runtime.artifacts`
 
 `runtime.normalizer.profiles` includes replacement-rule inspection and bulk-clear helpers, so hosts can inspect or reset the active or stored text-profile rules without dropping down to raw JSONL.
+
+Generation now routes all speech text through `runtime.normalizer.speechText(...)`, which delegates to the shared `TextForSpeech.Normalize` entry points. That keeps live playback, retained file generation, source-format normalization, custom text-profile selection, built-in style selection, and TextForSpeech summarization-provider selection on one package-owned path instead of reconstructing normalization inputs at each generation call site.
 
 When callers need a standalone text normalizer, `SpeakSwiftly.Normalizer(...)` throws if the persisted text-profile archive cannot be loaded or decoded. The worker runtime still uses a best-effort recovery path so `SpeakSwiftly.liftoff()` can continue starting in operator-facing environments.
 
