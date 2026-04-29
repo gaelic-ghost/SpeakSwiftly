@@ -43,6 +43,14 @@ actor SpeechGenerationController {
         return job
     }
 
+    func isPreparing(token: UUID) -> Bool {
+        preparingTokens.contains(token)
+    }
+
+    func preparingJobTokens() -> Set<UUID> {
+        preparingTokens
+    }
+
     func reserveQueuedJobs(tokens: [UUID]) -> [Job] {
         let tokenSet = Set(tokens)
         let reserved = queue.filter { tokenSet.contains($0.token) }

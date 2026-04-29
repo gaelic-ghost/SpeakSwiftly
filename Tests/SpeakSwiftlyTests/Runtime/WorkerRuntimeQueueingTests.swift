@@ -296,6 +296,43 @@ import TextForSpeech
     await playbackDrain.open()
 }
 
+@Test func `preparing live speech blocks later resident control barriers`() async throws {
+    let runtime = try await makeRuntime(
+        output: OutputRecorder(),
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    let preparingLiveJob = SpeechGenerationController.Job(
+        request: .queueSpeech(
+            id: "req-preparing-live",
+            text: "Hello while playback state is still preparing.",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .live,
+            inputTextContext: nil,
+            requestContext: nil,
+            qwenPreModelTextChunking: nil,
+        ),
+    )
+    let reloadJob = SpeechGenerationController.Job(
+        request: .reloadModels(id: "req-reload-models"),
+    )
+
+    let decision = try await runtime.evaluateGenerationSchedule(
+        activeJobs: [],
+        queuedJobs: [preparingLiveJob, reloadJob],
+        preparingJobTokens: [preparingLiveJob.token],
+        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot(
+            activeRequestID: nil,
+            activeRequestTuningProfile: nil,
+            allowsConcurrentGeneration: true,
+        ),
+    )
+
+    #expect(decision.runnableJobs.isEmpty)
+    #expect(decision.parkReasons == [preparingLiveJob.token: .waitingForActiveRequest])
+}
+
 @Test func `runtime uses configured speech backend for resident model preload`() async throws {
     let output = OutputRecorder()
     let recorder = LoadedBackendRecorder()

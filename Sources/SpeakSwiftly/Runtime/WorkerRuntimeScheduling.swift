@@ -9,12 +9,14 @@ extension SpeakSwiftly.Runtime {
         guard !isShuttingDown else { return }
 
         let activeJobs = await generationController.activeJobsOrdered()
-        let queuedJobs = await generationController.readyQueuedJobsOrdered()
+        let queuedJobs = await generationController.queuedJobsOrdered()
+        let preparingJobTokens = await generationController.preparingJobTokens()
         let playbackAdmission = await playbackController.generationAdmissionSnapshot()
         let playbackTelemetry = await playbackController.coordinationTelemetrySnapshot()
         let decision = try evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
+            preparingJobTokens: preparingJobTokens,
             playbackAdmission: playbackAdmission,
         )
 
@@ -72,6 +74,7 @@ extension SpeakSwiftly.Runtime {
     func evaluateGenerationSchedule(
         activeJobs: [SpeechGenerationController.Job],
         queuedJobs: [SpeechGenerationController.Job],
+        preparingJobTokens: Set<UUID> = [],
         playbackAdmission: PlaybackController.GenerationAdmissionSnapshot,
     ) throws -> GenerationScheduleDecision {
         guard !queuedJobs.isEmpty else {
@@ -84,6 +87,11 @@ extension SpeakSwiftly.Runtime {
         var selectedJobs = [SpeechGenerationController.Job]()
 
         for job in queuedJobs where !isBlockedByProfileCreation(job, activeJobs: activeJobs, queuedJobs: queuedJobs) {
+            if preparingJobTokens.contains(job.token) {
+                parkReasons[job.token] = .waitingForActiveRequest
+                break
+            }
+
             if sawParkedResidentDependentWork, !job.request.canBypassParkedResidentWork {
                 break
             }
