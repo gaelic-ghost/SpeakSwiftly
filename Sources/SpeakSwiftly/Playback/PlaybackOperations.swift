@@ -88,6 +88,7 @@ extension SpeakSwiftly.Runtime {
             }
             playbackState.execution.continuation.finish(throwing: cancellation)
             await completePlaybackJob(playbackState.request, result: .failure(cancellation))
+            try? await startNextGenerationIfPossible()
             await playbackController.startNextIfPossible()
             return targetRequestID
         }
