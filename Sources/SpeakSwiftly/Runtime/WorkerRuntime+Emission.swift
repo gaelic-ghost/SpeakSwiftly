@@ -394,7 +394,7 @@ extension SpeakSwiftly.Runtime {
                     id: id,
                     op: request.opName,
                 )
-            case let .createProfile(id, profileName, text, vibe, voiceDescription, outputPath, cwd):
+            case let .createProfile(id, profileName, text, vibe, voiceDescription, _, _, outputPath, cwd):
                 await submitRequest(
                     id: id,
                     op: request.opName,

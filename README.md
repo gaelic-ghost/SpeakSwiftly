@@ -223,6 +223,7 @@ Key typed runtime entry points include:
 - `runtime.generate.audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
 - `runtime.generate.batch(_:voiceProfile:)`
 - `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
+- `runtime.voices.create(systemDesign named:from:vibe:voice:seed:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
 - `runtime.voices.list()`
 - `runtime.voices.rename(_:to:)`

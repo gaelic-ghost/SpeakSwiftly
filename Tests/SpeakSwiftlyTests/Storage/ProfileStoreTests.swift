@@ -26,6 +26,8 @@ import Testing
 
     #expect(stored.manifest.profileName == "default-femme")
     #expect(stored.manifest.vibe == .femme)
+    #expect(stored.manifest.author == .user)
+    #expect(stored.manifest.seed == nil)
     #expect(stored.manifest.transcriptProvenance == nil)
     #expect(stored.manifest.backendMaterializations.map(\.backend) == [.qwen3])
     #expect(try stored.qwenMaterialization().manifest.referenceText == "Hello there")
@@ -33,6 +35,9 @@ import Testing
     let listed = try store.listProfiles()
     #expect(listed.count == 1)
     #expect(listed.first?.profileName == "default-femme")
+    #expect(listed.first?.author == .user)
+    #expect(listed.first?.seedID == nil)
+    #expect(listed.first?.seedVersion == nil)
     #expect(listed.first?.transcriptSource == nil)
     #expect(listed.first?.transcriptResolvedAt == nil)
     #expect(listed.first?.transcriptionModelRepo == nil)
@@ -46,6 +51,94 @@ import Testing
     try store.removeProfile(named: "default-femme")
     let empty = try store.listProfiles()
     #expect(empty.isEmpty)
+}
+
+@Test func `stores and lists system profile authorship and seed metadata`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let installedAt = Date(timeIntervalSince1970: 1_777_728_000)
+    let seed = SpeakSwiftly.ProfileSeed(
+        seedID: "swift.signal",
+        seedVersion: "1",
+        intendedProfileName: "swift-signal",
+        fallbackProfileName: nil,
+        installedAt: installedAt,
+        sourcePackage: "SpeakSwiftlyServer",
+        sourceVersion: "4.2.0",
+        sampleMediaPath: "Samples/swift-signal.wav",
+    )
+
+    let stored = try store.createProfile(
+        profileName: "swift-signal",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Bright and clear.",
+        sourceText: "Hello there",
+        author: .system,
+        seed: seed,
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+    )
+
+    #expect(stored.manifest.author == .system)
+    #expect(stored.manifest.seed == seed)
+
+    let reloaded = try store.loadProfile(named: "swift-signal")
+    #expect(reloaded.manifest.author == .system)
+    #expect(reloaded.manifest.seed?.seedID == "swift.signal")
+    #expect(reloaded.manifest.seed?.sampleMediaPath == "Samples/swift-signal.wav")
+
+    let summary = try #require(try store.listProfiles().first)
+    #expect(summary.profileName == "swift-signal")
+    #expect(summary.author == .system)
+    #expect(summary.seedID == "swift.signal")
+    #expect(summary.seedVersion == "1")
+}
+
+@Test func `ordinary mutation rejects system profiles`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    _ = try store.createProfile(
+        profileName: "swift-anchor",
+        vibe: .masc,
+        modelRepo: "test-model",
+        voiceDescription: "Grounded and steady.",
+        sourceText: "Hello there",
+        author: .system,
+        seed: SpeakSwiftly.ProfileSeed(
+            seedID: "swift.anchor",
+            seedVersion: "1",
+            intendedProfileName: "swift-anchor",
+            sourcePackage: "SpeakSwiftlyServer",
+        ),
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+    )
+
+    #expect(throws: WorkerError.self) {
+        _ = try store.renameProfile(named: "swift-anchor", to: "renamed-anchor")
+    }
+    #expect(throws: WorkerError.self) {
+        try store.removeProfile(named: "swift-anchor")
+    }
+    #expect(throws: WorkerError.self) {
+        _ = try store.replaceProfile(
+            named: "swift-anchor",
+            vibe: .masc,
+            modelRepo: "test-model",
+            voiceDescription: "Grounded and steady.",
+            sourceText: "Hello again",
+            sampleRate: 24000,
+            canonicalAudioData: Data([0x01]),
+            createdAt: Date(),
+        )
+    }
 }
 
 @Test func `rejects duplicate profiles`() throws {
@@ -340,6 +433,8 @@ import Testing
     #expect(loaded.manifest.version == ProfileStore.manifestVersion)
     #expect(loaded.manifest.sourceKind == .generated)
     #expect(loaded.manifest.vibe == .femme)
+    #expect(loaded.manifest.author == .user)
+    #expect(loaded.manifest.seed == nil)
     #expect(loaded.manifest.transcriptProvenance == nil)
     #expect(loaded.manifest.backendMaterializations.count == 1)
     #expect(try loaded.qwenMaterialization().referenceAudioURL.lastPathComponent == "reference.wav")

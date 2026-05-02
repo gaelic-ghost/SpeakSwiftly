@@ -124,13 +124,15 @@ extension SpeakSwiftly.Runtime {
                         ),
                     ))
 
-                case let .createProfile(id, profileName, text, vibe, voiceDescription, outputPath, cwd):
+                case let .createProfile(id, profileName, text, vibe, voiceDescription, author, seed, outputPath, cwd):
                     let storedProfile = try await handleCreateProfile(
                         id: id,
                         profileName: profileName,
                         text: text,
                         vibe: vibe,
                         voiceDescription: voiceDescription,
+                        author: author,
+                        seed: seed,
                         outputPath: outputPath,
                         cwd: cwd,
                     )

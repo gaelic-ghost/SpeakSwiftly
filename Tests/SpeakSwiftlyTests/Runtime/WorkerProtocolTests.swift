@@ -213,6 +213,8 @@ import TextForSpeech
             text: "Hello",
             vibe: .femme,
             voiceDescription: "Warm and bright",
+            author: .user,
+            seed: nil,
             outputPath: "./voice.wav",
             cwd: nil,
         ),
@@ -231,8 +233,37 @@ import TextForSpeech
             text: "Hello",
             vibe: .femme,
             voiceDescription: "Warm and bright",
+            author: .user,
+            seed: nil,
             outputPath: "./voice.wav",
             cwd: "/tmp/export-base",
+        ),
+    )
+}
+
+@Test func `decodes create system profile request with seed metadata`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-system","op":"create_system_voice_profile_from_description","profile_name":"swift-signal","text":"Hello","vibe":"femme","voice_description":"Bright and clear","seed_id":"swift.signal","seed_version":"1","source_package":"SpeakSwiftlyServer","source_version":"4.2.0","installed_at":"2026-05-02T12:00:00Z"}"#,
+    )
+
+    #expect(
+        try request == .createProfile(
+            id: "req-system",
+            profileName: "swift-signal",
+            text: "Hello",
+            vibe: .femme,
+            voiceDescription: "Bright and clear",
+            author: .system,
+            seed: SpeakSwiftly.ProfileSeed(
+                seedID: "swift.signal",
+                seedVersion: "1",
+                intendedProfileName: "swift-signal",
+                installedAt: #require(ISO8601DateFormatter().date(from: "2026-05-02T12:00:00Z")),
+                sourcePackage: "SpeakSwiftlyServer",
+                sourceVersion: "4.2.0",
+            ),
+            outputPath: nil,
+            cwd: nil,
         ),
     )
 }

@@ -112,6 +112,31 @@ extension WorkerRequest {
                     text: text,
                     vibe: vibe,
                     voiceDescription: voiceDescription,
+                    author: .user,
+                    seed: nil,
+                    outputPath: outputPath,
+                    cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
+                )
+
+            case "create_system_voice_profile_from_description":
+                let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
+                let text = try requireNonEmpty(raw.text, field: "text", id: id)
+                let vibe = try require(raw.vibe, field: "vibe", id: id)
+                let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
+                let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
+                let seed = try RawWorkerRequest.resolveProfileSeed(
+                    id: id,
+                    raw: raw,
+                    fallbackProfileName: profileName,
+                )
+                return .createProfile(
+                    id: id,
+                    profileName: profileName,
+                    text: text,
+                    vibe: vibe,
+                    voiceDescription: voiceDescription,
+                    author: .system,
+                    seed: seed,
                     outputPath: outputPath,
                     cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
                 )

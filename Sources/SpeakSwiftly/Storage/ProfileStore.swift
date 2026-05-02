@@ -181,6 +181,8 @@ struct ProfileStore: @unchecked Sendable {
         voiceDescription: String,
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         sampleRate: Int,
         canonicalAudioData: Data,
     ) throws -> StoredProfile {
@@ -204,6 +206,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: voiceDescription,
             sourceText: sourceText,
             transcriptProvenance: transcriptProvenance,
+            author: author,
+            seed: seed,
             sampleRate: sampleRate,
             materializations: materializations,
         )
@@ -217,6 +221,8 @@ struct ProfileStore: @unchecked Sendable {
         voiceDescription: String,
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         sampleRate: Int,
         materializations: [ProfileMaterializationDraft],
     ) throws -> StoredProfile {
@@ -251,6 +257,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: voiceDescription,
             sourceText: sourceText,
             transcriptProvenance: transcriptProvenance,
+            author: author,
+            seed: seed,
             sampleRate: sampleRate,
             backendMaterializations: materializations.map {
                 ProfileMaterializationManifest(
@@ -352,6 +360,9 @@ struct ProfileStore: @unchecked Sendable {
                 createdAt: $0.createdAt,
                 voiceDescription: $0.voiceDescription,
                 sourceText: $0.sourceText,
+                author: $0.author,
+                seedID: $0.seed?.seedID,
+                seedVersion: $0.seed?.seedVersion,
                 transcriptSource: $0.transcriptProvenance.map {
                     switch $0.source {
                         case .provided:
@@ -366,6 +377,47 @@ struct ProfileStore: @unchecked Sendable {
         }
     }
 
+    func requireUserMutableProfile(_ storedProfile: StoredProfile, operation: String) throws {
+        guard storedProfile.manifest.author != .system else {
+            throw WorkerError(
+                code: .invalidRequest,
+                message: "Profile '\(storedProfile.manifest.profileName)' is package-owned and cannot be \(operation) with the ordinary user profile operation. Create a user-owned copy before changing it, or use a future package-seed maintenance operation for system profile updates.",
+            )
+        }
+    }
+
+    func availableUserCopyName(for manifest: ProfileManifest) throws -> String {
+        if let intendedProfileName = manifest.seed?.intendedProfileName,
+           intendedProfileName != manifest.profileName,
+           !fileManager.fileExists(atPath: profileDirectoryURL(for: intendedProfileName).path) {
+            try validateProfileName(intendedProfileName)
+            return intendedProfileName
+        }
+
+        let baseLimit = 59
+        let baseStem = String(manifest.profileName.prefix(baseLimit))
+        let firstCandidate = "\(baseStem)-user"
+        if !fileManager.fileExists(atPath: profileDirectoryURL(for: firstCandidate).path) {
+            try validateProfileName(firstCandidate)
+            return firstCandidate
+        }
+
+        for index in 2...999 {
+            let suffix = "-user-\(index)"
+            let stem = String(manifest.profileName.prefix(max(1, 64 - suffix.count)))
+            let candidate = "\(stem)\(suffix)"
+            if !fileManager.fileExists(atPath: profileDirectoryURL(for: candidate).path) {
+                try validateProfileName(candidate)
+                return candidate
+            }
+        }
+
+        throw WorkerError(
+            code: .profileAlreadyExists,
+            message: "Profile '\(manifest.profileName)' is package-owned, and SpeakSwiftly could not find an available user-copy profile name after checking numbered '-user' variants.",
+        )
+    }
+
     func removeProfile(named profileName: String) throws {
         try ensureRootExists()
         try validateProfileName(profileName)
@@ -377,6 +429,8 @@ struct ProfileStore: @unchecked Sendable {
                 message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
             )
         }
+
+        try requireUserMutableProfile(loadProfile(named: profileName), operation: "deleted")
 
         do {
             try fileManager.removeItem(at: directoryURL)
@@ -420,6 +474,7 @@ struct ProfileStore: @unchecked Sendable {
         }
 
         let storedProfile = try loadProfile(named: profileName)
+        try requireUserMutableProfile(storedProfile, operation: "renamed")
         let renamedManifest = ProfileManifest(
             version: storedProfile.manifest.version,
             profileName: newProfileName,
@@ -430,6 +485,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: storedProfile.manifest.voiceDescription,
             sourceText: storedProfile.manifest.sourceText,
             transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+            author: storedProfile.manifest.author,
+            seed: storedProfile.manifest.seed,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
             qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts,
@@ -470,6 +527,8 @@ struct ProfileStore: @unchecked Sendable {
         voiceDescription: String,
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         sampleRate: Int,
         canonicalAudioData: Data,
         createdAt: Date,
@@ -494,6 +553,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: voiceDescription,
             sourceText: sourceText,
             transcriptProvenance: transcriptProvenance,
+            author: author,
+            seed: seed,
             sampleRate: sampleRate,
             materializations: materializations,
             createdAt: createdAt,
@@ -508,6 +569,8 @@ struct ProfileStore: @unchecked Sendable {
         voiceDescription: String,
         sourceText: String,
         transcriptProvenance: TranscriptProvenance? = nil,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         sampleRate: Int,
         materializations: [ProfileMaterializationDraft],
         createdAt: Date,
@@ -530,6 +593,8 @@ struct ProfileStore: @unchecked Sendable {
             )
         }
 
+        try requireUserMutableProfile(loadProfile(named: profileName), operation: "rerolled in place")
+
         let stagedDirectoryURL = rootURL.appendingPathComponent(".\(profileName).stage-\(UUID().uuidString)", isDirectory: true)
         let backupDirectoryURL = rootURL.appendingPathComponent(".\(profileName).backup-\(UUID().uuidString)", isDirectory: true)
         let manifest = ProfileManifest(
@@ -542,6 +607,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: voiceDescription,
             sourceText: sourceText,
             transcriptProvenance: transcriptProvenance,
+            author: author,
+            seed: seed,
             sampleRate: sampleRate,
             backendMaterializations: materializations.map {
                 ProfileMaterializationManifest(
@@ -645,6 +712,8 @@ struct ProfileStore: @unchecked Sendable {
             voiceDescription: storedProfile.manifest.voiceDescription,
             sourceText: storedProfile.manifest.sourceText,
             transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+            author: storedProfile.manifest.author,
+            seed: storedProfile.manifest.seed,
             sampleRate: storedProfile.manifest.sampleRate,
             backendMaterializations: storedProfile.manifest.backendMaterializations,
             qwenConditioningArtifacts: updatedArtifacts,

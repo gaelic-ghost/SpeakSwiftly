@@ -7,7 +7,9 @@ extension SpeakSwiftly.Runtime {
         id: String,
         op: String,
         storedProfile: StoredProfile,
+        targetProfileName: String? = nil,
     ) async throws -> StoredProfile {
+        let targetProfileName = targetProfileName ?? storedProfile.manifest.profileName
         await emitProgress(id: id, stage: .loadingProfileModel)
         let modelLoadStartedAt = dependencies.now()
         let profileModel = try await dependencies.loadProfileModel()
@@ -56,25 +58,43 @@ extension SpeakSwiftly.Runtime {
         let replaceStartedAt = dependencies.now()
         let profileStore = profileStore
         var rerolledProfile = try await runBlockingFilesystemOperation {
-            try profileStore.replaceProfile(
-                named: storedProfile.manifest.profileName,
+            if targetProfileName == storedProfile.manifest.profileName {
+                return try profileStore.replaceProfile(
+                    named: storedProfile.manifest.profileName,
+                    vibe: storedProfile.manifest.vibe,
+                    modelRepo: storedProfile.manifest.modelRepo,
+                    voiceDescription: storedProfile.manifest.voiceDescription,
+                    sourceText: storedProfile.manifest.sourceText,
+                    transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                    author: storedProfile.manifest.author,
+                    seed: storedProfile.manifest.seed,
+                    sampleRate: profileModel.sampleRate,
+                    canonicalAudioData: audioData,
+                    createdAt: storedProfile.manifest.createdAt,
+                )
+            }
+
+            return try profileStore.createProfile(
+                profileName: targetProfileName,
                 vibe: storedProfile.manifest.vibe,
                 modelRepo: storedProfile.manifest.modelRepo,
                 voiceDescription: storedProfile.manifest.voiceDescription,
                 sourceText: storedProfile.manifest.sourceText,
                 transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                author: .user,
+                seed: nil,
                 sampleRate: profileModel.sampleRate,
                 canonicalAudioData: audioData,
-                createdAt: storedProfile.manifest.createdAt,
             )
         }
         await logRequestEvent(
             "profile_rerolled",
             requestID: id,
             op: op,
-            profileName: storedProfile.manifest.profileName,
+            profileName: targetProfileName,
             details: [
                 "path": .string(rerolledProfile.directoryURL.path),
+                "source_profile_name": .string(storedProfile.manifest.profileName),
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
             ],
@@ -92,7 +112,9 @@ extension SpeakSwiftly.Runtime {
         id: String,
         op: String,
         storedProfile: StoredProfile,
+        targetProfileName: String? = nil,
     ) async throws -> StoredProfile {
+        let targetProfileName = targetProfileName ?? storedProfile.manifest.profileName
         let canonicalAudioData = try await runBlockingFilesystemOperation {
             try Data(contentsOf: storedProfile.referenceAudioURL)
         }
@@ -102,25 +124,43 @@ extension SpeakSwiftly.Runtime {
         let replaceStartedAt = dependencies.now()
         let profileStore = profileStore
         var rerolledProfile = try await runBlockingFilesystemOperation {
-            try profileStore.replaceProfile(
-                named: storedProfile.manifest.profileName,
+            if targetProfileName == storedProfile.manifest.profileName {
+                return try profileStore.replaceProfile(
+                    named: storedProfile.manifest.profileName,
+                    vibe: storedProfile.manifest.vibe,
+                    modelRepo: storedProfile.manifest.modelRepo,
+                    voiceDescription: storedProfile.manifest.voiceDescription,
+                    sourceText: storedProfile.manifest.sourceText,
+                    transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                    author: storedProfile.manifest.author,
+                    seed: storedProfile.manifest.seed,
+                    sampleRate: storedProfile.manifest.sampleRate,
+                    canonicalAudioData: canonicalAudioData,
+                    createdAt: storedProfile.manifest.createdAt,
+                )
+            }
+
+            return try profileStore.createProfile(
+                profileName: targetProfileName,
                 vibe: storedProfile.manifest.vibe,
                 modelRepo: storedProfile.manifest.modelRepo,
                 voiceDescription: storedProfile.manifest.voiceDescription,
                 sourceText: storedProfile.manifest.sourceText,
                 transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                author: .user,
+                seed: nil,
                 sampleRate: storedProfile.manifest.sampleRate,
                 canonicalAudioData: canonicalAudioData,
-                createdAt: storedProfile.manifest.createdAt,
             )
         }
         await logRequestEvent(
             "clone_profile_rerolled",
             requestID: id,
             op: op,
-            profileName: storedProfile.manifest.profileName,
+            profileName: targetProfileName,
             details: [
                 "path": .string(rerolledProfile.directoryURL.path),
+                "source_profile_name": .string(storedProfile.manifest.profileName),
                 "source_kind": .string(storedProfile.manifest.sourceKind.rawValue),
                 "duration_ms": .int(elapsedMS(since: replaceStartedAt)),
             ],

@@ -14,6 +14,8 @@ extension SpeakSwiftly.Runtime {
         text: String,
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         outputPath: String?,
         cwd: String?,
     ) async throws -> StoredProfile {
@@ -23,6 +25,8 @@ extension SpeakSwiftly.Runtime {
             text: text,
             vibe: vibe,
             voiceDescription: voiceDescription,
+            author: author,
+            seed: seed,
             outputPath: outputPath,
             cwd: cwd,
         )
@@ -95,6 +99,8 @@ extension SpeakSwiftly.Runtime {
                 modelRepo: ModelFactory.profileModelRepo,
                 voiceDescription: voiceDescription,
                 sourceText: text,
+                author: author,
+                seed: seed,
                 sampleRate: profileModel.sampleRate,
                 canonicalAudioData: canonicalAudioData,
             )
@@ -233,6 +239,8 @@ extension SpeakSwiftly.Runtime {
                 voiceDescription: ModelFactory.importedCloneVoiceDescription,
                 sourceText: resolvedTranscript.text,
                 transcriptProvenance: resolvedTranscript.provenance,
+                author: .user,
+                seed: nil,
                 sampleRate: ModelFactory.canonicalProfileSampleRate,
                 canonicalAudioData: canonicalAudioData,
             )
@@ -326,12 +334,31 @@ extension SpeakSwiftly.Runtime {
         )
         try Task.checkCancellation()
 
+        let targetProfileName: String?
+        if storedProfile.manifest.author == .system {
+            targetProfileName = try await runBlockingFilesystemOperation {
+                try profileStore.availableUserCopyName(for: storedProfile.manifest)
+            }
+            await logRequestEvent(
+                "system_profile_reroll_redirected_to_user_copy",
+                requestID: id,
+                op: op,
+                profileName: profileName,
+                details: [
+                    "target_profile_name": .string(targetProfileName ?? profileName),
+                ],
+            )
+        } else {
+            targetProfileName = nil
+        }
+
         switch storedProfile.manifest.sourceKind {
             case .generated:
                 return try await rerollGeneratedProfile(
                     id: id,
                     op: op,
                     storedProfile: storedProfile,
+                    targetProfileName: targetProfileName,
                 )
 
             case .importedClone:
@@ -339,6 +366,7 @@ extension SpeakSwiftly.Runtime {
                     id: id,
                     op: op,
                     storedProfile: storedProfile,
+                    targetProfileName: targetProfileName,
                 )
         }
     }

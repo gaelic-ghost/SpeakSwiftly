@@ -108,13 +108,13 @@ being forced into every public response payload.
 
 ## Implementation Slices
 
-1. Add persisted author and optional seed metadata to the profile manifest, migrating existing
+1. [x] Add persisted author and optional seed metadata to the profile manifest, migrating existing
    manifests as `.user`.
-2. Thread author and seed metadata into profile summaries only where consumers need it.
-3. Enforce mutation rules for `.system` profiles in rename, delete, and reroll paths.
-4. Add reroll-as-user-copy behavior for system profiles.
-5. Add tests for migration, list summaries, mutation rejection, and system reroll copy behavior.
-6. Coordinate a tagged `SpeakSwiftly` release before `SpeakSwiftlyServer` depends on the new
+2. [x] Thread author and seed metadata into profile summaries only where consumers need it.
+3. [x] Enforce mutation rules for `.system` profiles in rename, delete, and reroll paths.
+4. [x] Add reroll-as-user-copy behavior for system profiles.
+5. [x] Add tests for migration, list summaries, mutation rejection, and system reroll copy behavior.
+6. [ ] Coordinate a tagged `SpeakSwiftly` release before `SpeakSwiftlyServer` depends on the new
    authorship behavior.
 
 ## Open Questions
