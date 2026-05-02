@@ -229,7 +229,7 @@ extension SpeakSwiftly.Runtime {
 
     func activeRequestCreatesProfileNamed(_ request: WorkerRequest, profileName: String) -> Bool {
         switch request {
-            case let .createProfile(_, activeProfileName, _, _, _, _, _):
+            case let .createProfile(_, activeProfileName, _, _, _, _, _, _, _):
                 activeProfileName == profileName
             case let .createClone(_, activeProfileName, _, _, _, _):
                 activeProfileName == profileName

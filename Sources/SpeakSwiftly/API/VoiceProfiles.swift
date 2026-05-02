@@ -45,6 +45,42 @@ public extension SpeakSwiftly.Voices {
                 text: text,
                 vibe: vibe,
                 voiceDescription: voiceDescription,
+                author: .user,
+                seed: nil,
+                outputPath: outputPath,
+                cwd: FileManager.default.currentDirectoryPath,
+            ),
+        )
+    }
+
+    /// Creates a package-owned voice-design profile from trusted seed metadata.
+    ///
+    /// - Parameters:
+    ///   - named: The stored profile name to create.
+    ///   - text: The source text used to condition the design request.
+    ///   - vibe: The broad vocal presentation to request.
+    ///   - voiceDescription: The descriptive prompt that shapes the generated voice.
+    ///   - seed: Stable package seed metadata used for provenance and refresh decisions.
+    ///   - outputPath: An optional file path where SpeakSwiftly should export the
+    ///     generated reference audio after storing the profile.
+    /// - Returns: A request handle for the queued creation request.
+    func create(
+        systemDesign named: SpeakSwiftly.Name,
+        from text: String,
+        vibe: SpeakSwiftly.Vibe,
+        voice voiceDescription: String,
+        seed: SpeakSwiftly.ProfileSeed,
+        outputPath: String? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .createProfile(
+                id: UUID().uuidString,
+                profileName: named,
+                text: text,
+                vibe: vibe,
+                voiceDescription: voiceDescription,
+                author: .system,
+                seed: seed,
                 outputPath: outputPath,
                 cwd: FileManager.default.currentDirectoryPath,
             ),

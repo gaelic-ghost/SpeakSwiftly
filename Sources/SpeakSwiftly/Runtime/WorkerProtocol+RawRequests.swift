@@ -117,6 +117,14 @@ struct RawWorkerRequest: Decodable {
         case requestID = "request_id"
         case vibe
         case voiceDescription = "voice_description"
+        case seedID = "seed_id"
+        case seedVersion = "seed_version"
+        case intendedProfileName = "intended_profile_name"
+        case fallbackProfileName = "fallback_profile_name"
+        case installedAt = "installed_at"
+        case sourcePackage = "source_package"
+        case sourceVersion = "source_version"
+        case sampleMediaPath = "sample_media_path"
         case outputPath = "output_path"
         case referenceAudioPath = "reference_audio_path"
         case transcript
@@ -285,6 +293,14 @@ struct RawWorkerRequest: Decodable {
     let requestID: String?
     let vibe: SpeakSwiftly.Vibe?
     let voiceDescription: String?
+    let seedID: String?
+    let seedVersion: String?
+    let intendedProfileName: String?
+    let fallbackProfileName: String?
+    let installedAt: String?
+    let sourcePackage: String?
+    let sourceVersion: String?
+    let sampleMediaPath: String?
     let outputPath: String?
     let referenceAudioPath: String?
     let transcript: String?
@@ -325,6 +341,14 @@ struct RawWorkerRequest: Decodable {
         requestID = try container.decodeIfPresent(String.self, forKey: .requestID)
         vibe = try container.decodeIfPresent(SpeakSwiftly.Vibe.self, forKey: .vibe)
         voiceDescription = try container.decodeIfPresent(String.self, forKey: .voiceDescription)
+        seedID = try container.decodeIfPresent(String.self, forKey: .seedID)
+        seedVersion = try container.decodeIfPresent(String.self, forKey: .seedVersion)
+        intendedProfileName = try container.decodeIfPresent(String.self, forKey: .intendedProfileName)
+        fallbackProfileName = try container.decodeIfPresent(String.self, forKey: .fallbackProfileName)
+        installedAt = try container.decodeIfPresent(String.self, forKey: .installedAt)
+        sourcePackage = try container.decodeIfPresent(String.self, forKey: .sourcePackage)
+        sourceVersion = try container.decodeIfPresent(String.self, forKey: .sourceVersion)
+        sampleMediaPath = try container.decodeIfPresent(String.self, forKey: .sampleMediaPath)
         outputPath = try container.decodeIfPresent(String.self, forKey: .outputPath)
         referenceAudioPath = try container.decodeIfPresent(String.self, forKey: .referenceAudioPath)
         transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
@@ -448,6 +472,42 @@ struct RawWorkerRequest: Decodable {
                 requestContext: rawItem.requestContext,
             )
         }
+    }
+
+    static func resolveProfileSeed(
+        id: String,
+        raw: RawWorkerRequest,
+        fallbackProfileName: String,
+    ) throws -> SpeakSwiftly.ProfileSeed {
+        let seedID = try WorkerRequest.requireNonEmpty(raw.seedID, field: "seed_id", id: id)
+        let seedVersion = try WorkerRequest.requireNonEmpty(raw.seedVersion, field: "seed_version", id: id)
+        let sourcePackage = try WorkerRequest.requireNonEmpty(raw.sourcePackage, field: "source_package", id: id)
+        let intendedProfileName = raw.intendedProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
+            ?? fallbackProfileName
+        let installedAt: Date
+        if let rawInstalledAt = raw.installedAt?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil {
+            guard let parsedDate = ISO8601DateFormatter().date(from: rawInstalledAt) else {
+                throw WorkerError(
+                    code: .invalidRequest,
+                    message: "Request '\(id)' has an invalid 'installed_at' value. Use an ISO 8601 timestamp such as '2026-05-02T12:00:00Z'.",
+                )
+            }
+
+            installedAt = parsedDate
+        } else {
+            installedAt = Date()
+        }
+
+        return SpeakSwiftly.ProfileSeed(
+            seedID: seedID,
+            seedVersion: seedVersion,
+            intendedProfileName: intendedProfileName,
+            fallbackProfileName: raw.fallbackProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
+            installedAt: installedAt,
+            sourcePackage: sourcePackage,
+            sourceVersion: raw.sourceVersion?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
+            sampleMediaPath: raw.sampleMediaPath?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
+        )
     }
 
     static func decodeSourceFormat(

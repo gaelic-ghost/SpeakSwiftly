@@ -30,6 +30,8 @@ enum WorkerRequest: Equatable {
         text: String,
         vibe: SpeakSwiftly.Vibe,
         voiceDescription: String,
+        author: SpeakSwiftly.ProfileAuthor,
+        seed: SpeakSwiftly.ProfileSeed?,
         outputPath: String?,
         cwd: String?,
     )
@@ -85,7 +87,7 @@ enum WorkerRequest: Equatable {
                  let .expireGenerationJob(id, _),
                  let .generationJob(id, _),
                  let .generationJobs(id),
-                 let .createProfile(id, _, _, _, _, _, _),
+                 let .createProfile(id, _, _, _, _, _, _, _, _),
                  let .createClone(id, _, _, _, _, _),
                  let .listProfiles(id),
                  let .renameProfile(id, _, _),
@@ -145,8 +147,13 @@ enum WorkerRequest: Equatable {
                 "get_generation_job"
             case .generationJobs:
                 "list_generation_jobs"
-            case .createProfile:
-                "create_voice_profile_from_description"
+            case let .createProfile(id: _, profileName: _, text: _, vibe: _, voiceDescription: _, author: author, seed: _, outputPath: _, cwd: _):
+                switch author {
+                    case .user:
+                        "create_voice_profile_from_description"
+                    case .system:
+                        "create_system_voice_profile_from_description"
+                }
             case .createClone:
                 "create_voice_profile_from_audio"
             case .listProfiles:
@@ -349,7 +356,7 @@ enum WorkerRequest: Equatable {
         switch self {
             case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch(id: _, profileName: let profileName, items: _),
-                 let .createProfile(_, profileName, _, _, _, _, _),
+                 let .createProfile(_, profileName, _, _, _, _, _, _, _),
                  let .createClone(_, profileName, _, _, _, _),
                  let .renameProfile(_, profileName, _),
                  let .rerollProfile(_, profileName),

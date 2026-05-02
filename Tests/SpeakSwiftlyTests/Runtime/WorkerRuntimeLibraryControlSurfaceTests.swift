@@ -251,6 +251,80 @@ import TextForSpeech
     )
 }
 
+@Test func `rerolling a system profile creates a user owned copy`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "swift-signal-builtin",
+        vibe: .femme,
+        modelRepo: ModelFactory.profileModelRepo,
+        voiceDescription: "Bright and clear.",
+        sourceText: "Hello there",
+        author: .system,
+        seed: SpeakSwiftly.ProfileSeed(
+            seedID: "swift.signal",
+            seedVersion: "1",
+            intendedProfileName: "swift-signal",
+            fallbackProfileName: "swift-signal-builtin",
+            sourcePackage: "SpeakSwiftlyServer",
+        ),
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02, 0x03, 0x04]),
+    )
+
+    let rerolledSamples: [Float] = [0.7, 0.8, 0.9]
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        profileModelLoader: {
+            AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in rerolledSamples },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                },
+            )
+        },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let rerollID = await runtime.voices.reroll("swift-signal-builtin").id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == rerollID
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "swift-signal"
+        }
+    })
+
+    let systemProfile = try store.loadProfile(named: "swift-signal-builtin")
+    let userCopy = try store.loadProfile(named: "swift-signal")
+
+    #expect(systemProfile.manifest.author == .system)
+    #expect(systemProfile.manifest.seed?.seedID == "swift.signal")
+    #expect(userCopy.manifest.author == .user)
+    #expect(userCopy.manifest.seed == nil)
+    #expect(userCopy.manifest.sourceText == "Hello there")
+    try expectAudioSamples(
+        rawTestAudioSamples(from: Data(contentsOf: userCopy.referenceAudioURL)),
+        approximatelyEqualTo: [0.738_888_9, 0.844_444_45, 0.95],
+    )
+}
+
 @Test func `voice design profile creation gain normalizes reference audio`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

@@ -5,6 +5,55 @@ enum ProfileSourceKind: String, Codable, Equatable {
     case importedClone = "imported_clone"
 }
 
+public extension SpeakSwiftly {
+    enum ProfileAuthor: String, Codable, Sendable, Equatable {
+        case user
+        case system
+    }
+
+    struct ProfileSeed: Codable, Sendable, Equatable {
+        enum CodingKeys: String, CodingKey {
+            case seedID
+            case seedVersion
+            case intendedProfileName
+            case fallbackProfileName
+            case installedAt
+            case sourcePackage
+            case sourceVersion
+            case sampleMediaPath
+        }
+
+        public let seedID: String
+        public let seedVersion: String
+        public let intendedProfileName: String
+        public let fallbackProfileName: String?
+        public let installedAt: Date
+        public let sourcePackage: String
+        public let sourceVersion: String?
+        public let sampleMediaPath: String?
+
+        public init(
+            seedID: String,
+            seedVersion: String,
+            intendedProfileName: String,
+            fallbackProfileName: String? = nil,
+            installedAt: Date = Date(),
+            sourcePackage: String,
+            sourceVersion: String? = nil,
+            sampleMediaPath: String? = nil,
+        ) {
+            self.seedID = seedID
+            self.seedVersion = seedVersion
+            self.intendedProfileName = intendedProfileName
+            self.fallbackProfileName = fallbackProfileName
+            self.installedAt = installedAt
+            self.sourcePackage = sourcePackage
+            self.sourceVersion = sourceVersion
+            self.sampleMediaPath = sampleMediaPath
+        }
+    }
+}
+
 struct TranscriptProvenance: Codable, Equatable {
     enum Source: String, Codable, Equatable {
         case provided
@@ -36,6 +85,8 @@ struct ProfileManifest: Codable, Equatable {
         case voiceDescription
         case sourceText
         case transcriptProvenance
+        case author
+        case seed
         case sampleRate
         case backendMaterializations
         case qwenConditioningArtifacts
@@ -50,6 +101,8 @@ struct ProfileManifest: Codable, Equatable {
     let voiceDescription: String
     let sourceText: String
     let transcriptProvenance: TranscriptProvenance?
+    let author: SpeakSwiftly.ProfileAuthor
+    let seed: SpeakSwiftly.ProfileSeed?
     let sampleRate: Int
     let backendMaterializations: [ProfileMaterializationManifest]
     let qwenConditioningArtifacts: [QwenConditioningArtifactManifest]
@@ -64,6 +117,8 @@ struct ProfileManifest: Codable, Equatable {
         voiceDescription: String,
         sourceText: String,
         transcriptProvenance: TranscriptProvenance?,
+        author: SpeakSwiftly.ProfileAuthor = .user,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
         sampleRate: Int,
         backendMaterializations: [ProfileMaterializationManifest],
         qwenConditioningArtifacts: [QwenConditioningArtifactManifest],
@@ -77,6 +132,8 @@ struct ProfileManifest: Codable, Equatable {
         self.voiceDescription = voiceDescription
         self.sourceText = sourceText
         self.transcriptProvenance = transcriptProvenance
+        self.author = author
+        self.seed = seed
         self.sampleRate = sampleRate
         self.backendMaterializations = backendMaterializations
         self.qwenConditioningArtifacts = qwenConditioningArtifacts
@@ -96,6 +153,11 @@ struct ProfileManifest: Codable, Equatable {
             TranscriptProvenance.self,
             forKey: .transcriptProvenance,
         )
+        author = try container.decodeIfPresent(
+            SpeakSwiftly.ProfileAuthor.self,
+            forKey: .author,
+        ) ?? .user
+        seed = try container.decodeIfPresent(SpeakSwiftly.ProfileSeed.self, forKey: .seed)
         sampleRate = try container.decode(Int.self, forKey: .sampleRate)
         backendMaterializations = try container.decode(
             [ProfileMaterializationManifest].self,
@@ -149,6 +211,9 @@ public extension SpeakSwiftly {
             case transcriptSource = "transcript_source"
             case transcriptResolvedAt = "transcript_resolved_at"
             case transcriptionModelRepo = "transcription_model_repo"
+            case author
+            case seedID = "seed_id"
+            case seedVersion = "seed_version"
         }
 
         public let profileName: String
@@ -156,6 +221,9 @@ public extension SpeakSwiftly {
         public let createdAt: Date
         public let voiceDescription: String
         public let sourceText: String
+        public let author: SpeakSwiftly.ProfileAuthor
+        public let seedID: String?
+        public let seedVersion: String?
         public let transcriptSource: TranscriptSource?
         public let transcriptResolvedAt: Date?
         public let transcriptionModelRepo: String?
@@ -166,6 +234,9 @@ public extension SpeakSwiftly {
             createdAt: Date,
             voiceDescription: String,
             sourceText: String,
+            author: SpeakSwiftly.ProfileAuthor = .user,
+            seedID: String? = nil,
+            seedVersion: String? = nil,
             transcriptSource: TranscriptSource? = nil,
             transcriptResolvedAt: Date? = nil,
             transcriptionModelRepo: String? = nil,
@@ -175,6 +246,9 @@ public extension SpeakSwiftly {
             self.createdAt = createdAt
             self.voiceDescription = voiceDescription
             self.sourceText = sourceText
+            self.author = author
+            self.seedID = seedID
+            self.seedVersion = seedVersion
             self.transcriptSource = transcriptSource
             self.transcriptResolvedAt = transcriptResolvedAt
             self.transcriptionModelRepo = transcriptionModelRepo

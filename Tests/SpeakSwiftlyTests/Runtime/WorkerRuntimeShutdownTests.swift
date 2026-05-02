@@ -260,6 +260,8 @@ final class LockedFlag: @unchecked Sendable {
             text: "A queued request that should still be active when shutdown begins.",
             vibe: .femme,
             voiceDescription: "Warm and bright",
+            author: .user,
+            seed: nil,
             outputPath: nil,
             cwd: nil,
         ),
