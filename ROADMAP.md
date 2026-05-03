@@ -92,7 +92,7 @@ Planned
 
 ### Tickets
 
-- [ ] Add cross-process coordination for profile creation and removal so concurrent workers cannot partially stomp each other.
+- [x] Add cross-process coordination for profile creation and removal so concurrent workers cannot partially stomp each other.
 - [ ] Keep profile writes atomic across manifest and reference-audio creation, including cleanup of abandoned temp data after failed writes.
 - [ ] Make profile listing and loading resilient to in-flight writes from another process without producing misleading corruption failures.
 - [ ] Add clear operator-facing diagnostics for lock contention, stale temp directories, and cross-process filesystem races.
