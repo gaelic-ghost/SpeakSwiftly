@@ -7,8 +7,6 @@ public extension SpeakSwiftly {
     enum RequestCompletion: Sendable, Equatable {
         case generatedFile(GeneratedFile)
         case generatedFiles([GeneratedFile])
-        case generatedBatch(GeneratedBatch)
-        case generatedBatches([GeneratedBatch])
         case generationJob(GenerationJob)
         case generationJobs([GenerationJob])
         case voiceProfile(name: String?, path: String?)
@@ -38,9 +36,9 @@ public extension SpeakSwiftly {
             } else if let generatedFiles = success.generatedFiles {
                 self = .generatedFiles(generatedFiles)
             } else if let generatedBatch = success.generatedBatch {
-                self = .generatedBatch(generatedBatch)
+                self = .generationJob(GenerationJob(generatedBatch))
             } else if let generatedBatches = success.generatedBatches {
-                self = .generatedBatches(generatedBatches)
+                self = .generationJobs(generatedBatches.map(GenerationJob.init))
             } else if let generationJob = success.generationJob {
                 self = .generationJob(generationJob)
             } else if let generationJobs = success.generationJobs {

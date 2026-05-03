@@ -55,7 +55,6 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 - ``SpeakSwiftly/GenerationJob``
 - ``SpeakSwiftly/Artifacts``
 - ``SpeakSwiftly/GeneratedFile``
-- ``SpeakSwiftly/GeneratedBatch``
 
 ### Support
 

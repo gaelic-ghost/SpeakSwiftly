@@ -39,26 +39,26 @@ describe the same runtime concepts in different ways.
 
 ### 1. Retained Generation Models
 
-The retained generation surface currently exposes overlapping public models:
+The retained generation surface now treats `GenerationJob` as the canonical
+Swift model for retained work:
 
 - `SpeakSwiftly.GenerationJob`
-- `SpeakSwiftly.GeneratedBatch`
 - `SpeakSwiftly.GeneratedFile`
 - `SpeakSwiftly.GenerationArtifact`
 - `SpeakSwiftly.BatchItem`
 
-`GenerationJob`, `GeneratedBatch`, and `GenerationArtifact` carry similar
-information about state, timestamps, failure, retention, input items, and output
-artifacts. A caller can reasonably ask whether a retained batch should be
-inspected through `runtime.jobs.job(id:)`, `runtime.artifacts.batch(id:)`, or
-`runtime.artifacts.files()`.
+`GeneratedBatch` remains only as a JSONL response compatibility projection for
+the worker's `generated_batch` and `generated_batches` payloads. The public
+Swift convenience query surface no longer exposes batch-specific artifact
+methods; callers inspect retained batch work through `runtime.jobs.job(id:)` or
+`runtime.jobs.list()`.
 
 Desired direction:
 
-- make `GenerationJob` the canonical retained-work model
+- keep `GenerationJob` as the canonical retained-work model
 - treat generated files as outputs of retained jobs
-- remove `GeneratedBatch` as a separate public model unless a concrete consumer
-  needs a batch-specific projection
+- keep `GeneratedBatch` constrained to JSONL compatibility unless a concrete
+  typed Swift consumer needs a batch-specific projection
 - keep `BatchItem` only if batch submission remains caller-authored at the
   typed API boundary
 - make generated-artifact and generated-file terminology consistent across

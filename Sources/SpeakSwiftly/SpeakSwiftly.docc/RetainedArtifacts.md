@@ -58,16 +58,15 @@ for try await event in filesHandle.events {
 }
 ```
 
-The same pattern applies to retained jobs and batches:
+The same pattern applies to retained jobs:
 
 - ``SpeakSwiftly/Jobs/list()`` completes with `generationJobs`.
 - ``SpeakSwiftly/Artifacts/files()`` completes with `generatedFiles`.
-- ``SpeakSwiftly/Artifacts/batches()`` completes with `generatedBatches`.
-- ``SpeakSwiftly/Artifacts/file(id:)`` and ``SpeakSwiftly/Artifacts/batch(id:)`` complete with one stored resource.
+- ``SpeakSwiftly/Artifacts/file(id:)`` completes with one retained file projection.
 
-``SpeakSwiftly/GeneratedFile`` represents one retained audio file. ``SpeakSwiftly/GeneratedBatch`` represents a grouped generation result that keeps related retained files together.
+``SpeakSwiftly/GenerationJob`` is the canonical retained-work model for both file and batch generation. ``SpeakSwiftly/GeneratedFile`` remains a JSONL-compatible projection for direct generated-file lookups.
 
-If you already know the stable identifier for a stored resource, use the matching `get` API on ``SpeakSwiftly/Artifacts`` instead of scanning the full collection first.
+If you already know the stable identifier for a retained job, use ``SpeakSwiftly/Jobs/job(id:)`` instead of scanning the full collection first.
 
 ## Choosing The Right Surface
 

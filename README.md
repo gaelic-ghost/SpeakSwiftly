@@ -247,8 +247,6 @@ Key typed runtime entry points include:
 - `runtime.jobs.list()`
 - `runtime.artifacts.file(id:)`
 - `runtime.artifacts.files()`
-- `runtime.artifacts.batch(id:)`
-- `runtime.artifacts.batches()`
 - `SpeakSwiftly.SupportResources.bundle`
 - `SpeakSwiftly.SupportResources.mlxBundleURL()`
 - `SpeakSwiftly.SupportResources.defaultMetallibURL()`

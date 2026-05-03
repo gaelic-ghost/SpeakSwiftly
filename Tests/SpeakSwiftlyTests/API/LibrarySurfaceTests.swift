@@ -408,12 +408,6 @@ import Darwin
         profileName in
         await generate.batch(items, voiceProfile: profileName)
     }
-    let generatedBatch: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, batchID in
-        await artifacts.batch(id: batchID)
-    }
-    let generatedBatches: @Sendable (SpeakSwiftly.Artifacts) async -> SpeakSwiftly.RequestHandle = { artifacts in
-        await artifacts.batches()
-    }
     let expireGenerationJob: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID in
         await jobs.expire(id: jobID)
     }
@@ -515,8 +509,6 @@ import Darwin
     _ = generatedFile
     _ = generatedFiles
     _ = generateBatch
-    _ = generatedBatch
-    _ = generatedBatches
     _ = expireGenerationJob
     _ = generationJob
     _ = generationJobs

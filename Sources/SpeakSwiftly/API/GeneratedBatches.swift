@@ -117,20 +117,6 @@ public extension SpeakSwiftly {
     }
 }
 
-public extension SpeakSwiftly.Artifacts {
-    // MARK: Batch Queries
-
-    /// Fetches one retained generated batch by identifier.
-    func batch(id batchID: String) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedBatch(id: UUID().uuidString, batchID: batchID))
-    }
-
-    /// Lists the retained generated batches known to the runtime.
-    func batches() async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.generatedBatches(id: UUID().uuidString))
-    }
-}
-
 public extension SpeakSwiftly.Runtime {
     // MARK: Batch Helpers
 
@@ -148,5 +134,44 @@ public extension SpeakSwiftly.Runtime {
                 requestContext: item.requestContext,
             )
         }
+    }
+}
+
+extension SpeakSwiftly.GenerationArtifact {
+    init(_ generatedFile: SpeakSwiftly.GeneratedFile) {
+        self.init(
+            artifactID: generatedFile.artifactID,
+            kind: .audioWAV,
+            createdAt: generatedFile.createdAt,
+            filePath: generatedFile.filePath,
+            sampleRate: generatedFile.sampleRate,
+            voiceProfile: generatedFile.voiceProfile,
+            textProfile: generatedFile.textProfile,
+            inputTextContext: generatedFile.inputTextContext,
+            requestContext: generatedFile.requestContext,
+        )
+    }
+}
+
+extension SpeakSwiftly.GenerationJob {
+    init(_ generatedBatch: SpeakSwiftly.GeneratedBatch) {
+        self.init(
+            jobID: generatedBatch.batchID,
+            jobKind: .batch,
+            createdAt: generatedBatch.createdAt,
+            updatedAt: generatedBatch.updatedAt,
+            voiceProfile: generatedBatch.voiceProfile,
+            textProfile: generatedBatch.textProfile,
+            speechBackend: generatedBatch.speechBackend,
+            state: generatedBatch.state,
+            items: generatedBatch.items,
+            artifacts: generatedBatch.artifacts.map(SpeakSwiftly.GenerationArtifact.init),
+            failure: generatedBatch.failure,
+            startedAt: generatedBatch.startedAt,
+            completedAt: generatedBatch.completedAt,
+            failedAt: generatedBatch.failedAt,
+            expiresAt: generatedBatch.expiresAt,
+            retentionPolicy: generatedBatch.retentionPolicy,
+        )
     }
 }
