@@ -41,7 +41,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [x] Milestone 24: Playback execution ownership split
 - [x] Milestone 25: Playback scheduling boundary and public state review
 - [ ] Milestone 26: Pre-v1 release hardening
-- [ ] Milestone 27: Public API surface simplification
+- [x] Milestone 27: Public API surface simplification
 
 ## Active Milestones
 
@@ -141,7 +141,7 @@ Exit criteria:
 
 - [ ] A downstream Swift package can adopt `SpeakSwiftly` through a documented supported distribution path without relying on repo-local adjacency assumptions.
 - [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
-- [ ] Public API docs and tests distinguish typed Swift results from JSONL transport envelopes clearly enough that consumers do not have to infer the contract from worker payloads.
+- [x] Public API docs and tests distinguish typed Swift results from JSONL transport envelopes clearly enough that consumers do not have to infer the contract from worker payloads.
 - [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
@@ -333,52 +333,50 @@ Tickets:
 - [x] Publish launcher scripts, stable runtime aliases, and manifest-first consumption helpers so local consumers stop reconstructing executable and `default.metallib` paths by hand.
 - [x] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.
 - [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially package distribution, request observation, and playback-architecture cleanup.
-- [ ] Finish the Milestone 27 public API simplification pass or explicitly document any remaining public rough edges as accepted pre-v1 compatibility.
+- [x] Finish the Milestone 27 public API simplification pass or explicitly document any remaining public rough edges as accepted pre-v1 compatibility.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
 Exit criteria:
 
 - [ ] Tagged releases are operationally self-explanatory for local consumers and package consumers.
 - [ ] The package and worker surfaces are documented clearly enough that `v1.0.0` does not freeze accidental behavior.
-- [ ] The typed Swift API has one documented story for request completion, retained generation output, queue control, text profiles, and request identity before the stable release line.
+- [x] The typed Swift API has one documented story for request completion, retained generation output, queue control, text profiles, and request identity before the stable release line.
 - [ ] Release verification proves both package correctness and published-runtime correctness.
 
 ## Milestone 27: Public API Surface Simplification
 
 Scope:
 
-- [ ] Simplify the typed Swift API before downstream distribution and pre-v1 hardening freeze accidental public behavior.
-- [ ] Preserve the existing concern-handle backbone while reducing duplicated model families, transport leakage, and queue-control ambiguity.
-- [ ] Keep JSONL compatibility decisions explicit instead of letting typed Swift cleanup silently change the worker contract.
+- [x] Simplify the typed Swift API before downstream distribution and pre-v1 hardening freeze accidental public behavior.
+- [x] Preserve the existing concern-handle backbone while reducing duplicated model families, transport leakage, and queue-control ambiguity.
+- [x] Keep JSONL compatibility decisions explicit instead of letting typed Swift cleanup silently change the worker contract.
 
 Tickets:
 
-- [ ] Use `docs/maintainers/public-api-surface-audit-2026-05-02.md` as the working plan for this milestone.
-- [ ] Remove or deprecate cross-queue controls from `Player` so playback-owned convenience methods cannot operate on generation queues.
-- [ ] Keep queue-scoped controls explicit on `Runtime`, with same-queue conveniences on `Jobs` and `Player` only where the owner is obvious at the use site.
-- [ ] Make `SpeakSwiftly.Normalizer` consistently return `SpeakSwiftly` text-profile models instead of mixing `SpeakSwiftly` wrappers with `TextForSpeech.Runtime` profile and style models.
-- [ ] Decide and implement the typed Swift request-completion shape so callers no longer have to inspect the broad JSONL-style `Success` envelope full of unrelated optional fields.
-- [ ] Introduce a typed request-kind surface or equivalent so `RequestHandle`, request snapshots, and queue snapshots do not expose raw worker `op` strings as the primary Swift-facing semantic model.
-- [ ] Choose one canonical retained generation model for jobs, generated files, generated batches, and generation artifacts, then remove or narrow public duplicates.
-- [ ] Decide whether semantic identifier value types should replace string aliases for request ids, artifact ids, generation-job ids, text-profile ids, and voice-profile names.
-- [ ] Revisit `Voices.create(...)` labels after the larger model cleanup, especially `voice voiceDescription` and `systemDesign`, and change them only if the use sites read more clearly.
-- [ ] Update README, CONTRIBUTING, DocC, API-surface tests, worker protocol tests, and generated-artifact E2E assertions in the same pass as each public API change.
-- [ ] Verify downstream `SpeakSwiftlyServer` compatibility before release whenever this milestone changes types, labels, request observation, or text-profile return models.
+- [x] Use `docs/maintainers/public-api-surface-audit-2026-05-02.md` as the working plan for this milestone.
+- [x] Remove or deprecate cross-queue controls from `Player` so playback-owned convenience methods cannot operate on generation queues.
+- [x] Keep queue-scoped controls explicit on `Runtime`, with same-queue conveniences on `Jobs` and `Player` only where the owner is obvious at the use site.
+- [x] Make `SpeakSwiftly.Normalizer` consistently return `SpeakSwiftly` text-profile models instead of mixing `SpeakSwiftly` wrappers with `TextForSpeech.Runtime` profile and style models.
+- [x] Decide and implement the typed Swift request-completion shape so callers no longer have to inspect the broad JSONL-style `Success` envelope full of unrelated optional fields.
+- [x] Introduce a typed request-kind surface or equivalent so `RequestHandle`, request snapshots, and queue snapshots do not expose raw worker `op` strings as the primary Swift-facing semantic model.
+- [x] Choose one canonical retained generation model for jobs, generated files, generated batches, and generation artifacts, then remove or narrow public duplicates.
+- [x] Decide whether semantic identifier value types should replace string aliases for request ids, artifact ids, generation-job ids, text-profile ids, and voice-profile names.
+- [x] Revisit `Voices.create(...)` labels after the larger model cleanup and adopt `voiceDescription:` plus `builtInDesign:` where the use sites read more clearly.
+- [x] Update README, CONTRIBUTING, DocC, API-surface tests, worker protocol tests, and generated-artifact E2E assertions in the same pass as each public API change.
+- [ ] Verify downstream `SpeakSwiftlyServer` compatibility before release whenever this milestone changes types, labels, request observation, or text-profile return models. Downstream adoption is active separately and is intentionally not handled on this package branch.
 
-Planning notes:
+Completion notes:
 
-- Phase 1 should be the queue-control cleanup because the ownership rule is already documented and the change is narrow.
-- Phase 2 should be the text-profile boundary cleanup because it removes model-family confusion without changing generation or request observation.
-- Phase 3 should separate typed request completion from JSONL response envelopes and settle request-kind naming.
-- Phase 4 should collapse retained generation output around one canonical model.
-- Phase 5 should handle identifier value types and voice-creation label polish only after the larger API shape is stable.
+- Migration guidance lives in `docs/maintainers/milestone-27-migration-note.md`.
+- JSONL operation names, `profile_id` compatibility, and response payload keys remain stable.
+- Downstream `SpeakSwiftlyServer` adoption is tracked outside this standalone package branch before release.
 
 Exit criteria:
 
-- [ ] The typed Swift API preserves the concern-handle model while removing cross-handle queue ambiguity.
-- [ ] Text-profile operations return one coherent `SpeakSwiftly` model family at the package boundary.
-- [ ] Swift callers can inspect request completion and request kind without understanding JSONL worker response envelopes or raw operation strings.
-- [ ] Retained generation output has one documented model story across jobs, files, artifacts, and batches.
+- [x] The typed Swift API preserves the concern-handle model while removing cross-handle queue ambiguity.
+- [x] Text-profile operations return one coherent `SpeakSwiftly` model family at the package boundary.
+- [x] Swift callers can inspect request completion and request kind without understanding JSONL worker response envelopes or raw operation strings.
+- [x] Retained generation output has one documented model story across jobs, files, artifacts, and batches.
 - [ ] README, CONTRIBUTING, DocC, tests, and downstream compatibility checks reflect the final chosen public API shape.
 
 ## History

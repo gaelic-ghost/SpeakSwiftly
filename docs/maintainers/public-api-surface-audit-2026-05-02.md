@@ -31,9 +31,8 @@ voice-profile storage, text normalization, retained jobs, and retained artifacts
 are easier to reason about when callers enter through the handle that owns the
 job they are trying to do.
 
-The next cleanup should preserve that shape. The problem is not that the API has
-handles. The problem is that several public model and result families now
-describe the same runtime concepts in different ways.
+Milestone 27 preserved that shape. The cleanup kept callers on concern handles
+while reducing duplicate models, transport leakage, and queue-control ambiguity.
 
 ## Improvement Areas
 
@@ -85,37 +84,15 @@ overview, status, backend changes, cleared counts, and cancellation ids.
 That forces callers to know which optional payload should be present for the
 operation they submitted.
 
-Desired direction:
+Implemented direction:
 
 - keep the JSONL response envelope transport-owned
-- introduce typed completion payloads for Swift callers
+- introduce typed completion payloads for Swift callers through
+  `SpeakSwiftly.RequestCompletion`
 - make terminal request observation return data shaped around the operation
   that completed
-- consider a transitional public `RequestCompletion` enum if a fully generic
-  typed request handle is too large for one pass
 
-Possible first shape:
-
-```swift
-enum RequestCompletion: Sendable, Equatable {
-    case speech
-    case generatedFile(SpeakSwiftly.GeneratedFile)
-    case generationJob(SpeakSwiftly.GenerationJob)
-    case voiceProfile(SpeakSwiftly.ProfileSummary)
-    case profiles([SpeakSwiftly.ProfileSummary])
-    case textProfile(SpeakSwiftly.TextProfileDetails)
-    case textProfiles([SpeakSwiftly.TextProfileSummary])
-    case queue(SpeakSwiftly.QueueSnapshot)
-    case playbackState(SpeakSwiftly.PlaybackStateSnapshot)
-    case runtimeOverview(SpeakSwiftly.RuntimeOverview)
-    case status(SpeakSwiftly.StatusEvent)
-    case clearedQueue(count: Int)
-    case cancelledRequest(id: String)
-}
-```
-
-That enum is a possible planning target, not a committed final design. The
-important part is that typed callers should not have to inspect a transport
+The important part is that typed callers no longer have to inspect a transport
 envelope full of unrelated optional fields.
 
 Relevant files:
@@ -133,22 +110,18 @@ The intended queue-control model is already documented:
 - cross-queue controls live on `Runtime`
 - same-queue conveniences may live on `Jobs` and `Player`
 
-The current `Player` surface breaks that expectation by exposing
-`clearQueue(_:)` and `cancel(_:requestID:)`, which can operate on a queue that
-the playback handle does not own.
+Milestone 27 removed the cross-queue `Player.clearQueue(_:)` and
+`Player.cancel(_:requestID:)` entry points, which could operate on queues the
+playback handle did not own.
 
-Desired direction:
+Implemented direction:
 
 - keep `runtime.clearQueue(.generation)` and `runtime.clearQueue(.playback)`
 - keep `runtime.cancel(.generation, requestID:)` and
   `runtime.cancel(.playback, requestID:)`
 - keep `jobs.clearQueue()` and `jobs.cancel(_:)` as generation conveniences
 - keep `player.clearQueue()` as a playback convenience
-- keep `player.cancelRequest(_:)` only if the broad request-id behavior remains
-  intentionally different from queue-scoped cancellation
-- remove or deprecate `player.clearQueue(_:)` and
-  `player.cancel(_:requestID:)` because they make `Player` look like a general
-  queue router
+- keep `player.cancelRequest(_:)` for broad playback-request cancellation
 
 Practical consequence: a caller can tell from the handle name whether an
 operation affects playback, generation, or both.
@@ -281,43 +254,43 @@ Relevant files:
 - [`Sources/SpeakSwiftly/API/VoiceProfiles.swift`](../../Sources/SpeakSwiftly/API/VoiceProfiles.swift)
 - [`Sources/SpeakSwiftly/Generation/VoiceProfileOperations.swift`](../../Sources/SpeakSwiftly/Generation/VoiceProfileOperations.swift)
 
-## Planning Sequence
+## Implemented Sequence
 
 ### Phase 1: Low-Risk Boundary Cleanup
 
-Clean up public controls where the desired owner is already documented.
+Cleaned up public controls where the desired owner was already documented.
 
-- remove or deprecate cross-queue controls from `Player`
-- update README, CONTRIBUTING, DocC, and API tests to match the queue-control
+- removed cross-queue controls from `Player`
+- updated README, CONTRIBUTING, DocC, and API tests to match the queue-control
   ownership model
-- keep JSONL queue operation names unchanged
+- kept JSONL queue operation names unchanged
 
-This phase is the smallest useful first implementation slice.
+This phase was the smallest useful first implementation slice.
 
 ### Phase 2: Text Profile Boundary Cleanup
 
-Make `SpeakSwiftly.Normalizer` consistently return `SpeakSwiftly` models.
+Made `SpeakSwiftly.Normalizer` consistently return `SpeakSwiftly` models.
 
-- return `SpeakSwiftly.TextProfileSummary`
-- return `SpeakSwiftly.TextProfileDetails`
-- return `SpeakSwiftly.TextProfileStyleOption`
-- keep conversion to and from `TextForSpeech` localized inside normalization
+- returned `SpeakSwiftly.TextProfileSummary`
+- returned `SpeakSwiftly.TextProfileDetails`
+- returned `SpeakSwiftly.TextProfileStyleOption`
+- kept conversion to and from `TextForSpeech` localized inside normalization
   support code
-- verify downstream `SpeakSwiftlyServer` alignment before release
+- left downstream `SpeakSwiftlyServer` alignment as separate pre-release adoption
 
-This phase removes model-family confusion without changing the core runtime
+This phase removed model-family confusion without changing the core runtime
 queue or generation model.
 
 ### Phase 3: Request Observation And Completion Shape
 
-Separate typed Swift completion data from JSONL transport envelopes.
+Separated typed Swift completion data from JSONL transport envelopes.
 
-- design a typed request-completion model
-- add a typed request-kind model or equivalent
-- expose `RequestHandle.kind` and queue-summary `kind` values while preserving
+- added `SpeakSwiftly.RequestCompletion`
+- added `SpeakSwiftly.RequestKind`
+- exposed `RequestHandle.kind` and queue-summary `kind` values while preserving
   JSONL `op` encoding
-- update request-observation tests around terminal success and failure data
-- document how Swift callers should inspect completion results
+- updated request-observation tests around terminal success and failure data
+- documented how Swift callers should inspect completion results
 
 This phase is source-breaking: the public `Success` envelope remains the JSONL
 success payload, while typed request streams now complete with
@@ -325,30 +298,27 @@ success payload, while typed request streams now complete with
 
 ### Phase 4: Retained Generation Canonical Model
 
-Make retained generation work tell one story.
+Made retained generation work tell one story.
 
-- choose the canonical retained-work model
-- collapse batch-specific public output duplication where possible
-- align `GeneratedFile`, `GenerationArtifact`, and `GenerationJob` terminology
-- update artifact lookup and job lookup docs so callers know where to inspect
+- chose `GenerationJob` as the canonical retained-work model
+- collapsed batch-specific public output duplication where possible
+- aligned `GeneratedFile`, `GenerationArtifact`, and `GenerationJob` terminology
+- updated artifact lookup and job lookup docs so callers know where to inspect
   retained output
-- preserve JSONL response compatibility unless this is intentionally bundled
-  into a breaking release
+- preserved JSONL response compatibility
 
-This phase is the largest cleanup because it touches models, storage summaries,
+This phase was the largest cleanup because it touched models, storage summaries,
 worker responses, README examples, and E2E assertions.
 
 ### Phase 5: Identifier And Label Polish
 
-Only after the larger shape is settled, decide whether this release should
-introduce typed identifiers and voice-creation label changes.
+After the larger shape settled, the branch decided against identifier value
+types for Milestone 27 and applied the voice-creation label changes.
 
-- add semantic id value types if the package is intentionally taking a breaking
-  public API cleanup
-- otherwise, document the remaining string aliases as a conscious compatibility
+- documented remaining string aliases as a conscious cross-surface compatibility
   choice
-- polish voice-creation labels if call sites still read awkwardly after the
-  larger model cleanup
+- changed designed voice prompts to `voiceDescription:`
+- changed trusted package-owned defaults to `builtInDesign:`
 
 ## Non-Goals
 
