@@ -98,7 +98,7 @@ public extension SpeakSwiftly {
 
         struct RequestBroker {
             let id: String
-            let operation: String
+            let kind: SpeakSwiftly.RequestKind
             let voiceProfile: String?
             let requestContext: SpeakSwiftly.RequestContext?
             let acceptedAt: Date
@@ -159,7 +159,7 @@ public extension SpeakSwiftly {
 
                 return SpeakSwiftly.RequestSnapshot(
                     id: id,
-                    operation: operation,
+                    kind: kind,
                     voiceProfile: voiceProfile,
                     requestContext: requestContext,
                     acceptedAt: acceptedAt,

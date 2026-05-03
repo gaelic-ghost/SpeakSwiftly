@@ -227,7 +227,7 @@ actor PlaybackController {
 
         return ActiveWorkerRequestSummary(
             id: requestID,
-            op: playbackState.request.op,
+            kind: playbackState.request.kind,
             voiceProfile: playbackState.request.voiceProfile,
             requestContext: playbackState.request.requestContext,
         )
@@ -263,7 +263,7 @@ actor PlaybackController {
 
             return QueuedWorkerRequestSummary(
                 id: requestID,
-                op: playbackState.request.op,
+                kind: playbackState.request.kind,
                 voiceProfile: playbackState.request.voiceProfile,
                 requestContext: playbackState.request.requestContext,
                 queuePosition: offset + 1,

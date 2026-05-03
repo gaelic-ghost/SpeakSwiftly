@@ -6,7 +6,7 @@ extension SpeakSwiftly.Runtime {
     func makeRequestHandle(for request: WorkerRequest) -> WorkerRequestHandle {
         WorkerRequestHandle(
             id: request.id,
-            operation: request.opName,
+            kind: request.requestKind,
             voiceProfile: request.voiceProfile,
             requestContext: request.requestContext,
             events: makeLegacyRequestEventStream(for: request.id),
@@ -24,7 +24,7 @@ extension SpeakSwiftly.Runtime {
         let acceptedAt = dependencies.now()
         requestBrokers[request.id] = RequestBroker(
             id: request.id,
-            operation: request.opName,
+            kind: request.requestKind,
             voiceProfile: request.voiceProfile,
             requestContext: request.requestContext,
             acceptedAt: acceptedAt,
@@ -115,8 +115,8 @@ extension SpeakSwiftly.Runtime {
                                 continuation.yield(.started(event))
                             case let .progress(event):
                                 continuation.yield(.progress(event))
-                            case let .completed(success):
-                                continuation.yield(.completed(success))
+                            case let .completed(completion):
+                                continuation.yield(.completed(completion))
                             case let .failed(failure), let .cancelled(failure):
                                 continuation.finish(
                                     throwing: WorkerError(code: failure.code, message: failure.message),
@@ -146,8 +146,8 @@ extension SpeakSwiftly.Runtime {
                 .started(startedEvent)
             case let .progress(progressEvent):
                 .progress(progressEvent)
-            case let .completed(success):
-                .completed(success)
+            case let .completed(completion):
+                .completed(completion)
         }
 
         recordRequestState(

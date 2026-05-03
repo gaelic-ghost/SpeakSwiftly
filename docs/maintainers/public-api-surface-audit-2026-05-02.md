@@ -162,27 +162,13 @@ Relevant files:
 
 ### 4. Request Operation Names
 
-The typed Swift API currently exposes raw worker operation strings through:
+The typed Swift API now exposes `SpeakSwiftly.RequestKind` from request
+handles, retained request snapshots, active queue summaries, and queued request
+summaries. Raw worker operation names remain the JSONL transport truth and are
+still encoded as `op` in worker envelopes and queue payloads.
 
-- `RequestHandle.operation`
-- `RequestSnapshot.operation`
-- `ActiveRequest.op`
-- `QueuedRequest.op`
-
-Those names are transport truth for JSONL, but they leak worker vocabulary into
-typed Swift callers. A caller who used `runtime.generate.speech(...)` should not
-need to know that the worker op is `generate_speech` unless they are debugging
-or bridging to JSONL.
-
-Desired direction:
-
-- introduce a public typed request kind, such as `SpeakSwiftly.RequestKind`
-- expose typed request-kind values from request handles, snapshots, and queue
-  snapshots
-- keep raw JSONL `op` as a transport field where the JSONL response model still
-  needs it
-- decide whether raw operation strings remain available as a debug-only or
-  transport-only property
+This keeps Swift callers on a typed request-kind value while preserving the
+wire vocabulary for process-boundary callers and logs.
 
 Practical consequence: request observation becomes part of the Swift API instead
 of a thin view over the worker protocol.
@@ -321,12 +307,14 @@ Separate typed Swift completion data from JSONL transport envelopes.
 
 - design a typed request-completion model
 - add a typed request-kind model or equivalent
-- decide what happens to `RequestHandle.operation` and queue snapshot `op`
+- expose `RequestHandle.kind` and queue-summary `kind` values while preserving
+  JSONL `op` encoding
 - update request-observation tests around terminal success and failure data
 - document how Swift callers should inspect completion results
 
-This phase may be source-breaking if the public `Success` envelope stops being
-the primary terminal payload for typed callers.
+This phase is source-breaking: the public `Success` envelope remains the JSONL
+success payload, while typed request streams now complete with
+`SpeakSwiftly.RequestCompletion`.
 
 ### Phase 4: Retained Generation Canonical Model
 

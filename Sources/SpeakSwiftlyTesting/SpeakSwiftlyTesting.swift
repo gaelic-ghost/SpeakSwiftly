@@ -311,7 +311,7 @@ struct SpeakSwiftlyTestingMain {
 
         let handle = await runtime.status()
         print("request_id: \(handle.id)")
-        print("operation: \(handle.operation)")
+        print("request_kind: \(handle.kind.rawValue)")
 
         for try await event in handle.events {
             switch event {
@@ -324,8 +324,12 @@ struct SpeakSwiftlyTestingMain {
                     print("started: op=\(started.op)")
                 case let .progress(progress):
                     print("progress: stage=\(progress.stage.rawValue)")
-                case let .completed(success):
-                    print("completed: \(formatStatus(success.status))")
+                case let .completed(completion):
+                    if case let .runtimeStatus(status, _) = completion {
+                        print("completed: \(formatStatus(status))")
+                    } else {
+                        print("completed: no status payload")
+                    }
                     return
             }
         }
@@ -494,8 +498,12 @@ struct SpeakSwiftlyTestingMain {
             switch event {
                 case .queued, .started, .progress:
                     continue
-                case let .acknowledged(success), let .completed(success):
+                case let .acknowledged(success):
                     if let generatedFile = success.generatedFile {
+                        return generatedFile
+                    }
+                case let .completed(completion):
+                    if case let .generatedFile(generatedFile) = completion {
                         return generatedFile
                     }
             }
@@ -511,8 +519,14 @@ struct SpeakSwiftlyTestingMain {
             switch event {
                 case .queued, .started, .progress:
                     continue
-                case let .acknowledged(success), let .completed(success):
+                case let .acknowledged(success):
                     if let profileName = success.profileName, let profilePath = success.profilePath {
+                        return (profileName, profilePath)
+                    }
+                case let .completed(completion):
+                    if case let .voiceProfile(profileName, profilePath) = completion,
+                       let profileName,
+                       let profilePath {
                         return (profileName, profilePath)
                     }
             }

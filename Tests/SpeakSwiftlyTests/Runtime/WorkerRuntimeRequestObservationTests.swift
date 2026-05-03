@@ -139,7 +139,7 @@ import TextForSpeech
 
     let snapshot = await runtime.request(id: "req-late")
     #expect(snapshot?.id == "req-late")
-    #expect(snapshot?.operation == "list_voice_profiles")
+    #expect(snapshot?.kind == .listVoiceProfiles)
     #expect(snapshot?.sequence == 1)
     if let snapshot {
         switch snapshot.state {
@@ -192,13 +192,19 @@ import TextForSpeech
     let completedB = try await iteratorB.next()
     #expect(completedA?.sequence == 3)
     #expect(completedB?.sequence == 3)
-    if case let .completed(successA)? = completedA?.state {
-        #expect(successA.id == "req-late")
+    if case let .completed(completionA)? = completedA?.state {
+        #expect(completedA?.id == "req-late")
+        if case .voiceProfiles = completionA {} else {
+            Issue.record("Expected subscriber A completion to carry voice profiles.")
+        }
     } else {
         Issue.record("Expected subscriber A to receive a completed update third.")
     }
-    if case let .completed(successB)? = completedB?.state {
-        #expect(successB.id == "req-late")
+    if case let .completed(completionB)? = completedB?.state {
+        #expect(completedB?.id == "req-late")
+        if case .voiceProfiles = completionB {} else {
+            Issue.record("Expected subscriber B completion to carry voice profiles.")
+        }
     } else {
         Issue.record("Expected subscriber B to receive a completed update third.")
     }
@@ -220,8 +226,10 @@ import TextForSpeech
     } else {
         Issue.record("Expected the original handle stream to retain the started event history.")
     }
-    if case let .completed(success)? = handleCompleted {
-        #expect(success.id == "req-late")
+    if case let .completed(completion)? = handleCompleted {
+        if case .voiceProfiles = completion {} else {
+            Issue.record("Expected the original handle stream completion to carry voice profiles.")
+        }
     } else {
         Issue.record("Expected the original handle stream to retain the completed event history.")
     }
@@ -229,8 +237,10 @@ import TextForSpeech
 
     let completedSnapshot = await runtime.request(id: "req-late")
     #expect(completedSnapshot?.sequence == 3)
-    if case let .completed(success)? = completedSnapshot?.state {
-        #expect(success.id == "req-late")
+    if case let .completed(completion)? = completedSnapshot?.state {
+        if case .voiceProfiles = completion {} else {
+            Issue.record("Expected the retained request snapshot completion to carry voice profiles.")
+        }
     } else {
         Issue.record("Expected the retained request snapshot to stay completed after terminal success.")
     }
@@ -530,7 +540,7 @@ import TextForSpeech
 
     var sawCompletion = false
     while let event = try await iterator.next() {
-        if case .completed(WorkerSuccessResponse(id: "req-stream-bg", profileName: nil, profilePath: nil, profiles: nil)) = event {
+        if case .completed(.empty) = event {
             sawCompletion = true
             break
         }

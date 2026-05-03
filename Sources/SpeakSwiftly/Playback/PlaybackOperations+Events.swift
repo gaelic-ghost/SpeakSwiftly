@@ -175,7 +175,7 @@ extension SpeakSwiftly.Runtime {
         activeRequest: ActiveWorkerRequestSummary?,
     ) async {
         let requestID = activeRequest?.id
-        let op = activeRequest?.op
+        let op = activeRequest?.kind.rawValue
         let profileName = activeRequest?.voiceProfile
 
         switch event {

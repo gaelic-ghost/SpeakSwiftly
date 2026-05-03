@@ -52,8 +52,8 @@ For example, listing retained files looks like this:
 let filesHandle = await runtime.artifacts.files()
 
 for try await event in filesHandle.events {
-    if case .completed(let success) = event {
-        print(success.generatedFiles ?? [])
+    if case .completed(.generatedFiles(let files)) = event {
+        print(files)
     }
 }
 ```

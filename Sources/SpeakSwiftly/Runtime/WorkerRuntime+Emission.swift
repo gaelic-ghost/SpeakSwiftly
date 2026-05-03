@@ -27,6 +27,7 @@ extension SpeakSwiftly.Runtime {
                     profiles: payload.profiles,
                     textProfile: payload.textProfile,
                     textProfiles: payload.textProfiles,
+                    textProfileStyleOptions: payload.textProfileStyleOptions,
                     textProfileStyle: payload.textProfileStyle,
                     textProfilePath: payload.textProfilePath,
                     activeRequest: payload.activeRequest,
@@ -39,7 +40,7 @@ extension SpeakSwiftly.Runtime {
                     clearedCount: payload.clearedCount,
                     cancelledRequestID: payload.cancelledRequestID,
                 )
-                yieldRequestEvent(.completed(success), for: request.id)
+                yieldRequestEvent(.completed(SpeakSwiftly.RequestCompletion(success)), for: request.id)
                 if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
                     await emit(success)
                 }
@@ -143,7 +144,7 @@ extension SpeakSwiftly.Runtime {
             .map {
                 ActiveWorkerRequestSummary(
                     id: $0.id,
-                    op: $0.opName,
+                    kind: $0.requestKind,
                     voiceProfile: $0.voiceProfile,
                     requestContext: $0.requestContext,
                 )
@@ -157,7 +158,7 @@ extension SpeakSwiftly.Runtime {
                 return jobs.enumerated().map { offset, job in
                     QueuedWorkerRequestSummary(
                         id: job.request.id,
-                        op: job.request.opName,
+                        kind: job.request.requestKind,
                         voiceProfile: job.request.voiceProfile,
                         requestContext: job.request.requestContext,
                         queuePosition: offset + 1,

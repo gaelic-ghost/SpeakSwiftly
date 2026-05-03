@@ -561,12 +561,12 @@ import Darwin
 // MARK: - Handle Metadata
 
 @Test func `public worker request handle exposes stable metadata`() {
-    let operation: KeyPath<SpeakSwiftly.RequestHandle, String> = \.operation
+    let kind: KeyPath<SpeakSwiftly.RequestHandle, SpeakSwiftly.RequestKind> = \.kind
     let voiceProfile: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.voiceProfile
     let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
     let generationEvents: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>> = \.generationEvents
 
-    _ = operation
+    _ = kind
     _ = voiceProfile
     _ = events
     _ = generationEvents
@@ -588,7 +588,7 @@ import Darwin
     let updateDate: KeyPath<SpeakSwiftly.RequestUpdate, Date> = \.date
     let updateState: KeyPath<SpeakSwiftly.RequestUpdate, SpeakSwiftly.RequestState> = \.state
     let snapshotID: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.id
-    let snapshotOperation: KeyPath<SpeakSwiftly.RequestSnapshot, String> = \.operation
+    let snapshotKind: KeyPath<SpeakSwiftly.RequestSnapshot, SpeakSwiftly.RequestKind> = \.kind
     let snapshotVoiceProfile: KeyPath<SpeakSwiftly.RequestSnapshot, String?> = \.voiceProfile
     let snapshotAcceptedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.acceptedAt
     let snapshotLastUpdatedAt: KeyPath<SpeakSwiftly.RequestSnapshot, Date> = \.lastUpdatedAt
@@ -610,7 +610,7 @@ import Darwin
     _ = updateDate
     _ = updateState
     _ = snapshotID
-    _ = snapshotOperation
+    _ = snapshotKind
     _ = snapshotVoiceProfile
     _ = snapshotAcceptedAt
     _ = snapshotLastUpdatedAt

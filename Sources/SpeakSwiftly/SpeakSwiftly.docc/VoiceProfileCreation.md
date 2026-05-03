@@ -87,7 +87,10 @@ Both creation paths return a request handle, so completion is observed the same 
 
 ```swift
 for try await event in handle.events {
-    print(event)
+    if case .completed(.voiceProfile(let name, let path)) = event {
+        print(name ?? "")
+        print(path ?? "")
+    }
 }
 ```
 
