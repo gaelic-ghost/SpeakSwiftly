@@ -53,6 +53,113 @@ import Testing
     #expect(empty.isEmpty)
 }
 
+@Test func `concurrent create load and remove access stays consistent`() async throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    let profileNames = (0..<6).map { "parallel-\($0)" }
+
+    try await withThrowingTaskGroup(of: String.self) { group in
+        for profileName in profileNames {
+            group.addTask {
+                try store.createProfile(
+                    profileName: profileName,
+                    vibe: .femme,
+                    modelRepo: "test-model",
+                    voiceDescription: "Parallel voice \(profileName).",
+                    sourceText: "Parallel transcript \(profileName)",
+                    sampleRate: 24000,
+                    canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+                )
+                .manifest
+                .profileName
+            }
+        }
+
+        var createdNames: [String] = []
+        for try await profileName in group {
+            createdNames.append(profileName)
+        }
+
+        #expect(createdNames.sorted() == profileNames)
+    }
+
+    #expect(try store.listProfiles().map(\.profileName) == profileNames)
+
+    try await withThrowingTaskGroup(of: String.self) { group in
+        for profileName in profileNames {
+            group.addTask {
+                try store.loadProfile(named: profileName).manifest.profileName
+            }
+        }
+
+        var loadedNames: [String] = []
+        for try await profileName in group {
+            loadedNames.append(profileName)
+        }
+
+        #expect(loadedNames.sorted() == profileNames)
+    }
+
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        for profileName in profileNames {
+            group.addTask {
+                try store.removeProfile(named: profileName)
+            }
+        }
+
+        try await group.waitForAll()
+    }
+
+    #expect(try store.listProfiles().isEmpty)
+}
+
+@Test func `concurrent duplicate creates publish one complete profile`() async throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+
+    let outcomes = try await withThrowingTaskGroup(of: String.self, returning: [String].self) { group in
+        for index in 0..<6 {
+            group.addTask {
+                do {
+                    _ = try store.createProfile(
+                        profileName: "shared",
+                        vibe: .femme,
+                        modelRepo: "test-model",
+                        voiceDescription: "Shared voice \(index).",
+                        sourceText: "Shared transcript \(index)",
+                        sampleRate: 24000,
+                        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+                    )
+                    return "created"
+                } catch let error as WorkerError where error.code == .profileAlreadyExists {
+                    return "already-exists"
+                }
+            }
+        }
+
+        var outcomes: [String] = []
+        for try await outcome in group {
+            outcomes.append(outcome)
+        }
+
+        return outcomes
+    }
+
+    #expect(outcomes.filter { $0 == "created" }.count == 1)
+    #expect(outcomes.filter { $0 == "already-exists" }.count == 5)
+
+    let profileDirectory = store.profileDirectoryURL(for: "shared")
+    #expect(fileManager.fileExists(atPath: store.manifestURL(for: profileDirectory).path))
+    #expect(fileManager.fileExists(atPath: store.referenceAudioURL(for: profileDirectory).path))
+    #expect(try store.listProfiles().map(\.profileName) == ["shared"])
+}
+
 @Test func `stores and lists system profile authorship and seed metadata`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
