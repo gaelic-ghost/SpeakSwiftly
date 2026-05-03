@@ -4,7 +4,7 @@
 
 - Build a small, reliable Swift worker executable that keeps MLX and Apple-runtime concerns isolated behind a simple process boundary.
 
-## Product principles
+## Product Principles
 
 - Keep the worker thin and concrete instead of layering it into a mini-framework.
 - Prefer one boring process boundary over multiple internal coordinators or bridges.
@@ -18,50 +18,61 @@
 
 This roadmap now keeps active milestones and the current release-hardening queue in one place. Older completed plans, superseded investigations, and landing notes have been condensed into the history section so maintainer guidance stays readable instead of fragmenting across stale documents.
 
+## Table of Contents
+
+- [Vision](#vision)
+- [Product Principles](#product-principles)
+- [Roadmap Shape](#roadmap-shape)
+- [Milestone Progress](#milestone-progress)
+- [Active Milestones](#active-milestones)
+- [Milestone 4: File Rendering And Integration Hardening](#milestone-4-file-rendering-and-integration-hardening)
+- [Milestone 6: Multi-Process Profile-Store Hardening](#milestone-6-multi-process-profile-store-hardening)
+- [Milestone 9: Live-Service Operability Review](#milestone-9-live-service-operability-review)
+- [Milestone 13: Swift Package Distribution](#milestone-13-swift-package-distribution)
+- [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
+- [Milestone 17: Notification-Linked Priority Playback](#milestone-17-notification-linked-priority-playback)
+- [Milestone 18: Package Docs And Distribution Polish](#milestone-18-package-docs-and-distribution-polish)
+- [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
+- [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
+- [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
+- [Backlog Candidates](#backlog-candidates)
+- [History](#history)
+
 ## Milestone Progress
 
-- [x] Milestone 0: Bootstrap
-- [x] Milestone 1: JSONL worker contract
-- [x] Milestone 2: Resident runtime and live playback
-- [x] Milestone 3: On-demand profile creation and profile store
-- [ ] Milestone 4: File rendering and integration hardening
-- [ ] Milestone 6: Multi-process profile-store hardening
-- [ ] Milestone 9: Live-service operability review
-- [x] Milestone 10: Basic playback control surface
-- [x] Milestone 11: Basic queue inspection and clearing
-- [x] Milestone 12: Basic custom normalization replacements
-- [ ] Milestone 13: Swift package distribution
-- [ ] Milestone 16: `mlx-audio-swift` upgrade review
-- [ ] Milestone 17: Notification-linked priority playback
-- [ ] Milestone 18: Package docs and distribution polish
-- [x] Milestone 20: Per-request event stream observability
-- [ ] Milestone 21: Unified Logging with `Logger`
-- [ ] Milestone 22: Marvis MLX generation-path investigation and playback tuning
-- [x] Milestone 23: Playback request coordination flattening
-- [x] Milestone 24: Playback execution ownership split
-- [x] Milestone 25: Playback scheduling boundary and public state review
-- [ ] Milestone 26: Pre-v1 release hardening
-- [x] Milestone 27: Public API surface simplification
+- Milestone 4: File Rendering And Integration Hardening - In Progress
+- Milestone 6: Multi-Process Profile-Store Hardening - Planned
+- Milestone 9: Live-Service Operability Review - In Progress
+- Milestone 13: Swift Package Distribution - In Progress
+- Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
+- Milestone 17: Notification-Linked Priority Playback - Planned
+- Milestone 18: Package Docs And Distribution Polish - In Progress
+- Milestone 21: Unified Logging With `Logger` - Planned
+- Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
+- Milestone 26: Pre-v1 Release Hardening - In Progress
 
 ## Active Milestones
 
 ## Milestone 4: File Rendering And Integration Hardening
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Make the worker straightforward to own from a parent process.
-- [ ] Add the later resident file-rendering path for profile-based saved output.
-- [ ] Harden logs, shutdown behavior, and repo validation where the file path differs from live playback.
+- [ ] Finish the remaining hardening around retained file output, worker EOF, and process-lifecycle behavior.
+- [ ] Keep retained file output profile-based and aligned with the live generation path.
 
-Tickets:
+### Tickets
 
-- [ ] Add `generate_audio_file` parity coverage wherever the live path and saved-file path still diverge operationally.
-- [ ] Keep the file-rendering path profile-based instead of exposing raw clone inputs.
-- [ ] Tighten clean EOF and shutdown handling for long-lived worker ownership.
-- [ ] Add tests for malformed input, missing profiles, duplicate profile creation, removal, and process-lifecycle edges that still differ between live and saved-output lanes.
-- [ ] Keep packaging notes for parent-process ownership concrete and minimal.
+- [ ] Audit the current `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`, shutdown tests, malformed-input tests, and profile-store tests for any remaining file-rendering or worker-ownership gaps.
+- [ ] Add targeted coverage for missing profiles, duplicate profile creation, profile removal, or process-lifecycle edges only where the audit finds behavior that is still untested.
+- [ ] Tighten any remaining clean EOF or shutdown behavior for long-lived worker ownership that is not already covered by the current worker E2E lanes.
+- [ ] Keep the retained-file packaging notes concrete and minimal as the worker ownership story settles.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] The worker exits cleanly on EOF or shutdown requests.
 - [ ] Saved-file generation is operationally as predictable as live playback.
@@ -69,13 +80,17 @@ Exit criteria:
 
 ## Milestone 6: Multi-Process Profile-Store Hardening
 
-Scope:
+### Status
+
+Planned
+
+### Scope
 
 - [ ] Make the on-disk profile store safe and predictable when multiple local processes use it at the same time.
 - [ ] Preserve the current shared-store shape without adding unnecessary architecture around it.
 - [ ] Keep profile creation, listing, loading, and removal human-readable when cross-process contention or stale state appears.
 
-Tickets:
+### Tickets
 
 - [ ] Add cross-process coordination for profile creation and removal so concurrent workers cannot partially stomp each other.
 - [ ] Keep profile writes atomic across manifest and reference-audio creation, including cleanup of abandoned temp data after failed writes.
@@ -84,7 +99,7 @@ Tickets:
 - [ ] Add automated coverage for concurrent create/load/remove access against the shared profile root.
 - [ ] Document the shared per-user default profile root and the override path for process-isolated profile stores.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] Two local processes can share the default profile store without silent corruption or partially written profiles.
 - [ ] Cross-process profile creation and removal failures are explicit, structured, and recoverable.
@@ -92,23 +107,30 @@ Exit criteria:
 
 ## Milestone 9: Live-Service Operability Review
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Tighten the worker contract around service ownership and operational inspection for long-lived local deployments.
 - [ ] Make filesystem behavior and service-state inspection predictable for parent processes.
 - [ ] Make adjacent local consumer update flows explicit and reliable when standalone `SpeakSwiftly` releases are tagged.
 
-Tickets:
+### Tickets
 
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
-- [ ] Add a lightweight health and inspection surface for resident state, active request id, queue depth, profile root, and playback state without forcing log scraping.
+- [ ] Extend the existing `get_runtime_overview` / `runtime.overview()` inspection story where parent processes still need service-health fields such as profile root, runtime-state root, or richer resident state.
+- [ ] Add a runtime-level playback and overview event stream so hosts can keep playback state current without opportunistic polling. ([#45](https://github.com/gaelic-ghost/SpeakSwiftly/issues/45))
+- [ ] Rename or supersede `SPEAKSWIFTLY_PROFILE_ROOT` so the public override name matches its current runtime-state-root behavior. ([#21](https://github.com/gaelic-ghost/SpeakSwiftly/issues/21))
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as hidden conventions.
 - [ ] Persist a little more voice-profile source provenance from creation flows so rerolls, diagnostics, and later profile introspection have stable grounding.
+- [ ] Investigate whether startup-side playback preload or environment observation is still correlated with `freed pointer was not the last allocation`. ([#7](https://github.com/gaelic-ghost/SpeakSwiftly/issues/7))
 - [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
 - [ ] Document the current tag-time adoption flow for active downstream consumers such as `SpeakSwiftlyServer` and the `speak-to-user` integration repository, including what is automatic and what remains explicit follow-up.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] Parent processes can inspect worker state and reason about service health without log scraping alone.
 - [ ] Path resolution and profile-store behavior are predictable across different launch environments.
@@ -116,43 +138,45 @@ Exit criteria:
 
 ## Milestone 13: Swift Package Distribution
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Make `SpeakSwiftly` straightforward to consume as a real distributed Swift package instead of only as an adjacent local checkout.
 - [ ] Clarify what public API and semver guarantees the package actually intends to support for downstream apps and services.
 - [ ] Keep distribution work grounded in the existing package surface instead of adding unnecessary packaging layers or wrapper targets.
 
-Tickets:
+### Tickets
 
-- [x] Audit the `SpeakSwiftly` public API for the minimum supported downstream surface before advertising broader package distribution.
-- [ ] Use the public API audit in `docs/maintainers/public-api-surface-audit-2026-05-02.md` as the source plan for package-surface simplification before widening distribution.
 - [ ] Decide which parts of the public API are intended stable consumer contract versus transport-facing worker compatibility surface.
-- [ ] Decide whether semantic identifier value types such as request ids, artifact ids, generation-job ids, and voice-profile names belong in the supported package surface before the next breaking API cleanup.
-- [ ] Document SwiftPM dependency examples for both the library product and the executable product in the README.
+- [ ] Document SwiftPM dependency examples for the library product and clarify how package consumers should think about the executable product.
 - [ ] Add a package-consumer verification path that exercises dependency resolution from a clean external package instead of relying only on sibling-checkout integration.
 - [ ] Land the playback-platform seam described in `docs/maintainers/ios-portability-plan-2026-04-17.md` before widening supported platforms beyond macOS.
 - [ ] Decide whether package-registry publication is in scope or whether Git-based SwiftPM distribution is the intended first supported path.
 - [ ] Tighten release notes and release-checklist language so package consumers can tell when a change is semver-safe versus when migration work is required.
 - [ ] Document any remaining Xcode-built runtime caveats clearly so distributed package consumers understand where SwiftPM alone is sufficient and where it is not.
-- [ ] Revisit whether `BatchItem` should remain a caller-authored public input type once `Generate` owns more shaping work.
-- [ ] Revisit whether `GeneratedBatch`, `GenerationArtifact`, and `GenerationJob` should remain separate public output families or collapse around one canonical retained generation model.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] A downstream Swift package can adopt `SpeakSwiftly` through a documented supported distribution path without relying on repo-local adjacency assumptions.
 - [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
-- [x] Public API docs and tests distinguish typed Swift results from JSONL transport envelopes clearly enough that consumers do not have to infer the contract from worker payloads.
 - [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Review a newer `mlx-audio-swift` release or revision and decide whether `SpeakSwiftly` should adopt it.
 - [ ] Keep the worker thin and direct while making dependency drift easier to reason about.
 - [ ] Avoid wrapper-heavy compatibility architecture unless a real upstream API break makes it necessary.
 
-Tickets:
+### Tickets
 
 - [ ] Compare the currently pinned `mlx-audio-swift` revision with the latest available tagged release or stable candidate.
 - [ ] Review upstream changes to Qwen3 TTS defaults, generation controls, streaming behavior, and model-loading expectations for any impact on `SpeakSwiftly`.
@@ -160,7 +184,6 @@ Tickets:
 - [ ] Land durable Qwen generated-code investigation tooling on `main`, including capture, replay, code-stream comparison, and WAV-side prosody inspection commands that replace the invalid `compare-volume` diagnostic path.
 - [ ] Add Qwen E2E quality gates that inspect late-generation behavior, repeated or spiraling output, suspicious token/audio length, and per-chunk tail drift instead of treating playback completion as sufficient proof of speech quality.
 - [ ] Run the sampling-headroom investigation described in `docs/maintainers/qwen-sampling-headroom-report-2026-04-24.md` after generated-file rendering and the generated-code capture tools are trustworthy on `main`.
-- [x] Add a first-class chunked live-generation path for non-streaming backends, so `SpeakSwiftly` can segment text up front, synthesize chunk waveforms sequentially, and feed completed audio chunks into playback without waiting for full-request synthesis to finish.
 - [ ] Evaluate whether the current resident backend defaults are still the right MLX choices on current Apple Silicon, and record the latency, memory, and audible tradeoffs explicitly.
 - [ ] Generalize stored Qwen materializations so profiles can load backend-appropriate conditioning material without assuming one hard-coded shape forever.
 - [ ] Evaluate `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-6bit` after the 1.7B 8-bit resident path has enough local latency, memory, and audible-quality evidence.
@@ -168,20 +191,24 @@ Tickets:
 - [ ] Re-run resident playback, profile-generation, and typed-library integration checks against a candidate upgrade in an isolated branch.
 - [ ] Record any concrete reasons to upgrade, defer, or stay pinned, including behavior changes that affect playback stability or generation length.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] The repository documents whether a newer `mlx-audio-swift` should be adopted and why.
 - [ ] Dependency policy around `mlx-audio-swift` is explicit enough that future playback or generation regressions are easier to trace.
 
 ## Milestone 17: Notification-Linked Priority Playback
 
-Scope:
+### Status
+
+Planned
+
+### Scope
 
 - [ ] Decide how callers can submit ordinary speech work plus separate notification-linked priority playback work without making the worker contract confusing.
 - [ ] Review whether the existing request queue can absorb this feature cleanly or whether a distinct playback queue is truly necessary.
 - [ ] Keep the design thin and concrete instead of introducing a new queue, manager, coordinator, or job subsystem unless the simpler extension path clearly fails.
 
-Tickets:
+### Tickets
 
 - [ ] Define the minimum useful notification-linked job shape, including a normal speech job, a priority notification job, and a pre-generated straight-to-playback variant if that path is still justified after contract review.
 - [ ] Decide whether priority playback should be modeled as new request kinds inside the existing queueing model or whether a separate playback queue is truly required.
@@ -192,7 +219,7 @@ Tickets:
 - [ ] Add typed Swift library parity for submitting, inspecting, and triggering notification-linked priority jobs if this feature lands in the package surface.
 - [ ] Add automated coverage for ordinary queued playback plus injected priority work, notification-linked playback triggering, and no-op behavior when referenced jobs are missing or already consumed.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] The project has one explicit design for notification-linked priority playback and job triggering, with queue semantics that are documented and testable.
 - [ ] The design makes clear whether the existing request queue was extended or a distinct playback queue was justified after review.
@@ -200,66 +227,43 @@ Exit criteria:
 
 ## Milestone 18: Package Docs And Distribution Polish
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Keep package-facing documentation easy to navigate without making maintainers read the source tree first.
 - [ ] Keep DocC, README, and Swift Package Index metadata aligned with the actual public package surface.
 - [ ] Treat docs as product surface, not as a dumping ground for stale planning notes.
 
-Tickets:
+### Tickets
 
-- [ ] Add first-class DocC guidance for runtime ownership, playback control, request observation, and voice-profile creation.
-- [ ] Tighten package-consumer discovery around `SpeakSwiftly.Runtime`, concern handles, and request observation so the public API feels deliberate.
-- [ ] Add package-facing documentation for the chosen retained generation model so callers know whether to inspect jobs, artifacts, files, or batches for saved output.
-- [ ] Add package-facing documentation for typed request completion and request-kind inspection once the Swift API no longer exposes raw worker operation strings as the main semantic handle.
-- [ ] Keep the text-profile docs aligned with the chosen SpeakSwiftly-owned profile model family while still explaining where `TextForSpeech` remains the authored input type.
+- [ ] Complete the remaining DocC gaps around playback control and runtime-level observation after the `RuntimeOverview` stream decision lands.
+- [ ] Tighten package-consumer discovery around `SpeakSwiftly.Runtime`, concern handles, and request observation so the public API feels deliberate from package docs alone.
+- [ ] Keep the text-profile docs aligned with the SpeakSwiftly-owned profile model family while still explaining where `TextForSpeech` remains the authored input type.
 - [ ] Keep `.spi.yml` intentionally small and update it only when the public docs surface actually changes.
 - [ ] Keep README, CONTRIBUTING, ROADMAP, and DocC aligned whenever playback semantics, shutdown behavior, request observation, or runtime ownership change.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] A new consumer can navigate the main package API through the docs without relying on source spelunking.
 - [ ] Swift Package Index has the minimal metadata it needs to render the package cleanly without stale or speculative configuration.
 - [ ] Maintainer docs stay focused on current architecture and active plans instead of accumulated dead notes.
 
-## Milestone 20: Per-Request Event Stream Observability
-
-Scope:
-
-- [x] Make per-request event streaming a first-class documented part of the Swift package surface instead of an incidental detail of `RequestHandle`.
-- [x] Add an explicit in-process per-request observation surface for callers that only have a request ID and need to reconnect later.
-- [x] Keep request correlation and event observation readable without forcing callers down into JSONL worker internals.
-
-Tickets:
-
-- [x] Replace the current single-continuation request-stream bookkeeping with a runtime-owned per-request event broker that supports multiple in-process subscribers.
-- [x] Add a public `runtime.request(id:)` snapshot API for callers that need current per-request state before attaching to live updates.
-- [x] Add a public `runtime.updates(for:)` API for callers that only know a request ID and need on-demand in-process observation.
-- [x] Decide whether the new on-demand stream should replay a bounded recent window on attach or start at the live tail only, and make that behavior explicit in the API contract.
-- [x] Introduce a data-first per-request update payload that can represent terminal failure as data for late subscribers, while keeping `RequestHandle.events` source-compatible for existing callers.
-- [x] Audit `RequestHandle` and `RequestEvent` for missing lifecycle guarantees or mismatches between docs and implementation.
-- [x] Tighten tests around event ordering, terminal completion semantics, cancellation semantics, multiple subscribers, late subscribers, replay behavior, and stream teardown.
-- [x] Keep the in-process boundary explicit. This milestone does not promise durable cross-process subscriptions or persisted request-event history.
-
-Implementation notes:
-
-- The landed implementation shape is a runtime-owned request-event broker plus additive `request(id:)`, `updates(for:)`, and `generationEvents(for:)` APIs, not a second ad-hoc observer map.
-
-Exit criteria:
-
-- [x] The package documents one clear per-request observation story for Swift callers.
-- [x] In-process callers can reconnect to per-request state and live updates using only a request ID.
-- [x] Streamed request events and request snapshots have explicit lifecycle guarantees backed by tests.
-
 ## Milestone 21: Unified Logging With `Logger`
 
-Scope:
+### Status
+
+Planned
+
+### Scope
 
 - [ ] Move package-owned operator diagnostics from ad-hoc stderr writes toward Apple's Unified Logging surface built around `Logger`.
 - [ ] Preserve the current human-friendly, concrete diagnostic wording while making runtime logs easier to filter in Console, Instruments, and later log-store tooling.
 - [ ] Keep the logging shape direct and local to the runtime instead of adding a wrapper-heavy logging abstraction.
 
-Tickets:
+### Tickets
 
 - [ ] Inventory the current stderr logging surface and group it by subsystem, category, and intended audience before changing call sites.
 - [ ] Define a small package logging layout using `Logger` with clear subsystem and category names for runtime lifecycle, playback, generation, profiles, persistence, and request observation.
@@ -270,7 +274,7 @@ Tickets:
 - [ ] Add or tighten tests around the logging seam where practical, especially where the runtime currently depends on injected stderr writers for diagnostics assertions.
 - [ ] Document how package logs are intended to be consumed locally with Console or other Unified Logging readers, and clarify which information remains on the JSONL contract versus the logging channel.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] Package-owned operational diagnostics primarily flow through `Logger` with clear subsystem and category names.
 - [ ] The JSONL worker contract remains stdout-only and easy to reason about, with logging clearly separated from protocol traffic.
@@ -278,25 +282,24 @@ Exit criteria:
 
 ## Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Keep Marvis behavior simple enough that the runtime policy is easy to reason about and the remaining instability is attributable.
 - [ ] Document whether the remaining Marvis rebuffers are mainly a local playback-policy issue or a throughput limitation in the current `mlx-audio-swift` generation path.
 - [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning or investigation pass.
 
-Tickets:
+### Tickets
 
-- [x] Establish a repeatable Marvis profiling and measurement path using the audible Marvis E2E suite plus stderr scheduler and playback metrics.
-- [x] Simplify Marvis runtime policy to serialized generation with one conservative live-startup profile instead of overlap-specific queue choreography.
-- [x] Keep the working Milestone 22 tradeoff explicit: smoother first audible response wins even if the first audible reply waits another 1 to 2 seconds before playback begins.
-- [x] Revisit Marvis resident streaming cadence until it matches the upstream `0.5s` streaming path and can be tested without extra local cadence roles.
-- [x] Keep scheduler snapshots, queue visibility, and voice-routing logs aligned with the simplified serialized runtime so queue truth stays obvious.
-- [x] Add a Marvis resident-policy benchmark that compares `dual_resident_serialized` against `single_resident_dynamic` with the same three-request `femme -> masc -> femme` switch pattern.
 - [ ] Compare the current `mlx-audio-swift` Marvis generation path against Marvis's own reference implementation surface and document differences in chunking, sampler usage, cache behavior, streaming cadence, and throughput expectations.
 - [ ] Confirm whether `dual_resident_serialized` versus `single_resident_dynamic` changes real audible throughput enough to matter on Gale's Apple-silicon machines.
+- [ ] Verify whether the queued-Marvis playback drain abort remains reproducible after the later playback-drain and cancellation hardening. ([#13](https://github.com/gaelic-ghost/SpeakSwiftly/issues/13))
 - [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful Marvis runtime or upstream investigation pass.
 
-Stage notes:
+### Stage Notes
 
 - Earlier Milestone 22 work explored overlap-specific thresholds, cadence tweaks, and queue-admission changes in detail.
 - The current 2026-04-22 steady state is intentionally simpler:
@@ -311,7 +314,7 @@ Stage notes:
   - even after that simplification, audible Marvis still tends to rebuffer
   - the next useful work is upstream and reference-path investigation, not rebuilding the old overlap model
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] The repository documents how the current `mlx-audio-swift` Marvis path differs from Marvis's reference implementation surface and what those differences imply for local playback behavior.
 - [ ] Marvis audible playback is either measurably steadier after upstream-aware changes or explicitly documented as limited by the current MLX path.
@@ -319,68 +322,44 @@ Exit criteria:
 
 ## Milestone 26: Pre-v1 Release Hardening
 
-Scope:
+### Status
+
+In Progress
+
+### Scope
 
 - [ ] Finish the release-hardening pass needed before the first full `v1.0.0` release.
 - [ ] Keep release mechanics concrete, repeatable, and observable from this repository alone.
 - [ ] Make runtime publication and package-consumer expectations explicit enough that tagged releases are genuinely shippable.
 
-Tickets:
+### Tickets
 
-- [x] Persist real e2e worker stdout and stderr artifacts plus compact per-run summaries so memory and later CPU telemetry can be inspected after a run finishes.
-- [x] Add CPU accounting to the retained real e2e run summaries through the same unprivileged process-accounting path used for current memory snapshots.
-- [x] Enforce Debug and Release runtime publication and verification on tagged prereleases and final releases, not only through the local repo-maintenance release script.
-- [x] Publish launcher scripts, stable runtime aliases, and manifest-first consumption helpers so local consumers stop reconstructing executable and `default.metallib` paths by hand.
-- [x] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.
 - [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially package distribution, request observation, and playback-architecture cleanup.
-- [x] Finish the Milestone 27 public API simplification pass or explicitly document any remaining public rough edges as accepted pre-v1 compatibility.
+- [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 27 typed Swift API cleanup.
 - [ ] Investigate why `QueueControlE2ETests` are much heavier than the other real-model E2E suites, including whether they apply undue resource pressure, unnecessary parallelization, or avoidable resident-model contention on maintainer machines. ([#47](https://github.com/gaelic-ghost/SpeakSwiftly/issues/47))
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
-Exit criteria:
+### Exit Criteria
 
 - [ ] Tagged releases are operationally self-explanatory for local consumers and package consumers.
 - [ ] The package and worker surfaces are documented clearly enough that `v1.0.0` does not freeze accidental behavior.
-- [x] The typed Swift API has one documented story for request completion, retained generation output, queue control, text profiles, and request identity before the stable release line.
 - [ ] Release verification proves both package correctness and published-runtime correctness.
 
-## Milestone 27: Public API Surface Simplification
+## Backlog Candidates
 
-Scope:
-
-- [x] Simplify the typed Swift API before downstream distribution and pre-v1 hardening freeze accidental public behavior.
-- [x] Preserve the existing concern-handle backbone while reducing duplicated model families, transport leakage, and queue-control ambiguity.
-- [x] Keep JSONL compatibility decisions explicit instead of letting typed Swift cleanup silently change the worker contract.
-
-Tickets:
-
-- [x] Use `docs/maintainers/public-api-surface-audit-2026-05-02.md` as the working plan for this milestone.
-- [x] Remove or deprecate cross-queue controls from `Player` so playback-owned convenience methods cannot operate on generation queues.
-- [x] Keep queue-scoped controls explicit on `Runtime`, with same-queue conveniences on `Jobs` and `Player` only where the owner is obvious at the use site.
-- [x] Make `SpeakSwiftly.Normalizer` consistently return `SpeakSwiftly` text-profile models instead of mixing `SpeakSwiftly` wrappers with `TextForSpeech.Runtime` profile and style models.
-- [x] Decide and implement the typed Swift request-completion shape so callers no longer have to inspect the broad JSONL-style `Success` envelope full of unrelated optional fields.
-- [x] Introduce a typed request-kind surface or equivalent so `RequestHandle`, request snapshots, and queue snapshots do not expose raw worker `op` strings as the primary Swift-facing semantic model.
-- [x] Choose one canonical retained generation model for jobs, generated files, generated batches, and generation artifacts, then remove or narrow public duplicates.
-- [x] Decide whether semantic identifier value types should replace string aliases for request ids, artifact ids, generation-job ids, text-profile ids, and voice-profile names.
-- [x] Revisit `Voices.create(...)` labels after the larger model cleanup and adopt `voiceDescription:` plus `builtInDesign:` where the use sites read more clearly.
-- [x] Update README, CONTRIBUTING, DocC, API-surface tests, worker protocol tests, and generated-artifact E2E assertions in the same pass as each public API change.
-- [ ] Verify downstream `SpeakSwiftlyServer` compatibility before release whenever this milestone changes types, labels, request observation, or text-profile return models. Downstream adoption is active separately and is intentionally not handled on this package branch.
-
-Completion notes:
-
-- Migration guidance lives in `docs/maintainers/milestone-27-migration-note.md`.
-- JSONL operation names, `profile_id` compatibility, and response payload keys remain stable.
-- Downstream `SpeakSwiftlyServer` adoption is tracked outside this standalone package branch before release.
-
-Exit criteria:
-
-- [x] The typed Swift API preserves the concern-handle model while removing cross-handle queue ambiguity.
-- [x] Text-profile operations return one coherent `SpeakSwiftly` model family at the package boundary.
-- [x] Swift callers can inspect request completion and request kind without understanding JSONL worker response envelopes or raw operation strings.
-- [x] Retained generation output has one documented model story across jobs, files, artifacts, and batches.
-- [ ] README, CONTRIBUTING, DocC, tests, and downstream compatibility checks reflect the final chosen public API shape.
+- No committed backlog sits outside the active milestones right now; open follow-ups are assigned to the milestone blocks above.
 
 ## History
+
+### 2026-05-03 roadmap accuracy audit
+
+- Milestone 20 was condensed out of Active Milestones because the runtime-owned request-event broker, `request(id:)`, `updates(for:)`, `generationEvents(for:)`, replay semantics, and lifecycle tests are now landed.
+- Milestone 27 was condensed out of Active Milestones because the public API simplification shipped in PR #46 with queue-control ownership cleanup, SpeakSwiftly-owned text-profile return models, typed request kind and completion, canonical retained `GenerationJob` inspection, and polished `Voices.create(...)` labels.
+- Milestone 13 no longer carries completed public-API-audit, semantic-identifier, `BatchItem`, or retained-generation-model decision tickets; those outcomes now live in `docs/maintainers/public-api-surface-audit-2026-05-02.md` and `docs/maintainers/milestone-27-migration-note.md`.
+- Milestone 18 no longer carries completed retained-generation-model or typed request-completion DocC tickets; the active docs work is now narrowed to remaining playback-control, runtime-level observation, package-discovery, text-profile, and SPI-facing polish.
+- Milestone 26 no longer repeats completed E2E artifact, CPU-accounting, runtime-publication, launcher, resource-lookup, or public-API-simplification tickets; the remaining release-hardening work is downstream adoption, queue-control E2E pressure, unresolved active milestones, and final release-candidate validation.
+- Milestone 9 was corrected to acknowledge the existing `get_runtime_overview` / `runtime.overview()` inspection surface and now tracks the missing runtime-level playback or overview event stream separately in #45.
+- Open GitHub issues #7, #13, #21, #45, and #47 are now assigned to active roadmap milestones so the roadmap and issue tracker describe the same outstanding work.
 
 ### 2026-04-18 release-history consolidation
 
