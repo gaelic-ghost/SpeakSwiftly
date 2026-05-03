@@ -5,8 +5,33 @@ import SpeakSwiftly
 
 @main
 enum SpeakSwiftlyTool {
+    private enum ArgumentError: LocalizedError {
+        case unknown(String)
+        case missingValue(String)
+
+        var errorDescription: String? {
+            switch self {
+                case let .unknown(argument):
+                    "Unknown argument '\(argument)'. Supported options: --state-root PATH."
+                case let .missingValue(option):
+                    "Missing value for \(option)."
+            }
+        }
+    }
+
     static func main() async {
-        let runtime = await SpeakSwiftly.liftoff()
+        do {
+            let stateRootURL = try parseStateRootURL(arguments: Array(CommandLine.arguments.dropFirst()))
+            let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRootURL)
+            await run(runtime: runtime)
+        } catch {
+            let message = "SpeakSwiftlyTool could not start because its launch arguments were invalid. \(error.localizedDescription)\n"
+            try? FileHandle.standardError.write(contentsOf: Data(message.utf8))
+            exit(2)
+        }
+    }
+
+    private static func run(runtime: SpeakSwiftly.Runtime) async {
         await runtime.start()
 
         do {
@@ -42,5 +67,40 @@ enum SpeakSwiftlyTool {
         }
 
         await runtime.shutdown()
+    }
+
+    private static func parseStateRootURL(arguments: [String]) throws -> URL? {
+        guard !arguments.isEmpty else { return nil }
+
+        var stateRootURL: URL?
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            switch argument {
+                case "--state-root":
+                    index += 1
+                    stateRootURL = try URL(
+                        fileURLWithPath: requireOptionValue(arguments, index: index, for: argument),
+                        isDirectory: true,
+                    )
+                default:
+                    throw ArgumentError.unknown(argument)
+            }
+            index += 1
+        }
+
+        return stateRootURL
+    }
+
+    private static func requireOptionValue(
+        _ arguments: [String],
+        index: Int,
+        for option: String,
+    ) throws -> String {
+        guard index < arguments.count else {
+            throw ArgumentError.missingValue(option)
+        }
+
+        return arguments[index]
     }
 }

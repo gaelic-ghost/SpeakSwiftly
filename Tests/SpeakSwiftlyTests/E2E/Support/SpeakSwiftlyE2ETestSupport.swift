@@ -766,7 +766,6 @@ final class JSONLineRecorder: @unchecked Sendable {
 final class WorkerProcess: @unchecked Sendable {
     private enum Environment {
         static let dyldFrameworkPath = "DYLD_FRAMEWORK_PATH"
-        static let profileRoot = "SPEAKSWIFTLY_PROFILE_ROOT"
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
         static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
         static let speechBackend = "SPEAKSWIFTLY_SPEECH_BACKEND"
@@ -795,7 +794,7 @@ final class WorkerProcess: @unchecked Sendable {
         let packageRootURL = try Self.packageRootURL()
         let buildConfiguration = "Debug"
         let runtimeConfiguration = configuration
-        let profileRootOverrideURL = Self.workerProfileRootOverrideURL(for: profileRootURL)
+        let workerStateRootURL = Self.workerStateRootURL(for: profileRootURL)
         try Self.publishWorkerRuntime(packageRootURL: packageRootURL, configuration: buildConfiguration)
 
         process = Process()
@@ -823,7 +822,7 @@ final class WorkerProcess: @unchecked Sendable {
             try runtimeConfiguration.save(
                 to: SpeakSwiftly.Configuration.defaultPersistenceURL(
                     fileManager: .default,
-                    profileRootOverride: profileRootOverrideURL.path,
+                    stateRootOverride: workerStateRootURL.path,
                 ),
             )
         }
@@ -833,10 +832,10 @@ final class WorkerProcess: @unchecked Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         process.currentDirectoryURL = executableURL.deletingLastPathComponent()
+        process.arguments = ["--state-root", workerStateRootURL.path]
 
         var environment = ProcessInfo.processInfo.environment
         environment[Environment.dyldFrameworkPath] = executableURL.deletingLastPathComponent().path
-        environment[Environment.profileRoot] = profileRootOverrideURL.path
         if silentPlayback, !speakSwiftlyAudibleE2ETestsEnabled() {
             environment[Environment.silentPlayback] = "1"
         }
@@ -874,14 +873,14 @@ final class WorkerProcess: @unchecked Sendable {
         stderrTask.cancel()
     }
 
-    private static func workerProfileRootOverrideURL(for profileRootURL: URL) -> URL {
+    private static func workerStateRootURL(for profileRootURL: URL) -> URL {
         guard profileRootURL.lastPathComponent == ProfileStore.profilesDirectoryName else {
             return profileRootURL
         }
 
         // The E2E sandbox hands WorkerProcess the actual profile-store root.
-        // The runtime override env var, however, expects the broader state root
-        // so it can derive profiles/, configuration.json, and text-profiles.json
+        // The worker launch option expects the broader state root so it can
+        // derive profiles/, configuration.json, and text-profiles.json
         // consistently without nesting profiles/profiles/.
         return profileRootURL.deletingLastPathComponent()
     }

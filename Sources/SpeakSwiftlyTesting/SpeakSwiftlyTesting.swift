@@ -21,12 +21,12 @@ struct SpeakSwiftlyTestingMain {
         var sourceText = "Hello there from SpeakSwiftly end-to-end coverage."
         var vibe = "femme"
         var voiceDescription: String
-        var profileRoot: String?
+        var stateRoot: String?
     }
 
     struct VolumeProbeOptions {
         var profileName = "default-femme"
-        var profileRoot: String?
+        var stateRoot: String?
         var textFile: String?
         var repeatCount = 10
         var windowSeconds = 2.0
@@ -56,7 +56,7 @@ struct SpeakSwiftlyTestingMain {
         let toolName: String
         let sourceSurface: String
         let profileName: String
-        let profileRoot: String?
+        let stateRoot: String?
         let textCharacters: Int
         let textWords: Int
         let textFingerprint: String
@@ -68,7 +68,7 @@ struct SpeakSwiftlyTestingMain {
         let schemaVersion: Int
         let toolName: String
         let profileName: String
-        let profileRoot: String?
+        let stateRoot: String?
         let textCharacters: Int
         let textWords: Int
         let textFingerprint: String
@@ -135,8 +135,6 @@ struct SpeakSwiftlyTestingMain {
             MLXArray(values).reshaped(shape)
         }
     }
-
-    static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
 
     static func main() async {
         do {
@@ -213,9 +211,9 @@ struct SpeakSwiftlyTestingMain {
                 case "--vibe":
                     index += 1
                     options.vibe = try requireOptionValue(arguments, index: index, for: argument)
-                case "--profile-root":
+                case "--state-root":
                     index += 1
-                    options.profileRoot = try requireOptionValue(arguments, index: index, for: argument)
+                    options.stateRoot = try requireOptionValue(arguments, index: index, for: argument)
                 default:
                     throw UsageError.unknownCommand(argument)
             }
@@ -244,9 +242,9 @@ struct SpeakSwiftlyTestingMain {
                 case "--profile":
                     index += 1
                     options.profileName = try requireOptionValue(arguments, index: index, for: argument)
-                case "--profile-root":
+                case "--state-root":
                     index += 1
-                    options.profileRoot = try requireOptionValue(arguments, index: index, for: argument)
+                    options.stateRoot = try requireOptionValue(arguments, index: index, for: argument)
                 case "--text-file":
                     index += 1
                     options.textFile = try requireOptionValue(arguments, index: index, for: argument)
@@ -338,20 +336,17 @@ struct SpeakSwiftlyTestingMain {
     }
 
     static func runVolumeProbe(options: VolumeProbeOptions) async throws {
-        if let profileRoot = options.profileRoot {
-            setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
-        }
-
         let text = try loadVolumeProbeText(options: options)
         let result = try await runStreamedProbe(
             profileName: options.profileName,
             text: text,
             windowSeconds: options.windowSeconds,
+            stateRootURL: stateRootURL(options: options),
         )
 
         print("profile_name: \(options.profileName)")
-        if let profileRoot = options.profileRoot {
-            print("profile_root: \(profileRoot)")
+        if let stateRoot = options.stateRoot {
+            print("state_root: \(stateRoot)")
         }
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
@@ -366,7 +361,7 @@ struct SpeakSwiftlyTestingMain {
             toolName: "volume-probe",
             sourceSurface: "retained-file",
             profileName: options.profileName,
-            profileRoot: options.profileRoot,
+            stateRoot: options.stateRoot,
             textCharacters: text.count,
             textWords: text.split(whereSeparator: \.isWhitespace).count,
             textFingerprint: fingerprint(text),
@@ -378,12 +373,8 @@ struct SpeakSwiftlyTestingMain {
     }
 
     static func runCreateDesignProfile(options: CreateDesignProfileOptions) async throws {
-        if let profileRoot = options.profileRoot {
-            setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
-        }
-
         let vibe = try parseVibe(options.vibe)
-        let runtime = await SpeakSwiftly.liftoff()
+        let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRootURL(options: options))
         await runtime.start()
         let handle = await runtime.voices.create(
             design: options.profileName,
@@ -398,22 +389,18 @@ struct SpeakSwiftlyTestingMain {
         print("source_text: \(options.sourceText)")
         print("voice_description: \(options.voiceDescription)")
         print("vibe: \(vibe.rawValue)")
-        if let profileRoot = options.profileRoot {
-            print("profile_root: \(profileRoot)")
+        if let stateRoot = options.stateRoot {
+            print("state_root: \(stateRoot)")
         }
     }
 
     static func runCompareVolume(options: VolumeProbeOptions) async throws {
-        if let profileRoot = options.profileRoot {
-            setenv(profileRootOverrideEnvironmentVariable, profileRoot, 1)
-        }
-
         let text = try loadVolumeProbeText(options: options)
         let comparison = try await compareVolume(options: options, text: text)
 
         print("profile_name: \(options.profileName)")
-        if let profileRoot = options.profileRoot {
-            print("profile_root: \(profileRoot)")
+        if let stateRoot = options.stateRoot {
+            print("state_root: \(stateRoot)")
         }
         print("text_characters: \(text.count)")
         print("text_words: \(text.split(whereSeparator: \.isWhitespace).count)")
@@ -456,7 +443,7 @@ struct SpeakSwiftlyTestingMain {
             schemaVersion: 1,
             toolName: "compare-volume",
             profileName: options.profileName,
-            profileRoot: options.profileRoot,
+            stateRoot: options.stateRoot,
             textCharacters: text.count,
             textWords: text.split(whereSeparator: \.isWhitespace).count,
             textFingerprint: fingerprint(text),
@@ -547,8 +534,9 @@ struct SpeakSwiftlyTestingMain {
         profileName: String,
         text: String,
         windowSeconds: Double,
+        stateRootURL: URL?,
     ) async throws -> CompareRun {
-        let runtime = await SpeakSwiftly.liftoff()
+        let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRootURL)
         await runtime.start()
 
         let handle = await runtime.generate.audio(
@@ -577,9 +565,10 @@ struct SpeakSwiftlyTestingMain {
             profileName: options.profileName,
             text: text,
             windowSeconds: options.windowSeconds,
+            stateRootURL: stateRootURL(options: options),
         )
-        let profileRootURL = profileRootURL(options: options)
-        let profileDirectoryURL = profileRootURL
+        let stateRootURL = resolvedStateRootURL(options: options)
+        let profileDirectoryURL = stateRootURL
             .appendingPathComponent("profiles", isDirectory: true)
             .appendingPathComponent(options.profileName, isDirectory: true)
         let manifest = try loadProfileManifest(from: profileDirectoryURL)
@@ -720,13 +709,21 @@ struct SpeakSwiftlyTestingMain {
         )
     }
 
-    static func profileRootURL(options: VolumeProbeOptions) -> URL {
-        if let profileRoot = options.profileRoot {
-            return URL(fileURLWithPath: profileRoot, isDirectory: true)
+    static func resolvedStateRootURL(options: VolumeProbeOptions) -> URL {
+        if let stateRoot = options.stateRoot {
+            return URL(fileURLWithPath: stateRoot, isDirectory: true)
         }
 
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("SpeakSwiftly", isDirectory: true)
+    }
+
+    static func stateRootURL(options: CreateDesignProfileOptions) -> URL? {
+        options.stateRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+    }
+
+    static func stateRootURL(options: VolumeProbeOptions) -> URL? {
+        options.stateRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 
     static func loadProfileManifest(from profileDirectoryURL: URL) throws -> ProbeProfileManifest {
@@ -979,9 +976,9 @@ extension SpeakSwiftlyTestingMain {
               swift run SpeakSwiftlyTesting resources
               swift run SpeakSwiftlyTesting status
               swift run SpeakSwiftlyTesting smoke
-              swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--profile-root PATH]
-              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
-              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--profile-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
+              swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--state-root PATH]
+              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
+              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
             """
         }
     }

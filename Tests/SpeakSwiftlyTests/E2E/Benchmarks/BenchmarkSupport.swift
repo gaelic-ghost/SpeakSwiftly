@@ -414,7 +414,7 @@ enum BenchmarkHarness {
         let normalizer = try SpeakSwiftly.Normalizer(
             persistenceURL: ProfileStore.defaultTextProfilesURL(
                 fileManager: dependencies.fileManager,
-                profileRootOverride: profileRootURL.path,
+                stateRootOverride: profileRootURL.path,
             ),
         )
         let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())

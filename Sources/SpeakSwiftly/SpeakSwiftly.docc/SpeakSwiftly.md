@@ -4,7 +4,7 @@ Generate live speech playback and retained audio artifacts from a shared runtime
 
 ## Overview
 
-SpeakSwiftly centers around a long-lived ``SpeakSwiftly/Runtime``. You create that runtime with ``SpeakSwiftly/liftoff(configuration:)`` and then interact with focused handles instead of one large method surface.
+SpeakSwiftly centers around a long-lived ``SpeakSwiftly/Runtime``. You create that runtime with ``SpeakSwiftly/liftoff(configuration:stateRootURL:)`` and then interact with focused handles instead of one large method surface.
 
 Use ``SpeakSwiftly/Runtime/generate`` when you want to synthesize speech, ``SpeakSwiftly/Runtime/player`` when you want to inspect or control playback, ``SpeakSwiftly/Runtime/voices`` when you want to manage stored voice profiles, and ``SpeakSwiftly/Runtime/jobs`` or ``SpeakSwiftly/Runtime/artifacts`` when you want to inspect retained generation output.
 
@@ -15,7 +15,7 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 ### Essentials
 
 - ``SpeakSwiftly``
-- ``SpeakSwiftly/liftoff(configuration:)``
+- ``SpeakSwiftly/liftoff(configuration:stateRootURL:)``
 - ``SpeakSwiftly/Runtime``
 - ``SpeakSwiftly/Configuration``
 

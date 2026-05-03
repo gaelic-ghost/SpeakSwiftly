@@ -2,10 +2,21 @@ import Foundation
 import MLXAudioTTS
 
 struct ProfileStore: @unchecked Sendable {
+    struct RuntimeStateRootOverride: Equatable {
+        enum Source: Equatable {
+            case runtimeStateRoot
+            case deprecatedProfileRoot
+        }
+
+        let path: String
+        let source: Source
+    }
+
     static let directoryName = "SpeakSwiftly"
     static let profilesDirectoryName = "profiles"
     static let textProfilesFileName = "text-profiles.json"
     static let configurationFileName = "configuration.json"
+    static let runtimeStateRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_STATE_ROOT"
     static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
@@ -36,34 +47,61 @@ struct ProfileStore: @unchecked Sendable {
         self.decoder = decoder
     }
 
-    static func defaultRootURL(fileManager: FileManager = .default, overridePath: String? = nil) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: overridePath)
+    static func defaultRootURL(fileManager: FileManager = .default, stateRootOverride: String? = nil) -> URL {
+        defaultBaseURL(fileManager: fileManager, stateRootOverride: stateRootOverride)
             .appendingPathComponent(profilesDirectoryName, isDirectory: true)
     }
 
     static func defaultConfigurationURL(
         fileManager: FileManager = .default,
-        profileRootOverride: String? = nil,
+        stateRootOverride: String? = nil,
     ) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+        defaultBaseURL(fileManager: fileManager, stateRootOverride: stateRootOverride)
             .appendingPathComponent(configurationFileName, isDirectory: false)
     }
 
     static func defaultTextProfilesURL(
         fileManager: FileManager = .default,
-        profileRootOverride: String? = nil,
+        stateRootOverride: String? = nil,
     ) -> URL {
-        defaultBaseURL(fileManager: fileManager, profileRootOverride: profileRootOverride)
+        defaultBaseURL(fileManager: fileManager, stateRootOverride: stateRootOverride)
             .appendingPathComponent(textProfilesFileName, isDirectory: false)
+    }
+
+    static func runtimeStateRootOverride(in environment: [String: String]) -> RuntimeStateRootOverride? {
+        if let path = nonEmptyEnvironmentValue(
+            environment[runtimeStateRootOverrideEnvironmentVariable],
+        ) {
+            return RuntimeStateRootOverride(path: path, source: .runtimeStateRoot)
+        }
+
+        if let path = nonEmptyEnvironmentValue(
+            environment[profileRootOverrideEnvironmentVariable],
+        ) {
+            return RuntimeStateRootOverride(path: path, source: .deprecatedProfileRoot)
+        }
+
+        return nil
+    }
+
+    static func runtimeStateRootOverridePath(in environment: [String: String]) -> String? {
+        runtimeStateRootOverride(in: environment)?.path
+    }
+
+    private static func nonEmptyEnvironmentValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? nil : value
     }
 
     private static func defaultBaseURL(
         fileManager: FileManager = .default,
-        profileRootOverride: String? = nil,
+        stateRootOverride: String? = nil,
     ) -> URL {
-        if let profileRootOverride, !profileRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let stateRootOverride, !stateRootOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return normalizedOverrideBaseURL(
-                profileRootOverride,
+                stateRootOverride,
                 fileManager: fileManager,
             )
         }
@@ -73,10 +111,10 @@ struct ProfileStore: @unchecked Sendable {
     }
 
     private static func normalizedOverrideBaseURL(
-        _ profileRootOverride: String,
+        _ stateRootOverride: String,
         fileManager: FileManager,
     ) -> URL {
-        let overrideURL = URL(fileURLWithPath: profileRootOverride, isDirectory: true)
+        let overrideURL = URL(fileURLWithPath: stateRootOverride, isDirectory: true)
             .standardizedFileURL
 
         guard overrideURL.lastPathComponent == profilesDirectoryName else {

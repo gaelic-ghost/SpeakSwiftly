@@ -3,7 +3,7 @@ import TextForSpeech
 
 /// The top-level namespace and startup entrypoint for the SpeakSwiftly library.
 ///
-/// Use ``liftoff(configuration:)`` to create a shared ``Runtime`` and then work
+/// Use ``liftoff(configuration:stateRootURL:)`` to create a shared ``Runtime`` and then work
 /// through the runtime's typed concern handles such as ``SpeakSwiftly/Runtime/generate``
 /// and ``SpeakSwiftly/Runtime/player``.
 public enum SpeakSwiftly {
@@ -230,13 +230,18 @@ public enum SpeakSwiftly {
 
     /// Starts a SpeakSwiftly runtime.
     ///
-    /// - Parameter configuration: Optional startup configuration for backend selection
-    ///   and text normalization.
+    /// - Parameters:
+    ///   - configuration: Optional startup configuration for backend selection
+    ///     and text normalization.
+    ///   - stateRootURL: Optional runtime state directory. When omitted,
+    ///     SpeakSwiftly uses the platform Application Support default unless a
+    ///     process-level compatibility override is set.
     /// - Returns: A live ``Runtime`` that owns request submission, playback, and stored resources.
     public static func liftoff(
         configuration: SpeakSwiftly.Configuration? = nil,
+        stateRootURL: URL? = nil,
     ) async -> Runtime {
-        await Runtime.liftoff(configuration: configuration)
+        await Runtime.liftoff(configuration: configuration, stateRootURL: stateRootURL)
     }
 }
 

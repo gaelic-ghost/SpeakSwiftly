@@ -147,11 +147,11 @@ import Darwin
     #expect(await (normalizer.persistence.url())?.lastPathComponent == "text-profiles.json")
 }
 
-@Test func `public normalizer default persistence honors profile root override`() async throws {
+@Test func `public normalizer default persistence honors state root override`() async throws {
     let overrideRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: overrideRoot) }
 
-    let environmentVariable = ProfileStore.profileRootOverrideEnvironmentVariable
+    let environmentVariable = ProfileStore.runtimeStateRootOverrideEnvironmentVariable
     let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
     setenv(environmentVariable, overrideRoot.path, 1)
     defer {
@@ -168,28 +168,30 @@ import Darwin
     #expect(await normalizer.persistence.url()?.standardizedFileURL == expectedURL.standardizedFileURL)
 }
 
-@Test func `liftoff normalizer persistence matches the default text profile path`() async {
+@Test func `liftoff state root parameter drives runtime persistence without environment`() async {
     let overrideRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: overrideRoot) }
 
-    let environmentVariable = ProfileStore.profileRootOverrideEnvironmentVariable
-    let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
-    setenv(environmentVariable, overrideRoot.path, 1)
-    defer {
-        if let previousValue {
-            setenv(environmentVariable, previousValue, 1)
-        } else {
-            unsetenv(environmentVariable)
-        }
-    }
-
-    let runtime = await SpeakSwiftly.liftoff()
+    let runtime = await SpeakSwiftly.liftoff(stateRootURL: overrideRoot)
     let expectedURL = ProfileStore.defaultTextProfilesURL(
         fileManager: .default,
-        profileRootOverride: overrideRoot.path,
+        stateRootOverride: overrideRoot.path,
     )
 
     #expect(await (runtime.normalizer.persistence.url())?.lastPathComponent == expectedURL.lastPathComponent)
+}
+
+@Test func `liftoff state root parameter preserves persisted configuration`() async throws {
+    let stateRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: stateRoot) }
+
+    try SpeakSwiftly.Configuration(speechBackend: .marvis).saveDefault(
+        stateRootOverride: stateRoot.path,
+    )
+
+    let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRoot)
+
+    #expect(await runtime.speechBackend == .marvis)
 }
 
 // MARK: - Runtime Helpers
@@ -263,6 +265,9 @@ import Darwin
     }
     let liftoffWithConfiguration: @Sendable (SpeakSwiftly.Configuration) async -> SpeakSwiftly.Runtime = { configuration in
         await SpeakSwiftly.liftoff(configuration: configuration)
+    }
+    let liftoffWithStateRoot: @Sendable (URL) async -> SpeakSwiftly.Runtime = { stateRootURL in
+        await SpeakSwiftly.liftoff(stateRootURL: stateRootURL)
     }
     let activeStyle: @Sendable (SpeakSwiftly.Normalizer.Style) async -> TextForSpeech.BuiltInProfileStyle = { style in
         await style.getActive()
@@ -497,6 +502,7 @@ import Darwin
     _ = makeNormalizer
     _ = liftoffWithDefaults
     _ = liftoffWithConfiguration
+    _ = liftoffWithStateRoot
     _ = activeStyle
     _ = styleOptions
     _ = setActiveStyle

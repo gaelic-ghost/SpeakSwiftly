@@ -361,15 +361,15 @@ import TextForSpeech
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
-    let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
+    let stateRoot = rootURL
     let dependencies = makeSpeechBackendResolutionDependencies()
     try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
-        profileRootOverride: profileRoot.path,
+        stateRootOverride: stateRoot.path,
     )
 
     let resolved = WorkerRuntime.resolvedSpeechBackend(
         dependencies: dependencies,
-        environment: ["SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path],
+        environment: [ProfileStore.runtimeStateRootOverrideEnvironmentVariable: stateRoot.path],
         configuration: SpeakSwiftly.Configuration(speechBackend: .marvis),
     )
 
@@ -380,16 +380,16 @@ import TextForSpeech
     let rootURL = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
-    let profileRoot = rootURL.appendingPathComponent("profiles", isDirectory: true)
+    let stateRoot = rootURL
     let dependencies = makeSpeechBackendResolutionDependencies()
     try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
-        profileRootOverride: profileRoot.path,
+        stateRootOverride: stateRoot.path,
     )
 
     let resolved = WorkerRuntime.resolvedSpeechBackend(
         dependencies: dependencies,
         environment: [
-            "SPEAKSWIFTLY_PROFILE_ROOT": profileRoot.path,
+            ProfileStore.runtimeStateRootOverrideEnvironmentVariable: stateRoot.path,
             SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.marvis.rawValue,
         ],
         configuration: nil,

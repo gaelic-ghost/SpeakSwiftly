@@ -131,11 +131,11 @@ public extension SpeakSwiftly {
 
         static func loadDefault(
             fileManager: FileManager = .default,
-            profileRootOverride: String? = nil,
+            stateRootOverride: String? = nil,
         ) throws -> Self? {
             let persistenceURL = defaultPersistenceURL(
                 fileManager: fileManager,
-                profileRootOverride: profileRootOverride,
+                stateRootOverride: stateRootOverride,
             )
             guard fileManager.fileExists(atPath: persistenceURL.path) else {
                 return nil
@@ -146,11 +146,11 @@ public extension SpeakSwiftly {
 
         static func defaultPersistenceURL(
             fileManager: FileManager = .default,
-            profileRootOverride: String? = nil,
+            stateRootOverride: String? = nil,
         ) -> URL {
             ProfileStore.defaultConfigurationURL(
                 fileManager: fileManager,
-                profileRootOverride: profileRootOverride,
+                stateRootOverride: stateRootOverride,
             )
         }
 
@@ -182,12 +182,12 @@ public extension SpeakSwiftly {
 
         func saveDefault(
             fileManager: FileManager = .default,
-            profileRootOverride: String? = nil,
+            stateRootOverride: String? = nil,
         ) throws {
             try save(
                 to: Self.defaultPersistenceURL(
                     fileManager: fileManager,
-                    profileRootOverride: profileRootOverride,
+                    stateRootOverride: stateRootOverride,
                 ),
             )
         }
