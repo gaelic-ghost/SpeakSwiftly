@@ -427,6 +427,35 @@ import Testing
     #expect(listed.map(\.profileName) == ["healthy"])
 }
 
+@Test func `create profile publishes completed directory and clears abandoned staged data`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let store = ProfileStore(rootURL: tempRoot, fileManager: fileManager)
+    try store.ensureRootExists()
+
+    let abandonedStage = tempRoot.appendingPathComponent(".fresh.create-abandoned", isDirectory: true)
+    try fileManager.createDirectory(at: abandonedStage, withIntermediateDirectories: false)
+    try Data("stale".utf8).write(to: abandonedStage.appendingPathComponent("partial.txt"))
+
+    let stored = try store.createProfile(
+        profileName: "fresh",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Fresh voice.",
+        sourceText: "Fresh transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01]),
+    )
+
+    #expect(stored.directoryURL == store.profileDirectoryURL(for: "fresh"))
+    #expect(fileManager.fileExists(atPath: store.manifestURL(for: stored.directoryURL).path))
+    #expect(fileManager.fileExists(atPath: store.referenceAudioURL(for: stored.directoryURL).path))
+    #expect(!fileManager.fileExists(atPath: abandonedStage.path))
+    #expect(try store.listProfiles().map(\.profileName) == ["fresh"])
+}
+
 @Test func `upgrades legacy manifest into backend materializations`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()
