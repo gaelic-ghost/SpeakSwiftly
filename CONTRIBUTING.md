@@ -89,7 +89,7 @@ That split matters:
 
 The typed Swift surface uses Cocoa-style method names and one root runtime object:
 
-- `SpeakSwiftly.liftoff(configuration:)` is the single startup entry point
+- `SpeakSwiftly.liftoff(configuration:stateRootURL:)` is the single startup entry point
 - `SpeakSwiftly.liftoff(...)` returns `SpeakSwiftly.Runtime`
 - `runtime.generate`
 - `runtime.player`
@@ -176,9 +176,11 @@ Default persisted configuration path:
 
 - macOS production default: `~/Library/Application Support/SpeakSwiftly/configuration.json`
 - macOS debug and package-test default: `~/Library/Application Support/SpeakSwiftly-Debug/configuration.json`
-- with `SPEAKSWIFTLY_PROFILE_ROOT=/custom`: `/custom/configuration.json`
+- with `SpeakSwiftly.liftoff(stateRootURL: URL(fileURLWithPath: "/custom"))`: `/custom/configuration.json`
+- with `SpeakSwiftlyTool --state-root /custom`: `/custom/configuration.json`
+- with the process-level fallback `SPEAKSWIFTLY_STATE_ROOT=/custom`: `/custom/configuration.json`
 
-The same namespace split applies to the default profile store and `text-profiles.json`, so debug builds, local package tests, and production runs do not reuse the same local storage root unless you explicitly point them at one with `SPEAKSWIFTLY_PROFILE_ROOT`.
+The same namespace split applies to the default profile store and `text-profiles.json`, so debug builds, local package tests, and production runs do not reuse the same local storage root unless you explicitly point them at one state root. Prefer the typed Swift `stateRootURL` startup parameter for library callers and `--state-root` for the standalone worker. `SPEAKSWIFTLY_STATE_ROOT` remains available as a process-level fallback for hosts that cannot pass startup arguments. `SPEAKSWIFTLY_PROFILE_ROOT` is a deprecated compatibility alias for the same state-root behavior.
 For compatibility, SpeakSwiftly still recognizes the older trailing `.../profiles` form when it detects an existing legacy layout with adjacent `configuration.json` or `text-profiles.json` state.
 
 Backend resolution precedence is:

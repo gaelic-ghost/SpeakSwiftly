@@ -263,23 +263,23 @@ import Testing
     }
 }
 
-@Test func `profile root override accepts a base directory path`() {
+@Test func `state root override accepts a base directory path`() {
     let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root", isDirectory: true)
 
-    #expect(ProfileStore.defaultRootURL(overridePath: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
-    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
-    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+    #expect(ProfileStore.defaultRootURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
+    #expect(ProfileStore.defaultConfigurationURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
-@Test func `profile root override preserves a literal base directory named profiles`() {
+@Test func `state root override preserves a literal base directory named profiles`() {
     let overrideRoot = URL(fileURLWithPath: "/tmp/speakswiftly-override-root/profiles", isDirectory: true)
 
-    #expect(ProfileStore.defaultRootURL(overridePath: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
-    #expect(ProfileStore.defaultConfigurationURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
-    #expect(ProfileStore.defaultTextProfilesURL(profileRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+    #expect(ProfileStore.defaultRootURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("profiles", isDirectory: true))
+    #expect(ProfileStore.defaultConfigurationURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(stateRootOverride: overrideRoot.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
-@Test func `profile root override preserves compatibility with an existing legacy profiles directory path`() throws {
+@Test func `state root override preserves compatibility with an existing legacy profiles directory path`() throws {
     let fileManager = FileManager.default
     let overrideRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: overrideRoot) }
@@ -288,12 +288,12 @@ import Testing
     try fileManager.createDirectory(at: legacyProfilesURL, withIntermediateDirectories: true)
     try Data("{}".utf8).write(to: overrideRoot.appendingPathComponent(ProfileStore.configurationFileName))
 
-    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, overridePath: legacyProfilesURL.path) == legacyProfilesURL)
-    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
-    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == legacyProfilesURL)
+    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
 }
 
-@Test func `profile root override preserves compatibility with a profiles-only legacy store`() throws {
+@Test func `state root override preserves compatibility with a profiles-only legacy store`() throws {
     let fileManager = FileManager.default
     let overrideRoot = makeTempDirectoryURL()
     defer { try? fileManager.removeItem(at: overrideRoot) }
@@ -310,9 +310,34 @@ import Testing
         canonicalAudioData: Data([0x01, 0x02]),
     )
 
-    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, overridePath: legacyProfilesURL.path) == legacyProfilesURL)
-    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
-    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, profileRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+    #expect(ProfileStore.defaultRootURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == legacyProfilesURL)
+    #expect(ProfileStore.defaultConfigurationURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("configuration.json", isDirectory: false))
+    #expect(ProfileStore.defaultTextProfilesURL(fileManager: fileManager, stateRootOverride: legacyProfilesURL.path) == overrideRoot.appendingPathComponent("text-profiles.json", isDirectory: false))
+}
+
+@Test func `runtime state root environment override supersedes deprecated profile root alias`() {
+    let environment = [
+        ProfileStore.runtimeStateRootOverrideEnvironmentVariable: "/tmp/speakswiftly-state-root",
+        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+    ]
+
+    #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(
+        path: "/tmp/speakswiftly-state-root",
+        source: .runtimeStateRoot,
+    ))
+    #expect(ProfileStore.runtimeStateRootOverridePath(in: environment) == "/tmp/speakswiftly-state-root")
+}
+
+@Test func `deprecated profile root environment alias remains compatible`() {
+    let environment = [
+        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+    ]
+
+    #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(
+        path: "/tmp/speakswiftly-profile-root",
+        source: .deprecatedProfileRoot,
+    ))
+    #expect(ProfileStore.runtimeStateRootOverridePath(in: environment) == "/tmp/speakswiftly-profile-root")
 }
 
 // MARK: - Listing and Validation

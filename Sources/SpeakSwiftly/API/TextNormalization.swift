@@ -118,9 +118,9 @@ public extension SpeakSwiftly {
                 resolvedPersistenceURL = standardizedURL
             } else {
                 let defaultURL = ProfileStore.defaultTextProfilesURL(
-                    profileRootOverride: ProcessInfo.processInfo.environment[
-                        ProfileStore.profileRootOverrideEnvironmentVariable,
-                    ],
+                    stateRootOverride: ProfileStore.runtimeStateRootOverridePath(
+                        in: ProcessInfo.processInfo.environment,
+                    ),
                 )
                 persistence = .file(defaultURL)
                 resolvedPersistenceURL = defaultURL

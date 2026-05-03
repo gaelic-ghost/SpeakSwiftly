@@ -97,7 +97,7 @@ Planned
 - [ ] Make profile listing and loading resilient to in-flight writes from another process without producing misleading corruption failures.
 - [ ] Add clear operator-facing diagnostics for lock contention, stale temp directories, and cross-process filesystem races.
 - [ ] Add automated coverage for concurrent create/load/remove access against the shared profile root.
-- [ ] Document the shared per-user default profile root and the override path for process-isolated profile stores.
+- [ ] Document the shared per-user default profile root and the state-root override path for process-isolated profile stores.
 
 ### Exit Criteria
 
@@ -122,12 +122,12 @@ In Progress
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
 - [ ] Extend the existing `get_runtime_overview` / `runtime.overview()` inspection story where parent processes still need service-health fields such as profile root, runtime-state root, or richer resident state.
 - [ ] Add a runtime-level playback and overview event stream so hosts can keep playback state current without opportunistic polling. ([#45](https://github.com/gaelic-ghost/SpeakSwiftly/issues/45))
-- [ ] Rename or supersede `SPEAKSWIFTLY_PROFILE_ROOT` so the public override name matches its current runtime-state-root behavior. ([#21](https://github.com/gaelic-ghost/SpeakSwiftly/issues/21))
+- [x] Add native state-root startup controls so Application Support stays the default while Swift callers use `stateRootURL`, worker hosts use `--state-root`, and `SPEAKSWIFTLY_PROFILE_ROOT` remains only as a deprecated compatibility alias. ([#21](https://github.com/gaelic-ghost/SpeakSwiftly/issues/21))
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.
 - [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as hidden conventions.
 - [ ] Persist a little more voice-profile source provenance from creation flows so rerolls, diagnostics, and later profile introspection have stable grounding.
 - [ ] Investigate whether startup-side playback preload or environment observation is still correlated with `freed pointer was not the last allocation`. ([#7](https://github.com/gaelic-ghost/SpeakSwiftly/issues/7))
-- [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and profile-root selection.
+- [ ] Document the parent-process ownership expectations for startup warmup, health inspection, shutdown, and state-root selection.
 - [ ] Document the current tag-time adoption flow for active downstream consumers such as `SpeakSwiftlyServer` and the `speak-to-user` integration repository, including what is automatic and what remains explicit follow-up.
 
 ### Exit Criteria

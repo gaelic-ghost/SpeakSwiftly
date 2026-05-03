@@ -52,12 +52,22 @@ extension SpeakSwiftly.Runtime {
 
     static func liftoff(
         configuration: SpeakSwiftly.Configuration? = nil,
+        stateRootURL: URL? = nil,
     ) async -> SpeakSwiftly.Runtime {
         let environment = ProcessInfo.processInfo.environment
         let bootstrapDependencies = WorkerDependencies.live()
+        let environmentStateRootOverride = ProfileStore.runtimeStateRootOverride(in: environment)
+        let stateRootOverridePath = stateRootURL?.standardizedFileURL.path
+            ?? environmentStateRootOverride?.path
+        if stateRootURL == nil,
+           environmentStateRootOverride?.source == .deprecatedProfileRoot {
+            bootstrapDependencies.writeStderr(
+                "SpeakSwiftly is using deprecated \(Environment.deprecatedProfileRootOverride)='\(environmentStateRootOverride?.path ?? "")' as the runtime state root. Prefer SpeakSwiftly.liftoff(stateRootURL:), the SpeakSwiftlyTool --state-root option, or \(Environment.runtimeStateRootOverride); SpeakSwiftly derives profiles/, \(ProfileStore.configurationFileName), and \(ProfileStore.textProfilesFileName) from that state root.\n",
+            )
+        }
         let persistedConfiguration = resolvedPersistedConfiguration(
             dependencies: bootstrapDependencies,
-            environment: environment,
+            runtimeStateRootOverridePath: stateRootOverridePath,
         )
         let configuredSpeechBackend = resolvedSpeechBackend(
             environment: environment,
@@ -84,7 +94,7 @@ extension SpeakSwiftly.Runtime {
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
                 fileManager: dependencies.fileManager,
-                overridePath: environment[Environment.profileRootOverride],
+                stateRootOverride: stateRootOverridePath,
             ),
             fileManager: dependencies.fileManager,
         )
@@ -96,7 +106,7 @@ extension SpeakSwiftly.Runtime {
         )
         let textProfilesURL = ProfileStore.defaultTextProfilesURL(
             fileManager: dependencies.fileManager,
-            profileRootOverride: environment[Environment.profileRootOverride],
+            stateRootOverride: stateRootOverridePath,
         )
         let normalizer = configuration?.textNormalizer
             ?? makeDefaultNormalizer(
@@ -176,17 +186,17 @@ extension SpeakSwiftly.Runtime {
 
     private static func resolvedPersistedConfiguration(
         dependencies: WorkerDependencies,
-        environment: [String: String],
+        runtimeStateRootOverridePath: String?,
     ) -> SpeakSwiftly.Configuration? {
         do {
             return try SpeakSwiftly.Configuration.loadDefault(
                 fileManager: dependencies.fileManager,
-                profileRootOverride: environment[Environment.profileRootOverride],
+                stateRootOverride: runtimeStateRootOverridePath,
             )
         } catch {
             let configurationPath = SpeakSwiftly.Configuration.defaultPersistenceURL(
                 fileManager: dependencies.fileManager,
-                profileRootOverride: environment[Environment.profileRootOverride],
+                stateRootOverride: runtimeStateRootOverridePath,
             )
             .path
             let message = "SpeakSwiftly could not load persisted runtime configuration from '\(configurationPath)'. Falling back to the default runtime configuration. \(error.localizedDescription)\n"

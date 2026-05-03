@@ -4,7 +4,7 @@ Create one runtime, use its focused handles, and keep long-lived work attached t
 
 ## Overview
 
-The main entry point into SpeakSwiftly is ``SpeakSwiftly/liftoff(configuration:)``. That call starts a shared ``SpeakSwiftly/Runtime`` and applies startup-only choices from ``SpeakSwiftly/Configuration``, such as which speech backend to load and whether a custom ``SpeakSwiftly/Normalizer`` should be installed up front.
+The main entry point into SpeakSwiftly is ``SpeakSwiftly/liftoff(configuration:stateRootURL:)``. That call starts a shared ``SpeakSwiftly/Runtime`` and applies startup-only choices from ``SpeakSwiftly/Configuration``, such as which speech backend to load and whether a custom ``SpeakSwiftly/Normalizer`` should be installed up front. By default, SpeakSwiftly stores runtime state in the platform Application Support directory. Pass `stateRootURL` only when a host needs an isolated state directory for profiles, configuration, and text profiles.
 
 Once you have a runtime, the package expects you to work through narrow concern handles instead of one large method namespace. Use ``SpeakSwiftly/Runtime/generate`` to request speech or retained audio output, ``SpeakSwiftly/Runtime/player`` to inspect or control playback, ``SpeakSwiftly/Runtime/voices`` to manage stored voice profiles, and ``SpeakSwiftly/Runtime/jobs`` or ``SpeakSwiftly/Runtime/artifacts`` when you want to inspect work that stays around after generation finishes.
 
@@ -34,6 +34,14 @@ let runtime = await SpeakSwiftly.liftoff(
         speechBackend: .qwen3,
         textNormalizer: normalizer
     )
+)
+```
+
+When a host needs isolated persisted state, pass the state root at startup:
+
+```swift
+let runtime = await SpeakSwiftly.liftoff(
+    stateRootURL: URL(fileURLWithPath: "/tmp/SpeakSwiftly-Isolated")
 )
 ```
 

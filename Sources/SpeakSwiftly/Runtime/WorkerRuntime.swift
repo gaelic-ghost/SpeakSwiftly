@@ -9,7 +9,8 @@ public extension SpeakSwiftly {
         // MARK: Environment
 
         enum Environment {
-            static let profileRootOverride = ProfileStore.profileRootOverrideEnvironmentVariable
+            static let runtimeStateRootOverride = ProfileStore.runtimeStateRootOverrideEnvironmentVariable
+            static let deprecatedProfileRootOverride = ProfileStore.profileRootOverrideEnvironmentVariable
         }
 
         enum RequestObservationConfiguration {

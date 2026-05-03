@@ -173,6 +173,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 ```
 
 At startup the worker begins warming the resident backend and emits JSONL status events on `stdout`.
+By default, runtime state lives under the platform Application Support directory. Use `SpeakSwiftly.liftoff(stateRootURL:)` from Swift or launch the worker with `--state-root PATH` only when a host needs an isolated state root for `profiles/`, `configuration.json`, and `text-profiles.json`.
 
 ### Consumer Test Harness
 
@@ -183,9 +184,9 @@ swift run SpeakSwiftlyTesting resources
 swift run SpeakSwiftlyTesting status
 swift run SpeakSwiftlyTesting smoke
 swift run SpeakSwiftlyTesting create-design-profile --profile probe-fresh-a --voice "A steady, intimate, softly spoken feminine voice with even projection."
-swift run SpeakSwiftlyTesting volume-probe --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
-swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
-swift run SpeakSwiftlyTesting compare-volume --profile default-femme --profile-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
+swift run SpeakSwiftlyTesting volume-probe --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
 ```
 
 `resources` prints the packaged bundle and metallib paths, `status` constructs
