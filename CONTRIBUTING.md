@@ -621,7 +621,9 @@ test invocation so the live service restores resident models when testing is
 complete. If the live service is not reachable, the helpers log a warning and
 continue so CI and non-live developer machines do not fail for missing
 LaunchAgent state. Override the base URL with `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL`,
-or deliberately skip the service-control flow with
+increase the unload wait with
+`SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_TIMEOUT_SECONDS`, or deliberately skip the
+service-control flow with
 `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
 `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1`.
 

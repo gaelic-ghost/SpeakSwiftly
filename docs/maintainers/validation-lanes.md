@@ -149,7 +149,9 @@ live service resident models after the test invocation completes. The full-lane
 wrapper owns one outer unload/reload pair around the full release-safe sequence,
 so child suite invocations do not repeatedly reload the live service between
 suites. Set `SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL` for a non-default live-service
-URL, or set `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
+URL, set `SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_TIMEOUT_SECONDS` when active
+generation or playback can keep `unload_models` waiting longer than the default
+preflight window, or set `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_UNLOAD=1` and
 `SPEAKSWIFTLY_SKIP_LIVE_SERVICE_RELOAD=1` for a deliberate skip.
 
 Plain `swift test` remains the execution engine under those wrappers. Keep the
