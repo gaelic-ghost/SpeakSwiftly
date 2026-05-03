@@ -334,6 +334,7 @@ Tickets:
 - [x] Keep runtime resource lookup anchored to bundle or manifest reality instead of current-working-directory assumptions wherever published runtimes are consumed.
 - [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially package distribution, request observation, and playback-architecture cleanup.
 - [x] Finish the Milestone 27 public API simplification pass or explicitly document any remaining public rough edges as accepted pre-v1 compatibility.
+- [ ] Investigate why `QueueControlE2ETests` are much heavier than the other real-model E2E suites, including whether they apply undue resource pressure, unnecessary parallelization, or avoidable resident-model contention on maintainer machines. ([#47](https://github.com/gaelic-ghost/SpeakSwiftly/issues/47))
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
 Exit criteria:
