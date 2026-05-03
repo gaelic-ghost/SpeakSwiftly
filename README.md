@@ -174,6 +174,7 @@ sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 
 At startup the worker begins warming the resident backend and emits JSONL status events on `stdout`.
 By default, runtime state lives under the platform Application Support directory. Use `SpeakSwiftly.liftoff(stateRootURL:)` from Swift or launch the worker with `--state-root PATH` only when a host needs an isolated state root for `profiles/`, `configuration.json`, and `text-profiles.json`.
+Voice-profile listing treats each profile directory as an independent read: stray files, partial profile directories, and unreadable manifests are ignored so one damaged or in-progress entry does not hide healthy stored profiles.
 
 ### Consumer Test Harness
 

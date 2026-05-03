@@ -47,6 +47,8 @@ Representative operations include:
 
 The broad compatibility operations `clear_queue` and `cancel_request` still exist for hosts that intentionally want to affect any queued work, but new operators should prefer the queue-specific operations when the target queue is known.
 
+`list_voice_profiles` treats profile directories independently. Stray files, partial directories, and unreadable manifests are skipped so the operation can still return healthy profiles while a separate cleanup or coordination pass deals with damaged entries.
+
 ## Read Events And Results
 
 The worker emits both status events and request-scoped events. For example:
