@@ -362,7 +362,7 @@ import Darwin
             design: profileName,
             from: text,
             vibe: vibe,
-            voice: voiceDescription,
+            voiceDescription: voiceDescription,
             outputPath: outputPath,
         )
     }

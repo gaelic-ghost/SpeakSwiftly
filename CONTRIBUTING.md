@@ -118,11 +118,11 @@ Treat this as a durable building-block cleanup, not as a compatibility layer. Do
 
 For voice-profile creation, the intended Swift shape is one overloaded `Voices.create(...)` entry point:
 
-- `create(design named: Name, from: String, vibe: SpeakSwiftly.Vibe, voice: String, outputPath: String?)`
-- `create(systemDesign named: Name, from: String, vibe: SpeakSwiftly.Vibe, voice: String, seed: SpeakSwiftly.ProfileSeed, outputPath: String?)`
+- `create(design named: Name, from: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, outputPath: String?)`
+- `create(builtInDesign named: Name, from: String, vibe: SpeakSwiftly.Vibe, voiceDescription: String, seed: SpeakSwiftly.ProfileSeed, outputPath: String?)`
 - `create(clone named: Name, from: URL, vibe: SpeakSwiftly.Vibe, transcript: String?)`
 
-Normal voice-design and voice-clone creation stores profiles as user-authored. The system-design creation path is only for trusted package-owned defaults with stable seed metadata; ordinary rename, delete, and in-place reroll operations reject system-authored profiles. Rerolling a system-authored profile creates a user-authored copy instead so package-owned defaults are not silently overwritten.
+Normal voice-design and voice-clone creation stores profiles as user-authored. The built-in design creation path is only for trusted package-owned defaults with stable seed metadata; ordinary rename, delete, and in-place reroll operations reject system-authored profiles. Rerolling a system-authored profile creates a user-authored copy instead so package-owned defaults are not silently overwritten.
 
 ### JSONL Wire API
 

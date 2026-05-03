@@ -272,7 +272,7 @@ import TextForSpeech
     _ = await runtime.voices.create(design: "bright-guide",
                                     from: "Hello there",
                                     vibe: .femme,
-                                    voice: "Warm and bright")
+                                    voiceDescription: "Warm and bright")
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "started"

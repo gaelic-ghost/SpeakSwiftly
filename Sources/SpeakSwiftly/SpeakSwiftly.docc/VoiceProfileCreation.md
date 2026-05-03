@@ -28,14 +28,14 @@ From there, use ``SpeakSwiftly/Runtime/voices`` for profile work.
 
 ## Create A Designed Voice
 
-Use ``SpeakSwiftly/Voices/create(design:from:vibe:voice:outputPath:)`` when you want a new stored profile generated from text and a prompt:
+Use ``SpeakSwiftly/Voices/create(design:from:vibe:voiceDescription:outputPath:)`` when you want a new stored profile generated from text and a prompt:
 
 ```swift
 let handle = await runtime.voices.create(
     design: "guide-femme",
     from: "A calm narrator with crisp pacing.",
     vibe: .femme,
-    voice: "Warm, clear, confident, and measured."
+    voiceDescription: "Warm, clear, confident, and measured."
 )
 ```
 
@@ -44,7 +44,7 @@ If you pass `outputPath`, SpeakSwiftly uses that as an export-audio file path fo
 
 ## Create A Package-Owned Designed Voice
 
-Use ``SpeakSwiftly/Voices/create(systemDesign:from:vibe:voice:seed:outputPath:)`` when a trusted downstream package installs a built-in default voice:
+Use ``SpeakSwiftly/Voices/create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)`` when a trusted downstream package installs a built-in default voice:
 
 ```swift
 let seed = SpeakSwiftly.ProfileSeed(
@@ -56,10 +56,10 @@ let seed = SpeakSwiftly.ProfileSeed(
 )
 
 let handle = await runtime.voices.create(
-    systemDesign: "swift-signal",
+    builtInDesign: "swift-signal",
     from: "A clear technical assistant introduction.",
     vibe: .femme,
-    voice: "Bright, clear, responsive, and crisply articulated.",
+    voiceDescription: "Bright, clear, responsive, and crisply articulated.",
     seed: seed
 )
 ```

@@ -389,7 +389,7 @@ struct SpeakSwiftlyTestingMain {
             design: options.profileName,
             from: options.sourceText,
             vibe: vibe,
-            voice: options.voiceDescription,
+            voiceDescription: options.voiceDescription,
         )
         let created = try await awaitCreatedProfile(from: handle)
 

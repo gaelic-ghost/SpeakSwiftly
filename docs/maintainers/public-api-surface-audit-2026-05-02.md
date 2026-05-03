@@ -227,17 +227,23 @@ The package currently uses `String` for several semantically different values:
 `SpeakSwiftly.Name` and `TextProfileID` document intent, but they do not prevent
 accidental mixing because they are still type aliases.
 
+Slice 5 decision: do not introduce identifier value types in Milestone 27. The
+current identifiers are intentionally wire-shaped strings that pass through JSONL
+requests, JSONL responses, retained manifests, request observation, and the
+downstream server adapter. Wrapping only part of that surface would make the API
+less consistent; wrapping all of it belongs in a dedicated follow-up with
+downstream adoption planned at the same time.
+
 Desired direction:
 
-- decide whether this public cleanup pass should introduce small value types for
-  the identifiers that are easiest to confuse
-- prioritize `VoiceProfileName`, `TextProfileID`, `RequestID`, `ArtifactID`, and
-  `GenerationJobID` if typed ids are adopted
+- leave identifier aliases and stored string ids in place for this milestone
+- revisit `VoiceProfileName`, `TextProfileID`, `RequestID`, `ArtifactID`, and
+  `GenerationJobID` only as a dedicated cross-surface migration
 - do not introduce typed ids only halfway; every affected method, model,
   JSONL-mapping boundary, and test should tell the same story
 
-Practical consequence: downstream callers get compiler help when passing ids
-between request observation, artifact lookup, and profile APIs.
+Practical consequence: Slice 5 stays focused on labels that improve call sites
+without forcing a broad JSONL and manifest migration.
 
 Relevant files:
 
@@ -251,18 +257,19 @@ Relevant files:
 The `Voices.create(...)` overload family is mostly sound because the first label
 distinguishes the creation path:
 
-- `create(design:from:vibe:voice:outputPath:)`
-- `create(systemDesign:from:vibe:voice:seed:outputPath:)`
+- `create(design:from:vibe:voiceDescription:outputPath:)`
+- `create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)`
 - `create(clone:from:vibe:transcript:)`
 
-The main naming rough spots are `voice voiceDescription`, which reads doubled at
-the use site, and `systemDesign`, which says more about package authorship than
-what the caller is doing.
+Slice 5 resolves the two roughest labels: the voice prompt now appears as
+`voiceDescription:` at the use site, and package-owned seed creation now appears
+as `builtInDesign:` instead of `systemDesign:`.
 
 Desired direction:
 
-- consider `describedAs:` or `description:` for the voice prompt
-- consider `seededDesign` or `packageDesign` for the system-owned design path
+- keep `voiceDescription:` unless callers prove the label is too verbose
+- keep `builtInDesign:` unless package-owned defaults start covering non-built-in
+  resources
 - keep one `create(...)` family unless the implementation proves the overloads
   are making use sites ambiguous
 

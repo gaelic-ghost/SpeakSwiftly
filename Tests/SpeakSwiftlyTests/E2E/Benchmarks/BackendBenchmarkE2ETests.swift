@@ -143,7 +143,7 @@ private extension BackendBenchmarkE2ETests {
                     design: profileName(for: backend),
                     from: E2EHarness.testingProfileText,
                     vibe: .masc,
-                    voice: E2EHarness.testingProfileVoiceDescription,
+                    voiceDescription: E2EHarness.testingProfileVoiceDescription,
                 )
                 _ = try await BenchmarkHarness.awaitSuccess(from: handle)
             }
@@ -163,7 +163,7 @@ private extension BackendBenchmarkE2ETests {
                     design: fixture.profileName,
                     from: E2EHarness.testingCloneSourceText,
                     vibe: fixture.vibe,
-                    voice: fixture.voiceDescription,
+                    voiceDescription: fixture.voiceDescription,
                 )
                 _ = try await BenchmarkHarness.awaitSuccess(from: handle)
             }

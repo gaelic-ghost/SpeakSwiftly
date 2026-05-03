@@ -27,7 +27,7 @@ import TextForSpeech
         .create(design: "bright-guide",
                 from: "Hello there",
                 vibe: .femme,
-                voice: "Warm and bright",
+                voiceDescription: "Warm and bright",
                 outputPath: nil)
         .id
     #expect(await waitUntil {
@@ -362,7 +362,7 @@ import TextForSpeech
         .create(design: "bright-guide",
                 from: "Hello there",
                 vibe: .femme,
-                voice: "Warm and bright",
+                voiceDescription: "Warm and bright",
                 outputPath: nil)
         .id
     #expect(await waitUntil {
