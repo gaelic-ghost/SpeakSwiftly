@@ -275,62 +275,64 @@ struct ProfileStore: @unchecked Sendable {
         try ensureRootExists()
         try validateProfileName(profileName)
 
-        guard !materializations.isEmpty else {
-            throw WorkerError(
-                code: .internalError,
-                message: "Profile '\(profileName)' could not be created because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
-            )
-        }
-
-        let directoryURL = profileDirectoryURL(for: profileName)
-        guard !fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .profileAlreadyExists,
-                message: "Profile '\(profileName)' already exists in the SpeakSwiftly profile store and cannot be overwritten.",
-            )
-        }
-
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
-
-        let createdAt = Date()
-        let manifest = ProfileManifest(
-            version: Self.manifestVersion,
-            profileName: profileName,
-            vibe: vibe,
-            createdAt: createdAt,
-            sourceKind: sourceKind,
-            modelRepo: sourceModelRepo,
-            voiceDescription: voiceDescription,
-            sourceText: sourceText,
-            transcriptProvenance: transcriptProvenance,
-            author: author,
-            seed: seed,
-            sampleRate: sampleRate,
-            backendMaterializations: materializations.map {
-                ProfileMaterializationManifest(
-                    backend: $0.backend,
-                    modelRepo: $0.modelRepo,
-                    createdAt: createdAt,
-                    referenceAudioFile: $0.referenceAudioFile,
-                    referenceText: $0.referenceText,
-                    sampleRate: $0.sampleRate,
+        return try withExclusiveStoreAccess(operation: "creating profile '\(profileName)'") {
+            guard !materializations.isEmpty else {
+                throw WorkerError(
+                    code: .internalError,
+                    message: "Profile '\(profileName)' could not be created because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
                 )
-            },
-            qwenConditioningArtifacts: [],
-        )
+            }
 
-        do {
-            try writeMaterializationFiles(materializations, to: directoryURL)
-            try writeManifest(manifest, to: directoryURL)
-        } catch {
-            try? fileManager.removeItem(at: directoryURL)
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)",
+            let directoryURL = profileDirectoryURL(for: profileName)
+            guard !fileManager.fileExists(atPath: directoryURL.path) else {
+                throw WorkerError(
+                    code: .profileAlreadyExists,
+                    message: "Profile '\(profileName)' already exists in the SpeakSwiftly profile store and cannot be overwritten.",
+                )
+            }
+
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
+
+            let createdAt = Date()
+            let manifest = ProfileManifest(
+                version: Self.manifestVersion,
+                profileName: profileName,
+                vibe: vibe,
+                createdAt: createdAt,
+                sourceKind: sourceKind,
+                modelRepo: sourceModelRepo,
+                voiceDescription: voiceDescription,
+                sourceText: sourceText,
+                transcriptProvenance: transcriptProvenance,
+                author: author,
+                seed: seed,
+                sampleRate: sampleRate,
+                backendMaterializations: materializations.map {
+                    ProfileMaterializationManifest(
+                        backend: $0.backend,
+                        modelRepo: $0.modelRepo,
+                        createdAt: createdAt,
+                        referenceAudioFile: $0.referenceAudioFile,
+                        referenceText: $0.referenceText,
+                        sampleRate: $0.sampleRate,
+                    )
+                },
+                qwenConditioningArtifacts: [],
             )
-        }
 
-        return try loadProfile(named: profileName)
+            do {
+                try writeMaterializationFiles(materializations, to: directoryURL)
+                try writeManifest(manifest, to: directoryURL)
+            } catch {
+                try? fileManager.removeItem(at: directoryURL)
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)",
+                )
+            }
+
+            return try loadProfile(named: profileName)
+        }
     }
 
     func loadProfile(named profileName: String) throws -> StoredProfile {
@@ -468,23 +470,25 @@ struct ProfileStore: @unchecked Sendable {
         try ensureRootExists()
         try validateProfileName(profileName)
 
-        let directoryURL = profileDirectoryURL(for: profileName)
-        guard fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
-            )
-        }
+        try withExclusiveStoreAccess(operation: "removing profile '\(profileName)'") {
+            let directoryURL = profileDirectoryURL(for: profileName)
+            guard fileManager.fileExists(atPath: directoryURL.path) else {
+                throw WorkerError(
+                    code: .profileNotFound,
+                    message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
+                )
+            }
 
-        try requireUserMutableProfile(loadProfile(named: profileName), operation: "deleted")
+            try requireUserMutableProfile(loadProfile(named: profileName), operation: "deleted")
 
-        do {
-            try fileManager.removeItem(at: directoryURL)
-        } catch {
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Profile '\(profileName)' could not be removed from disk. \(error.localizedDescription)",
-            )
+            do {
+                try fileManager.removeItem(at: directoryURL)
+            } catch {
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not be removed from disk. \(error.localizedDescription)",
+                )
+            }
         }
     }
 
@@ -496,74 +500,76 @@ struct ProfileStore: @unchecked Sendable {
         try validateProfileName(profileName)
         try validateProfileName(newProfileName)
 
-        guard profileName != newProfileName else {
-            throw WorkerError(
-                code: .invalidProfileName,
-                message: "Profile '\(profileName)' is already named '\(newProfileName)'. Choose a different target name before requesting a rename.",
-            )
-        }
-
-        let directoryURL = profileDirectoryURL(for: profileName)
-        guard fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
-            )
-        }
-
-        let newDirectoryURL = profileDirectoryURL(for: newProfileName)
-        guard !fileManager.fileExists(atPath: newDirectoryURL.path) else {
-            throw WorkerError(
-                code: .profileAlreadyExists,
-                message: "Profile '\(newProfileName)' already exists in the SpeakSwiftly profile store and cannot be replaced by renaming '\(profileName)'.",
-            )
-        }
-
-        let storedProfile = try loadProfile(named: profileName)
-        try requireUserMutableProfile(storedProfile, operation: "renamed")
-        let renamedManifest = ProfileManifest(
-            version: storedProfile.manifest.version,
-            profileName: newProfileName,
-            vibe: storedProfile.manifest.vibe,
-            createdAt: storedProfile.manifest.createdAt,
-            sourceKind: storedProfile.manifest.sourceKind,
-            modelRepo: storedProfile.manifest.modelRepo,
-            voiceDescription: storedProfile.manifest.voiceDescription,
-            sourceText: storedProfile.manifest.sourceText,
-            transcriptProvenance: storedProfile.manifest.transcriptProvenance,
-            author: storedProfile.manifest.author,
-            seed: storedProfile.manifest.seed,
-            sampleRate: storedProfile.manifest.sampleRate,
-            backendMaterializations: storedProfile.manifest.backendMaterializations,
-            qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts,
-        )
-
-        do {
-            try fileManager.moveItem(at: directoryURL, to: newDirectoryURL)
-            do {
-                try writeManifest(renamedManifest, to: newDirectoryURL)
-            } catch let manifestWriteError {
-                do {
-                    try fileManager.moveItem(at: newDirectoryURL, to: directoryURL)
-                } catch let rollbackError {
-                    throw WorkerError(
-                        code: .filesystemError,
-                        message: "Profile '\(profileName)' was moved to '\(newProfileName)', but SpeakSwiftly could not restore the original directory after the manifest rewrite failed. Manifest error: \(manifestWriteError.localizedDescription) Rollback error: \(rollbackError.localizedDescription)",
-                    )
-                }
-
-                throw manifestWriteError
+        return try withExclusiveStoreAccess(operation: "renaming profile '\(profileName)' to '\(newProfileName)'") {
+            guard profileName != newProfileName else {
+                throw WorkerError(
+                    code: .invalidProfileName,
+                    message: "Profile '\(profileName)' is already named '\(newProfileName)'. Choose a different target name before requesting a rename.",
+                )
             }
-        } catch let workerError as WorkerError {
-            throw workerError
-        } catch {
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Profile '\(profileName)' could not be renamed to '\(newProfileName)'. \(error.localizedDescription)",
-            )
-        }
 
-        return try loadProfile(named: newProfileName)
+            let directoryURL = profileDirectoryURL(for: profileName)
+            guard fileManager.fileExists(atPath: directoryURL.path) else {
+                throw WorkerError(
+                    code: .profileNotFound,
+                    message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
+                )
+            }
+
+            let newDirectoryURL = profileDirectoryURL(for: newProfileName)
+            guard !fileManager.fileExists(atPath: newDirectoryURL.path) else {
+                throw WorkerError(
+                    code: .profileAlreadyExists,
+                    message: "Profile '\(newProfileName)' already exists in the SpeakSwiftly profile store and cannot be replaced by renaming '\(profileName)'.",
+                )
+            }
+
+            let storedProfile = try loadProfile(named: profileName)
+            try requireUserMutableProfile(storedProfile, operation: "renamed")
+            let renamedManifest = ProfileManifest(
+                version: storedProfile.manifest.version,
+                profileName: newProfileName,
+                vibe: storedProfile.manifest.vibe,
+                createdAt: storedProfile.manifest.createdAt,
+                sourceKind: storedProfile.manifest.sourceKind,
+                modelRepo: storedProfile.manifest.modelRepo,
+                voiceDescription: storedProfile.manifest.voiceDescription,
+                sourceText: storedProfile.manifest.sourceText,
+                transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                author: storedProfile.manifest.author,
+                seed: storedProfile.manifest.seed,
+                sampleRate: storedProfile.manifest.sampleRate,
+                backendMaterializations: storedProfile.manifest.backendMaterializations,
+                qwenConditioningArtifacts: storedProfile.manifest.qwenConditioningArtifacts,
+            )
+
+            do {
+                try fileManager.moveItem(at: directoryURL, to: newDirectoryURL)
+                do {
+                    try writeManifest(renamedManifest, to: newDirectoryURL)
+                } catch let manifestWriteError {
+                    do {
+                        try fileManager.moveItem(at: newDirectoryURL, to: directoryURL)
+                    } catch let rollbackError {
+                        throw WorkerError(
+                            code: .filesystemError,
+                            message: "Profile '\(profileName)' was moved to '\(newProfileName)', but SpeakSwiftly could not restore the original directory after the manifest rewrite failed. Manifest error: \(manifestWriteError.localizedDescription) Rollback error: \(rollbackError.localizedDescription)",
+                        )
+                    }
+
+                    throw manifestWriteError
+                }
+            } catch let workerError as WorkerError {
+                throw workerError
+            } catch {
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not be renamed to '\(newProfileName)'. \(error.localizedDescription)",
+                )
+            }
+
+            return try loadProfile(named: newProfileName)
+        }
     }
 
     func replaceProfile(
@@ -624,80 +630,88 @@ struct ProfileStore: @unchecked Sendable {
         try ensureRootExists()
         try validateProfileName(profileName)
 
-        guard !materializations.isEmpty else {
-            throw WorkerError(
-                code: .internalError,
-                message: "Profile '\(profileName)' could not be replaced because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
-            )
-        }
-
-        let directoryURL = profileDirectoryURL(for: profileName)
-        guard fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .profileNotFound,
-                message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
-            )
-        }
-
-        try requireUserMutableProfile(loadProfile(named: profileName), operation: "rerolled in place")
-
-        let stagedDirectoryURL = rootURL.appendingPathComponent(".\(profileName).stage-\(UUID().uuidString)", isDirectory: true)
-        let backupDirectoryURL = rootURL.appendingPathComponent(".\(profileName).backup-\(UUID().uuidString)", isDirectory: true)
-        let manifest = ProfileManifest(
-            version: Self.manifestVersion,
-            profileName: profileName,
-            vibe: vibe,
-            createdAt: createdAt,
-            sourceKind: sourceKind,
-            modelRepo: sourceModelRepo,
-            voiceDescription: voiceDescription,
-            sourceText: sourceText,
-            transcriptProvenance: transcriptProvenance,
-            author: author,
-            seed: seed,
-            sampleRate: sampleRate,
-            backendMaterializations: materializations.map {
-                ProfileMaterializationManifest(
-                    backend: $0.backend,
-                    modelRepo: $0.modelRepo,
-                    createdAt: createdAt,
-                    referenceAudioFile: $0.referenceAudioFile,
-                    referenceText: $0.referenceText,
-                    sampleRate: $0.sampleRate,
-                )
-            },
-            qwenConditioningArtifacts: [],
-        )
-
-        do {
-            try fileManager.createDirectory(at: stagedDirectoryURL, withIntermediateDirectories: false)
-            try writeMaterializationFiles(materializations, to: stagedDirectoryURL)
-            try writeManifest(manifest, to: stagedDirectoryURL)
-            try fileManager.moveItem(at: directoryURL, to: backupDirectoryURL)
-
-            do {
-                try fileManager.moveItem(at: stagedDirectoryURL, to: directoryURL)
-            } catch let moveInError {
-                try? fileManager.moveItem(at: backupDirectoryURL, to: directoryURL)
+        return try withExclusiveStoreAccess(operation: "replacing profile '\(profileName)'") {
+            guard !materializations.isEmpty else {
                 throw WorkerError(
-                    code: .filesystemError,
-                    message: "Profile '\(profileName)' could not be replaced with the rerolled assets after staging succeeded. \(moveInError.localizedDescription)",
+                    code: .internalError,
+                    message: "Profile '\(profileName)' could not be replaced because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
                 )
             }
 
-            try fileManager.removeItem(at: backupDirectoryURL)
-        } catch let workerError as WorkerError {
-            try? fileManager.removeItem(at: stagedDirectoryURL)
-            throw workerError
-        } catch {
-            try? fileManager.removeItem(at: stagedDirectoryURL)
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Profile '\(profileName)' could not be replaced in place. \(error.localizedDescription)",
-            )
-        }
+            let directoryURL = profileDirectoryURL(for: profileName)
+            guard fileManager.fileExists(atPath: directoryURL.path) else {
+                throw WorkerError(
+                    code: .profileNotFound,
+                    message: "Profile '\(profileName)' was not found in the SpeakSwiftly profile store.",
+                )
+            }
 
-        return try loadProfile(named: profileName)
+            try requireUserMutableProfile(loadProfile(named: profileName), operation: "rerolled in place")
+
+            let stagedDirectoryURL = rootURL.appendingPathComponent(
+                ".\(profileName).stage-\(UUID().uuidString)",
+                isDirectory: true,
+            )
+            let backupDirectoryURL = rootURL.appendingPathComponent(
+                ".\(profileName).backup-\(UUID().uuidString)",
+                isDirectory: true,
+            )
+            let manifest = ProfileManifest(
+                version: Self.manifestVersion,
+                profileName: profileName,
+                vibe: vibe,
+                createdAt: createdAt,
+                sourceKind: sourceKind,
+                modelRepo: sourceModelRepo,
+                voiceDescription: voiceDescription,
+                sourceText: sourceText,
+                transcriptProvenance: transcriptProvenance,
+                author: author,
+                seed: seed,
+                sampleRate: sampleRate,
+                backendMaterializations: materializations.map {
+                    ProfileMaterializationManifest(
+                        backend: $0.backend,
+                        modelRepo: $0.modelRepo,
+                        createdAt: createdAt,
+                        referenceAudioFile: $0.referenceAudioFile,
+                        referenceText: $0.referenceText,
+                        sampleRate: $0.sampleRate,
+                    )
+                },
+                qwenConditioningArtifacts: [],
+            )
+
+            do {
+                try fileManager.createDirectory(at: stagedDirectoryURL, withIntermediateDirectories: false)
+                try writeMaterializationFiles(materializations, to: stagedDirectoryURL)
+                try writeManifest(manifest, to: stagedDirectoryURL)
+                try fileManager.moveItem(at: directoryURL, to: backupDirectoryURL)
+
+                do {
+                    try fileManager.moveItem(at: stagedDirectoryURL, to: directoryURL)
+                } catch let moveInError {
+                    try? fileManager.moveItem(at: backupDirectoryURL, to: directoryURL)
+                    throw WorkerError(
+                        code: .filesystemError,
+                        message: "Profile '\(profileName)' could not be replaced with the rerolled assets after staging succeeded. \(moveInError.localizedDescription)",
+                    )
+                }
+
+                try fileManager.removeItem(at: backupDirectoryURL)
+            } catch let workerError as WorkerError {
+                try? fileManager.removeItem(at: stagedDirectoryURL)
+                throw workerError
+            } catch {
+                try? fileManager.removeItem(at: stagedDirectoryURL)
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not be replaced in place. \(error.localizedDescription)",
+                )
+            }
+
+            return try loadProfile(named: profileName)
+        }
     }
 
     func exportCanonicalAudio(for profile: StoredProfile, to outputURL: URL) throws {
@@ -726,60 +740,65 @@ struct ProfileStore: @unchecked Sendable {
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
         createdAt: Date = Date(),
     ) throws -> StoredProfile {
-        let storedProfile = try loadProfile(named: profileName)
-        let artifactFile = Self.qwenConditioningArtifactFileName(for: backend, modelRepo: modelRepo)
-        let persistedArtifact = PersistedQwenConditioningArtifact(conditioning: conditioning)
-        let updatedArtifactManifest = QwenConditioningArtifactManifest(
-            backend: backend,
-            modelRepo: modelRepo,
-            createdAt: createdAt,
-            artifactVersion: PersistedQwenConditioningArtifact.currentVersion,
-            artifactFile: artifactFile,
-        )
-        let updatedArtifacts = (
-            storedProfile.manifest.qwenConditioningArtifacts.filter {
-                $0.backend != backend || $0.modelRepo != modelRepo
-            } + [updatedArtifactManifest],
-        )
-        .sorted {
-            if $0.backend.rawValue == $1.backend.rawValue {
-                return $0.modelRepo < $1.modelRepo
+        try ensureRootExists()
+        try validateProfileName(profileName)
+
+        return try withExclusiveStoreAccess(operation: "storing Qwen conditioning for profile '\(profileName)'") {
+            let storedProfile = try loadProfile(named: profileName)
+            let artifactFile = Self.qwenConditioningArtifactFileName(for: backend, modelRepo: modelRepo)
+            let persistedArtifact = PersistedQwenConditioningArtifact(conditioning: conditioning)
+            let updatedArtifactManifest = QwenConditioningArtifactManifest(
+                backend: backend,
+                modelRepo: modelRepo,
+                createdAt: createdAt,
+                artifactVersion: PersistedQwenConditioningArtifact.currentVersion,
+                artifactFile: artifactFile,
+            )
+            let updatedArtifacts = (
+                storedProfile.manifest.qwenConditioningArtifacts.filter {
+                    $0.backend != backend || $0.modelRepo != modelRepo
+                } + [updatedArtifactManifest],
+            )
+            .sorted {
+                if $0.backend.rawValue == $1.backend.rawValue {
+                    return $0.modelRepo < $1.modelRepo
+                }
+
+                return $0.backend.rawValue < $1.backend.rawValue
+            }
+            let updatedManifest = ProfileManifest(
+                version: Self.manifestVersion,
+                profileName: storedProfile.manifest.profileName,
+                vibe: storedProfile.manifest.vibe,
+                createdAt: storedProfile.manifest.createdAt,
+                sourceKind: storedProfile.manifest.sourceKind,
+                modelRepo: storedProfile.manifest.modelRepo,
+                voiceDescription: storedProfile.manifest.voiceDescription,
+                sourceText: storedProfile.manifest.sourceText,
+                transcriptProvenance: storedProfile.manifest.transcriptProvenance,
+                author: storedProfile.manifest.author,
+                seed: storedProfile.manifest.seed,
+                sampleRate: storedProfile.manifest.sampleRate,
+                backendMaterializations: storedProfile.manifest.backendMaterializations,
+                qwenConditioningArtifacts: updatedArtifacts,
+            )
+
+            do {
+                try writeQwenConditioningArtifact(
+                    persistedArtifact,
+                    to: storedProfile.directoryURL,
+                    fileName: artifactFile,
+                )
+                try writeManifest(updatedManifest, to: storedProfile.directoryURL)
+            } catch {
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not persist the prepared Qwen conditioning artifact for the '\(backend.rawValue)' backend. \(error.localizedDescription)",
+                )
             }
 
-            return $0.backend.rawValue < $1.backend.rawValue
+            return try loadProfile(named: profileName)
         }
-        let updatedManifest = ProfileManifest(
-            version: Self.manifestVersion,
-            profileName: storedProfile.manifest.profileName,
-            vibe: storedProfile.manifest.vibe,
-            createdAt: storedProfile.manifest.createdAt,
-            sourceKind: storedProfile.manifest.sourceKind,
-            modelRepo: storedProfile.manifest.modelRepo,
-            voiceDescription: storedProfile.manifest.voiceDescription,
-            sourceText: storedProfile.manifest.sourceText,
-            transcriptProvenance: storedProfile.manifest.transcriptProvenance,
-            author: storedProfile.manifest.author,
-            seed: storedProfile.manifest.seed,
-            sampleRate: storedProfile.manifest.sampleRate,
-            backendMaterializations: storedProfile.manifest.backendMaterializations,
-            qwenConditioningArtifacts: updatedArtifacts,
-        )
-
-        do {
-            try writeQwenConditioningArtifact(
-                persistedArtifact,
-                to: storedProfile.directoryURL,
-                fileName: artifactFile,
-            )
-            try writeManifest(updatedManifest, to: storedProfile.directoryURL)
-        } catch {
-            throw WorkerError(
-                code: .filesystemError,
-                message: "Profile '\(profileName)' could not persist the prepared Qwen conditioning artifact for the '\(backend.rawValue)' backend. \(error.localizedDescription)",
-            )
-        }
-
-        return try loadProfile(named: profileName)
     }
 
     func loadQwenConditioningArtifact(
