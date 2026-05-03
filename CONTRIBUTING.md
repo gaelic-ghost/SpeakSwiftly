@@ -189,6 +189,7 @@ The same namespace split applies to the default profile store and `text-profiles
 For compatibility, SpeakSwiftly still recognizes the older trailing `.../profiles` form when it detects an existing legacy layout with adjacent `configuration.json` or `text-profiles.json` state.
 Profile listing is deliberately tolerant of profile-root noise: `list_voice_profiles` skips stray files, partial profile directories, and unreadable manifests so one damaged or in-progress entry does not make healthy profiles disappear from the listing. Direct profile loading still reports a targeted error when the named profile exists but its manifest cannot be read.
 Profile writes use a per-profile-root advisory lock file before creating, removing, renaming, replacing, or extending stored profile directories. Keep new profile-store mutations inside `ProfileStore` so cross-process coordination stays at one filesystem boundary instead of being duplicated in runtime scheduling or voice-operation callers.
+Profile creation writes reference audio and manifest data into a hidden staged directory first, removes abandoned staged data for the same profile name, and publishes the completed profile by moving the staged directory into the final profile name only after the profile is complete.
 
 Backend resolution precedence is:
 

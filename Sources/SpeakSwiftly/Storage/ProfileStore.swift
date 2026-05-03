@@ -291,7 +291,7 @@ struct ProfileStore: @unchecked Sendable {
                 )
             }
 
-            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
+            try cleanupStagedProfileDirectories(for: profileName)
 
             let createdAt = Date()
             let manifest = ProfileManifest(
@@ -319,12 +319,15 @@ struct ProfileStore: @unchecked Sendable {
                 },
                 qwenConditioningArtifacts: [],
             )
+            let stagedDirectoryURL = temporaryProfileDirectoryURL(for: profileName, purpose: "create")
 
             do {
-                try writeMaterializationFiles(materializations, to: directoryURL)
-                try writeManifest(manifest, to: directoryURL)
+                try fileManager.createDirectory(at: stagedDirectoryURL, withIntermediateDirectories: false)
+                try writeMaterializationFiles(materializations, to: stagedDirectoryURL)
+                try writeManifest(manifest, to: stagedDirectoryURL)
+                try fileManager.moveItem(at: stagedDirectoryURL, to: directoryURL)
             } catch {
-                try? fileManager.removeItem(at: directoryURL)
+                try? fileManager.removeItem(at: stagedDirectoryURL)
                 throw WorkerError(
                     code: .filesystemError,
                     message: "Profile '\(profileName)' could not be written to disk. \(error.localizedDescription)",
@@ -647,15 +650,10 @@ struct ProfileStore: @unchecked Sendable {
             }
 
             try requireUserMutableProfile(loadProfile(named: profileName), operation: "rerolled in place")
+            try cleanupStagedProfileDirectories(for: profileName)
 
-            let stagedDirectoryURL = rootURL.appendingPathComponent(
-                ".\(profileName).stage-\(UUID().uuidString)",
-                isDirectory: true,
-            )
-            let backupDirectoryURL = rootURL.appendingPathComponent(
-                ".\(profileName).backup-\(UUID().uuidString)",
-                isDirectory: true,
-            )
+            let stagedDirectoryURL = temporaryProfileDirectoryURL(for: profileName, purpose: "stage")
+            let backupDirectoryURL = temporaryProfileDirectoryURL(for: profileName, purpose: "backup")
             let manifest = ProfileManifest(
                 version: Self.manifestVersion,
                 profileName: profileName,
