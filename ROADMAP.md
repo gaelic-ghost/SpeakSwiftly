@@ -26,7 +26,6 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone Progress](#milestone-progress)
 - [Active Milestones](#active-milestones)
 - [Milestone 9: Live-Service Operability Review](#milestone-9-live-service-operability-review)
-- [Milestone 13: Swift Package Distribution](#milestone-13-swift-package-distribution)
 - [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
 - [Milestone 18: Package Docs And Distribution Polish](#milestone-18-package-docs-and-distribution-polish)
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
@@ -38,7 +37,6 @@ This roadmap now keeps active milestones and the current release-hardening queue
 ## Milestone Progress
 
 - Milestone 9: Live-Service Operability Review - In Progress
-- Milestone 13: Swift Package Distribution - In Progress
 - Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
 - Milestone 18: Package Docs And Distribution Polish - In Progress
 - Milestone 21: Unified Logging With `Logger` - Planned
@@ -70,31 +68,6 @@ In Progress
 - [ ] Hosts can keep runtime overview and playback state current from a first-class stream or a clearly documented snapshot/stream pairing.
 - [ ] Swift and JSONL callers can discover or configure the default voice-profile name without hard-coding `default-femme`.
 - [ ] The startup-side playback preload warning is fixed or ruled out with a documented remaining owner.
-
-## Milestone 13: Swift Package Distribution
-
-### Status
-
-In Progress
-
-### Scope
-
-- [ ] Make `SpeakSwiftly` straightforward to consume as a real distributed Swift package instead of only as an adjacent local checkout.
-- [ ] Prove the package works from a clean external consumer instead of only from this checkout and sibling integrations.
-- [ ] Clarify the first supported distribution path and release/migration expectations.
-- [ ] Keep distribution work grounded in the existing package surface instead of adding unnecessary packaging layers or wrapper targets.
-
-### Tickets
-
-- [ ] Add a package-consumer verification path that exercises dependency resolution from a clean external package instead of relying only on sibling-checkout integration.
-- [ ] Decide whether package-registry publication is in scope or whether Git-based SwiftPM distribution is the intended first supported path.
-- [ ] Tighten release notes and release-checklist language so package consumers can tell when a change is semver-safe versus when migration work is required.
-
-### Exit Criteria
-
-- [ ] A clean external Swift package can adopt `SpeakSwiftly` through a documented supported distribution path without relying on repo-local adjacency assumptions.
-- [ ] The supported package surface and migration expectations are explicit enough for semver-based consumption.
-- [ ] Package distribution stays thin and concrete rather than accumulating extra compatibility wrappers.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
 
@@ -135,19 +108,17 @@ In Progress
 
 ### Scope
 
-- [ ] Keep package-facing documentation aligned with the remaining runtime-observation and distribution decisions.
+- [ ] Keep package-facing documentation aligned with the remaining runtime-observation decisions.
 - [ ] Treat docs as product surface, not as a dumping ground for stale planning notes.
 
 ### Tickets
 
 - [ ] Update DocC, README, and CONTRIBUTING for the runtime-level playback and overview event stream after #45 lands.
-- [ ] Update package-consumer docs after Milestone 13 proves the clean external-consumer path and decides the first supported distribution path.
-- [ ] Keep README, CONTRIBUTING, ROADMAP, and DocC aligned whenever playback semantics, request observation, package distribution, or runtime ownership change.
+- [ ] Keep README, CONTRIBUTING, ROADMAP, and DocC aligned whenever playback semantics, request observation, or runtime ownership change.
 
 ### Exit Criteria
 
 - [ ] Runtime-observation docs match the final #45 surface instead of describing either polling-only behavior or speculative streams.
-- [ ] Package-consumer docs match the final Milestone 13 distribution decision.
 - [ ] Maintainer docs stay focused on current architecture and active plans instead of accumulated dead notes.
 
 ## Milestone 21: Unified Logging With `Logger`
@@ -233,7 +204,7 @@ In Progress
 
 ### Tickets
 
-- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially package distribution, runtime observation, logging migration, and Marvis playback tuning.
+- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially runtime observation, logging migration, and Marvis playback tuning.
 - [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 27 typed Swift API cleanup.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
@@ -253,9 +224,9 @@ In Progress
 
 - Milestone 4 was condensed out of Active Milestones after auditing retained generated-file E2E coverage, generated-batch E2E coverage, worker EOF handling, shutdown cancellation behavior, malformed JSONL handling, and profile-store failure coverage. No current file-rendering or worker-ownership gap remained specific enough to justify an active milestone.
 - Milestone 9 was narrowed to the live-service items still backed by open evidence: #45 for runtime-level playback and overview streaming, #7 for the startup-side allocator-warning investigation, and the still-missing first-class default-profile concept. Completed `output_path`, state-root, profile-listing, runtime-overview, voice-profile provenance, downstream-adoption, and parent-process ownership documentation work no longer appears as open active work.
-- Milestone 13 was narrowed to clean external package verification, the package-registry versus Git-based distribution decision, and final release-note or migration language. Completed public-API-audit, SwiftPM dependency-example, playback-platform seam, and Xcode-runtime caveat documentation work no longer appears as open active work.
+- Milestone 13 was condensed out of Active Milestones after a second audit confirmed the package already has SemVer Git tags, GitHub SwiftPM dependency documentation, `.spi.yml`, a live Swift Package Index page, and a real adjacent Swift package consumer in `SpeakSwiftlyServer` using `https://github.com/gaelic-ghost/SpeakSwiftly.git` from `4.2.0`.
 - Milestone 17 was moved out of Active Milestones because notification-linked priority playback has no current issue, implementation branch, or package-ownership decision. It remains a backlog candidate only.
-- Milestone 18 was narrowed to documentation work that depends on still-open runtime observation and package distribution decisions. Completed text-profile, retained-generation, request-completion, concern-handle, DocC, and SPI cleanup no longer appears as open active work.
+- Milestone 18 was narrowed to documentation work that depends on still-open runtime observation decisions. Completed text-profile, retained-generation, request-completion, concern-handle, package-distribution, DocC, and SPI cleanup no longer appears as open active work.
 - Milestone 22 was narrowed to the Marvis work that still needs fresh target-machine evidence: resident-policy benchmark results, #13 reproduction or closure, and an evidence-backed decision about whether remaining instability belongs to upstream generation throughput, local wrapper behavior, playback policy, or machine pressure. The completed Marvis-reference comparison no longer appears as open active work.
 - Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path and has Qwen plus Chatterbox E2E coverage for provided and inferred transcripts.
 
