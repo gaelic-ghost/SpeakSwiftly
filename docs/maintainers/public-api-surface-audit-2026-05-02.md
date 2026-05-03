@@ -201,13 +201,14 @@ Relevant files:
 - `SpeakSwiftly.TextProfileDetails`
 - `SpeakSwiftly.TextProfileStyleOption`
 
-But the direct `runtime.normalizer` API still returns
-`TextForSpeech.Runtime.Profiles.*` and `TextForSpeech.Runtime.Style.Option`.
-That means callers see two model families for the same text-profile concept.
+The direct `runtime.normalizer` API now returns these `SpeakSwiftly` models
+instead of `TextForSpeech.Runtime.Profiles.*` and
+`TextForSpeech.Runtime.Style.Option`. This keeps Swift callers in one model
+family for text-profile reads and mutations.
 
 Desired direction:
 
-- have `SpeakSwiftly.Normalizer` return `SpeakSwiftly` text-profile models
+- keep `SpeakSwiftly.Normalizer` returning `SpeakSwiftly` text-profile models
   consistently
 - continue accepting `TextForSpeech.Replacement` where that is genuinely the
   shared authored replacement-rule input

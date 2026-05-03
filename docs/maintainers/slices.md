@@ -71,6 +71,7 @@ The transport models on the SpeakSwiftly side are:
 - `SpeakSwiftly.TextProfileDetails`
 
 Those are transport wrappers around the underlying `TextForSpeech.Runtime.Profiles.Summary` and `.Details` shapes.
+They are also the public Swift return models for text-profile reads and mutations; the raw `TextForSpeech.Runtime.Profiles.*` models stay behind the `SpeakSwiftly` API boundary.
 
 ## Profile Lifecycle
 

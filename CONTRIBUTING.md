@@ -252,7 +252,7 @@ Current resident-status stages:
 ## JSONL Reference
 
 For generation requests, the worker now documents `voice_profile`, `text_profile`, `input_text_context`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names.
-`input_text_context.context` maps to `TextForSpeech.InputContext`, while `request_context` maps to `TextForSpeech.RequestContext`. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the underlying `TextForSpeech.Runtime.Profiles.Details` model now names that field `id`.
+`input_text_context.context` maps to `TextForSpeech.InputContext`, while `request_context` maps to `TextForSpeech.RequestContext`. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
 
 Representative request shapes:
 

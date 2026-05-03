@@ -267,7 +267,7 @@ import Darwin
     let activeStyle: @Sendable (SpeakSwiftly.Normalizer.Style) async -> TextForSpeech.BuiltInProfileStyle = { style in
         await style.getActive()
     }
-    let styleOptions: @Sendable (SpeakSwiftly.Normalizer.Style) async -> [TextForSpeech.Runtime.Style.Option] = { style in
+    let styleOptions: @Sendable (SpeakSwiftly.Normalizer.Style) async -> [SpeakSwiftly.TextProfileStyleOption] = { style in
         await style.list()
     }
     let setActiveStyle: @Sendable (SpeakSwiftly.Normalizer.Style, TextForSpeech.BuiltInProfileStyle) async throws -> Void = {
@@ -275,18 +275,18 @@ import Darwin
         builtInStyle in
         try await style.setActive(to: builtInStyle)
     }
-    let profile: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let profile: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         id in
         try await profiles.get(id: id)
     }
-    let profilesList: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> [TextForSpeech.Runtime.Profiles.Summary] = { profiles in
+    let profilesList: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> [SpeakSwiftly.TextProfileSummary] = { profiles in
         await profiles.list()
     }
-    let activeProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> TextForSpeech.Runtime.Profiles.Details = { profiles in
+    let activeProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> SpeakSwiftly.TextProfileDetails = { profiles in
         await profiles.getActive()
     }
-    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> TextForSpeech.Runtime.Profiles.Details = { profiles in
+    let effectiveProfile: @Sendable (SpeakSwiftly.Normalizer.Profiles) async -> SpeakSwiftly.TextProfileDetails = { profiles in
         await profiles.getEffective()
     }
     let loadProfiles: @Sendable (SpeakSwiftly.Normalizer.Persistence) async throws -> Void = { persistence in
@@ -295,7 +295,7 @@ import Darwin
     let saveProfiles: @Sendable (SpeakSwiftly.Normalizer.Persistence) async throws -> Void = { persistence in
         try await persistence.save()
     }
-    let createProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let createProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         name in
         try await profiles.create(name: name)
@@ -303,7 +303,7 @@ import Darwin
     let removeProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> Void = { profiles, id in
         try await profiles.delete(id: id)
     }
-    let renameProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let renameProfileObject: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         id,
         name in
@@ -318,34 +318,34 @@ import Darwin
     let reset: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> Void = { profiles, id in
         try await profiles.reset(id: id)
     }
-    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement in
         try await profiles.addReplacement(replacement)
     }
-    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement,
         profileID in
         try await profiles.addReplacement(replacement, toProfile: profileID)
     }
-    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement in
         try await profiles.patchReplacement(replacement)
     }
-    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement,
         profileID in
         try await profiles.patchReplacement(replacement, inProfile: profileID)
     }
-    let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let removeActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacementID in
         try await profiles.removeReplacement(id: replacementID)
     }
-    let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String) async throws -> TextForSpeech.Runtime.Profiles.Details = {
+    let removeStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, String, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacementID,
         profileID in

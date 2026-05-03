@@ -70,9 +70,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.getActive(),
-                            ),
+                            textProfile: normalizerRef.profiles.getActive(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -82,9 +80,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: try? SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.get(id: profileID),
-                            ),
+                            textProfile: try? normalizerRef.profiles.get(id: profileID),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -94,7 +90,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfiles: normalizerRef.profiles.list().map(SpeakSwiftly.TextProfileSummary.init),
+                            textProfiles: normalizerRef.profiles.list(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -113,7 +109,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfileStyleOptions: normalizerRef.style.list().map(SpeakSwiftly.TextProfileStyleOption.init),
+                            textProfileStyleOptions: normalizerRef.style.list(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -123,9 +119,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.getEffective(),
-                            ),
+                            textProfile: normalizerRef.profiles.getEffective(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -145,10 +139,8 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.getActive(),
-                            ),
-                            textProfiles: normalizerRef.profiles.list().map(SpeakSwiftly.TextProfileSummary.init),
+                            textProfile: normalizerRef.profiles.getActive(),
+                            textProfiles: normalizerRef.profiles.list(),
                             textProfileStyle: normalizerRef.style.getActive(),
                             textProfilePath: textProfilePath,
                         ),
@@ -179,7 +171,7 @@ extension SpeakSwiftly.Runtime {
                     result = .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(profile),
+                            textProfile: profile,
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -193,7 +185,7 @@ extension SpeakSwiftly.Runtime {
                     result = .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(profile),
+                            textProfile: profile,
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -204,9 +196,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.getActive(),
-                            ),
+                            textProfile: normalizerRef.profiles.getActive(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -227,10 +217,8 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.getActive(),
-                            ),
-                            textProfiles: normalizerRef.profiles.list().map(SpeakSwiftly.TextProfileSummary.init),
+                            textProfile: normalizerRef.profiles.getActive(),
+                            textProfiles: normalizerRef.profiles.list(),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -241,9 +229,7 @@ extension SpeakSwiftly.Runtime {
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: try? SpeakSwiftly.TextProfileDetails(
-                                normalizerRef.profiles.get(id: profileID),
-                            ),
+                            textProfile: try? normalizerRef.profiles.get(id: profileID),
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -261,7 +247,7 @@ extension SpeakSwiftly.Runtime {
                     result = .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(profile),
+                            textProfile: profile,
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -279,7 +265,7 @@ extension SpeakSwiftly.Runtime {
                     result = .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(profile),
+                            textProfile: profile,
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
@@ -297,7 +283,7 @@ extension SpeakSwiftly.Runtime {
                     result = .success(
                         WorkerSuccessPayload(
                             id: id,
-                            textProfile: SpeakSwiftly.TextProfileDetails(profile),
+                            textProfile: profile,
                             textProfileStyle: textProfileStyle,
                             textProfilePath: textProfilePath,
                         ),
