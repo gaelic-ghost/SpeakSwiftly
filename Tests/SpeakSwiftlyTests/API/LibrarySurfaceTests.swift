@@ -638,12 +638,26 @@ import Darwin
     let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
     let successSpeechBackend: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.SpeechBackend?> = \.speechBackend
     let successActiveRequests: KeyPath<SpeakSwiftly.Success, [SpeakSwiftly.ActiveRequest]?> = \.activeRequests
+    let overviewStorage: KeyPath<SpeakSwiftly.RuntimeOverview, SpeakSwiftly.RuntimeStorageSnapshot> = \.storage
+    let stateRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.stateRootPath
+    let profileStoreRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.profileStoreRootPath
+    let configurationPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.configurationPath
+    let textProfilesPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.textProfilesPath
+    let generatedFilesRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.generatedFilesRootPath
+    let generationJobsRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.generationJobsRootPath
 
     _ = speechBackend
     _ = residentState
     _ = successStatus
     _ = successSpeechBackend
     _ = successActiveRequests
+    _ = overviewStorage
+    _ = stateRootPath
+    _ = profileStoreRootPath
+    _ = configurationPath
+    _ = textProfilesPath
+    _ = generatedFilesRootPath
+    _ = generationJobsRootPath
 }
 
 @Test func `public text normalization surface exposes profile metadata`() {

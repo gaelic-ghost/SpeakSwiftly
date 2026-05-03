@@ -629,6 +629,14 @@ import TextForSpeech
             runtimeOverview: SpeakSwiftly.RuntimeOverview(
                 status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
                 speechBackend: .qwen3,
+                storage: SpeakSwiftly.RuntimeStorageSnapshot(
+                    stateRootPath: "/tmp/SpeakSwiftly",
+                    profileStoreRootPath: "/tmp/SpeakSwiftly/profiles",
+                    configurationPath: "/tmp/SpeakSwiftly/configuration.json",
+                    textProfilesPath: "/tmp/SpeakSwiftly/text-profiles.json",
+                    generatedFilesRootPath: "/tmp/SpeakSwiftly/profiles/generated-files",
+                    generationJobsRootPath: "/tmp/SpeakSwiftly/profiles/generation-jobs",
+                ),
                 generationQueue: SpeakSwiftly.QueueSnapshot(
                     queueType: "generation",
                     activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
@@ -668,6 +676,8 @@ import TextForSpeech
     #expect((success["playback_state"] as? [String: Any])?["is_stable_for_concurrent_generation"] as? Bool == true)
     #expect((success["playback_state"] as? [String: Any])?["stable_buffered_audio_ms"] as? Int == 840)
     #expect((success["runtime_overview"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
+    #expect(((success["runtime_overview"] as? [String: Any])?["storage"] as? [String: Any])?["state_root_path"] as? String == "/tmp/SpeakSwiftly")
+    #expect(((success["runtime_overview"] as? [String: Any])?["storage"] as? [String: Any])?["profile_store_root_path"] as? String == "/tmp/SpeakSwiftly/profiles")
     #expect((((success["runtime_overview"] as? [String: Any])?["generation_queue"] as? [String: Any])?["active_requests"] as? [[String: Any]])?.count == 2)
     #expect((success["status"] as? [String: Any])?["resident_state"] as? String == "ready")
     #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3")

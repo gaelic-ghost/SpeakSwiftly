@@ -228,6 +228,7 @@ import TextForSpeech
                 $0["id"] as? String == overviewID,
                 $0["ok"] as? Bool == true,
                 let overview = $0["runtime_overview"] as? [String: Any],
+                let storage = overview["storage"] as? [String: Any],
                 let generationQueue = overview["generation_queue"] as? [String: Any],
                 let activeRequests = generationQueue["active_requests"] as? [[String: Any]],
                 let queuedRequests = generationQueue["queue"] as? [[String: Any]],
@@ -240,6 +241,12 @@ import TextForSpeech
             let activeIDs = Set(activeRequests.compactMap { $0["id"] as? String })
             let queuedIDs = Set(queuedRequests.compactMap { $0["id"] as? String })
             return overview["speech_backend"] as? String == "marvis"
+                && storage["state_root_path"] as? String == storeRoot.standardizedFileURL.path
+                && storage["profile_store_root_path"] as? String == storeRoot.standardizedFileURL.path
+                && storage["configuration_path"] as? String == storeRoot.appendingPathComponent("configuration.json").path
+                && storage["text_profiles_path"] as? String == storeRoot.appendingPathComponent("text-profiles.json").path
+                && storage["generated_files_root_path"] as? String == storeRoot.appendingPathComponent("generated-files").path
+                && storage["generation_jobs_root_path"] as? String == storeRoot.appendingPathComponent("generation-jobs").path
                 && activeIDs == Set([firstHandle.id])
                 && queuedIDs == Set([secondHandle.id])
                 && playbackState["state"] as? String == "playing"

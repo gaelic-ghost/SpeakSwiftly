@@ -201,9 +201,26 @@ extension SpeakSwiftly.Runtime {
         await SpeakSwiftly.RuntimeOverview(
             status: currentStatusSnapshot(),
             speechBackend: speechBackend,
+            storage: runtimeStorageSnapshot(),
             generationQueue: queueSnapshot(for: .generation),
             playbackQueue: queueSnapshot(for: .playback),
             playbackState: playbackController.stateSnapshot(),
+        )
+    }
+
+    func runtimeStorageSnapshot() -> SpeakSwiftly.RuntimeStorageSnapshot {
+        let stateRootURL = profileStore.stateRootURL.standardizedFileURL
+        return SpeakSwiftly.RuntimeStorageSnapshot(
+            stateRootPath: stateRootURL.path,
+            profileStoreRootPath: profileStore.rootURL.standardizedFileURL.path,
+            configurationPath: stateRootURL
+                .appendingPathComponent(ProfileStore.configurationFileName, isDirectory: false)
+                .path,
+            textProfilesPath: stateRootURL
+                .appendingPathComponent(ProfileStore.textProfilesFileName, isDirectory: false)
+                .path,
+            generatedFilesRootPath: generatedFileStore.rootURL.standardizedFileURL.path,
+            generationJobsRootPath: generationJobStore.rootURL.standardizedFileURL.path,
         )
     }
 

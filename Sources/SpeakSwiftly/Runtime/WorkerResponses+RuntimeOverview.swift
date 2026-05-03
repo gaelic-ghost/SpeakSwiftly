@@ -68,6 +68,7 @@ public extension SpeakSwiftly {
     struct RuntimeOverview: Encodable, Sendable, Equatable {
         public let status: StatusEvent?
         public let speechBackend: SpeechBackend
+        public let storage: RuntimeStorageSnapshot
         public let generationQueue: QueueSnapshot
         public let playbackQueue: QueueSnapshot
         public let playbackState: PlaybackStateSnapshot
@@ -75,6 +76,7 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case status
             case speechBackend = "speech_backend"
+            case storage
             case generationQueue = "generation_queue"
             case playbackQueue = "playback_queue"
             case playbackState = "playback_state"
@@ -83,15 +85,51 @@ public extension SpeakSwiftly {
         public init(
             status: StatusEvent?,
             speechBackend: SpeechBackend,
+            storage: RuntimeStorageSnapshot,
             generationQueue: QueueSnapshot,
             playbackQueue: QueueSnapshot,
             playbackState: PlaybackStateSnapshot,
         ) {
             self.status = status
             self.speechBackend = speechBackend
+            self.storage = storage
             self.generationQueue = generationQueue
             self.playbackQueue = playbackQueue
             self.playbackState = playbackState
+        }
+    }
+
+    struct RuntimeStorageSnapshot: Codable, Sendable, Equatable {
+        public let stateRootPath: String
+        public let profileStoreRootPath: String
+        public let configurationPath: String
+        public let textProfilesPath: String
+        public let generatedFilesRootPath: String
+        public let generationJobsRootPath: String
+
+        enum CodingKeys: String, CodingKey {
+            case stateRootPath = "state_root_path"
+            case profileStoreRootPath = "profile_store_root_path"
+            case configurationPath = "configuration_path"
+            case textProfilesPath = "text_profiles_path"
+            case generatedFilesRootPath = "generated_files_root_path"
+            case generationJobsRootPath = "generation_jobs_root_path"
+        }
+
+        public init(
+            stateRootPath: String,
+            profileStoreRootPath: String,
+            configurationPath: String,
+            textProfilesPath: String,
+            generatedFilesRootPath: String,
+            generationJobsRootPath: String,
+        ) {
+            self.stateRootPath = stateRootPath
+            self.profileStoreRootPath = profileStoreRootPath
+            self.configurationPath = configurationPath
+            self.textProfilesPath = textProfilesPath
+            self.generatedFilesRootPath = generatedFilesRootPath
+            self.generationJobsRootPath = generationJobsRootPath
         }
     }
 

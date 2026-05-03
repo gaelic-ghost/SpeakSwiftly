@@ -120,7 +120,7 @@ In Progress
 ### Tickets
 
 - [ ] Revisit `output_path` resolution so relative paths cannot silently depend on the worker launch directory.
-- [ ] Extend the existing `get_runtime_overview` / `runtime.overview()` inspection story where parent processes still need service-health fields such as profile root, runtime-state root, or richer resident state.
+- [x] Extend the existing `get_runtime_overview` / `runtime.overview()` inspection story so parent processes can inspect runtime-state, profile-store, configuration, text-profile, generated-file, and generation-job paths without log scraping.
 - [ ] Add a runtime-level playback and overview event stream so hosts can keep playback state current without opportunistic polling. ([#45](https://github.com/gaelic-ghost/SpeakSwiftly/issues/45))
 - [x] Add native state-root startup controls so Application Support stays the default while Swift callers use `stateRootURL`, worker hosts use `--state-root`, and `SPEAKSWIFTLY_PROFILE_ROOT` remains only as a deprecated compatibility alias. ([#21](https://github.com/gaelic-ghost/SpeakSwiftly/issues/21))
 - [ ] Make profile listing resilient to stray files, partial directories, and damaged entries without poisoning the full operation when recovery is possible.

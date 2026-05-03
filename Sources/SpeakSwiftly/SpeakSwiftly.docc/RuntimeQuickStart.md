@@ -87,7 +87,7 @@ for try await update in runtime.updates(for: handle.id) {
 }
 ```
 
-When you want the broader runtime view instead of one request, use ``SpeakSwiftly/Player/state()`` for playback and ``SpeakSwiftly/Jobs/list()`` for retained generation-job snapshots.
+When you want the broader runtime view instead of one request, use ``SpeakSwiftly/Runtime/overview()`` for a service-health snapshot that includes resident state, queue state, playback telemetry, and resolved storage paths. Use ``SpeakSwiftly/Player/state()`` for the smaller playback-only view and ``SpeakSwiftly/Jobs/list()`` for retained generation-job snapshots.
 
 ## Where To Look Next
 
