@@ -35,6 +35,14 @@ struct ProfileStore: @unchecked Sendable {
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
+    var stateRootURL: URL {
+        guard rootURL.lastPathComponent == Self.profilesDirectoryName else {
+            return rootURL
+        }
+
+        return rootURL.deletingLastPathComponent()
+    }
+
     init(
         rootURL: URL,
         fileManager: FileManager = .default,

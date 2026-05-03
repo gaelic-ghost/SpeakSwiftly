@@ -76,12 +76,17 @@ Resident runtime state is now explicitly observable as:
 - `speech_backend`
 - `resident_state`
 - `stage`
+- `runtime_overview.storage.state_root_path`
+- `runtime_overview.storage.profile_store_root_path`
+- `runtime_overview.storage.configuration_path`
+- `runtime_overview.storage.text_profiles_path`
 
 That split matters:
 
 - `speech_backend` says which backend family is selected
 - `resident_state` says whether resident models are loaded, warming, unloaded, or failed
 - `stage` is the worker-status event label currently emitted on the wire
+- `runtime_overview.storage` says which persisted state family this runtime owns, so parent processes can verify service health and storage isolation without scraping logs
 
 ## Naming Conventions
 

@@ -41,6 +41,7 @@ Representative operations include:
 - `generate_batch` for grouped retained artifacts.
 - `create_voice_profile_from_description`, `create_voice_profile_from_audio`, `list_voice_profiles`, and related voice-management operations.
 - `get_status`, `reload_models`, and `unload_models` for runtime control.
+- `get_runtime_overview` for one service-health snapshot that includes resident state, queue state, playback telemetry, and storage paths.
 - `list_generation_queue`, `clear_generation_queue`, and `cancel_generation` for generation-queue inspection and control.
 - `list_playback_queue`, `clear_playback_queue`, and `cancel_playback` for playback-queue inspection and control.
 
@@ -58,6 +59,8 @@ The worker emits both status events and request-scoped events. For example:
 
 Status events describe the shared runtime. Request-scoped events and terminal payloads describe one submitted operation.
 During startup warmup, queued work uses `waiting_for_resident_model`. After an explicit unload, parked work uses `waiting_for_resident_models`.
+
+`get_runtime_overview` returns a `runtime_overview.storage` object for parent processes that need to verify which persisted state they are supervising. The storage snapshot reports the resolved state root, profile-store root, persisted configuration path, text-profile archive path, generated-file root, and generation-job root. By default, those paths live under the platform Application Support directory; `stateRootURL` and `--state-root` intentionally move the whole storage family together.
 
 ## Choose Between Swift And JSONL
 
