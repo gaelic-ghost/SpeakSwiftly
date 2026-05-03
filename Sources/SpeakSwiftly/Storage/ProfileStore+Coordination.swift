@@ -5,6 +5,8 @@ import Foundation
 
 extension ProfileStore {
     private static let coordinationLockFileName = ".profile-store.lock"
+    private static let coordinationLockRetryIntervalMicroseconds: useconds_t = 20000
+    private static let coordinationLockTimeoutMicroseconds: useconds_t = 10_000_000
 
     private var coordinationLockURL: URL {
         rootURL.appendingPathComponent(Self.coordinationLockFileName, isDirectory: false)
@@ -29,18 +31,49 @@ extension ProfileStore {
             _ = close(descriptor)
         }
 
-        guard flock(descriptor, LOCK_EX) == 0 else {
-            let lockError = String(cString: strerror(errno))
-            throw WorkerError(
-                code: .filesystemError,
-                message: "SpeakSwiftly could not acquire the profile-store coordination lock at '\(lockPath)' before \(operation). \(lockError)",
-            )
-        }
+        try acquireExclusiveLock(
+            descriptor: descriptor,
+            lockPath: lockPath,
+            operation: operation,
+        )
 
         defer {
             _ = flock(descriptor, LOCK_UN)
         }
 
         return try body()
+    }
+
+    private func acquireExclusiveLock(
+        descriptor: Int32,
+        lockPath: String,
+        operation: String,
+    ) throws {
+        var waitedMicroseconds: useconds_t = 0
+
+        while true {
+            if flock(descriptor, LOCK_EX | LOCK_NB) == 0 {
+                return
+            }
+
+            let lockErrno = errno
+            guard lockErrno == EWOULDBLOCK || lockErrno == EAGAIN else {
+                let lockError = String(cString: strerror(lockErrno))
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "SpeakSwiftly could not acquire the profile-store coordination lock at '\(lockPath)' before \(operation). \(lockError)",
+                )
+            }
+            guard waitedMicroseconds < Self.coordinationLockTimeoutMicroseconds else {
+                let timeoutSeconds = Double(Self.coordinationLockTimeoutMicroseconds) / 1_000_000
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "SpeakSwiftly waited \(timeoutSeconds) seconds for the profile-store coordination lock at '\(lockPath)' before \(operation), but another local process still appears to be writing the profile store. If this persists, check for a stuck SpeakSwiftly worker or remove only the lock file after confirming no SpeakSwiftly process is using this profile root.",
+                )
+            }
+
+            usleep(Self.coordinationLockRetryIntervalMicroseconds)
+            waitedMicroseconds += Self.coordinationLockRetryIntervalMicroseconds
+        }
     }
 }
