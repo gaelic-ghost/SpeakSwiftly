@@ -26,7 +26,6 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone Progress](#milestone-progress)
 - [Active Milestones](#active-milestones)
 - [Milestone 4: File Rendering And Integration Hardening](#milestone-4-file-rendering-and-integration-hardening)
-- [Milestone 6: Multi-Process Profile-Store Hardening](#milestone-6-multi-process-profile-store-hardening)
 - [Milestone 9: Live-Service Operability Review](#milestone-9-live-service-operability-review)
 - [Milestone 13: Swift Package Distribution](#milestone-13-swift-package-distribution)
 - [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
@@ -41,7 +40,6 @@ This roadmap now keeps active milestones and the current release-hardening queue
 ## Milestone Progress
 
 - Milestone 4: File Rendering And Integration Hardening - In Progress
-- Milestone 6: Multi-Process Profile-Store Hardening - Planned
 - Milestone 9: Live-Service Operability Review - In Progress
 - Milestone 13: Swift Package Distribution - In Progress
 - Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
@@ -77,33 +75,6 @@ In Progress
 - [ ] The worker exits cleanly on EOF or shutdown requests.
 - [ ] Saved-file generation is operationally as predictable as live playback.
 - [ ] Failure modes around malformed JSONL, profile storage, and filesystem issues are covered by tests.
-
-## Milestone 6: Multi-Process Profile-Store Hardening
-
-### Status
-
-Planned
-
-### Scope
-
-- [ ] Make the on-disk profile store safe and predictable when multiple local processes use it at the same time.
-- [ ] Preserve the current shared-store shape without adding unnecessary architecture around it.
-- [ ] Keep profile creation, listing, loading, and removal human-readable when cross-process contention or stale state appears.
-
-### Tickets
-
-- [x] Add cross-process coordination for profile creation and removal so concurrent workers cannot partially stomp each other.
-- [x] Keep profile writes atomic across manifest and reference-audio creation, including cleanup of abandoned temp data after failed writes.
-- [ ] Make profile listing and loading resilient to in-flight writes from another process without producing misleading corruption failures.
-- [x] Add clear operator-facing diagnostics for lock contention, stale temp directories, and cross-process filesystem races.
-- [x] Add automated coverage for concurrent create/load/remove access against the shared profile root.
-- [ ] Document the shared per-user default profile root and the state-root override path for process-isolated profile stores.
-
-### Exit Criteria
-
-- [ ] Two local processes can share the default profile store without silent corruption or partially written profiles.
-- [ ] Cross-process profile creation and removal failures are explicit, structured, and recoverable.
-- [ ] The shared-store behavior and override-based isolation path are documented clearly for downstream apps and services.
 
 ## Milestone 9: Live-Service Operability Review
 
@@ -336,7 +307,6 @@ In Progress
 
 - [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially package distribution, request observation, and playback-architecture cleanup.
 - [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 27 typed Swift API cleanup.
-- [ ] Investigate why `QueueControlE2ETests` are much heavier than the other real-model E2E suites, including whether they apply undue resource pressure, unnecessary parallelization, or avoidable resident-model contention on maintainer machines. ([#47](https://github.com/gaelic-ghost/SpeakSwiftly/issues/47))
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
 ### Exit Criteria
@@ -353,13 +323,15 @@ In Progress
 
 ### 2026-05-03 roadmap accuracy audit
 
+- Milestone 6 was condensed out of Active Milestones because the multi-process profile-store hardening landed across PRs #52 through #55: profile listing skips stray, partial, hidden staged, and corrupt entries; profile writes use a per-root advisory lock; profile creation and replacement publish staged data only after complete writes; manifest, reference-audio, and Qwen-conditioning writes use atomic file writes; lock contention now reports a bounded stuck-writer diagnostic; concurrent create, load, remove, and duplicate-create coverage is in place; and `CONTRIBUTING.md` documents the shared default state root plus `stateRootURL`, `--state-root`, and `SPEAKSWIFTLY_STATE_ROOT` isolation paths.
+- Milestone 26 no longer tracks queue-control E2E pressure as active release-hardening work because #47 closed after PR #49 reduced that suite's pressure while preserving its coverage intent.
 - Milestone 20 was condensed out of Active Milestones because the runtime-owned request-event broker, `request(id:)`, `updates(for:)`, `generationEvents(for:)`, replay semantics, and lifecycle tests are now landed.
 - Milestone 27 was condensed out of Active Milestones because the public API simplification shipped in PR #46 with queue-control ownership cleanup, SpeakSwiftly-owned text-profile return models, typed request kind and completion, canonical retained `GenerationJob` inspection, and polished `Voices.create(...)` labels.
 - Milestone 13 no longer carries completed public-API-audit, semantic-identifier, `BatchItem`, or retained-generation-model decision tickets; those outcomes now live in `docs/maintainers/public-api-surface-audit-2026-05-02.md` and `docs/maintainers/milestone-27-migration-note.md`.
 - Milestone 18 no longer carries completed retained-generation-model or typed request-completion DocC tickets; the active docs work is now narrowed to remaining playback-control, runtime-level observation, package-discovery, text-profile, and SPI-facing polish.
-- Milestone 26 no longer repeats completed E2E artifact, CPU-accounting, runtime-publication, launcher, resource-lookup, or public-API-simplification tickets; the remaining release-hardening work is downstream adoption, queue-control E2E pressure, unresolved active milestones, and final release-candidate validation.
+- Milestone 26 no longer repeats completed E2E artifact, CPU-accounting, runtime-publication, launcher, resource-lookup, queue-control E2E pressure, or public-API-simplification tickets; the remaining release-hardening work is downstream adoption, unresolved active milestones, and final release-candidate validation.
 - Milestone 9 was corrected to acknowledge the existing `get_runtime_overview` / `runtime.overview()` inspection surface and now tracks the missing runtime-level playback or overview event stream separately in #45.
-- Open GitHub issues #7, #13, #21, #45, and #47 are now assigned to active roadmap milestones so the roadmap and issue tracker describe the same outstanding work.
+- Open GitHub issues #7, #13, and #45 are now assigned to active roadmap milestones so the roadmap and issue tracker describe the same outstanding work.
 
 ### 2026-04-18 release-history consolidation
 
