@@ -237,6 +237,10 @@ enum WorkerRequest: Equatable {
         }
     }
 
+    var requestKind: SpeakSwiftly.RequestKind {
+        SpeakSwiftly.RequestKind(rawValue: opName)
+    }
+
     var isSpeechRequest: Bool {
         switch self {
             case .queueSpeech, .queueBatch:

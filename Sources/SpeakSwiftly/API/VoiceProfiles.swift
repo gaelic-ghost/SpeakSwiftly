@@ -35,7 +35,7 @@ public extension SpeakSwiftly.Voices {
         design named: SpeakSwiftly.Name,
         from text: String,
         vibe: SpeakSwiftly.Vibe,
-        voice voiceDescription: String,
+        voiceDescription: String,
         outputPath: String? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
@@ -53,7 +53,7 @@ public extension SpeakSwiftly.Voices {
         )
     }
 
-    /// Creates a package-owned voice-design profile from trusted seed metadata.
+    /// Creates a package-owned built-in voice-design profile from trusted seed metadata.
     ///
     /// - Parameters:
     ///   - named: The stored profile name to create.
@@ -65,10 +65,10 @@ public extension SpeakSwiftly.Voices {
     ///     generated reference audio after storing the profile.
     /// - Returns: A request handle for the queued creation request.
     func create(
-        systemDesign named: SpeakSwiftly.Name,
+        builtInDesign named: SpeakSwiftly.Name,
         from text: String,
         vibe: SpeakSwiftly.Vibe,
-        voice voiceDescription: String,
+        voiceDescription: String,
         seed: SpeakSwiftly.ProfileSeed,
         outputPath: String? = nil,
     ) async -> SpeakSwiftly.RequestHandle {

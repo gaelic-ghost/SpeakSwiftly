@@ -925,14 +925,14 @@ extension SpeakSwiftly.Voices {
     func create(
         design named: SpeakSwiftly.Name,
         from text: String,
-        voice voiceDescription: String,
+        voiceDescription: String,
         outputPath: String? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await create(
             design: named,
             from: text,
             vibe: inferredTestVibe(profileName: named, voiceDescription: voiceDescription),
-            voice: voiceDescription,
+            voiceDescription: voiceDescription,
             outputPath: outputPath,
         )
     }

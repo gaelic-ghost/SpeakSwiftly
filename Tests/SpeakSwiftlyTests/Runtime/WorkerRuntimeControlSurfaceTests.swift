@@ -634,7 +634,7 @@ import TextForSpeech
         .create(design: "bright-guide",
                 from: "Hello there",
                 vibe: .femme,
-                voice: "Warm and bright")
+                voiceDescription: "Warm and bright")
         .id
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -714,7 +714,7 @@ import TextForSpeech
         .create(design: "bright-guide",
                 from: "Hello there",
                 vibe: .femme,
-                voice: "Warm and bright")
+                voiceDescription: "Warm and bright")
         .id
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -878,7 +878,7 @@ import TextForSpeech
         .create(design: "bright-guide",
                 from: "Hello there",
                 vibe: .femme,
-                voice: "Warm and bright")
+                voiceDescription: "Warm and bright")
         .id
     #expect(await waitUntil {
         output.containsJSONObject {

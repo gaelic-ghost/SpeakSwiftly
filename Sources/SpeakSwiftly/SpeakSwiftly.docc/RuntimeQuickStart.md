@@ -65,7 +65,9 @@ You can watch a request move through queueing, warmup, generation, and completio
 
 ```swift
 for try await event in handle.events {
-    print(event)
+    if case .completed(let completion) = event {
+        print(completion)
+    }
 }
 ```
 

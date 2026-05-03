@@ -97,7 +97,7 @@ public extension SpeakSwiftly {
 
     struct ActiveRequest: Codable, Sendable, Equatable {
         public let id: String
-        public let op: String
+        public let kind: RequestKind
         public let voiceProfile: String?
         public let requestContext: SpeakSwiftly.RequestContext?
 
@@ -108,21 +108,31 @@ public extension SpeakSwiftly {
             case requestContext = "request_context"
         }
 
-        public init(id: String, op: String, voiceProfile: String?, requestContext: SpeakSwiftly.RequestContext?) {
+        public init(id: String, kind: RequestKind, voiceProfile: String?, requestContext: SpeakSwiftly.RequestContext?) {
             self.id = id
-            self.op = op
+            self.kind = kind
             self.voiceProfile = voiceProfile
             self.requestContext = requestContext
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            kind = try container.decode(RequestKind.self, forKey: .op)
+            voiceProfile = try container.decodeIfPresent(String.self, forKey: .voiceProfile)
+            requestContext = try container.decodeIfPresent(SpeakSwiftly.RequestContext.self, forKey: .requestContext)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(kind, forKey: .op)
+            try container.encodeIfPresent(voiceProfile, forKey: .voiceProfile)
+            try container.encodeIfPresent(requestContext, forKey: .requestContext)
         }
     }
 
     struct QueuedRequest: Codable, Sendable, Equatable {
-        public let id: String
-        public let op: String
-        public let voiceProfile: String?
-        public let requestContext: SpeakSwiftly.RequestContext?
-        public let queuePosition: Int
-
         enum CodingKeys: String, CodingKey {
             case id
             case op
@@ -131,18 +141,42 @@ public extension SpeakSwiftly {
             case queuePosition = "queue_position"
         }
 
+        public let id: String
+        public let kind: RequestKind
+        public let voiceProfile: String?
+        public let requestContext: SpeakSwiftly.RequestContext?
+        public let queuePosition: Int
+
         public init(
             id: String,
-            op: String,
+            kind: RequestKind,
             voiceProfile: String?,
             requestContext: SpeakSwiftly.RequestContext?,
             queuePosition: Int,
         ) {
             self.id = id
-            self.op = op
+            self.kind = kind
             self.voiceProfile = voiceProfile
             self.requestContext = requestContext
             self.queuePosition = queuePosition
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            kind = try container.decode(RequestKind.self, forKey: .op)
+            voiceProfile = try container.decodeIfPresent(String.self, forKey: .voiceProfile)
+            requestContext = try container.decodeIfPresent(SpeakSwiftly.RequestContext.self, forKey: .requestContext)
+            queuePosition = try container.decode(Int.self, forKey: .queuePosition)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(kind, forKey: .op)
+            try container.encodeIfPresent(voiceProfile, forKey: .voiceProfile)
+            try container.encodeIfPresent(requestContext, forKey: .requestContext)
+            try container.encode(queuePosition, forKey: .queuePosition)
         }
     }
 }

@@ -81,7 +81,7 @@ private extension QwenBenchmarkE2ETests {
                 design: benchmarkProfileName,
                 from: E2EHarness.testingProfileText,
                 vibe: .masc,
-                voice: E2EHarness.testingProfileVoiceDescription,
+                voiceDescription: E2EHarness.testingProfileVoiceDescription,
             )
             _ = try await BenchmarkHarness.awaitSuccess(from: handle)
         }

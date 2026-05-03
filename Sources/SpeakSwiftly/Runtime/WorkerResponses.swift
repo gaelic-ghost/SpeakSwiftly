@@ -4,6 +4,83 @@ import TextForSpeech
 // MARK: - Response Envelope
 
 public extension SpeakSwiftly {
+    enum RequestCompletion: Sendable, Equatable {
+        case generatedFile(GeneratedFile)
+        case generatedFiles([GeneratedFile])
+        case generationJob(GenerationJob)
+        case generationJobs([GenerationJob])
+        case voiceProfile(name: String?, path: String?)
+        case voiceProfiles([ProfileSummary])
+        case textProfile(
+            profile: SpeakSwiftly.TextProfileDetails?,
+            profiles: [SpeakSwiftly.TextProfileSummary]?,
+            styleOptions: [SpeakSwiftly.TextProfileStyleOption]?,
+            activeStyle: TextForSpeech.BuiltInProfileStyle?,
+            persistencePath: String?,
+        )
+        case queue(
+            activeRequest: ActiveRequest?,
+            activeRequests: [ActiveRequest]?,
+            queuedRequests: [QueuedRequest]?,
+        )
+        case playbackState(PlaybackStateSnapshot)
+        case runtimeOverview(RuntimeOverview)
+        case runtimeStatus(status: StatusEvent?, speechBackend: SpeechBackend?)
+        case queueCleared(count: Int)
+        case requestCancelled(id: String)
+        case empty
+
+        public init(_ success: Success) {
+            if let generatedFile = success.generatedFile {
+                self = .generatedFile(generatedFile)
+            } else if let generatedFiles = success.generatedFiles {
+                self = .generatedFiles(generatedFiles)
+            } else if let generatedBatch = success.generatedBatch {
+                self = .generationJob(GenerationJob(generatedBatch))
+            } else if let generatedBatches = success.generatedBatches {
+                self = .generationJobs(generatedBatches.map(GenerationJob.init))
+            } else if let generationJob = success.generationJob {
+                self = .generationJob(generationJob)
+            } else if let generationJobs = success.generationJobs {
+                self = .generationJobs(generationJobs)
+            } else if success.profileName != nil || success.profilePath != nil {
+                self = .voiceProfile(name: success.profileName, path: success.profilePath)
+            } else if let profiles = success.profiles {
+                self = .voiceProfiles(profiles)
+            } else if success.textProfile != nil
+                || success.textProfiles != nil
+                || success.textProfileStyleOptions != nil
+                || success.textProfileStyle != nil
+                || success.textProfilePath != nil {
+                self = .textProfile(
+                    profile: success.textProfile,
+                    profiles: success.textProfiles,
+                    styleOptions: success.textProfileStyleOptions,
+                    activeStyle: success.textProfileStyle,
+                    persistencePath: success.textProfilePath,
+                )
+            } else if success.activeRequest != nil || success.activeRequests != nil || success.queue != nil {
+                self = .queue(
+                    activeRequest: success.activeRequest,
+                    activeRequests: success.activeRequests,
+                    queuedRequests: success.queue,
+                )
+            } else if let playbackState = success.playbackState {
+                self = .playbackState(playbackState)
+            } else if let runtimeOverview = success.runtimeOverview {
+                self = .runtimeOverview(runtimeOverview)
+            } else if success.status != nil || success.speechBackend != nil {
+                self = .runtimeStatus(status: success.status, speechBackend: success.speechBackend)
+            } else if let clearedCount = success.clearedCount {
+                self = .queueCleared(count: clearedCount)
+            } else if let cancelledRequestID = success.cancelledRequestID {
+                self = .requestCancelled(id: cancelledRequestID)
+            } else {
+                self = .empty
+            }
+        }
+    }
+
     struct Success: Encodable, Sendable, Equatable {
         enum CodingKeys: String, CodingKey {
             case id

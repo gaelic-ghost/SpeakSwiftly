@@ -167,8 +167,8 @@ public extension SpeakSwiftly.Normalizer.Style {
     }
 
     /// Lists the built-in text styles available for activation.
-    func list() async -> [TextForSpeech.Runtime.Style.Option] {
-        await normalizer.textProfileStyleOptions()
+    func list() async -> [SpeakSwiftly.TextProfileStyleOption] {
+        await normalizer.textProfileStyleOptions().map(SpeakSwiftly.TextProfileStyleOption.init)
     }
 
     /// Activates one built-in text style.
@@ -181,33 +181,33 @@ public extension SpeakSwiftly.Normalizer.Style {
 
 public extension SpeakSwiftly.Normalizer.Profiles {
     /// Returns the active custom text profile details.
-    func getActive() async -> TextForSpeech.Runtime.Profiles.Details {
-        await normalizer.activeTextProfileDetails()
+    func getActive() async -> SpeakSwiftly.TextProfileDetails {
+        await SpeakSwiftly.TextProfileDetails(normalizer.activeTextProfileDetails())
     }
 
     /// Returns one stored custom text profile by stable identifier.
     func get(
         id: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.textProfileDetails(id: id)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.textProfileDetails(id: id))
     }
 
     /// Lists the stored custom text profiles.
-    func list() async -> [TextForSpeech.Runtime.Profiles.Summary] {
-        await normalizer.textProfileSummaries()
+    func list() async -> [SpeakSwiftly.TextProfileSummary] {
+        await normalizer.textProfileSummaries().map(SpeakSwiftly.TextProfileSummary.init)
     }
 
     /// Returns the effective text profile after the built-in style and active custom profile are merged.
-    func getEffective() async -> TextForSpeech.Runtime.Profiles.Details {
-        await normalizer.effectiveTextProfileDetails()
+    func getEffective() async -> SpeakSwiftly.TextProfileDetails {
+        await SpeakSwiftly.TextProfileDetails(normalizer.effectiveTextProfileDetails())
     }
 
     /// Creates one stored custom text profile from a display name.
     @discardableResult
     func create(
         name: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.createTextProfile(name: name)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.createTextProfile(name: name))
     }
 
     /// Renames one stored custom text profile without changing its stable identifier.
@@ -215,8 +215,8 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     func rename(
         profile id: String,
         to name: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.renameTextProfile(id: id, to: name)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.renameTextProfile(id: id, to: name))
     }
 
     /// Makes one stored custom text profile active.
@@ -249,8 +249,8 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     @discardableResult
     func addReplacement(
         _ replacement: TextForSpeech.Replacement,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.addTextReplacement(replacement)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.addTextReplacement(replacement))
     }
 
     /// Adds one replacement rule to one stored custom text profile.
@@ -258,16 +258,16 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     func addReplacement(
         _ replacement: TextForSpeech.Replacement,
         toProfile id: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.addTextReplacement(replacement, toProfile: id)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.addTextReplacement(replacement, toProfile: id))
     }
 
     /// Replaces one existing replacement rule on the active custom text profile.
     @discardableResult
     func patchReplacement(
         _ replacement: TextForSpeech.Replacement,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.patchTextReplacement(replacement)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.patchTextReplacement(replacement))
     }
 
     /// Replaces one existing replacement rule on one stored custom text profile.
@@ -275,16 +275,16 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     func patchReplacement(
         _ replacement: TextForSpeech.Replacement,
         inProfile id: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.patchTextReplacement(replacement, inProfile: id)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.patchTextReplacement(replacement, inProfile: id))
     }
 
     /// Removes one replacement rule from the active custom text profile.
     @discardableResult
     func removeReplacement(
         id replacementID: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.removeTextReplacement(id: replacementID)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.removeTextReplacement(id: replacementID))
     }
 
     /// Removes one replacement rule from one stored custom text profile.
@@ -292,8 +292,8 @@ public extension SpeakSwiftly.Normalizer.Profiles {
     func removeReplacement(
         id replacementID: String,
         fromProfile profileID: String,
-    ) async throws -> TextForSpeech.Runtime.Profiles.Details {
-        try await normalizer.removeTextReplacement(id: replacementID, fromProfile: profileID)
+    ) async throws -> SpeakSwiftly.TextProfileDetails {
+        try await SpeakSwiftly.TextProfileDetails(normalizer.removeTextReplacement(id: replacementID, fromProfile: profileID))
     }
 }
 

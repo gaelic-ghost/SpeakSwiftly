@@ -25,6 +25,10 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         request.opName
     }
 
+    var kind: SpeakSwiftly.RequestKind {
+        request.requestKind
+    }
+
     var voiceProfile: String {
         profileName
     }

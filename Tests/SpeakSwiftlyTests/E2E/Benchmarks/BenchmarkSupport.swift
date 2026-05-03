@@ -457,22 +457,22 @@ enum BenchmarkHarness {
 
     static func awaitSuccess(
         from handle: SpeakSwiftly.RequestHandle,
-    ) async throws -> SpeakSwiftly.Success {
+    ) async throws -> SpeakSwiftly.RequestCompletion {
         var acknowledgedSuccess: SpeakSwiftly.Success?
 
         for try await event in handle.events {
             switch event {
                 case let .acknowledged(success):
                     acknowledgedSuccess = success
-                case let .completed(success):
-                    return success
+                case let .completed(completion):
+                    return completion
                 case .queued, .started, .progress:
                     continue
             }
         }
 
         if let acknowledgedSuccess {
-            return acknowledgedSuccess
+            return SpeakSwiftly.RequestCompletion(acknowledgedSuccess)
         }
 
         throw BenchmarkError("Request '\(handle.id)' ended before it reported an acknowledged or completed success payload.")
@@ -500,14 +500,14 @@ enum BenchmarkHarness {
         let generationMetrics = try await generation
         let playbackMetrics = try await awaitPlaybackMetrics(
             for: handle.id,
-            operation: handle.operation,
+            operation: handle.kind.rawValue,
             logRecorder: logRecorder,
         )
 
         return BenchmarkRequest(
             requestID: handle.id,
-            operation: handle.operation,
-            generatedArtifactID: success.generatedFile?.artifactID,
+            operation: handle.kind.rawValue,
+            generatedArtifactID: generatedArtifactID(from: success),
             lifecycle: lifecycleMetrics,
             generation: generationMetrics,
             playback: playbackMetrics,
@@ -569,11 +569,18 @@ enum BenchmarkHarness {
             + Double(components.attoseconds) / 1_000_000_000_000_000
     }
 
+    private static func generatedArtifactID(from completion: SpeakSwiftly.RequestCompletion) -> String? {
+        if case let .generatedFile(file) = completion {
+            return file.artifactID
+        }
+        return nil
+    }
+
     private static func collectLifecycleMetrics(
         from events: AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
-    ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.Success) {
+    ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.RequestCompletion) {
         var metrics = BenchmarkRequestLifecycleMetrics()
         var acknowledgedSuccess: SpeakSwiftly.Success?
 
@@ -601,14 +608,14 @@ enum BenchmarkHarness {
                         default:
                             continue
                     }
-                case let .completed(success):
+                case let .completed(completion):
                     metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
-                    return (metrics, success)
+                    return (metrics, completion)
             }
         }
 
         if let acknowledgedSuccess {
-            return (metrics, acknowledgedSuccess)
+            return (metrics, SpeakSwiftly.RequestCompletion(acknowledgedSuccess))
         }
 
         throw BenchmarkError("A benchmark request stream ended before it reported terminal success.")

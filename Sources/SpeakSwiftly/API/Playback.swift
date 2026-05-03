@@ -46,19 +46,9 @@ public extension SpeakSwiftly.Player {
         await runtime.clearQueue(.playback)
     }
 
-    /// Clears queued work from one runtime queue.
-    func clearQueue(_ queueType: SpeakSwiftly.QueueType) async -> SpeakSwiftly.RequestHandle {
-        await runtime.clearQueue(queueType)
-    }
-
     /// Cancels one queued or active request by identifier.
     func cancelRequest(_ requestID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.cancelRequest(id: UUID().uuidString, requestID: requestID, queueType: nil))
-    }
-
-    /// Cancels one queued or active request in one runtime queue.
-    func cancel(_ queueType: SpeakSwiftly.QueueType, requestID: String) async -> SpeakSwiftly.RequestHandle {
-        await runtime.cancel(queueType, requestID: requestID)
     }
 }
 

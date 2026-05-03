@@ -222,8 +222,8 @@ Key typed runtime entry points include:
 - `runtime.generate.speech(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
 - `runtime.generate.audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
 - `runtime.generate.batch(_:voiceProfile:)`
-- `runtime.voices.create(design named:from:vibe:voice:outputPath:)`
-- `runtime.voices.create(systemDesign named:from:vibe:voice:seed:outputPath:)`
+- `runtime.voices.create(design named:from:vibe:voiceDescription:outputPath:)`
+- `runtime.voices.create(builtInDesign named:from:vibe:voiceDescription:seed:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
 - `runtime.voices.list()`
 - `runtime.voices.rename(_:to:)`
@@ -247,8 +247,6 @@ Key typed runtime entry points include:
 - `runtime.jobs.list()`
 - `runtime.artifacts.file(id:)`
 - `runtime.artifacts.files()`
-- `runtime.artifacts.batch(id:)`
-- `runtime.artifacts.batches()`
 - `SpeakSwiftly.SupportResources.bundle`
 - `SpeakSwiftly.SupportResources.mlxBundleURL()`
 - `SpeakSwiftly.SupportResources.defaultMetallibURL()`
