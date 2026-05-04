@@ -379,7 +379,7 @@ import TextForSpeech
         }
     })
 
-    #expect(recorder.lastText == "Hello there, gale wumbo.")
+    #expect(recorder.lastText == "Hello there, galew.")
     #expect(recorder.lastGenerationParameters?.maxTokens == 4096)
     #expect(recorder.lastGenerationParameters?.temperature == 0.9)
     #expect(recorder.lastGenerationParameters?.topP == 1.0)

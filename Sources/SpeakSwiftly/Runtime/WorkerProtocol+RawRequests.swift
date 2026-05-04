@@ -27,6 +27,7 @@ struct RawBatchItem: Decodable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         try Self.rejectRemovedGenerationContextKeys(in: container)
+        try Self.rejectRemovedRequestContextKeys(in: container)
 
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
@@ -262,6 +263,7 @@ struct RawWorkerRequest: Decodable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         try Self.rejectRemovedGenerationContextKeys(in: container)
+        try Self.rejectRemovedRequestContextKeys(in: container)
 
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
@@ -476,6 +478,15 @@ private extension RawBatchItem {
             ],
         )
     }
+
+    static func rejectRemovedRequestContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedRequestContextKeysInContainer(
+            in: container,
+            forKey: .requestContext,
+        )
+    }
 }
 
 private extension RawWorkerRequest {
@@ -491,6 +502,28 @@ private extension RawWorkerRequest {
             ],
         )
     }
+
+    static func rejectRemovedRequestContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedRequestContextKeysInContainer(
+            in: container,
+            forKey: .requestContext,
+        )
+    }
+}
+
+private struct RequestContextCompatibilityKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        nil
+    }
 }
 
 private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
@@ -502,6 +535,27 @@ private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
             forKey: key,
             in: container,
             debugDescription: "Generation context key '\(key.stringValue)' was removed. Use 'source_format' only for whole-source input, move path and request metadata into 'request_context', and omit source hints for mixed prose, Markdown, HTML, logs, CLI output, and agent text.",
+        )
+    }
+}
+
+private func rejectRemovedRequestContextKeysInContainer<Key: CodingKey>(
+    in container: KeyedDecodingContainer<Key>,
+    forKey requestContextKey: Key,
+) throws {
+    guard container.contains(requestContextKey) else { return }
+    guard try !container.decodeNil(forKey: requestContextKey) else { return }
+
+    let requestContext = try container.nestedContainer(
+        keyedBy: RequestContextCompatibilityKey.self,
+        forKey: requestContextKey,
+    )
+    let removedKeys = ["app", "agent", "project"].compactMap(RequestContextCompatibilityKey.init(stringValue:))
+    for key in removedKeys where requestContext.contains(key) {
+        throw DecodingError.dataCorruptedError(
+            forKey: key,
+            in: requestContext,
+            debugDescription: "Request context key '\(key.stringValue)' was removed. Use 'source', 'topic', 'attributes', 'cwd', and 'repo_root' in 'request_context'.",
         )
     }
 }

@@ -668,6 +668,27 @@ import TextForSpeech
     }
 }
 
+@Test func `rejects removed request context keys`() throws {
+    let removedKeyPayloads = [
+        #"{"id":"req-old-context-app","op":"generate_speech","text":"Hello","request_context":{"app":"SpeakSwiftlyOperator"}}"#,
+        #"{"id":"req-old-context-agent","op":"generate_speech","text":"Hello","request_context":{"agent":"Codex"}}"#,
+        #"{"id":"req-old-context-project","op":"generate_batch","items":[{"text":"Hello","request_context":{"project":"SpeakSwiftly"}}]}"#,
+    ]
+
+    for payload in removedKeyPayloads {
+        do {
+            _ = try WorkerRequest.decode(from: payload)
+            Issue.record("Expected removed request context key to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("Request context key"))
+            #expect(error.message.contains("request_context"))
+            #expect(error.message.contains("source"))
+            #expect(error.message.contains("repo_root"))
+        }
+    }
+}
+
 @Test func `rejects invalid profile name`() throws {
     let tempRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: tempRoot) }

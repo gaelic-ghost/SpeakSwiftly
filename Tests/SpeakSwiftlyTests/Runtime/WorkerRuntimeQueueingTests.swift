@@ -532,7 +532,7 @@ import TextForSpeech
     #expect(activeProfile.id == ops.id)
     #expect(activeProfile.replacements.map(\.id) == ["ops-rule"])
     #expect(effectiveProfile.replacements.map(\.id).contains("ops-rule"))
-    #expect(effectiveProfile.replacements.map(\.id).contains("base-url"))
+    #expect(effectiveProfile.replacements.map(\.id).contains("base-file-path"))
 }
 
 @Test func `text profile editing helpers mutate and persist stored profiles`() async throws {
