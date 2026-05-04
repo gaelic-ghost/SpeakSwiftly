@@ -1,6 +1,6 @@
 # Retained Artifacts
 
-Inspect generated files and batches after synthesis finishes, without reaching into runtime internals.
+Inspect retained artifacts and generation jobs after synthesis finishes, without reaching into runtime internals.
 
 ## Overview
 
@@ -21,7 +21,7 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)``:
+The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)``:
 
 ```swift
 let handle = await runtime.generate.audio(
@@ -29,7 +29,7 @@ let handle = await runtime.generate.audio(
 )
 ```
 
-You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:voiceProfile:)`` when the work belongs together as one generated batch:
+You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:voiceProfile:)`` when the work belongs together as one generation job:
 
 ```swift
 let batchHandle = await runtime.generate.batch(

@@ -38,7 +38,7 @@ SpeakSwiftly currently includes:
 - stored voice profiles and text-normalization profiles
 - resident backend switching between `qwen3`, `chatterbox_turbo`, and `marvis`
 - resident model unload and reload controls
-- retained generated-file and generated-batch artifacts
+- retained artifacts and generation jobs
 
 For contributor-facing architecture notes, repository workflow, runtime behavior details, and extended verification paths, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -195,9 +195,9 @@ runs both checks in sequence, and `create-design-profile` creates and stores a
 fresh voice-design profile through the typed runtime.
 
 The two volume commands are investigation tools. `volume-probe` profiles one
-retained generated file and reports the exact analyzed span, fixed-duration
-windows, RMS, peak, slope, quarter-bucket summaries, head/tail averages, and
-last-window averages. `compare-volume` runs the retained-file path against a
+retained artifact and reports the exact analyzed span, fixed-duration windows,
+RMS, peak, slope, quarter-bucket summaries, head/tail averages, and last-window
+averages. `compare-volume` runs the retained-artifact path against a
 direct non-stream Qwen decode using the same stored profile conditioning, but it
 refuses to compare by default when the analyzed sample counts differ. Use
 `--matched-duration trim-to-shorter` only when the question can tolerate

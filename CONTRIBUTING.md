@@ -44,8 +44,8 @@ harness. Keep it small, explicit, and honest about what each command measures.
 
 The volume commands have separate jobs:
 
-- `volume-probe` profiles one retained generated file and writes a versioned
-  JSON artifact under `.local/volume-probes/`.
+- `volume-probe` profiles one retained artifact and writes a versioned JSON
+  artifact under `.local/volume-probes/`.
 - `compare-volume` compares retained streamed output against direct Qwen decode
   only after it proves the analyzed spans are compatible.
 - `compare-volume --matched-duration trim-to-shorter` is the explicit mode for
@@ -347,19 +347,19 @@ Current live-playback behavior:
 - All live-speech and retained-file text normalization goes through `SpeakSwiftly.Normalizer.speechText(...)`, which delegates to the static async `TextForSpeech.Normalize` entry points with the selected stored or active custom profile, the active built-in style, source-format context, and the runtime summarization provider. Keep future generation call sites on this shared path instead of rebuilding TextForSpeech profile/style inputs locally.
 - The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_active_text_profile_style`, inspect the available choices with `list_text_profile_styles`, and update it with `set_active_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
-- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV under the generated-file store instead of scheduling playback. The Qwen pre-model text chunking flag applies only to live playback; generated audio files stay on the single-pass Qwen rendering path.
+- `generate_audio_file` follows that same backend-routing path, then saves the completed WAV as a retained artifact instead of scheduling playback. The Qwen pre-model text chunking flag applies only to live playback; retained artifact generation stays on the single-pass Qwen rendering path.
 - Marvis defaults to `dual_resident_serialized`, which keeps both `conversational_a` and `conversational_b` resident while still allowing only one active Marvis generation at a time. Configuration can also switch to `single_resident_dynamic` if one reusable resident model is preferred over two always-warm voices.
 - Profile `vibe` currently drives Marvis routing like this: `.femme` -> `conversational_a`, `.masc` -> `conversational_b`.
 - Resident Qwen3 generation now uses the model's own language auto-detection and streams chunks at the `0.32` cadence. For live playback, Qwen request text is handed to the model in one pass unless the caller opts into pre-model text chunking for that request. Marvis now requests the upstream-aligned `0.5` streaming cadence, Chatterbox live synthesis also uses `0.5`, and the ordinary non-Qwen resident baseline stays `0.5`.
 - Playback uses adaptive duration-based startup and low-water thresholds rather than a fixed one-chunk gate.
 
-Current generated-file behavior:
+Current retained-artifact behavior:
 
 - file jobs use the request id as the durable job id, not the artifact id
 - single-file generation resolves its saved artifact id as `<jobID>-artifact-1`
 - batch generation resolves one saved artifact id per item, using caller-provided `artifact_id` when present and `<batchID>-artifact-N` otherwise
-- saved artifacts live in the runtime-managed generated-file store, not at a caller-provided output path
-- expired batch reads stay inspectable through `get_generated_batch` and `list_generated_batches`, but return an empty `artifacts` list because the saved files are intentionally gone
+- saved artifacts live in the runtime-managed artifact store, not at a caller-provided output path
+- expired batch work stays inspectable through generation jobs; the JSONL worker compatibility operations `get_generated_batch` and `list_generated_batches` return an empty `artifacts` list because the saved files are intentionally gone
 - expired file and batch jobs keep artifact references inside `get_generation_job` and `list_generation_jobs` so operators can still see what existed before cleanup
 
 ## Playback Architecture
