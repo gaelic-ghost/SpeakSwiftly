@@ -4,28 +4,31 @@ import Foundation
 
 public extension SpeakSwiftly {
     struct QueueSnapshot: Codable, Sendable, Equatable {
-        public let queueType: String
-        public let activeRequest: ActiveRequest?
-        public let activeRequests: [ActiveRequest]?
+        public let queueType: QueueType
+        public let activeRequests: [ActiveRequest]
         public let queue: [QueuedRequest]
 
         enum CodingKeys: String, CodingKey {
             case queueType = "queue_type"
-            case activeRequest = "active_request"
             case activeRequests = "active_requests"
             case queue
         }
 
         public init(
-            queueType: String,
-            activeRequest: ActiveRequest? = nil,
-            activeRequests: [ActiveRequest]? = nil,
+            queueType: QueueType,
+            activeRequests: [ActiveRequest] = [],
             queue: [QueuedRequest],
         ) {
             self.queueType = queueType
-            self.activeRequest = activeRequest
             self.activeRequests = activeRequests
             self.queue = queue
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            queueType = try container.decode(QueueType.self, forKey: .queueType)
+            activeRequests = try container.decodeIfPresent([ActiveRequest].self, forKey: .activeRequests) ?? []
+            queue = try container.decode([QueuedRequest].self, forKey: .queue)
         }
     }
 
@@ -72,6 +75,7 @@ public extension SpeakSwiftly {
         public let generationQueue: QueueSnapshot
         public let playbackQueue: QueueSnapshot
         public let playbackState: PlaybackStateSnapshot
+        public let defaultVoiceProfile: String
 
         enum CodingKeys: String, CodingKey {
             case status
@@ -80,6 +84,7 @@ public extension SpeakSwiftly {
             case generationQueue = "generation_queue"
             case playbackQueue = "playback_queue"
             case playbackState = "playback_state"
+            case defaultVoiceProfile = "default_voice_profile"
         }
 
         public init(
@@ -89,6 +94,7 @@ public extension SpeakSwiftly {
             generationQueue: QueueSnapshot,
             playbackQueue: QueueSnapshot,
             playbackState: PlaybackStateSnapshot,
+            defaultVoiceProfile: String,
         ) {
             self.status = status
             self.speechBackend = speechBackend
@@ -96,6 +102,7 @@ public extension SpeakSwiftly {
             self.generationQueue = generationQueue
             self.playbackQueue = playbackQueue
             self.playbackState = playbackState
+            self.defaultVoiceProfile = defaultVoiceProfile
         }
     }
 

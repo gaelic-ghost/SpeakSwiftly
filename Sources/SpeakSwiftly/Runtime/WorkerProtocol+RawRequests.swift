@@ -8,27 +8,26 @@ struct RawBatchItem: Decodable {
         case textProfile = "text_profile"
         case textProfileID = "text_profile_id"
         case requestContext = "request_context"
-        case inputTextContext = "input_text_context"
         case cwd
         case repoRoot = "repo_root"
+        case sourceFormat = "source_format"
+        case inputTextContext = "input_text_context"
         case textFormat = "text_format"
         case nestedSourceFormat = "nested_source_format"
-        case sourceFormat = "source_format"
     }
 
     let artifactID: String?
     let text: String?
     let textProfile: SpeakSwiftly.TextProfileID?
     let requestContext: SpeakSwiftly.RequestContext?
-    let inputTextContext: SpeakSwiftly.InputTextContext?
     let cwd: String?
     let repoRoot: String?
-    let textFormat: TextForSpeech.TextFormat?
-    let nestedSourceFormat: TextForSpeech.SourceFormat?
     let sourceFormat: TextForSpeech.SourceFormat?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        try Self.rejectRemovedGenerationContextKeys(in: container)
+
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         textProfile = try container.decodeIfPresent(String.self, forKey: .textProfile)
@@ -37,56 +36,12 @@ struct RawBatchItem: Decodable {
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
         )
-        inputTextContext = try container.decodeIfPresent(
-            SpeakSwiftly.InputTextContext.self,
-            forKey: .inputTextContext,
+        sourceFormat = try container.decodeIfPresent(
+            TextForSpeech.SourceFormat.self,
+            forKey: .sourceFormat,
         )
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
-
-        let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
-        let explicitNestedSourceFormat = try Self.decodeSourceFormat(in: container, forKey: .nestedSourceFormat)
-        let explicitSourceFormat = try Self.decodeSourceFormat(in: container, forKey: .sourceFormat)
-        let fallbackContext = inputTextContext?.context
-
-        if let rawTextFormat {
-            if let parsedTextFormat = TextForSpeech.TextFormat(rawValue: rawTextFormat) {
-                textFormat = parsedTextFormat
-                sourceFormat = explicitSourceFormat ?? inputTextContext?.sourceFormat
-            } else if let compatibility = RawWorkerRequest.legacyCompatibility(forRawValue: rawTextFormat) {
-                textFormat = compatibility.textFormat
-                sourceFormat = explicitSourceFormat ?? compatibility.sourceFormat ?? inputTextContext?.sourceFormat
-            } else {
-                throw DecodingError.dataCorruptedError(
-                    forKey: .textFormat,
-                    in: container,
-                    debugDescription: "Unsupported text_format value '\(rawTextFormat)'.",
-                )
-            }
-        } else {
-            textFormat = fallbackContext?.textFormat
-            sourceFormat = explicitSourceFormat ?? inputTextContext?.sourceFormat
-        }
-
-        nestedSourceFormat = explicitNestedSourceFormat ?? fallbackContext?.nestedSourceFormat
-    }
-
-    private static func decodeSourceFormat(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys,
-    ) throws -> TextForSpeech.SourceFormat? {
-        guard let raw = try container.decodeIfPresent(String.self, forKey: key) else {
-            return nil
-        }
-        guard let format = TextForSpeech.SourceFormat(rawValue: raw) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: key,
-                in: container,
-                debugDescription: "Unsupported \(key.stringValue) value '\(raw)'.",
-            )
-        }
-
-        return format
     }
 }
 
@@ -105,15 +60,15 @@ struct RawWorkerRequest: Decodable {
         case textProfile = "text_profile"
         case textProfileID = "text_profile_id"
         case requestContext = "request_context"
-        case inputTextContext = "input_text_context"
         case textProfileStyle = "text_profile_style"
         case replacement
         case replacementID = "replacement_id"
         case cwd
         case repoRoot = "repo_root"
+        case sourceFormat = "source_format"
+        case inputTextContext = "input_text_context"
         case textFormat = "text_format"
         case nestedSourceFormat = "nested_source_format"
-        case sourceFormat = "source_format"
         case requestID = "request_id"
         case vibe
         case voiceDescription = "voice_description"
@@ -281,14 +236,11 @@ struct RawWorkerRequest: Decodable {
     let textProfile: SpeakSwiftly.TextProfileID?
     let textProfileID: String?
     let requestContext: SpeakSwiftly.RequestContext?
-    let inputTextContext: SpeakSwiftly.InputTextContext?
     let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
     let replacement: TextForSpeech.Replacement?
     let replacementID: String?
     let cwd: String?
     let repoRoot: String?
-    let textFormat: TextForSpeech.TextFormat?
-    let nestedSourceFormat: TextForSpeech.SourceFormat?
     let sourceFormat: TextForSpeech.SourceFormat?
     let requestID: String?
     let vibe: SpeakSwiftly.Vibe?
@@ -309,6 +261,7 @@ struct RawWorkerRequest: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        try Self.rejectRemovedGenerationContextKeys(in: container)
 
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
@@ -326,9 +279,9 @@ struct RawWorkerRequest: Decodable {
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
         )
-        inputTextContext = try container.decodeIfPresent(
-            SpeakSwiftly.InputTextContext.self,
-            forKey: .inputTextContext,
+        sourceFormat = try container.decodeIfPresent(
+            TextForSpeech.SourceFormat.self,
+            forKey: .sourceFormat,
         )
         textProfileStyle = try container.decodeIfPresent(
             TextForSpeech.BuiltInProfileStyle.self,
@@ -354,79 +307,25 @@ struct RawWorkerRequest: Decodable {
         transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
         speechBackend = try container.decodeIfPresent(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
         qwenPreModelTextChunking = try container.decodeIfPresent(Bool.self, forKey: .qwenPreModelTextChunking)
-
-        let rawTextFormat = try container.decodeIfPresent(String.self, forKey: .textFormat)
-        let explicitNestedSourceFormat = try Self.decodeSourceFormat(
-            in: container,
-            forKey: .nestedSourceFormat,
-        )
-        let explicitSourceFormat = try Self.decodeSourceFormat(
-            in: container,
-            forKey: .sourceFormat,
-        )
-        let fallbackContext = inputTextContext?.context
-
-        if let rawTextFormat {
-            if let parsedTextFormat = TextForSpeech.TextFormat(rawValue: rawTextFormat) {
-                textFormat = parsedTextFormat
-                sourceFormat = explicitSourceFormat ?? inputTextContext?.sourceFormat
-            } else if let compatibility = Self.legacyCompatibility(forRawValue: rawTextFormat) {
-                textFormat = compatibility.textFormat
-                sourceFormat = explicitSourceFormat ?? compatibility.sourceFormat ?? inputTextContext?.sourceFormat
-            } else {
-                throw DecodingError.dataCorruptedError(
-                    forKey: .textFormat,
-                    in: container,
-                    debugDescription: "Unsupported text_format value '\(rawTextFormat)'.",
-                )
-            }
-        } else {
-            textFormat = fallbackContext?.textFormat
-            sourceFormat = explicitSourceFormat ?? inputTextContext?.sourceFormat
-        }
-
-        nestedSourceFormat = explicitNestedSourceFormat ?? fallbackContext?.nestedSourceFormat
     }
 
     static func resolveSpeechTextInput(
         id: String,
         text: String?,
         textProfileID: String?,
-        cwd: String?,
-        repoRoot: String?,
-        textFormat: TextForSpeech.TextFormat?,
-        nestedSourceFormat: TextForSpeech.SourceFormat?,
         sourceFormat: TextForSpeech.SourceFormat?,
     ) throws -> (
         text: String,
         textProfileID: SpeakSwiftly.TextProfileID?,
-        inputTextContext: SpeakSwiftly.InputTextContext?,
+        sourceFormat: TextForSpeech.SourceFormat?,
     ) {
         let resolvedText = try WorkerRequest.requireNonEmpty(text, field: "text", id: id)
         let resolvedTextProfileID = textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
-        if sourceFormat != nil, textFormat != nil || nestedSourceFormat != nil {
-            throw WorkerError(
-                code: .invalidRequest,
-                message: "Request '\(id)' cannot combine the whole-source lane (`source_format`) with mixed-text lane fields (`text_format` or `nested_source_format`).",
-            )
-        }
-        let textContext = TextForSpeech.InputContext(
-            cwd: cwd,
-            repoRoot: repoRoot,
-            textFormat: textFormat,
-            nestedSourceFormat: nestedSourceFormat,
-        )
-        let normalizedTextContext = textContext.isEmpty ? nil : textContext
-        let inputTextContext = SpeakSwiftly.InputTextContext(
-            context: normalizedTextContext,
-            sourceFormat: sourceFormat,
-        )
-        let normalizedInputTextContext = inputTextContext.isEmpty ? nil : inputTextContext
 
         return (
             text: resolvedText,
             textProfileID: resolvedTextProfileID,
-            inputTextContext: normalizedInputTextContext,
+            sourceFormat: sourceFormat,
         )
     }
 
@@ -444,16 +343,16 @@ struct RawWorkerRequest: Decodable {
         var seenArtifactIDs = Set<String>()
         return try rawItems.enumerated().map { index, rawItem in
             let itemID = "\(id).items[\(index)]"
-            let context = rawItem.inputTextContext?.context
             let resolved = try resolveSpeechTextInput(
                 id: itemID,
                 text: rawItem.text,
                 textProfileID: rawItem.textProfile,
-                cwd: rawItem.cwd ?? context?.cwd,
-                repoRoot: rawItem.repoRoot ?? context?.repoRoot,
-                textFormat: rawItem.textFormat ?? context?.textFormat,
-                nestedSourceFormat: rawItem.nestedSourceFormat ?? context?.nestedSourceFormat,
-                sourceFormat: rawItem.sourceFormat ?? rawItem.inputTextContext?.sourceFormat,
+                sourceFormat: rawItem.sourceFormat,
+            )
+            let requestContext = requestContext(
+                cwd: rawItem.cwd,
+                repoRoot: rawItem.repoRoot,
+                base: rawItem.requestContext,
             )
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 ?? "\(id)-artifact-\(index + 1)"
@@ -468,10 +367,33 @@ struct RawWorkerRequest: Decodable {
                 artifactID: artifactID,
                 text: resolved.text,
                 textProfile: resolved.textProfileID,
-                inputTextContext: resolved.inputTextContext,
-                requestContext: rawItem.requestContext,
+                sourceFormat: resolved.sourceFormat,
+                requestContext: requestContext,
             )
         }
+    }
+
+    static func requestContext(
+        cwd: String?,
+        repoRoot: String?,
+        base: SpeakSwiftly.RequestContext? = nil,
+    ) -> SpeakSwiftly.RequestContext? {
+        let resolvedCWD = cwd ?? base?.cwd
+        let resolvedRepoRoot = repoRoot ?? base?.repoRoot
+        if resolvedCWD == nil, resolvedRepoRoot == nil {
+            return base
+        }
+
+        return SpeakSwiftly.RequestContext(
+            source: base?.source,
+            app: base?.app,
+            agent: base?.agent,
+            project: base?.project,
+            topic: base?.topic,
+            cwd: resolvedCWD,
+            repoRoot: resolvedRepoRoot,
+            attributes: base?.attributes ?? [:],
+        )
     }
 
     static func resolveProfileSeed(
@@ -528,24 +450,6 @@ struct RawWorkerRequest: Decodable {
         return format
     }
 
-    static func legacyCompatibility(
-        forRawValue rawValue: String,
-    ) -> (textFormat: TextForSpeech.TextFormat?, sourceFormat: TextForSpeech.SourceFormat?)? {
-        switch rawValue {
-            case TextForSpeech.TextFormat.plain.rawValue: (.plain, nil)
-            case TextForSpeech.TextFormat.markdown.rawValue: (.markdown, nil)
-            case TextForSpeech.TextFormat.html.rawValue: (.html, nil)
-            case TextForSpeech.TextFormat.log.rawValue: (.log, nil)
-            case TextForSpeech.TextFormat.cli.rawValue: (.cli, nil)
-            case TextForSpeech.TextFormat.list.rawValue: (.list, nil)
-            case TextForSpeech.SourceFormat.generic.rawValue: (nil, .generic)
-            case TextForSpeech.SourceFormat.swift.rawValue: (nil, .swift)
-            case TextForSpeech.SourceFormat.python.rawValue: (nil, .python)
-            case TextForSpeech.SourceFormat.rust.rawValue: (nil, .rust)
-            default: nil
-        }
-    }
-
     private static func decodeReplacementIfPresent(
         in container: KeyedDecodingContainer<CodingKeys>,
         forKey key: CodingKeys,
@@ -562,20 +466,51 @@ struct RawWorkerRequest: Decodable {
     }
 }
 
+private extension RawBatchItem {
+    static func rejectRemovedGenerationContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedGenerationContextKeysInContainer(
+            in: container,
+            keys: [
+                .inputTextContext,
+                .textFormat,
+                .nestedSourceFormat,
+            ],
+        )
+    }
+}
+
+private extension RawWorkerRequest {
+    static func rejectRemovedGenerationContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedGenerationContextKeysInContainer(
+            in: container,
+            keys: [
+                .inputTextContext,
+                .textFormat,
+                .nestedSourceFormat,
+            ],
+        )
+    }
+}
+
+private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
+    in container: KeyedDecodingContainer<Key>,
+    keys: [Key],
+) throws {
+    for key in keys where container.contains(key) {
+        throw DecodingError.dataCorruptedError(
+            forKey: key,
+            in: container,
+            debugDescription: "Generation context key '\(key.stringValue)' was removed. Use 'source_format' only for whole-source input, move path and request metadata into 'request_context', and omit source hints for mixed prose, Markdown, HTML, logs, CLI output, and agent text.",
+        )
+    }
+}
+
 private extension String {
     var emptyAsNil: String? {
         isEmpty ? nil : self
-    }
-}
-
-private extension TextForSpeech.InputContext {
-    var isEmpty: Bool {
-        cwd == nil && repoRoot == nil && textFormat == nil && nestedSourceFormat == nil
-    }
-}
-
-private extension SpeakSwiftly.InputTextContext {
-    var isEmpty: Bool {
-        context == nil && sourceFormat == nil
     }
 }

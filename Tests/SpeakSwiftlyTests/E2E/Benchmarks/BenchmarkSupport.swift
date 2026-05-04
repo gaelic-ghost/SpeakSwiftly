@@ -458,24 +458,7 @@ enum BenchmarkHarness {
     static func awaitSuccess(
         from handle: SpeakSwiftly.RequestHandle,
     ) async throws -> SpeakSwiftly.RequestCompletion {
-        var acknowledgedSuccess: SpeakSwiftly.Success?
-
-        for try await event in handle.events {
-            switch event {
-                case let .acknowledged(success):
-                    acknowledgedSuccess = success
-                case let .completed(completion):
-                    return completion
-                case .queued, .started, .progress:
-                    continue
-            }
-        }
-
-        if let acknowledgedSuccess {
-            return SpeakSwiftly.RequestCompletion(acknowledgedSuccess)
-        }
-
-        throw BenchmarkError("Request '\(handle.id)' ended before it reported an acknowledged or completed success payload.")
+        try await handle.completion()
     }
 
     static func runRequestBenchmark(
@@ -570,7 +553,7 @@ enum BenchmarkHarness {
     }
 
     private static func generatedArtifactID(from completion: SpeakSwiftly.RequestCompletion) -> String? {
-        if case let .generatedFile(file) = completion {
+        if case let .artifact(file) = completion {
             return file.artifactID
         }
         return nil
@@ -582,7 +565,6 @@ enum BenchmarkHarness {
         clock: ContinuousClock,
     ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.RequestCompletion) {
         var metrics = BenchmarkRequestLifecycleMetrics()
-        var acknowledgedSuccess: SpeakSwiftly.Success?
 
         for try await event in events {
             let elapsedMS = milliseconds(since: submittedAt, clock: clock)
@@ -592,9 +574,8 @@ enum BenchmarkHarness {
                     metrics.queuedAtMS = metrics.queuedAtMS ?? elapsedMS
                     metrics.queueReason = queued.reason.rawValue
                     metrics.queuePosition = queued.queuePosition
-                case let .acknowledged(success):
+                case .acknowledged:
                     metrics.acknowledgedAtMS = metrics.acknowledgedAtMS ?? elapsedMS
-                    acknowledgedSuccess = success
                 case .started:
                     metrics.startedAtMS = metrics.startedAtMS ?? elapsedMS
                 case let .progress(progress):
@@ -612,10 +593,6 @@ enum BenchmarkHarness {
                     metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
                     return (metrics, completion)
             }
-        }
-
-        if let acknowledgedSuccess {
-            return (metrics, SpeakSwiftly.RequestCompletion(acknowledgedSuccess))
         }
 
         throw BenchmarkError("A benchmark request stream ended before it reported terminal success.")

@@ -10,11 +10,10 @@ What is implemented now:
 - Chatterbox synthesizes those chunks sequentially
 - each completed chunk waveform is yielded into the existing live playback buffer immediately
 
-What still remains follow-up work:
+Remaining follow-up work:
 
 - tighten chunk sizing and scheduling heuristics for clone-heavy paths
 - widen the same chunked live model to other non-streaming backends as they land
-- clean up this file later into a shorter historical maintainer note once the broader docs pass happens
 
 ## Why This Exists
 

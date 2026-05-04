@@ -1,6 +1,6 @@
 # Retained Artifacts
 
-Inspect generated files and batches after synthesis finishes, without reaching into runtime internals.
+Inspect retained artifacts and generation jobs after synthesis finishes, without reaching into runtime internals.
 
 ## Overview
 
@@ -12,7 +12,7 @@ That split keeps the public API honest about ownership. A request may pass throu
 
 Use ``SpeakSwiftly/Jobs`` when you want to understand what happened to a generation request. Jobs tell you about queue position, status, and the metadata that ties one retained run back to the request that created it.
 
-Use ``SpeakSwiftly/Artifacts`` when you want the retained result itself. Artifacts expose generated files and batches as operator-facing resources you can list and inspect after the work completes.
+Use ``SpeakSwiftly/Artifacts`` when you want the retained result itself. Artifacts expose retained generated-audio outputs as operator-facing resources you can list and inspect after the work completes.
 
 In practice, that means:
 
@@ -21,39 +21,39 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained file is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)``:
+The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)``:
 
 ```swift
 let handle = await runtime.generate.audio(
-    text: "Persist this clip for later use.",
-    voiceProfile: "default-femme"
+    text: "Persist this clip for later use."
 )
 ```
 
-You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:voiceProfile:)`` when the work belongs together as one generated batch:
+You can also queue several retained outputs together with ``SpeakSwiftly/Generate/batch(_:voiceProfile:)`` when the work belongs together as one generation job:
 
 ```swift
 let batchHandle = await runtime.generate.batch(
     [
         .text("Intro clip"),
         .text("Outro clip")
-    ],
-    voiceProfile: "default-femme"
+    ]
 )
 ```
+
+Pass `voiceProfile:` only when a request should override `runtime.defaultVoiceProfile`.
 
 ## Inspect Stored Results
 
 The retained-query APIs return ``SpeakSwiftly/RequestHandle`` values. Their terminal success events carry the stored payload you asked for.
 
-For example, listing retained files looks like this:
+For example, listing retained artifacts looks like this:
 
 ```swift
-let filesHandle = await runtime.artifacts.files()
+let artifactsHandle = await runtime.artifacts()
 
-for try await event in filesHandle.events {
-    if case .completed(.generatedFiles(let files)) = event {
-        print(files)
+for try await event in artifactsHandle.events {
+    if case .completed(.artifacts(let artifacts)) = event {
+        print(artifacts)
     }
 }
 ```
@@ -61,10 +61,11 @@ for try await event in filesHandle.events {
 The same pattern applies to retained jobs:
 
 - ``SpeakSwiftly/Jobs/list()`` completes with `generationJobs`.
-- ``SpeakSwiftly/Artifacts/files()`` completes with `generatedFiles`.
-- ``SpeakSwiftly/Artifacts/file(id:)`` completes with one retained file projection.
+- ``SpeakSwiftly/Artifacts/callAsFunction()`` completes with `artifacts`.
+- ``SpeakSwiftly/Artifacts/list()`` is the explicit list convenience.
+- ``SpeakSwiftly/Runtime/artifact(id:)`` completes with one retained artifact projection.
 
-``SpeakSwiftly/GenerationJob`` is the canonical retained-work model for both file and batch generation. ``SpeakSwiftly/GeneratedFile`` remains a JSONL-compatible projection for direct generated-file lookups.
+``SpeakSwiftly/GenerationJob`` is the canonical retained-work model for both file and batch generation. ``SpeakSwiftly/GenerationArtifact`` is the public typed Swift model for retained generated-audio outputs.
 
 If you already know the stable identifier for a retained job, use ``SpeakSwiftly/Jobs/job(id:)`` instead of scanning the full collection first.
 

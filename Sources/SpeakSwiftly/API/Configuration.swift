@@ -3,6 +3,12 @@ import Foundation
 // MARK: - Runtime Configuration
 
 public extension SpeakSwiftly {
+    /// Stable names for package-recognized built-in voice profiles.
+    enum DefaultVoiceProfiles {
+        public static let signal: SpeakSwiftly.Name = "swift-signal"
+        public static let anchor: SpeakSwiftly.Name = "swift-anchor"
+    }
+
     /// Selects how Qwen-specific conditioning artifacts are prepared before generation.
     enum QwenConditioningStrategy: String, Codable, Sendable, Equatable, CaseIterable {
         case legacyRaw = "legacy_raw"
@@ -56,6 +62,7 @@ public extension SpeakSwiftly {
             case qwenConditioningStrategy
             case qwenResidentModel
             case marvisResidentPolicy
+            case defaultVoiceProfile
         }
 
         /// The speech backend to activate when the runtime starts.
@@ -66,6 +73,8 @@ public extension SpeakSwiftly {
         public let qwenResidentModel: SpeakSwiftly.QwenResidentModel
         /// The resident Marvis loading policy to use for Marvis-backed generation.
         public let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
+        /// The stored voice profile used when callers do not choose one explicitly.
+        public let defaultVoiceProfile: SpeakSwiftly.Name
         /// An optional text normalizer to reuse instead of creating the default one.
         public let textNormalizer: SpeakSwiftly.Normalizer?
 
@@ -75,12 +84,14 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+            defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
+            self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
             self.textNormalizer = textNormalizer
         }
 
@@ -99,6 +110,12 @@ public extension SpeakSwiftly {
                 SpeakSwiftly.MarvisResidentPolicy.self,
                 forKey: .marvisResidentPolicy,
             ) ?? .dualResidentSerialized
+            defaultVoiceProfile = try Self.normalizedDefaultVoiceProfile(
+                container.decodeIfPresent(
+                    SpeakSwiftly.Name.self,
+                    forKey: .defaultVoiceProfile,
+                ),
+            )
             textNormalizer = nil
         }
 
@@ -154,6 +171,11 @@ public extension SpeakSwiftly {
             )
         }
 
+        static func normalizedDefaultVoiceProfile(_ profileName: SpeakSwiftly.Name?) -> SpeakSwiftly.Name {
+            let trimmed = profileName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return trimmed.isEmpty ? SpeakSwiftly.DefaultVoiceProfiles.signal : trimmed
+        }
+
         private static func makeEncoder() -> JSONEncoder {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -170,6 +192,7 @@ public extension SpeakSwiftly {
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
             try container.encode(qwenResidentModel, forKey: .qwenResidentModel)
             try container.encode(marvisResidentPolicy, forKey: .marvisResidentPolicy)
+            try container.encode(defaultVoiceProfile, forKey: .defaultVoiceProfile)
         }
 
         /// Saves this configuration value to disk.
@@ -205,6 +228,16 @@ public extension SpeakSwiftly.Runtime {
     /// Retrieves a richer runtime overview snapshot.
     func overview() async -> SpeakSwiftly.RequestHandle {
         await submit(.overview(id: UUID().uuidString))
+    }
+
+    /// Returns the voice profile name used when a caller omits an explicit voice profile.
+    var defaultVoiceProfile: SpeakSwiftly.Name {
+        defaultVoiceProfileName
+    }
+
+    /// Sets and persists the voice profile name used when a caller omits an explicit voice profile.
+    func setDefaultVoiceProfile(_ profileName: SpeakSwiftly.Name) throws {
+        try setDefaultVoiceProfileName(profileName)
     }
 
     /// Switches the active speech backend for the running runtime.

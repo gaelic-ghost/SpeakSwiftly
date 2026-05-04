@@ -37,16 +37,17 @@ extension SpeakSwiftly.Runtime {
                     runtimeOverview: payload.runtimeOverview,
                     status: payload.status,
                     speechBackend: payload.speechBackend,
+                    defaultVoiceProfile: payload.defaultVoiceProfile,
                     clearedCount: payload.clearedCount,
                     cancelledRequestID: payload.cancelledRequestID,
                 )
-                yieldRequestEvent(.completed(SpeakSwiftly.RequestCompletion(success)), for: request.id)
+                await yieldRequestEvent(.completed(SpeakSwiftly.RequestCompletion(success)), for: request.id)
                 if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
                     await emit(success)
                 }
 
             case let .failure(error):
-                failRequestStream(for: request.id, error: error)
+                await failRequestStream(for: request.id, error: error)
                 await logError(
                     error.message,
                     requestID: request.id,
@@ -120,7 +121,7 @@ extension SpeakSwiftly.Runtime {
                 queuePosition: queuePosition,
             )
             await emit(queuedEvent)
-            yieldRequestEvent(.queued(queuedEvent), for: job.request.id)
+            await yieldRequestEvent(.queued(queuedEvent), for: job.request.id)
             lastQueuedGenerationParkReason[job.request.id] = reason
         }
 
@@ -171,8 +172,7 @@ extension SpeakSwiftly.Runtime {
 
     func queueSnapshot(for queueType: WorkerQueueType) async -> SpeakSwiftly.QueueSnapshot {
         await SpeakSwiftly.QueueSnapshot(
-            queueType: queueType.rawValue,
-            activeRequest: queueSummaryActiveRequest(for: queueType),
+            queueType: queueType,
             activeRequests: queueSummaryActiveRequests(for: queueType),
             queue: queuedRequestSummaries(for: queueType),
         )
@@ -187,13 +187,12 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func queueSummaryActiveRequests(for queueType: WorkerQueueType) async -> [ActiveWorkerRequestSummary]? {
+    func queueSummaryActiveRequests(for queueType: WorkerQueueType) async -> [ActiveWorkerRequestSummary] {
         switch queueType {
             case .generation:
-                let activeRequests = generationActiveRequestSummaries()
-                return activeRequests.isEmpty ? nil : activeRequests
+                generationActiveRequestSummaries()
             case .playback:
-                return nil
+                await queueSummaryActiveRequest(for: .playback).map { [$0] } ?? []
         }
     }
 
@@ -205,6 +204,7 @@ extension SpeakSwiftly.Runtime {
             generationQueue: queueSnapshot(for: .generation),
             playbackQueue: queueSnapshot(for: .playback),
             playbackState: playbackController.stateSnapshot(),
+            defaultVoiceProfile: defaultVoiceProfileName,
         )
     }
 
@@ -242,13 +242,13 @@ extension SpeakSwiftly.Runtime {
     }
 
     func emitStarted(for request: WorkerRequest) async {
-        await emit(WorkerStartedEvent(id: request.id, op: request.opName))
+        await emit(WorkerStartedEvent(id: request.id, kind: request.requestKind))
     }
 
     func emitProgress(id: String, stage: WorkerProgressStage) async {
         let progress = WorkerProgressEvent(id: id, stage: stage)
         await emit(progress)
-        yieldRequestEvent(.progress(progress), for: id)
+        await yieldRequestEvent(.progress(progress), for: id)
     }
 
     func emitStatus(_ stage: WorkerStatusStage) async {
@@ -286,7 +286,7 @@ extension SpeakSwiftly.Runtime {
         profileName: String? = nil,
         newProfileName: String? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
         replacement: TextForSpeech.Replacement? = nil,
@@ -313,16 +313,13 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             newProfileName: newProfileName,
             textProfile: textProfile,
-            inputTextContext: inputTextContext,
+            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileStyle: textProfileStyle,
             replacement: replacement,
             replacementID: replacementID,
-            cwd: cwd ?? inputTextContext?.context?.cwd,
-            repoRoot: inputTextContext?.context?.repoRoot,
-            textFormat: inputTextContext?.context?.textFormat,
-            nestedSourceFormat: inputTextContext?.context?.nestedSourceFormat,
-            sourceFormat: inputTextContext?.sourceFormat,
+            cwd: cwd ?? requestContext?.cwd,
+            repoRoot: requestContext?.repoRoot,
             requestID: requestID,
             speechBackend: speechBackend,
             qwenPreModelTextChunking: qwenPreModelTextChunking,
@@ -350,14 +347,14 @@ extension SpeakSwiftly.Runtime {
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-            case let .queueSpeech(id, text, profileName, textProfileID, _, inputTextContext, requestContext, qwenPreModelTextChunking):
+            case let .queueSpeech(id, text, profileName, textProfileID, _, sourceFormat, requestContext, qwenPreModelTextChunking):
                 await submitRequest(
                     id: id,
                     op: request.opName,
                     text: text,
                     voiceProfile: profileName,
                     textProfile: textProfileID,
-                    inputTextContext: inputTextContext,
+                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
@@ -383,6 +380,17 @@ extension SpeakSwiftly.Runtime {
                 await submitRequest(
                     id: id,
                     op: request.opName,
+                )
+            case let .defaultVoiceProfile(id):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                )
+            case let .setDefaultVoiceProfile(id, profileName):
+                await submitRequest(
+                    id: id,
+                    op: request.opName,
+                    voiceProfile: profileName,
                 )
             case let .generatedBatch(id, batchID):
                 await submitRequest(

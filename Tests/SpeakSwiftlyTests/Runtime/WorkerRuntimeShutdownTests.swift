@@ -239,7 +239,7 @@ final class LockedFlag: @unchecked Sendable {
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -249,7 +249,11 @@ final class LockedFlag: @unchecked Sendable {
     let activeStarted = try await activeIterator.next()
     #expect(
         activeStarted == .acknowledged(
-            WorkerSuccessResponse(id: "req-active-shutdown-stream"),
+            SpeakSwiftly.RequestAcknowledgement(
+                id: "req-active-shutdown-stream",
+                kind: .generateSpeech,
+                generationJob: nil,
+            ),
         ),
     )
 

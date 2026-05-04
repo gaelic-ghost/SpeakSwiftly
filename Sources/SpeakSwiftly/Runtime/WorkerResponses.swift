@@ -5,8 +5,8 @@ import TextForSpeech
 
 public extension SpeakSwiftly {
     enum RequestCompletion: Sendable, Equatable {
-        case generatedFile(GeneratedFile)
-        case generatedFiles([GeneratedFile])
+        case artifact(GenerationArtifact)
+        case artifacts([GenerationArtifact])
         case generationJob(GenerationJob)
         case generationJobs([GenerationJob])
         case voiceProfile(name: String?, path: String?)
@@ -18,23 +18,20 @@ public extension SpeakSwiftly {
             activeStyle: TextForSpeech.BuiltInProfileStyle?,
             persistencePath: String?,
         )
-        case queue(
-            activeRequest: ActiveRequest?,
-            activeRequests: [ActiveRequest]?,
-            queuedRequests: [QueuedRequest]?,
-        )
+        case queue(activeRequests: [ActiveRequest], queuedRequests: [QueuedRequest])
         case playbackState(PlaybackStateSnapshot)
         case runtimeOverview(RuntimeOverview)
         case runtimeStatus(status: StatusEvent?, speechBackend: SpeechBackend?)
+        case defaultVoiceProfile(String)
         case queueCleared(count: Int)
         case requestCancelled(id: String)
         case empty
 
-        public init(_ success: Success) {
+        init(_ success: Success) {
             if let generatedFile = success.generatedFile {
-                self = .generatedFile(generatedFile)
+                self = .artifact(GenerationArtifact(generatedFile))
             } else if let generatedFiles = success.generatedFiles {
-                self = .generatedFiles(generatedFiles)
+                self = .artifacts(generatedFiles.map(GenerationArtifact.init))
             } else if let generatedBatch = success.generatedBatch {
                 self = .generationJob(GenerationJob(generatedBatch))
             } else if let generatedBatches = success.generatedBatches {
@@ -61,9 +58,8 @@ public extension SpeakSwiftly {
                 )
             } else if success.activeRequest != nil || success.activeRequests != nil || success.queue != nil {
                 self = .queue(
-                    activeRequest: success.activeRequest,
-                    activeRequests: success.activeRequests,
-                    queuedRequests: success.queue,
+                    activeRequests: success.resolvedActiveRequests,
+                    queuedRequests: success.queue ?? [],
                 )
             } else if let playbackState = success.playbackState {
                 self = .playbackState(playbackState)
@@ -71,6 +67,8 @@ public extension SpeakSwiftly {
                 self = .runtimeOverview(runtimeOverview)
             } else if success.status != nil || success.speechBackend != nil {
                 self = .runtimeStatus(status: success.status, speechBackend: success.speechBackend)
+            } else if let defaultVoiceProfile = success.defaultVoiceProfile {
+                self = .defaultVoiceProfile(defaultVoiceProfile)
             } else if let clearedCount = success.clearedCount {
                 self = .queueCleared(count: clearedCount)
             } else if let cancelledRequestID = success.cancelledRequestID {
@@ -80,8 +78,10 @@ public extension SpeakSwiftly {
             }
         }
     }
+}
 
-    struct Success: Encodable, Sendable, Equatable {
+extension SpeakSwiftly {
+    struct Success: Encodable, Equatable {
         enum CodingKeys: String, CodingKey {
             case id
             case ok
@@ -106,37 +106,49 @@ public extension SpeakSwiftly {
             case runtimeOverview = "runtime_overview"
             case status
             case speechBackend = "speech_backend"
+            case defaultVoiceProfile = "default_voice_profile"
             case clearedCount = "cleared_count"
             case cancelledRequestID = "cancelled_request_id"
         }
 
-        public let id: String
-        public let ok = true
-        public let generatedFile: GeneratedFile?
-        public let generatedFiles: [GeneratedFile]?
-        public let generatedBatch: GeneratedBatch?
-        public let generatedBatches: [GeneratedBatch]?
-        public let generationJob: GenerationJob?
-        public let generationJobs: [GenerationJob]?
-        public let profileName: String?
-        public let profilePath: String?
-        public let profiles: [ProfileSummary]?
-        public let textProfile: SpeakSwiftly.TextProfileDetails?
-        public let textProfiles: [SpeakSwiftly.TextProfileSummary]?
-        public let textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]?
-        public let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-        public let textProfilePath: String?
-        public let activeRequest: ActiveRequest?
-        public let activeRequests: [ActiveRequest]?
-        public let queue: [QueuedRequest]?
-        public let playbackState: PlaybackStateSnapshot?
-        public let runtimeOverview: RuntimeOverview?
-        public let status: StatusEvent?
-        public let speechBackend: SpeechBackend?
-        public let clearedCount: Int?
-        public let cancelledRequestID: String?
+        let id: String
+        let ok = true
+        let generatedFile: GeneratedFile?
+        let generatedFiles: [GeneratedFile]?
+        let generatedBatch: GeneratedBatch?
+        let generatedBatches: [GeneratedBatch]?
+        let generationJob: GenerationJob?
+        let generationJobs: [GenerationJob]?
+        let profileName: String?
+        let profilePath: String?
+        let profiles: [ProfileSummary]?
+        let textProfile: SpeakSwiftly.TextProfileDetails?
+        let textProfiles: [SpeakSwiftly.TextProfileSummary]?
+        let textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]?
+        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+        let textProfilePath: String?
+        let activeRequest: ActiveRequest?
+        let activeRequests: [ActiveRequest]?
+        let queue: [QueuedRequest]?
+        let playbackState: PlaybackStateSnapshot?
+        let runtimeOverview: RuntimeOverview?
+        let status: StatusEvent?
+        let speechBackend: SpeechBackend?
+        let defaultVoiceProfile: String?
+        let clearedCount: Int?
+        let cancelledRequestID: String?
 
-        public init(
+        var resolvedActiveRequests: [ActiveRequest] {
+            if let activeRequests {
+                return activeRequests
+            }
+            if let activeRequest {
+                return [activeRequest]
+            }
+            return []
+        }
+
+        init(
             id: String,
             generatedFile: GeneratedFile? = nil,
             generatedFiles: [GeneratedFile]? = nil,
@@ -159,6 +171,7 @@ public extension SpeakSwiftly {
             runtimeOverview: RuntimeOverview? = nil,
             status: StatusEvent? = nil,
             speechBackend: SpeechBackend? = nil,
+            defaultVoiceProfile: String? = nil,
             clearedCount: Int? = nil,
             cancelledRequestID: String? = nil,
         ) {
@@ -184,11 +197,14 @@ public extension SpeakSwiftly {
             self.runtimeOverview = runtimeOverview
             self.status = status
             self.speechBackend = speechBackend
+            self.defaultVoiceProfile = defaultVoiceProfile
             self.clearedCount = clearedCount
             self.cancelledRequestID = cancelledRequestID
         }
     }
+}
 
+public extension SpeakSwiftly {
     struct Failure: Encodable, Sendable, Equatable {
         public let id: String
         public let ok = false

@@ -6,7 +6,6 @@ final class LiveSpeechRequestState: @unchecked Sendable {
     let text: String
     let profileName: String
     let textProfileID: String?
-    let textContext: TextForSpeech.InputContext?
     let sourceFormat: TextForSpeech.SourceFormat?
     let requestContext: SpeakSwiftly.RequestContext?
     let normalizedText: String
@@ -49,7 +48,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
             profileName: profileName,
             textProfileID: textProfileID,
             jobType: .live,
-            inputTextContext: inputTextContext,
+            sourceFormat: sourceFormat,
             requestContext: requestContext,
             qwenPreModelTextChunking: _,
         ) = request else {
@@ -62,8 +61,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         self.text = text
         self.profileName = profileName
         self.textProfileID = textProfileID
-        textContext = inputTextContext?.context
-        sourceFormat = inputTextContext?.sourceFormat
+        self.sourceFormat = sourceFormat
         self.requestContext = requestContext
         self.normalizedText = normalizedText
         self.normalizedLiveChunks = normalizedLiveChunks

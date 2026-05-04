@@ -1,5 +1,5 @@
 {
-  "originHash" : "98ec5de0d1bb492b58ff4fef53fa3f63b8bc708d2493581ad50db5a69e1e9618",
+  "originHash" : "9dfd0ec698737ce45ab7a9b1040d83d7b21fcb132f21db08aeb756ad13a36c65",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -56,6 +56,15 @@
       }
     },
     {
+      "identity" : "swift-cmark",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-cmark.git",
+      "state" : {
+        "revision" : "5d9bdaa4228b381639fff09403e39a04926e2dbe",
+        "version" : "0.7.1"
+      }
+    },
+    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
@@ -89,6 +98,15 @@
       "state" : {
         "revision" : "0aeefadec459ce8e11a333769950fb86183aca43",
         "version" : "2.3.5"
+      }
+    },
+    {
+      "identity" : "swift-markdown",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-markdown.git",
+      "state" : {
+        "revision" : "7d9a5ce307528578dfa777d505496bd5f544ad94",
+        "version" : "0.7.3"
       }
     },
     {
@@ -137,12 +155,21 @@
       }
     },
     {
+      "identity" : "swiftsoup",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/scinfu/SwiftSoup.git",
+      "state" : {
+        "revision" : "6c7915e16f729857aec3e99068c361e58a00ed68",
+        "version" : "2.13.4"
+      }
+    },
+    {
       "identity" : "textforspeech",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/TextForSpeech.git",
       "state" : {
-        "revision" : "2f3c8c095eaef151cc28f5f977f4e4daae28c474",
-        "version" : "0.18.9"
+        "revision" : "ceaeb442e06cbbe7b583a71b41d05429fe7fe71e",
+        "version" : "0.19.0"
       }
     },
     {

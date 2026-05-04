@@ -159,9 +159,10 @@ extension SpeakSwiftly.Runtime {
 
         do {
             request = try WorkerRequest.decode(from: line)
+                .resolvingRuntimeDefaultVoiceProfile(defaultVoiceProfileName)
         } catch let workerError as WorkerError {
             let id = bestEffortID(from: line)
-            failRequestStream(for: id, error: workerError)
+            await failRequestStream(for: id, error: workerError)
             await emitFailure(id: id, error: workerError)
             return
         } catch {
@@ -170,7 +171,7 @@ extension SpeakSwiftly.Runtime {
                 code: .internalError,
                 message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
             )
-            failRequestStream(for: id, error: workerError)
+            await failRequestStream(for: id, error: workerError)
             await emitFailure(
                 id: id,
                 error: workerError,
@@ -185,7 +186,7 @@ extension SpeakSwiftly.Runtime {
                 code: .workerShuttingDown,
                 message: "Request '\(request.id)' was rejected because the SpeakSwiftly worker is shutting down.",
             )
-            failRequestStream(for: request.id, error: workerError)
+            await failRequestStream(for: request.id, error: workerError)
             await emitFailure(
                 id: request.id,
                 error: workerError,
@@ -202,7 +203,7 @@ extension SpeakSwiftly.Runtime {
                 queueDepth: generationQueueDepth(),
             )
             await emitStarted(for: request)
-            yieldRequestEvent(.started(WorkerStartedEvent(id: request.id, op: request.opName)), for: request.id)
+            await yieldRequestEvent(.started(WorkerStartedEvent(id: request.id, kind: request.requestKind)), for: request.id)
             await logRequestEvent(
                 "request_started",
                 requestID: request.id,
@@ -221,7 +222,7 @@ extension SpeakSwiftly.Runtime {
                 code: error.code,
                 message: "Request '\(request.id)' cannot start because the resident model state is failed. Queue `reload_models` or `set_speech_backend` first, then retry the generation request.",
             )
-            failRequestStream(for: request.id, error: workerError)
+            await failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
             return
         }
@@ -231,7 +232,7 @@ extension SpeakSwiftly.Runtime {
                 code: .invalidRequest,
                 message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more.",
             )
-            failRequestStream(for: request.id, error: workerError)
+            await failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
             return
         }
@@ -240,7 +241,7 @@ extension SpeakSwiftly.Runtime {
         do {
             queuedGenerationJob = try createQueuedGenerationJobIfNeeded(for: request)
         } catch let workerError as WorkerError {
-            failRequestStream(for: request.id, error: workerError)
+            await failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
             return
         } catch {
@@ -248,7 +249,7 @@ extension SpeakSwiftly.Runtime {
                 code: .filesystemError,
                 message: "Request '\(request.id)' could not create a persisted generation job record before queueing generation work. \(error.localizedDescription)",
             )
-            failRequestStream(for: request.id, error: workerError)
+            await failRequestStream(for: request.id, error: workerError)
             await emitFailure(id: request.id, error: workerError)
             return
         }
@@ -265,7 +266,7 @@ extension SpeakSwiftly.Runtime {
         )
         if let queuedEvent = await makeQueuedEvent(for: job) {
             await emit(queuedEvent)
-            yieldRequestEvent(.queued(queuedEvent), for: request.id)
+            await yieldRequestEvent(.queued(queuedEvent), for: request.id)
             lastQueuedGenerationParkReason[request.id] = GenerationParkReason(rawValue: queuedEvent.reason.rawValue)
             await logRequestEvent(
                 "request_queued",
@@ -280,11 +281,12 @@ extension SpeakSwiftly.Runtime {
             )
         }
         if request.acknowledgesEnqueueImmediately {
-            let acknowledgement = WorkerSuccessResponse(
+            let acknowledgement = SpeakSwiftly.RequestAcknowledgement(
                 id: request.id,
+                kind: request.requestKind,
                 generationJob: queuedGenerationJob,
             )
-            yieldRequestEvent(.acknowledged(acknowledgement), for: request.id)
+            await yieldRequestEvent(.acknowledged(acknowledgement), for: request.id)
             await logRequestEvent(
                 "request_enqueue_acknowledged",
                 requestID: request.id,
@@ -292,7 +294,7 @@ extension SpeakSwiftly.Runtime {
                 profileName: request.voiceProfile,
                 queueDepth: generationQueueDepth(),
             )
-            await emit(acknowledgement)
+            await emit(WorkerSuccessResponse(id: request.id, generationJob: queuedGenerationJob))
         }
         if request.requiresPlayback {
             let speechJob: LiveSpeechRequestState
@@ -301,7 +303,7 @@ extension SpeakSwiftly.Runtime {
             } catch let workerError as WorkerError {
                 guard await generationController.cancel(requestID: request.id) != nil else { return }
 
-                failRequestStream(for: request.id, error: workerError)
+                await failRequestStream(for: request.id, error: workerError)
                 await emitFailure(id: request.id, error: workerError)
                 return
             } catch {
@@ -311,7 +313,7 @@ extension SpeakSwiftly.Runtime {
                 )
                 guard await generationController.cancel(requestID: request.id) != nil else { return }
 
-                failRequestStream(for: request.id, error: workerError)
+                await failRequestStream(for: request.id, error: workerError)
                 await emitFailure(id: request.id, error: workerError)
                 return
             }

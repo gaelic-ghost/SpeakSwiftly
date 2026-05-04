@@ -316,6 +316,23 @@ extension SpeakSwiftly.Runtime {
                         ),
                     )
 
+                case let .defaultVoiceProfile(id):
+                    result = .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            defaultVoiceProfile: defaultVoiceProfileName,
+                        ),
+                    )
+
+                case let .setDefaultVoiceProfile(id, profileName):
+                    try setDefaultVoiceProfileName(profileName)
+                    result = .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            defaultVoiceProfile: defaultVoiceProfileName,
+                        ),
+                    )
+
                 case let .playback(id, action):
                     _ = await playbackController.handle(action)
                     result = await .success(

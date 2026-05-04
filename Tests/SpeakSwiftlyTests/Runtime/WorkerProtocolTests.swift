@@ -15,7 +15,24 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
+            requestContext: nil,
+            qwenPreModelTextChunking: false,
+        ),
+    )
+}
+
+@Test func `decodes speak live request without voice profile as runtime default`() throws {
+    let request = try WorkerRequest.decode(from: #"{"id":"req-default","op":"generate_speech","text":"Hello"}"#)
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-default",
+            text: "Hello",
+            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            textProfileID: nil,
+            jobType: .live,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -34,7 +51,26 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .file,
-            inputTextContext: nil,
+            sourceFormat: nil,
+            requestContext: nil,
+            qwenPreModelTextChunking: nil,
+        ),
+    )
+}
+
+@Test func `decodes speak file request without voice profile as runtime default`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-file-default","op":"generate_audio_file","text":"Hello"}"#,
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-file-default",
+            text: "Hello",
+            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            textProfileID: nil,
+            jobType: .file,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -55,14 +91,14 @@ import TextForSpeech
                     artifactID: "req-batch-artifact-1",
                     text: "First file",
                     textProfile: nil,
-                    inputTextContext: nil,
+                    sourceFormat: nil,
                     requestContext: nil,
                 ),
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "custom-artifact",
                     text: "Second file",
                     textProfile: "logs",
-                    inputTextContext: .init(sourceFormat: .swift),
+                    sourceFormat: .swift,
                     requestContext: nil,
                 ),
             ],
@@ -70,9 +106,59 @@ import TextForSpeech
     )
 }
 
-@Test func `decodes speak live request with text context and profile`() throws {
+@Test func `decodes speak batch request without voice profile as runtime default`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#,
+        from: #"{"id":"req-batch-default","op":"generate_batch","items":[{"text":"First file"}]}"#,
+    )
+
+    #expect(
+        request == .queueBatch(
+            id: "req-batch-default",
+            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            items: [
+                SpeakSwiftly.GenerationJobItem(
+                    artifactID: "req-batch-default-artifact-1",
+                    text: "First file",
+                    textProfile: nil,
+                    sourceFormat: nil,
+                    requestContext: nil,
+                ),
+            ],
+        ),
+    )
+}
+
+@Test func `decodes speak batch item with merged request path context`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","project":"SpeakSwiftly","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+    )
+
+    #expect(
+        request == .queueBatch(
+            id: "req-batch-context",
+            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            items: [
+                SpeakSwiftly.GenerationJobItem(
+                    artifactID: "context-artifact",
+                    text: "File with path context.",
+                    textProfile: nil,
+                    sourceFormat: nil,
+                    requestContext: .init(
+                        source: "batch_export",
+                        project: "SpeakSwiftly",
+                        topic: "release",
+                        cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                        repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
+                    ),
+                ),
+            ],
+        ),
+    )
+}
+
+@Test func `decodes speak live request with request path context and profile`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
     )
 
     #expect(
@@ -82,23 +168,19 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: "logs",
             jobType: .live,
-            inputTextContext: .init(
-                context: TextForSpeech.InputContext(
-                    cwd: "/Users/galew/Workspace/SpeakSwiftly",
-                    repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
-                    textFormat: .cli,
-                ),
-                sourceFormat: nil,
+            sourceFormat: nil,
+            requestContext: .init(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
             ),
-            requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
     )
 }
 
-@Test func `decodes speak live request with nested source format`() throws {
+@Test func `decodes speak live request with mixed markdown text`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}"#,
+        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme"}"#,
     )
 
     #expect(
@@ -108,13 +190,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: .init(
-                context: TextForSpeech.InputContext(
-                    textFormat: .markdown,
-                    nestedSourceFormat: .swift,
-                ),
-                sourceFormat: nil,
-            ),
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -133,7 +209,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: .init(sourceFormat: .swift),
+            sourceFormat: .swift,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -152,7 +228,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: .init(
                 source: "status_panel",
                 app: "SpeakSwiftlyOperator",
@@ -175,28 +251,9 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: true,
-        ),
-    )
-}
-
-@Test func `decodes legacy whole source text format as source lane`() throws {
-    let request = try WorkerRequest.decode(
-        from: #"{"id":"req-legacy-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","text_format":"swift_source"}"#,
-    )
-
-    #expect(
-        request == .queueSpeech(
-            id: "req-legacy-source",
-            text: "struct WorkerRuntime { let sampleRate: Int }",
-            profileName: "default-femme",
-            textProfileID: nil,
-            jobType: .live,
-            inputTextContext: .init(sourceFormat: .swift),
-            requestContext: nil,
-            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -474,6 +531,43 @@ import TextForSpeech
     #expect(request == .overview(id: "req-overview"))
 }
 
+@Test func `decodes default voice profile requests`() throws {
+    let get = try WorkerRequest.decode(from: #"{"id":"req-default-get","op":"get_default_voice_profile"}"#)
+    let set = try WorkerRequest.decode(
+        from: #"{"id":"req-default-set","op":"set_default_voice_profile","voice_profile":"swift-anchor"}"#,
+    )
+
+    #expect(get == .defaultVoiceProfile(id: "req-default-get"))
+    #expect(set == .setDefaultVoiceProfile(id: "req-default-set", profileName: "swift-anchor"))
+}
+
+@Test func `resolves omitted generation voice profile against runtime default`() {
+    let request = WorkerRequest.queueSpeech(
+        id: "req-default",
+        text: "Hello",
+        profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+        textProfileID: nil,
+        jobType: .live,
+        sourceFormat: nil,
+        requestContext: nil,
+        qwenPreModelTextChunking: false,
+    )
+
+    #expect(
+        request.resolvingRuntimeDefaultVoiceProfile("swift-signal")
+            == .queueSpeech(
+                id: "req-default",
+                text: "Hello",
+                profileName: "swift-signal",
+                textProfileID: nil,
+                jobType: .live,
+                sourceFormat: nil,
+                requestContext: nil,
+                qwenPreModelTextChunking: false,
+            ),
+    )
+}
+
 @Test func `decodes switch speech backend request`() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}"#,
@@ -556,6 +650,26 @@ import TextForSpeech
     }
 }
 
+@Test func `rejects removed generation context keys`() throws {
+    let removedKeyPayloads = [
+        #"{"id":"req-old-context","op":"generate_speech","text":"Hello","input_text_context":{"source_format":"swift_source"}}"#,
+        #"{"id":"req-old-format","op":"generate_speech","text":"Hello","text_format":"source"}"#,
+        #"{"id":"req-old-nested-source","op":"generate_batch","items":[{"text":"Hello","nested_source_format":"swift_source"}]}"#,
+    ]
+
+    for payload in removedKeyPayloads {
+        do {
+            _ = try WorkerRequest.decode(from: payload)
+            Issue.record("Expected removed generation context key to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("Generation context key"))
+            #expect(error.message.contains("request_context"))
+            #expect(error.message.contains("source_format"))
+        }
+    }
+}
+
 @Test func `rejects invalid profile name`() throws {
     let tempRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: tempRoot) }
@@ -581,7 +695,7 @@ import TextForSpeech
     #expect(queued["reason"] as? String == "waiting_for_resident_model")
     #expect(queued["queue_position"] as? Int == 2)
 
-    let started = try jsonObject(SpeakSwiftly.StartedEvent(id: "req-1", op: "generate_speech"))
+    let started = try jsonObject(SpeakSwiftly.StartedEvent(id: "req-1", kind: .generateSpeech))
     #expect(started["event"] as? String == "started")
     #expect(started["op"] as? String == "generate_speech")
 
@@ -638,8 +752,7 @@ import TextForSpeech
                     generationJobsRootPath: "/tmp/SpeakSwiftly/profiles/generation-jobs",
                 ),
                 generationQueue: SpeakSwiftly.QueueSnapshot(
-                    queueType: "generation",
-                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
+                    queueType: .generation,
                     activeRequests: [
                         SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
                         SpeakSwiftly.ActiveRequest(id: "req-active-2", kind: .generateSpeech, voiceProfile: "default-masc", requestContext: nil),
@@ -647,8 +760,10 @@ import TextForSpeech
                     queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil, queuePosition: 1)],
                 ),
                 playbackQueue: SpeakSwiftly.QueueSnapshot(
-                    queueType: "playback",
-                    activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
+                    queueType: .playback,
+                    activeRequests: [
+                        SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
+                    ],
                     queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil, queuePosition: 1)],
                 ),
                 playbackState: SpeakSwiftly.PlaybackStateSnapshot(
@@ -659,6 +774,7 @@ import TextForSpeech
                     stableBufferedAudioMS: 840,
                     stableBufferTargetMS: 600,
                 ),
+                defaultVoiceProfile: "swift-signal",
             ),
             status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,

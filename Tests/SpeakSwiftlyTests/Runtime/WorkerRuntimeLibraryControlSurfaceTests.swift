@@ -108,7 +108,7 @@ import TextForSpeech
         }
     })
 
-    let generatedFileID = await runtime.artifacts.file(id: fileArtifactID).id
+    let generatedFileID = await runtime.artifact(id: fileArtifactID).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
@@ -123,7 +123,7 @@ import TextForSpeech
         }
     })
 
-    let generatedFilesID = await runtime.artifacts.files().id
+    let generatedFilesID = await runtime.artifacts().id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard

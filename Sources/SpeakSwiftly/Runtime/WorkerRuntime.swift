@@ -206,6 +206,7 @@ public extension SpeakSwiftly {
             let runtimeOverview: SpeakSwiftly.RuntimeOverview?
             let status: WorkerStatusEvent?
             let speechBackend: SpeakSwiftly.SpeechBackend?
+            let defaultVoiceProfile: SpeakSwiftly.Name?
             let clearedCount: Int?
             let cancelledRequestID: String?
 
@@ -232,6 +233,7 @@ public extension SpeakSwiftly {
                 runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
                 status: WorkerStatusEvent? = nil,
                 speechBackend: SpeakSwiftly.SpeechBackend? = nil,
+                defaultVoiceProfile: SpeakSwiftly.Name? = nil,
                 clearedCount: Int? = nil,
                 cancelledRequestID: String? = nil,
             ) {
@@ -257,6 +259,7 @@ public extension SpeakSwiftly {
                 self.runtimeOverview = runtimeOverview
                 self.status = status
                 self.speechBackend = speechBackend
+                self.defaultVoiceProfile = defaultVoiceProfile
                 self.clearedCount = clearedCount
                 self.cancelledRequestID = cancelledRequestID
             }
@@ -281,15 +284,12 @@ public extension SpeakSwiftly {
                 case newProfileName = "new_profile_name"
                 case textProfile = "text_profile"
                 case textProfileID = "text_profile_id"
-                case inputTextContext = "input_text_context"
                 case requestContext = "request_context"
                 case textProfileStyle = "text_profile_style"
                 case replacement
                 case replacementID = "replacement_id"
                 case cwd
                 case repoRoot = "repo_root"
-                case textFormat = "text_format"
-                case nestedSourceFormat = "nested_source_format"
                 case sourceFormat = "source_format"
                 case requestID = "request_id"
                 case speechBackend = "speech_backend"
@@ -312,16 +312,13 @@ public extension SpeakSwiftly {
             let profileName: String?
             let newProfileName: String?
             let textProfile: SpeakSwiftly.TextProfileID?
-            let inputTextContext: SpeakSwiftly.InputTextContext?
+            let sourceFormat: TextForSpeech.SourceFormat?
             let requestContext: SpeakSwiftly.RequestContext?
             let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
             let replacement: TextForSpeech.Replacement?
             let replacementID: String?
             let cwd: String?
             let repoRoot: String?
-            let textFormat: TextForSpeech.TextFormat?
-            let nestedSourceFormat: TextForSpeech.SourceFormat?
-            let sourceFormat: TextForSpeech.SourceFormat?
             let requestID: String?
             let speechBackend: SpeakSwiftly.SpeechBackend?
             let qwenPreModelTextChunking: Bool?
@@ -344,15 +341,13 @@ public extension SpeakSwiftly {
                 try container.encodeIfPresent(profileName, forKey: .profileName)
                 try container.encodeIfPresent(newProfileName, forKey: .newProfileName)
                 try container.encodeIfPresent(textProfile, forKey: .textProfile)
-                try container.encodeIfPresent(inputTextContext, forKey: .inputTextContext)
+                try container.encodeIfPresent(sourceFormat, forKey: .sourceFormat)
                 try container.encodeIfPresent(requestContext, forKey: .requestContext)
                 try container.encodeIfPresent(textProfileStyle, forKey: .textProfileStyle)
                 try container.encodeIfPresent(replacement, forKey: .replacement)
                 try container.encodeIfPresent(replacementID, forKey: .replacementID)
                 try container.encodeIfPresent(cwd, forKey: .cwd)
                 try container.encodeIfPresent(repoRoot, forKey: .repoRoot)
-                try container.encodeIfPresent(textFormat, forKey: .textFormat)
-                try container.encodeIfPresent(nestedSourceFormat, forKey: .nestedSourceFormat)
                 try container.encodeIfPresent(sourceFormat, forKey: .sourceFormat)
                 try container.encodeIfPresent(requestID, forKey: .requestID)
                 try container.encodeIfPresent(speechBackend, forKey: .speechBackend)
@@ -396,6 +391,7 @@ public extension SpeakSwiftly {
         var activeGenerationCancellations = [String: WorkerError]()
         var lastLoggedMarvisSchedulerState: String?
         var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
+        var defaultVoiceProfileName: SpeakSwiftly.Name
 
         // MARK: Initialization
 
@@ -405,6 +401,7 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+            defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
@@ -416,6 +413,7 @@ public extension SpeakSwiftly {
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
+            self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore

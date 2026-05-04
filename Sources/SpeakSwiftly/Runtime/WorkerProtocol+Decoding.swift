@@ -25,16 +25,17 @@ extension WorkerRequest {
 
         switch op {
             case "generate_speech":
-                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
+                let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
-                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
-                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
+                    sourceFormat: raw.sourceFormat,
+                )
+                let requestContext = RawWorkerRequest.requestContext(
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    base: raw.requestContext,
                 )
                 return .queueSpeech(
                     id: id,
@@ -42,22 +43,23 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .live,
-                    inputTextContext: resolved.inputTextContext,
-                    requestContext: raw.requestContext,
+                    sourceFormat: resolved.sourceFormat,
+                    requestContext: requestContext,
                     qwenPreModelTextChunking: raw.qwenPreModelTextChunking ?? false,
                 )
 
             case "generate_audio_file":
-                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
+                let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
-                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
-                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
+                    sourceFormat: raw.sourceFormat,
+                )
+                let requestContext = RawWorkerRequest.requestContext(
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    base: raw.requestContext,
                 )
                 return .queueSpeech(
                     id: id,
@@ -65,13 +67,13 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .file,
-                    inputTextContext: resolved.inputTextContext,
-                    requestContext: raw.requestContext,
+                    sourceFormat: resolved.sourceFormat,
+                    requestContext: requestContext,
                     qwenPreModelTextChunking: nil,
                 )
 
             case "generate_batch":
-                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
+                let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
                 return .queueBatch(id: id, profileName: profileName, items: items)
 
@@ -272,6 +274,13 @@ extension WorkerRequest {
             case "get_runtime_overview":
                 return .overview(id: id)
 
+            case "get_default_voice_profile":
+                return .defaultVoiceProfile(id: id)
+
+            case "set_default_voice_profile":
+                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
+                return .setDefaultVoiceProfile(id: id, profileName: profileName)
+
             case "set_speech_backend":
                 let speechBackend = try require(raw.speechBackend, field: "speech_backend", id: id)
                 return .switchSpeechBackend(id: id, speechBackend: speechBackend)
@@ -344,6 +353,17 @@ extension WorkerRequest {
             @unknown default:
                 "The request payload could not be decoded."
         }
+    }
+}
+
+private extension RawWorkerRequest {
+    func resolvedVoiceProfileOrRuntimeDefault(id: String) throws -> String {
+        let candidate = voiceProfile ?? profileName
+        guard let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return WorkerRequest.runtimeDefaultVoiceProfilePlaceholder
+        }
+
+        return try WorkerRequest.requireNonEmpty(trimmed, field: "voice_profile", id: id)
     }
 }
 

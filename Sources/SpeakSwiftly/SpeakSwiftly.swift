@@ -15,20 +15,6 @@ public enum SpeakSwiftly {
     /// A stable identifier for one stored text-normalization profile.
     public typealias TextProfileID = String
 
-    /// Describes how one input text payload should be interpreted before generation.
-    public struct InputTextContext: Codable, Sendable, Equatable {
-        public let context: TextForSpeech.InputContext?
-        public let sourceFormat: TextForSpeech.SourceFormat?
-
-        public init(
-            context: TextForSpeech.InputContext? = nil,
-            sourceFormat: TextForSpeech.SourceFormat? = nil,
-        ) {
-            self.context = context
-            self.sourceFormat = sourceFormat
-        }
-    }
-
     /// Describes where a generation request came from and what it is related to.
     ///
     /// `TextForSpeech` owns the concrete model so request metadata stays identical
@@ -40,10 +26,8 @@ public enum SpeakSwiftly {
         public static let generateSpeech = Self(rawValue: "generate_speech")
         public static let generateAudioFile = Self(rawValue: "generate_audio_file")
         public static let generateBatch = Self(rawValue: "generate_batch")
-        public static let getGeneratedFile = Self(rawValue: "get_generated_file")
-        public static let listGeneratedFiles = Self(rawValue: "list_generated_files")
-        public static let getGeneratedBatch = Self(rawValue: "get_generated_batch")
-        public static let listGeneratedBatches = Self(rawValue: "list_generated_batches")
+        public static let getArtifact = Self(rawValue: "get_generated_file")
+        public static let listArtifacts = Self(rawValue: "list_generated_files")
         public static let getGenerationJob = Self(rawValue: "get_generation_job")
         public static let listGenerationJobs = Self(rawValue: "list_generation_jobs")
         public static let expireGenerationJob = Self(rawValue: "expire_generation_job")
@@ -81,6 +65,8 @@ public enum SpeakSwiftly {
         public static let cancelPlayback = Self(rawValue: "cancel_playback")
         public static let getStatus = Self(rawValue: "get_status")
         public static let getRuntimeOverview = Self(rawValue: "get_runtime_overview")
+        public static let getDefaultVoiceProfile = Self(rawValue: "get_default_voice_profile")
+        public static let setDefaultVoiceProfile = Self(rawValue: "set_default_voice_profile")
         public static let getPlaybackState = Self(rawValue: "get_playback_state")
         public static let playbackPause = Self(rawValue: "playback_pause")
         public static let playbackResume = Self(rawValue: "playback_resume")
@@ -117,7 +103,7 @@ public enum SpeakSwiftly {
     /// A high-level request lifecycle event emitted by a request handle.
     public enum RequestEvent: Sendable, Equatable {
         case queued(QueuedEvent)
-        case acknowledged(Success)
+        case acknowledged(RequestAcknowledgement)
         case started(StartedEvent)
         case progress(ProgressEvent)
         case completed(RequestCompletion)
@@ -126,7 +112,7 @@ public enum SpeakSwiftly {
     /// A point-in-time state for a submitted request.
     public enum RequestState: Sendable, Equatable {
         case queued(QueuedEvent)
-        case acknowledged(Success)
+        case acknowledged(RequestAcknowledgement)
         case started(StartedEvent)
         case progress(ProgressEvent)
         case completed(RequestCompletion)
@@ -179,6 +165,13 @@ public enum SpeakSwiftly {
         public let state: RequestState
     }
 
+    /// A lightweight acknowledgement that a submitted request was accepted by the runtime.
+    public struct RequestAcknowledgement: Sendable, Equatable {
+        public let id: String
+        public let kind: RequestKind
+        public let generationJob: GenerationJob?
+    }
+
     // MARK: Handles
 
     /// A typed handle for one submitted request and its live event streams.
@@ -207,10 +200,24 @@ public enum SpeakSwiftly {
             self.events = events
             self.generationEvents = generationEvents
         }
+
+        /// Waits until the request reaches a terminal completion and returns its typed payload.
+        public func completion() async throws -> RequestCompletion {
+            for try await event in events {
+                if case let .completed(completion) = event {
+                    return completion
+                }
+            }
+
+            throw SpeakSwiftly.Error(
+                code: .requestCancelled,
+                message: "Request '\(id)' ended before SpeakSwiftly reported a terminal completion event.",
+            )
+        }
     }
 
     /// Identifies a runtime work queue for queue-specific controls.
-    public enum QueueType: String, Sendable, Equatable {
+    public enum QueueType: String, Codable, Sendable, Equatable {
         case generation
         case playback
     }
@@ -254,7 +261,6 @@ typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent
 typealias WorkerRequestHandle = SpeakSwiftly.RequestHandle
 typealias WorkerRuntime = SpeakSwiftly.Runtime
-typealias SpeechNormalizationContext = TextForSpeech.InputContext
 typealias SpeechTextDeepTraceFeatures = SpeakSwiftly.DeepTrace.Features
 typealias SpeechTextDeepTraceSection = SpeakSwiftly.DeepTrace.Section
 typealias SpeechTextDeepTraceSectionWindow = SpeakSwiftly.DeepTrace.SectionWindow

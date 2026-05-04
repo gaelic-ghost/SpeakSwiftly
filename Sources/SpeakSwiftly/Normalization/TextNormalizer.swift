@@ -127,7 +127,7 @@ private extension SpeakSwiftly.Normalizer {
     func normalizeSpeechText(
         _ text: String,
         sourceFormat: TextForSpeech.SourceFormat?,
-        context: TextForSpeech.InputContext?,
+        requestContext: TextForSpeech.RequestContext?,
         textProfileID: SpeakSwiftly.TextProfileID?,
     ) async throws -> String {
         let textProfile = if let textProfileID,
@@ -143,7 +143,7 @@ private extension SpeakSwiftly.Normalizer {
             return try await TextForSpeech.Normalize.source(
                 text,
                 as: sourceFormat,
-                withContext: context,
+                requestContext: requestContext,
                 customProfile: textProfile,
                 style: style,
                 summarizationProvider: summarizationProvider,
@@ -152,7 +152,7 @@ private extension SpeakSwiftly.Normalizer {
 
         return try await TextForSpeech.Normalize.text(
             text,
-            withContext: context,
+            requestContext: requestContext,
             customProfile: textProfile,
             style: style,
             summarizationProvider: summarizationProvider,
@@ -302,13 +302,13 @@ public extension SpeakSwiftly.Normalizer {
     func speechText(
         _ text: String,
         sourceFormat: TextForSpeech.SourceFormat? = nil,
-        context: TextForSpeech.InputContext? = nil,
+        requestContext: TextForSpeech.RequestContext? = nil,
         textProfileID: SpeakSwiftly.TextProfileID? = nil,
     ) async throws -> String {
         try await normalizeSpeechText(
             text,
             sourceFormat: sourceFormat,
-            context: context,
+            requestContext: requestContext,
             textProfileID: textProfileID,
         )
     }

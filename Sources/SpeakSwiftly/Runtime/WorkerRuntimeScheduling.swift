@@ -41,7 +41,10 @@ extension SpeakSwiftly.Runtime {
             try? markGenerationJobRunningIfNeeded(for: job.request)
 
             await emitStarted(for: job.request)
-            yieldRequestEvent(.started(WorkerStartedEvent(id: job.request.id, op: job.request.opName)), for: job.request.id)
+            await yieldRequestEvent(
+                .started(WorkerStartedEvent(id: job.request.id, kind: job.request.requestKind)),
+                for: job.request.id,
+            )
 
             var details = [String: LogValue]()
             if let marvisLane = try marvisGenerationLane(for: job.request) {
@@ -60,7 +63,7 @@ extension SpeakSwiftly.Runtime {
                 await self.processGeneration(job.request, token: job.token)
             }
             activeGenerations[job.token] = ActiveRequest(token: job.token, request: job.request, task: task)
-            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _) = job.request {
+            if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _) = job.request {
                 await playbackController.setGenerationTask(task, for: id)
             }
             await logMarvisGenerationLaneReservedIfNeeded(
@@ -192,7 +195,7 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .live,
-            inputTextContext: _,
+            sourceFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ) = request {
@@ -206,7 +209,7 @@ extension SpeakSwiftly.Runtime {
         activeJobs: [SpeechGenerationController.Job],
         queuedJobs: [SpeechGenerationController.Job],
     ) -> Bool {
-        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _) = job.request else {
+        guard case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _) = job.request else {
             return false
         }
 
@@ -372,7 +375,7 @@ extension SpeakSwiftly.Runtime {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: error)
-            failRequestStream(for: job.request.id, error: error)
+            await failRequestStream(for: job.request.id, error: error)
             await emitFailure(id: job.request.id, error: error)
         }
     }

@@ -26,28 +26,29 @@ public extension SpeakSwiftly.Generate {
     ///
     /// - Parameters:
     ///   - text: The text to synthesize.
-    ///   - voiceProfile: The stored voice profile to use.
+    ///   - voiceProfile: The stored voice profile to use. When omitted, SpeakSwiftly uses the runtime default.
     ///   - textProfile: An optional text-normalization profile override.
-    ///   - inputTextContext: Optional metadata that describes how the input text should be interpreted.
+    ///   - sourceFormat: Optional metadata that describes how the input text should be interpreted.
     ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
     ///   - qwenPreModelTextChunking: Whether Qwen live playback should split text before model generation.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
-        voiceProfile: SpeakSwiftly.Name,
+        voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         qwenPreModelTextChunking: Bool = false,
     ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(
+        let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
+        return await runtime.submit(
             .queueSpeech(
                 id: UUID().uuidString,
                 text: text,
-                profileName: voiceProfile,
+                profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .live,
-                inputTextContext: inputTextContext,
+                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
@@ -60,19 +61,20 @@ public extension SpeakSwiftly.Generate {
     /// immediate live playback.
     func audio(
         text: String,
-        voiceProfile: SpeakSwiftly.Name,
+        voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(
+        let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
+        return await runtime.submit(
             .queueSpeech(
                 id: UUID().uuidString,
                 text: text,
-                profileName: voiceProfile,
+                profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .file,
-                inputTextContext: inputTextContext,
+                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: nil,
             ),
@@ -83,19 +85,28 @@ public extension SpeakSwiftly.Generate {
     ///
     /// - Parameters:
     ///   - items: The items to synthesize.
-    ///   - voiceProfile: The stored voice profile to use for every item in the batch.
+    ///   - voiceProfile: The stored voice profile to use for every item in the batch. When omitted,
+    ///     SpeakSwiftly uses the runtime default.
     /// - Returns: A request handle whose terminal success payload includes the created batch.
     func batch(
         _ items: [SpeakSwiftly.BatchItem],
-        voiceProfile: SpeakSwiftly.Name,
+        voiceProfile: SpeakSwiftly.Name? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         let requestID = UUID().uuidString
+        let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
         return await runtime.submit(
             .queueBatch(
                 id: requestID,
-                profileName: voiceProfile,
+                profileName: resolvedVoiceProfile,
                 items: SpeakSwiftly.Runtime.resolveBatchItems(items, batchID: requestID),
             ),
         )
+    }
+}
+
+extension SpeakSwiftly.Runtime {
+    func resolveGenerationVoiceProfile(_ profileName: SpeakSwiftly.Name?) -> SpeakSwiftly.Name {
+        let trimmed = profileName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? defaultVoiceProfileName : trimmed
     }
 }

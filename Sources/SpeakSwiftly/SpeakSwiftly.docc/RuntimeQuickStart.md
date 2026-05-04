@@ -47,27 +47,34 @@ let runtime = await SpeakSwiftly.liftoff(
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:inputTextContext:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:sourceFormat:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
 
 ```swift
 let handle = await runtime.generate.speech(
-    text: "Hello from SpeakSwiftly.",
-    voiceProfile: "default-femme"
+    text: "Hello from SpeakSwiftly."
 )
 ```
 
-Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`` when you want retained file output instead:
+Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)`` when you want retained file output instead:
 
 ```swift
 let handle = await runtime.generate.audio(
-    text: "Keep this as a generated artifact.",
-    voiceProfile: "default-femme"
+    text: "Keep this as a generated artifact."
 )
 ```
+
+If a call omits `voiceProfile:`, SpeakSwiftly uses `runtime.defaultVoiceProfile`. The package fallback is `swift-signal`.
 
 Both calls return a ``SpeakSwiftly/RequestHandle``. That handle is your typed anchor for the specific request you just queued, including later status lookups and update streams.
 
 ## Observe Request Progress
+
+For the common submit-and-wait path, call ``SpeakSwiftly/RequestHandle/completion()``:
+
+```swift
+let completion = try await handle.completion()
+print(completion)
+```
 
 You can watch a request move through queueing, warmup, generation, and completion by iterating the lifecycle stream on its ``SpeakSwiftly/RequestHandle``:
 

@@ -315,11 +315,10 @@ struct SpeakSwiftlyTestingMain {
             switch event {
                 case let .queued(queued):
                     print("queued: position=\(queued.queuePosition) reason=\(queued.reason.rawValue)")
-                case let .acknowledged(success):
-                    print("acknowledged: \(formatStatus(success.status))")
-                    return
+                case let .acknowledged(acknowledgement):
+                    print("acknowledged: kind=\(acknowledgement.kind.rawValue)")
                 case let .started(started):
-                    print("started: op=\(started.op)")
+                    print("started: kind=\(started.kind.rawValue)")
                 case let .progress(progress):
                     print("progress: stage=\(progress.stage.rawValue)")
                 case let .completed(completion):
@@ -478,20 +477,18 @@ struct SpeakSwiftlyTestingMain {
         return Array(repeating: paragraph, count: options.repeatCount).joined(separator: "\n\n")
     }
 
-    static func awaitGeneratedFile(
+    static func awaitGeneratedArtifact(
         from handle: SpeakSwiftly.RequestHandle,
-    ) async throws -> SpeakSwiftly.GeneratedFile {
+    ) async throws -> SpeakSwiftly.GenerationArtifact {
         for try await event in handle.events {
             switch event {
                 case .queued, .started, .progress:
                     continue
-                case let .acknowledged(success):
-                    if let generatedFile = success.generatedFile {
-                        return generatedFile
-                    }
+                case .acknowledged:
+                    continue
                 case let .completed(completion):
-                    if case let .generatedFile(generatedFile) = completion {
-                        return generatedFile
+                    if case let .artifact(generatedArtifact) = completion {
+                        return generatedArtifact
                     }
             }
         }
@@ -506,10 +503,8 @@ struct SpeakSwiftlyTestingMain {
             switch event {
                 case .queued, .started, .progress:
                     continue
-                case let .acknowledged(success):
-                    if let profileName = success.profileName, let profilePath = success.profilePath {
-                        return (profileName, profilePath)
-                    }
+                case .acknowledged:
+                    continue
                 case let .completed(completion):
                     if case let .voiceProfile(profileName, profilePath) = completion,
                        let profileName,
@@ -544,14 +539,14 @@ struct SpeakSwiftlyTestingMain {
             voiceProfile: profileName,
         )
 
-        let generatedFile = try await awaitGeneratedFile(from: handle)
+        let generatedArtifact = try await awaitGeneratedArtifact(from: handle)
         let analysis = try analyzeVolume(
-            at: generatedFile.filePath,
+            at: generatedArtifact.filePath,
             windowSeconds: windowSeconds,
         )
 
         return CompareRun(
-            generatedFilePath: generatedFile.filePath,
+            generatedFilePath: generatedArtifact.filePath,
             fullAnalysis: analysis,
             comparedAnalysis: analysis,
         )
