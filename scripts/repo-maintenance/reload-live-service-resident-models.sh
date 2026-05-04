@@ -19,7 +19,7 @@ fi
 
 base_url="${SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL:-http://127.0.0.1:7337}"
 health_url="$base_url/healthz"
-reload_url="$base_url/runtime/models/reload"
+reload_paths="${SPEAKSWIFTLY_LIVE_SERVICE_RELOAD_PATHS:-/models/reload /runtime/models/reload}"
 
 if ! curl -fsS --max-time 2 "$health_url" >/dev/null 2>&1; then
   warn "No reachable SpeakSwiftlyServer live service at '$base_url'; continuing without resident-model reload."
@@ -31,9 +31,16 @@ trap 'rm -f "$response_file"' EXIT INT TERM
 
 log "Requesting resident-model reload from the live SpeakSwiftlyServer service at '$base_url'."
 
-if ! curl -fsS --max-time 180 -X POST "$reload_url" -H 'accept: application/json' -o "$response_file"; then
-  die "SpeakSwiftly live-service resident-model reload failed while POSTing to '$reload_url'. The live service is reachable, but it did not accept the reload request."
-fi
+reload_url=""
+for reload_path in $reload_paths; do
+  candidate_url="$base_url$reload_path"
+  if curl -fsS --max-time 180 -X POST "$candidate_url" -H 'accept: application/json' -o "$response_file"; then
+    reload_url="$candidate_url"
+    break
+  fi
+done
+
+[ -n "$reload_url" ] || die "SpeakSwiftly live-service resident-model reload failed after trying paths '$reload_paths' at '$base_url'. The live service is reachable, but it did not accept any reload request."
 
 if grep -Eq '"resident_state"[[:space:]]*:[[:space:]]*"ready"|"worker_stage"[[:space:]]*:[[:space:]]*"resident_model_ready"|resident_model_ready' "$response_file"; then
   log "Live SpeakSwiftlyServer resident models are reloaded after E2E."

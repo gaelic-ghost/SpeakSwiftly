@@ -19,8 +19,8 @@ fi
 
 base_url="${SPEAKSWIFTLY_LIVE_SERVICE_BASE_URL:-http://127.0.0.1:7337}"
 health_url="$base_url/healthz"
-unload_url="$base_url/runtime/models/unload"
 unload_timeout="${SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_TIMEOUT_SECONDS:-600}"
+unload_paths="${SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_PATHS:-/models/unload /runtime/models/unload}"
 
 if ! curl -fsS --max-time 2 "$health_url" >/dev/null 2>&1; then
   warn "No reachable SpeakSwiftlyServer live service at '$base_url'; continuing without resident-model unload preflight."
@@ -32,9 +32,16 @@ trap 'rm -f "$response_file"' EXIT INT TERM
 
 log "Requesting resident-model unload from the live SpeakSwiftlyServer service at '$base_url'."
 
-if ! curl -fsS --max-time "$unload_timeout" -X POST "$unload_url" -H 'accept: application/json' -o "$response_file"; then
-  die "SpeakSwiftly live-service resident-model unload preflight failed while POSTing to '$unload_url' after waiting up to ${unload_timeout}s. The live service is reachable, but it did not accept or finish the unload request. If generation or playback is active, unload_models is expected to wait behind that work; rerun after the active request drains or increase SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_TIMEOUT_SECONDS."
-fi
+unload_url=""
+for unload_path in $unload_paths; do
+  candidate_url="$base_url$unload_path"
+  if curl -fsS --max-time "$unload_timeout" -X POST "$candidate_url" -H 'accept: application/json' -o "$response_file"; then
+    unload_url="$candidate_url"
+    break
+  fi
+done
+
+[ -n "$unload_url" ] || die "SpeakSwiftly live-service resident-model unload preflight failed after trying paths '$unload_paths' at '$base_url' for up to ${unload_timeout}s each. The live service is reachable, but it did not accept or finish any unload request. If generation or playback is active, unload_models is expected to wait behind that work; rerun after the active request drains or increase SPEAKSWIFTLY_LIVE_SERVICE_UNLOAD_TIMEOUT_SECONDS."
 
 if grep -Eq '"resident_state"[[:space:]]*:[[:space:]]*"unloaded"|"worker_stage"[[:space:]]*:[[:space:]]*"resident_models_unloaded"|resident_models_unloaded' "$response_file"; then
   log "Live SpeakSwiftlyServer resident models are unloaded; E2E has memory headroom without uninstalling the service."
