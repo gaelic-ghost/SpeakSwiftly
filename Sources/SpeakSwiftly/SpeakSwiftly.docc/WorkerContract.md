@@ -29,10 +29,10 @@ At startup the worker may emit status events while the resident backend warms.
 Every request includes an `id` and an `op`:
 
 ```json
-{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}
+{"id":"req-1","op":"generate_speech","text":"Hello there"}
 ```
 
-For generation requests, the current worker keys are `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. `input_text_context.context` uses the shared `TextForSpeech.InputContext` shape, while `request_context` uses the shared `TextForSpeech.RequestContext` shape. Qwen live playback can also opt into pre-model text chunking with `qwen_pre_model_text_chunking: true`; when omitted, Qwen live playback remains single-pass. Qwen resident model selection is a startup configuration concern, and prepared Qwen conditioning is stored per resident model repo so a profile can lazily accumulate conditioning for each selected Qwen model. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
+For generation requests, the current worker keys are `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Omit `voice_profile` to use the runtime default voice profile, which falls back to `swift-signal`. `input_text_context.context` uses the shared `TextForSpeech.InputContext` shape, while `request_context` uses the shared `TextForSpeech.RequestContext` shape. Qwen live playback can also opt into pre-model text chunking with `qwen_pre_model_text_chunking: true`; when omitted, Qwen live playback remains single-pass. Qwen resident model selection is a startup configuration concern, and prepared Qwen conditioning is stored per resident model repo so a profile can lazily accumulate conditioning for each selected Qwen model. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 Representative operations include:
 
@@ -40,12 +40,14 @@ Representative operations include:
 - `generate_audio_file` for retained file output.
 - `generate_batch` for grouped retained artifacts.
 - `create_voice_profile_from_description`, `create_voice_profile_from_audio`, `list_voice_profiles`, and related voice-management operations.
-- `get_status`, `reload_models`, and `unload_models` for runtime control.
+- `get_status`, `get_default_voice_profile`, `set_default_voice_profile`, `reload_models`, and `unload_models` for runtime control.
 - `get_runtime_overview` for one service-health snapshot that includes resident state, queue state, playback telemetry, and storage paths.
 - `list_generation_queue`, `clear_generation_queue`, and `cancel_generation` for generation-queue inspection and control.
 - `list_playback_queue`, `clear_playback_queue`, and `cancel_playback` for playback-queue inspection and control.
 
 The broad compatibility operations `clear_queue` and `cancel_request` still exist for hosts that intentionally want to affect any queued work, but new operators should prefer the queue-specific operations when the target queue is known.
+
+The JSONL retained-output reads `get_generated_file`, `list_generated_files`, `get_generated_batch`, and `list_generated_batches` are transport compatibility operations. Native Swift callers should use `runtime.artifact(id:)`, `runtime.artifacts()`, `runtime.artifacts.list()`, `runtime.jobs.job(id:)`, and `runtime.jobs.list()` instead.
 
 `list_voice_profiles` treats profile directories independently. Stray files, partial directories, and unreadable manifests are skipped so the operation can still return healthy profiles while a separate cleanup or coordination pass deals with damaged entries.
 

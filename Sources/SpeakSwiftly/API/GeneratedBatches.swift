@@ -42,11 +42,13 @@ public extension SpeakSwiftly {
             self.requestContext = requestContext
         }
     }
+}
 
+extension SpeakSwiftly {
     // MARK: Batch Output
 
-    /// A retained batch-generation snapshot.
-    struct GeneratedBatch: Codable, Sendable, Equatable {
+    /// A JSONL compatibility projection for retained batch-generation responses.
+    struct GeneratedBatch: Codable, Equatable {
         enum CodingKeys: String, CodingKey {
             case batchID = "batch_id"
             case voiceProfile = "voice_profile"
@@ -65,21 +67,21 @@ public extension SpeakSwiftly {
             case retentionPolicy = "retention_policy"
         }
 
-        public let batchID: String
-        public let voiceProfile: String
-        public let textProfile: SpeakSwiftly.TextProfileID?
-        public let speechBackend: SpeechBackend
-        public let state: GenerationJobState
-        public let items: [GenerationJobItem]
-        public let artifacts: [GeneratedFile]
-        public let failure: GenerationJobFailure?
-        public let createdAt: Date
-        public let updatedAt: Date
-        public let startedAt: Date?
-        public let completedAt: Date?
-        public let failedAt: Date?
-        public let expiresAt: Date?
-        public let retentionPolicy: GenerationRetentionPolicy
+        let batchID: String
+        let voiceProfile: String
+        let textProfile: SpeakSwiftly.TextProfileID?
+        let speechBackend: SpeechBackend
+        let state: GenerationJobState
+        let items: [GenerationJobItem]
+        let artifacts: [GeneratedFile]
+        let failure: GenerationJobFailure?
+        let createdAt: Date
+        let updatedAt: Date
+        let startedAt: Date?
+        let completedAt: Date?
+        let failedAt: Date?
+        let expiresAt: Date?
+        let retentionPolicy: GenerationRetentionPolicy
 
         init(
             batchID: String,
@@ -117,7 +119,7 @@ public extension SpeakSwiftly {
     }
 }
 
-public extension SpeakSwiftly.Runtime {
+extension SpeakSwiftly.Runtime {
     // MARK: Batch Helpers
 
     /// Resolves batch items into retained job items with concrete artifact identifiers.

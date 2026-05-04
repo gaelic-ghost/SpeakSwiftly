@@ -87,6 +87,10 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredDefaultVoiceProfile = resolvedDefaultVoiceProfile(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
         let dependencies = WorkerDependencies.live(
             qwenResidentModel: configuredQwenResidentModel,
             marvisResidentPolicy: configuredMarvisResidentPolicy,
@@ -121,6 +125,7 @@ extension SpeakSwiftly.Runtime {
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
             qwenResidentModel: configuredQwenResidentModel,
             marvisResidentPolicy: configuredMarvisResidentPolicy,
+            defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
@@ -182,6 +187,32 @@ extension SpeakSwiftly.Runtime {
         configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.MarvisResidentPolicy {
         configuration?.marvisResidentPolicy ?? .dualResidentSerialized
+    }
+
+    static func resolvedDefaultVoiceProfile(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> SpeakSwiftly.Name {
+        SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(configuration?.defaultVoiceProfile)
+    }
+
+    func setDefaultVoiceProfileName(_ profileName: SpeakSwiftly.Name) throws {
+        let resolvedProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(profileName)
+        defaultVoiceProfileName = resolvedProfileName
+        try currentConfiguration().saveDefault(
+            fileManager: dependencies.fileManager,
+            stateRootOverride: profileStore.stateRootURL.path,
+        )
+    }
+
+    func currentConfiguration() -> SpeakSwiftly.Configuration {
+        SpeakSwiftly.Configuration(
+            speechBackend: speechBackend,
+            qwenConditioningStrategy: qwenConditioningStrategy,
+            qwenResidentModel: qwenResidentModel,
+            marvisResidentPolicy: marvisResidentPolicy,
+            defaultVoiceProfile: defaultVoiceProfileName,
+            textNormalizer: normalizerRef,
+        )
     }
 
     private static func resolvedPersistedConfiguration(

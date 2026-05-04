@@ -12,17 +12,17 @@ struct GeneratedFileManifest: Codable, Equatable {
     let audioFile: String
 }
 
-public extension SpeakSwiftly {
+extension SpeakSwiftly {
     /// Metadata for one retained generated audio file.
-    struct GeneratedFile: Codable, Sendable, Equatable {
-        public let artifactID: String
-        public let createdAt: Date
-        public let voiceProfile: String
-        public let textProfile: SpeakSwiftly.TextProfileID?
-        public let inputTextContext: SpeakSwiftly.InputTextContext?
-        public let requestContext: SpeakSwiftly.RequestContext?
-        public let sampleRate: Int
-        public let filePath: String
+    struct GeneratedFile: Codable, Equatable {
+        let artifactID: String
+        let createdAt: Date
+        let voiceProfile: String
+        let textProfile: SpeakSwiftly.TextProfileID?
+        let inputTextContext: SpeakSwiftly.InputTextContext?
+        let requestContext: SpeakSwiftly.RequestContext?
+        let sampleRate: Int
+        let filePath: String
 
         enum CodingKeys: String, CodingKey {
             case artifactID = "artifact_id"

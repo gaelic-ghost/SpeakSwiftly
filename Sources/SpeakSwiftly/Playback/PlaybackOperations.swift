@@ -33,7 +33,7 @@ extension SpeakSwiftly.Runtime {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
-            failRequestStream(for: job.request.id, error: cancellation)
+            await failRequestStream(for: job.request.id, error: cancellation)
             await logError(
                 cancellation.message,
                 requestID: job.request.id,
@@ -113,7 +113,7 @@ extension SpeakSwiftly.Runtime {
                     _ = await playbackController.discard(requestID: job.request.id)
                 }
                 markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
-                failRequestStream(for: targetRequestID, error: cancellation)
+                await failRequestStream(for: targetRequestID, error: cancellation)
                 await logError(
                     cancellation.message,
                     requestID: targetRequestID,

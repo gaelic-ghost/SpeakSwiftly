@@ -41,6 +41,7 @@ import Darwin
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
+    #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -51,6 +52,7 @@ import Darwin
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
+    #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
 @Test func `public configuration supports chatterbox turbo backend`() {
@@ -60,6 +62,7 @@ import Darwin
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
+    #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
 @Test func `public configuration round trips to disk`() throws {
@@ -73,6 +76,7 @@ import Darwin
         qwenConditioningStrategy: .preparedConditioning,
         qwenResidentModel: .base17B8Bit,
         marvisResidentPolicy: .singleResidentDynamic,
+        defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
     )
 
     try configuration.save(to: persistenceURL)
@@ -82,6 +86,7 @@ import Darwin
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.qwenResidentModel == configuration.qwenResidentModel)
     #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
+    #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
     #expect(loaded.textNormalizer == nil)
 }
 
@@ -117,6 +122,7 @@ import Darwin
     #expect(loaded.qwenConditioningStrategy == .legacyRaw)
     #expect(loaded.qwenResidentModel == .base06B8Bit)
     #expect(loaded.marvisResidentPolicy == .dualResidentSerialized)
+    #expect(loaded.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {
@@ -210,6 +216,9 @@ import Darwin
             inputTextContext: inputTextContext,
         )
     }
+    let speakWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
+        await generate.speech(text: text)
+    }
     let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, SpeakSwiftly.InputTextContext?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
@@ -222,6 +231,9 @@ import Darwin
             textProfile: textProfile,
             inputTextContext: inputTextContext,
         )
+    }
+    let generateAudioWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
+        await generate.audio(text: text)
     }
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
         runtime.generate
@@ -401,17 +413,23 @@ import Darwin
     let removeProfile: @Sendable (SpeakSwiftly.Voices, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = { voices, profileName in
         await voices.delete(named: profileName)
     }
-    let generatedFile: @Sendable (SpeakSwiftly.Artifacts, String) async -> SpeakSwiftly.RequestHandle = { artifacts, artifactID in
-        await artifacts.file(id: artifactID)
+    let generatedFile: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestHandle = { runtime, artifactID in
+        await runtime.artifact(id: artifactID)
     }
     let generatedFiles: @Sendable (SpeakSwiftly.Artifacts) async -> SpeakSwiftly.RequestHandle = { artifacts in
-        await artifacts.files()
+        await artifacts()
+    }
+    let generatedFilesList: @Sendable (SpeakSwiftly.Artifacts) async -> SpeakSwiftly.RequestHandle = { artifacts in
+        await artifacts.list()
     }
     let generateBatch: @Sendable (SpeakSwiftly.Generate, [SpeakSwiftly.BatchItem], SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = {
         generate,
         items,
         profileName in
         await generate.batch(items, voiceProfile: profileName)
+    }
+    let generateBatchWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, [SpeakSwiftly.BatchItem]) async -> SpeakSwiftly.RequestHandle = { generate, items in
+        await generate.batch(items)
     }
     let expireGenerationJob: @Sendable (SpeakSwiftly.Jobs, String) async -> SpeakSwiftly.RequestHandle = { jobs, jobID in
         await jobs.expire(id: jobID)
@@ -448,6 +466,12 @@ import Darwin
     let overview: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.overview()
     }
+    let defaultVoiceProfile: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.Name = { runtime in
+        await runtime.defaultVoiceProfile
+    }
+    let setDefaultVoiceProfile: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.Name) async throws -> Void = { runtime, profileName in
+        try await runtime.setDefaultVoiceProfile(profileName)
+    }
     let requestSnapshot: @Sendable (SpeakSwiftly.Runtime, String) async -> SpeakSwiftly.RequestSnapshot? = { runtime, requestID in
         await runtime.request(id: requestID)
     }
@@ -460,6 +484,9 @@ import Darwin
         runtime,
         requestID in
         await runtime.generationEvents(for: requestID)
+    }
+    let completion: @Sendable (SpeakSwiftly.RequestHandle) async throws -> SpeakSwiftly.RequestCompletion = { handle in
+        try await handle.completion()
     }
     let switchSpeechBackend: @Sendable (SpeakSwiftly.Runtime, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = {
         runtime,
@@ -489,7 +516,9 @@ import Darwin
     }
 
     _ = speak
+    _ = speakWithDefaultVoice
     _ = generateAudio
+    _ = generateAudioWithDefaultVoice
     _ = generateHandle
     _ = playerHandle
     _ = voicesHandle
@@ -514,7 +543,9 @@ import Darwin
     _ = removeProfile
     _ = generatedFile
     _ = generatedFiles
+    _ = generatedFilesList
     _ = generateBatch
+    _ = generateBatchWithDefaultVoice
     _ = expireGenerationJob
     _ = generationJob
     _ = generationJobs
@@ -539,9 +570,12 @@ import Darwin
     _ = generationQueue
     _ = status
     _ = overview
+    _ = defaultVoiceProfile
+    _ = setDefaultVoiceProfile
     _ = requestSnapshot
     _ = updates
     _ = generationEvents
+    _ = completion
     _ = clearGenerationQueue
     _ = cancelGeneration
     _ = clearRuntimeQueue
@@ -616,28 +650,67 @@ import Darwin
     _ = snapshotState
 }
 
-@Test func `public generated file surface exposes stable metadata`() {
-    let artifactID: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.artifactID
-    let createdAt: KeyPath<SpeakSwiftly.GeneratedFile, Date> = \.createdAt
-    let voiceProfile: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.voiceProfile
-    let textProfile: KeyPath<SpeakSwiftly.GeneratedFile, String?> = \.textProfile
-    let sampleRate: KeyPath<SpeakSwiftly.GeneratedFile, Int> = \.sampleRate
-    let filePath: KeyPath<SpeakSwiftly.GeneratedFile, String> = \.filePath
+@Test func `public retained artifact surface exposes stable metadata`() {
+    let artifactID: KeyPath<SpeakSwiftly.GenerationArtifact, String> = \.artifactID
+    let kind: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.GenerationArtifactKind> = \.kind
+    let createdAt: KeyPath<SpeakSwiftly.GenerationArtifact, Date> = \.createdAt
+    let filePath: KeyPath<SpeakSwiftly.GenerationArtifact, String> = \.filePath
+    let sampleRate: KeyPath<SpeakSwiftly.GenerationArtifact, Int> = \.sampleRate
+    let voiceProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String> = \.voiceProfile
+    let textProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String?> = \.textProfile
+    let inputTextContext: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.InputTextContext?> = \.inputTextContext
+    let requestContext: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.RequestContext?> = \.requestContext
 
     _ = artifactID
+    _ = kind
     _ = createdAt
+    _ = filePath
+    _ = sampleRate
     _ = voiceProfile
     _ = textProfile
-    _ = sampleRate
-    _ = filePath
+    _ = inputTextContext
+    _ = requestContext
+}
+
+@Test func `public generation job surface exposes stable metadata`() {
+    let jobID: KeyPath<SpeakSwiftly.GenerationJob, String> = \.jobID
+    let jobKind: KeyPath<SpeakSwiftly.GenerationJob, SpeakSwiftly.GenerationJobKind> = \.jobKind
+    let createdAt: KeyPath<SpeakSwiftly.GenerationJob, Date> = \.createdAt
+    let updatedAt: KeyPath<SpeakSwiftly.GenerationJob, Date> = \.updatedAt
+    let voiceProfile: KeyPath<SpeakSwiftly.GenerationJob, String> = \.voiceProfile
+    let textProfile: KeyPath<SpeakSwiftly.GenerationJob, String?> = \.textProfile
+    let speechBackend: KeyPath<SpeakSwiftly.GenerationJob, SpeakSwiftly.SpeechBackend> = \.speechBackend
+    let state: KeyPath<SpeakSwiftly.GenerationJob, SpeakSwiftly.GenerationJobState> = \.state
+    let items: KeyPath<SpeakSwiftly.GenerationJob, [SpeakSwiftly.GenerationJobItem]> = \.items
+    let artifacts: KeyPath<SpeakSwiftly.GenerationJob, [SpeakSwiftly.GenerationArtifact]> = \.artifacts
+    let failure: KeyPath<SpeakSwiftly.GenerationJob, SpeakSwiftly.GenerationJobFailure?> = \.failure
+    let retentionPolicy: KeyPath<SpeakSwiftly.GenerationJob, SpeakSwiftly.GenerationRetentionPolicy> = \.retentionPolicy
+
+    _ = jobID
+    _ = jobKind
+    _ = createdAt
+    _ = updatedAt
+    _ = voiceProfile
+    _ = textProfile
+    _ = speechBackend
+    _ = state
+    _ = items
+    _ = artifacts
+    _ = failure
+    _ = retentionPolicy
+}
+
+@Test func `public request kinds expose artifact names over worker compatibility strings`() {
+    let generatedFileOperation = ["get", "generated", "file"].joined(separator: "_")
+    let generatedFilesOperation = ["list", "generated", "files"].joined(separator: "_")
+
+    #expect(SpeakSwiftly.RequestKind.getArtifact.rawValue == generatedFileOperation)
+    #expect(SpeakSwiftly.RequestKind.listArtifacts.rawValue == generatedFilesOperation)
 }
 
 @Test func `public status surface exposes stable metadata`() {
     let speechBackend: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.SpeechBackend> = \.speechBackend
     let residentState: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.ResidentModelState> = \.residentState
-    let successStatus: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.StatusEvent?> = \.status
-    let successSpeechBackend: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.SpeechBackend?> = \.speechBackend
-    let successActiveRequests: KeyPath<SpeakSwiftly.Success, [SpeakSwiftly.ActiveRequest]?> = \.activeRequests
     let overviewStorage: KeyPath<SpeakSwiftly.RuntimeOverview, SpeakSwiftly.RuntimeStorageSnapshot> = \.storage
     let stateRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.stateRootPath
     let profileStoreRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.profileStoreRootPath
@@ -648,9 +721,6 @@ import Darwin
 
     _ = speechBackend
     _ = residentState
-    _ = successStatus
-    _ = successSpeechBackend
-    _ = successActiveRequests
     _ = overviewStorage
     _ = stateRootPath
     _ = profileStoreRootPath
@@ -661,9 +731,6 @@ import Darwin
 }
 
 @Test func `public text normalization surface exposes profile metadata`() {
-    let successTextProfile: KeyPath<SpeakSwiftly.Success, SpeakSwiftly.TextProfileDetails?> = \.textProfile
-    let successTextProfiles: KeyPath<SpeakSwiftly.Success, [SpeakSwiftly.TextProfileSummary]?> = \.textProfiles
-    let successTextProfileStyleOptions: KeyPath<SpeakSwiftly.Success, [SpeakSwiftly.TextProfileStyleOption]?> = \.textProfileStyleOptions
     let textProfileID: KeyPath<SpeakSwiftly.TextProfileDetails, String> = \.profileID
     let textProfileSummary: KeyPath<SpeakSwiftly.TextProfileDetails, SpeakSwiftly.TextProfileSummary> = \.summary
     let textProfileReplacements: KeyPath<SpeakSwiftly.TextProfileDetails, [TextForSpeech.Replacement]> = \.replacements
@@ -673,9 +740,6 @@ import Darwin
     let textProfileStyle: KeyPath<SpeakSwiftly.TextProfileStyleOption, TextForSpeech.BuiltInProfileStyle> = \.style
     let textProfileStyleSummary: KeyPath<SpeakSwiftly.TextProfileStyleOption, String> = \.summary
 
-    _ = successTextProfile
-    _ = successTextProfiles
-    _ = successTextProfileStyleOptions
     _ = textProfileID
     _ = textProfileSummary
     _ = textProfileReplacements

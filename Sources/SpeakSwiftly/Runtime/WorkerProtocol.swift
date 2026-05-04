@@ -69,12 +69,16 @@ enum WorkerRequest: Equatable {
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)
     case overview(id: String)
+    case defaultVoiceProfile(id: String)
+    case setDefaultVoiceProfile(id: String, profileName: String)
     case switchSpeechBackend(id: String, speechBackend: SpeakSwiftly.SpeechBackend)
     case reloadModels(id: String)
     case unloadModels(id: String)
     case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String, queueType: WorkerQueueType?)
     case cancelRequest(id: String, requestID: String, queueType: WorkerQueueType?)
+
+    static let runtimeDefaultVoiceProfilePlaceholder = "__speakswiftly_runtime_default_voice_profile__"
 
     var id: String {
         switch self {
@@ -115,6 +119,8 @@ enum WorkerRequest: Equatable {
                  let .listQueue(id, _),
                  let .status(id),
                  let .overview(id),
+                 let .defaultVoiceProfile(id),
+                 let .setDefaultVoiceProfile(id, _),
                  let .switchSpeechBackend(id, _),
                  let .reloadModels(id),
                  let .unloadModels(id),
@@ -210,6 +216,10 @@ enum WorkerRequest: Equatable {
                 "get_status"
             case .overview:
                 "get_runtime_overview"
+            case .defaultVoiceProfile:
+                "get_default_voice_profile"
+            case .setDefaultVoiceProfile:
+                "set_default_voice_profile"
             case .switchSpeechBackend:
                 "set_speech_backend"
             case .reloadModels:
@@ -330,6 +340,8 @@ enum WorkerRequest: Equatable {
                  .listQueue,
                  .status,
                  .overview,
+                 .defaultVoiceProfile,
+                 .setDefaultVoiceProfile,
                  .playback,
                  .clearQueue,
                  .cancelRequest:
@@ -387,6 +399,7 @@ enum WorkerRequest: Equatable {
                  .listQueue,
                  .status,
                  .overview,
+                 .defaultVoiceProfile,
                  .switchSpeechBackend,
                  .reloadModels,
                  .unloadModels,
@@ -394,6 +407,8 @@ enum WorkerRequest: Equatable {
                  .clearQueue,
                  .cancelRequest:
                 nil
+            case let .setDefaultVoiceProfile(_, profileName):
+                profileName
             case let .renameTextProfile(_, _, profileName):
                 profileName
             case .textProfile,
@@ -441,6 +456,8 @@ enum WorkerRequest: Equatable {
                  .listQueue,
                  .status,
                  .overview,
+                 .defaultVoiceProfile,
+                 .setDefaultVoiceProfile,
                  .switchSpeechBackend,
                  .reloadModels,
                  .unloadModels,
@@ -504,6 +521,8 @@ enum WorkerRequest: Equatable {
                  .listQueue,
                  .status,
                  .overview,
+                 .defaultVoiceProfile,
+                 .setDefaultVoiceProfile,
                  .switchSpeechBackend,
                  .reloadModels,
                  .unloadModels,
@@ -555,6 +574,8 @@ enum WorkerRequest: Equatable {
                  .listQueue,
                  .status,
                  .overview,
+                 .defaultVoiceProfile,
+                 .setDefaultVoiceProfile,
                  .switchSpeechBackend,
                  .reloadModels,
                  .unloadModels,
@@ -571,6 +592,30 @@ enum WorkerRequest: Equatable {
                 qwenPreModelTextChunking
             default:
                 nil
+        }
+    }
+
+    func resolvingRuntimeDefaultVoiceProfile(_ defaultVoiceProfileName: String) -> WorkerRequest {
+        switch self {
+            case let .queueSpeech(id, text, profileName, textProfileID, jobType, inputTextContext, requestContext, qwenPreModelTextChunking):
+                .queueSpeech(
+                    id: id,
+                    text: text,
+                    profileName: profileName == Self.runtimeDefaultVoiceProfilePlaceholder ? defaultVoiceProfileName : profileName,
+                    textProfileID: textProfileID,
+                    jobType: jobType,
+                    inputTextContext: inputTextContext,
+                    requestContext: requestContext,
+                    qwenPreModelTextChunking: qwenPreModelTextChunking,
+                )
+            case let .queueBatch(id, profileName, items):
+                .queueBatch(
+                    id: id,
+                    profileName: profileName == Self.runtimeDefaultVoiceProfilePlaceholder ? defaultVoiceProfileName : profileName,
+                    items: items,
+                )
+            default:
+                self
         }
     }
 }

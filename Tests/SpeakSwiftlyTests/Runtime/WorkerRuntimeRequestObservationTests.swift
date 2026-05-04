@@ -178,12 +178,12 @@ import TextForSpeech
     #expect(startedA?.sequence == 2)
     #expect(startedB?.sequence == 2)
     if case let .started(eventA)? = startedA?.state {
-        #expect(eventA == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+        #expect(eventA == WorkerStartedEvent(id: "req-late", kind: .listVoiceProfiles))
     } else {
         Issue.record("Expected subscriber A to receive a started update second.")
     }
     if case let .started(eventB)? = startedB?.state {
-        #expect(eventB == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+        #expect(eventB == WorkerStartedEvent(id: "req-late", kind: .listVoiceProfiles))
     } else {
         Issue.record("Expected subscriber B to receive a started update second.")
     }
@@ -222,7 +222,7 @@ import TextForSpeech
         Issue.record("Expected the original handle stream to retain the queued event history.")
     }
     if case let .started(started)? = handleStarted {
-        #expect(started == WorkerStartedEvent(id: "req-late", op: "list_voice_profiles"))
+        #expect(started == WorkerStartedEvent(id: "req-late", kind: .listVoiceProfiles))
     } else {
         Issue.record("Expected the original handle stream to retain the started event history.")
     }
@@ -534,7 +534,15 @@ import TextForSpeech
     var iterator = handle.events.makeAsyncIterator()
 
     let acknowledged = try await iterator.next()
-    #expect(acknowledged == .acknowledged(WorkerSuccessResponse(id: "req-stream-bg")))
+    #expect(
+        acknowledged == .acknowledged(
+            SpeakSwiftly.RequestAcknowledgement(
+                id: "req-stream-bg",
+                kind: .generateSpeech,
+                generationJob: nil,
+            ),
+        ),
+    )
 
     await playbackDrain.open()
 

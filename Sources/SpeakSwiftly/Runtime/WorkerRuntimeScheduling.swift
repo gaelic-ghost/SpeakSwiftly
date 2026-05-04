@@ -41,7 +41,10 @@ extension SpeakSwiftly.Runtime {
             try? markGenerationJobRunningIfNeeded(for: job.request)
 
             await emitStarted(for: job.request)
-            yieldRequestEvent(.started(WorkerStartedEvent(id: job.request.id, op: job.request.opName)), for: job.request.id)
+            await yieldRequestEvent(
+                .started(WorkerStartedEvent(id: job.request.id, kind: job.request.requestKind)),
+                for: job.request.id,
+            )
 
             var details = [String: LogValue]()
             if let marvisLane = try marvisGenerationLane(for: job.request) {
@@ -372,7 +375,7 @@ extension SpeakSwiftly.Runtime {
                 _ = await playbackController.discard(requestID: job.request.id)
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: error)
-            failRequestStream(for: job.request.id, error: error)
+            await failRequestStream(for: job.request.id, error: error)
             await emitFailure(id: job.request.id, error: error)
         }
     }

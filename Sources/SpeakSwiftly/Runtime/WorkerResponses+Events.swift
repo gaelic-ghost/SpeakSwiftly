@@ -91,11 +91,17 @@ public extension SpeakSwiftly {
     struct StartedEvent: Encodable, Sendable, Equatable {
         public let id: String
         public let event = RequestEventName.started
-        public let op: String
+        public let kind: RequestKind
 
-        public init(id: String, op: String) {
+        enum CodingKeys: String, CodingKey {
+            case id
+            case event
+            case kind = "op"
+        }
+
+        public init(id: String, kind: RequestKind) {
             self.id = id
-            self.op = op
+            self.kind = kind
         }
     }
 

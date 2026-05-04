@@ -23,10 +23,14 @@ surface.
 - Terminal Swift request events now use `SpeakSwiftly.RequestCompletion` instead
   of requiring callers to inspect the broad JSONL `SpeakSwiftly.Success`
   envelope.
+- Retained artifacts now read through `runtime.artifact(id:)` and
+  `runtime.artifacts()`. `runtime.artifacts.list()` remains as an explicit list
+  convenience. The old generated-file named Swift methods are removed.
 - Retained batch work is inspected through canonical `SpeakSwiftly.GenerationJob`
-  snapshots from `runtime.jobs.job(id:)` and `runtime.jobs.list()`. `GeneratedBatch`
-  remains available only as a JSONL compatibility projection for existing
-  worker responses.
+  snapshots from `runtime.jobs.job(id:)` and `runtime.jobs.list()`. Typed
+  generated-batch public reads are replaced by generation jobs; the generated
+  batch JSONL payload remains internal compatibility for existing worker
+  responses.
 - Designed voice creation now uses `voiceDescription:` at the call site, and
   trusted package-owned defaults use `builtInDesign:` instead of `systemDesign:`.
 

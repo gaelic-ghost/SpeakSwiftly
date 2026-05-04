@@ -260,6 +260,8 @@ extension SpeakSwiftly.Runtime {
                      .listQueue,
                      .status,
                      .overview,
+                     .defaultVoiceProfile,
+                     .setDefaultVoiceProfile,
                      .playback,
                      .clearQueue,
                      .cancelRequest:

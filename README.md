@@ -87,8 +87,7 @@ let runtime = await SpeakSwiftly.liftoff()
 await runtime.start()
 
 let handle = await runtime.generate.speech(
-    text: "Hello there.",
-    voiceProfile: "default-femme"
+    text: "Hello there."
 )
 
 for try await event in handle.events {
@@ -101,13 +100,11 @@ When the input is source code rather than prose with embedded snippets, pass an 
 ```swift
 let sourceHandle = await runtime.generate.speech(
     text: "struct WorkerRuntime { let sampleRate: Int }",
-    voiceProfile: "default-femme",
     inputTextContext: .init(sourceFormat: .swift)
 )
 
 let requestHandle = await runtime.generate.audio(
     text: "Read the latest release note summary.",
-    voiceProfile: "default-femme",
     textProfile: "logs",
     requestContext: .init(
         source: "release_panel",
@@ -117,6 +114,8 @@ let requestHandle = await runtime.generate.audio(
     )
 )
 ```
+
+When a caller does not pass `voiceProfile:`, SpeakSwiftly uses the runtime default voice profile. The package default is `swift-signal`; callers can inspect or change it with `runtime.defaultVoiceProfile` and `runtime.setDefaultVoiceProfile(_:)`.
 
 The typed Swift surface uses `voiceProfile`, `textProfile`, `inputTextContext`, and `requestContext`.
 `SpeakSwiftly.InputTextContext.context` is the shared `TextForSpeech.InputContext` model, and `SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so the same text-shaping and request-origin metadata shapes can move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
@@ -185,9 +184,9 @@ swift run SpeakSwiftlyTesting resources
 swift run SpeakSwiftlyTesting status
 swift run SpeakSwiftlyTesting smoke
 swift run SpeakSwiftlyTesting create-design-profile --profile probe-fresh-a --voice "A steady, intimate, softly spoken feminine voice with even projection."
-swift run SpeakSwiftlyTesting volume-probe --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
-swift run SpeakSwiftlyTesting compare-volume --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
-swift run SpeakSwiftlyTesting compare-volume --profile default-femme --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
+swift run SpeakSwiftlyTesting volume-probe --profile swift-signal --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile swift-signal --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16
+swift run SpeakSwiftlyTesting compare-volume --profile swift-signal --state-root "$HOME/Library/Application Support/SpeakSwiftly" --repeat 16 --matched-duration trim-to-shorter
 ```
 
 `resources` prints the packaged bundle and metallib paths, `status` constructs
@@ -224,6 +223,8 @@ Key typed runtime entry points include:
 - `runtime.generate.speech(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
 - `runtime.generate.audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
 - `runtime.generate.batch(_:voiceProfile:)`
+- `runtime.defaultVoiceProfile`
+- `runtime.setDefaultVoiceProfile(_:)`
 - `runtime.voices.create(design named:from:vibe:voiceDescription:outputPath:)`
 - `runtime.voices.create(builtInDesign named:from:vibe:voiceDescription:seed:outputPath:)`
 - `runtime.voices.create(clone named:from:vibe:transcript:)`
@@ -247,8 +248,9 @@ Key typed runtime entry points include:
 - `runtime.jobs.generationQueue()`
 - `runtime.jobs.job(id:)`
 - `runtime.jobs.list()`
-- `runtime.artifacts.file(id:)`
-- `runtime.artifacts.files()`
+- `runtime.artifact(id:)`
+- `runtime.artifacts()`
+- `runtime.artifacts.list()`
 - `SpeakSwiftly.SupportResources.bundle`
 - `SpeakSwiftly.SupportResources.mlxBundleURL()`
 - `SpeakSwiftly.SupportResources.defaultMetallibURL()`

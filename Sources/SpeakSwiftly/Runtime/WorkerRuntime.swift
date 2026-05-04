@@ -206,6 +206,7 @@ public extension SpeakSwiftly {
             let runtimeOverview: SpeakSwiftly.RuntimeOverview?
             let status: WorkerStatusEvent?
             let speechBackend: SpeakSwiftly.SpeechBackend?
+            let defaultVoiceProfile: SpeakSwiftly.Name?
             let clearedCount: Int?
             let cancelledRequestID: String?
 
@@ -232,6 +233,7 @@ public extension SpeakSwiftly {
                 runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
                 status: WorkerStatusEvent? = nil,
                 speechBackend: SpeakSwiftly.SpeechBackend? = nil,
+                defaultVoiceProfile: SpeakSwiftly.Name? = nil,
                 clearedCount: Int? = nil,
                 cancelledRequestID: String? = nil,
             ) {
@@ -257,6 +259,7 @@ public extension SpeakSwiftly {
                 self.runtimeOverview = runtimeOverview
                 self.status = status
                 self.speechBackend = speechBackend
+                self.defaultVoiceProfile = defaultVoiceProfile
                 self.clearedCount = clearedCount
                 self.cancelledRequestID = cancelledRequestID
             }
@@ -396,6 +399,7 @@ public extension SpeakSwiftly {
         var activeGenerationCancellations = [String: WorkerError]()
         var lastLoggedMarvisSchedulerState: String?
         var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
+        var defaultVoiceProfileName: SpeakSwiftly.Name
 
         // MARK: Initialization
 
@@ -405,6 +409,7 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+            defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
@@ -416,6 +421,7 @@ public extension SpeakSwiftly {
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
+            self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore

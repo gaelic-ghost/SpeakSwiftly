@@ -53,8 +53,8 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 
 - ``SpeakSwiftly/Jobs``
 - ``SpeakSwiftly/GenerationJob``
+- ``SpeakSwiftly/GenerationArtifact``
 - ``SpeakSwiftly/Artifacts``
-- ``SpeakSwiftly/GeneratedFile``
 
 ### Support
 

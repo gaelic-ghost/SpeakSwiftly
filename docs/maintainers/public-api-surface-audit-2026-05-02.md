@@ -42,30 +42,29 @@ The retained generation surface now treats `GenerationJob` as the canonical
 Swift model for retained work:
 
 - `SpeakSwiftly.GenerationJob`
-- `SpeakSwiftly.GeneratedFile`
 - `SpeakSwiftly.GenerationArtifact`
 - `SpeakSwiftly.BatchItem`
 
-`GeneratedBatch` remains only as a JSONL response compatibility projection for
-the worker's `generated_batch` and `generated_batches` payloads. The public
-Swift convenience query surface no longer exposes batch-specific artifact
-methods; callers inspect retained batch work through `runtime.jobs.job(id:)` or
-`runtime.jobs.list()`.
+`GeneratedBatch` remains only as an internal JSONL response compatibility
+projection for the worker's `generated_batch` and `generated_batches` payloads.
+The public Swift convenience query surface no longer exposes batch-specific
+artifact methods; callers inspect retained batch work through
+`runtime.jobs.job(id:)` or `runtime.jobs.list()`.
 
-Desired direction:
+Implemented direction:
 
 - keep `GenerationJob` as the canonical retained-work model
-- treat generated files as outputs of retained jobs
-- keep `GeneratedBatch` constrained to JSONL compatibility unless a concrete
-  typed Swift consumer needs a batch-specific projection
+- treat retained audio outputs as `GenerationArtifact` values
+- keep the internal generated-batch compatibility projection constrained to
+  JSONL worker responses
 - keep `BatchItem` only if batch submission remains caller-authored at the
   typed API boundary
-- make generated-artifact and generated-file terminology consistent across
-  Swift names, JSONL payloads, README examples, and tests
+- keep generated-file terminology only where the worker contract documents
+  stable JSONL compatibility names
 
-Practical consequence: downstream code can follow one story. A retained request
-creates a generation job. That job has input items, state, failure information,
-and output files.
+Practical consequence: downstream Swift code can follow one story. A retained
+request creates a generation job, and that job exposes public generation
+artifacts for its outputs.
 
 Relevant files:
 
@@ -76,8 +75,8 @@ Relevant files:
 
 ### 2. Typed Completion Results
 
-`SpeakSwiftly.Success` is useful as a JSONL response envelope, but it is too
-wide for typed Swift callers. It has optional slots for generated files,
+`SpeakSwiftly.Success` is useful as an internal JSONL response envelope, but it
+is too wide for typed Swift callers. It has optional slots for generated files,
 batches, jobs, voice profiles, text profiles, queues, playback state, runtime
 overview, status, backend changes, cleared counts, and cancellation ids.
 
@@ -89,8 +88,11 @@ Implemented direction:
 - keep the JSONL response envelope transport-owned
 - introduce typed completion payloads for Swift callers through
   `SpeakSwiftly.RequestCompletion`
+- introduce typed acknowledgement payloads through
+  `SpeakSwiftly.RequestAcknowledgement`
 - make terminal request observation return data shaped around the operation
   that completed
+- provide `RequestHandle.completion()` for the common submit-and-wait path
 
 The important part is that typed callers no longer have to inspect a transport
 envelope full of unrelated optional fields.
@@ -292,9 +294,9 @@ Separated typed Swift completion data from JSONL transport envelopes.
 - updated request-observation tests around terminal success and failure data
 - documented how Swift callers should inspect completion results
 
-This phase is source-breaking: the public `Success` envelope remains the JSONL
-success payload, while typed request streams now complete with
-`SpeakSwiftly.RequestCompletion`.
+This phase is source-breaking: `Success` is an internal JSONL success payload.
+Typed request streams acknowledge with `SpeakSwiftly.RequestAcknowledgement` and
+complete with `SpeakSwiftly.RequestCompletion`.
 
 ### Phase 4: Retained Generation Canonical Model
 
@@ -302,7 +304,8 @@ Made retained generation work tell one story.
 
 - chose `GenerationJob` as the canonical retained-work model
 - collapsed batch-specific public output duplication where possible
-- aligned `GeneratedFile`, `GenerationArtifact`, and `GenerationJob` terminology
+- aligned internal JSONL compatibility, `GenerationArtifact`, and
+  `GenerationJob` terminology
 - updated artifact lookup and job lookup docs so callers know where to inspect
   retained output
 - preserved JSONL response compatibility

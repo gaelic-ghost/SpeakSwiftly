@@ -136,7 +136,7 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) {
+    func yieldRequestEvent(_ event: WorkerRequestStreamEvent, for requestID: String) async {
         let state: SpeakSwiftly.RequestState = switch event {
             case let .queued(queuedEvent):
                 .queued(queuedEvent)
@@ -150,7 +150,7 @@ extension SpeakSwiftly.Runtime {
                 .completed(completion)
         }
 
-        recordRequestState(
+        await recordRequestState(
             state,
             for: requestID,
             terminal: {
@@ -179,7 +179,7 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func failRequestStream(for requestID: String, error: WorkerError) {
+    func failRequestStream(for requestID: String, error: WorkerError) async {
         let failure = WorkerFailureResponse(
             id: requestID,
             code: error.code,
@@ -187,14 +187,14 @@ extension SpeakSwiftly.Runtime {
         )
         let state: SpeakSwiftly.RequestState =
             error.code == .requestCancelled ? .cancelled(failure) : .failed(failure)
-        recordRequestState(state, for: requestID, terminal: true)
+        await recordRequestState(state, for: requestID, terminal: true)
     }
 
     func recordRequestState(
         _ state: SpeakSwiftly.RequestState,
         for requestID: String,
         terminal: Bool,
-    ) {
+    ) async {
         guard var broker = requestBrokers[requestID] else { return }
 
         let update = broker.recordState(

@@ -25,9 +25,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Roadmap Shape](#roadmap-shape)
 - [Milestone Progress](#milestone-progress)
 - [Active Milestones](#active-milestones)
-- [Milestone 9: Live-Service Operability Review](#milestone-9-live-service-operability-review)
 - [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
-- [Milestone 18: Package Docs And Distribution Polish](#milestone-18-package-docs-and-distribution-polish)
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
@@ -36,38 +34,12 @@ This roadmap now keeps active milestones and the current release-hardening queue
 
 ## Milestone Progress
 
-- Milestone 9: Live-Service Operability Review - In Progress
 - Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
-- Milestone 18: Package Docs And Distribution Polish - In Progress
 - Milestone 21: Unified Logging With `Logger` - Planned
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 
 ## Active Milestones
-
-## Milestone 9: Live-Service Operability Review
-
-### Status
-
-In Progress
-
-### Scope
-
-- [ ] Give long-lived hosts current runtime and playback visibility without log scraping or hidden polling triggers.
-- [ ] Make default voice-profile selection explicit instead of relying on an undocumented saved-name convention.
-- [ ] Resolve the remaining startup-side allocator warning investigation.
-
-### Tickets
-
-- [ ] Add a runtime-level playback and overview event stream so hosts can keep playback state current without opportunistic polling. ([#45](https://github.com/gaelic-ghost/SpeakSwiftly/issues/45))
-- [ ] Add a first-class default-profile concept so downstream callers are not forced to treat names like `default-femme` as hidden conventions.
-- [ ] Investigate whether startup-side playback preload or environment observation is still correlated with `freed pointer was not the last allocation`. ([#7](https://github.com/gaelic-ghost/SpeakSwiftly/issues/7))
-
-### Exit Criteria
-
-- [ ] Hosts can keep runtime overview and playback state current from a first-class stream or a clearly documented snapshot/stream pairing.
-- [ ] Swift and JSONL callers can discover or configure the default voice-profile name without hard-coding `default-femme`.
-- [ ] The startup-side playback preload warning is fixed or ruled out with a documented remaining owner.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
 
@@ -99,27 +71,6 @@ In Progress
 
 - [ ] The repository documents whether a newer `mlx-audio-swift` should be adopted and why.
 - [ ] Dependency policy around `mlx-audio-swift` is explicit enough that future playback or generation regressions are easier to trace.
-
-## Milestone 18: Package Docs And Distribution Polish
-
-### Status
-
-In Progress
-
-### Scope
-
-- [ ] Keep package-facing documentation aligned with the remaining runtime-observation decisions.
-- [ ] Treat docs as product surface, not as a dumping ground for stale planning notes.
-
-### Tickets
-
-- [ ] Update DocC, README, and CONTRIBUTING for the runtime-level playback and overview event stream after #45 lands.
-- [ ] Keep README, CONTRIBUTING, ROADMAP, and DocC aligned whenever playback semantics, request observation, or runtime ownership change.
-
-### Exit Criteria
-
-- [ ] Runtime-observation docs match the final #45 surface instead of describing either polling-only behavior or speculative streams.
-- [ ] Maintainer docs stay focused on current architecture and active plans instead of accumulated dead notes.
 
 ## Milestone 21: Unified Logging With `Logger`
 
@@ -220,13 +171,18 @@ In Progress
 
 ## History
 
+### 2026-05-03 Milestone 9 closeout
+
+- Milestone 9 was condensed out of Active Milestones after the default-profile work landed as a deliberately small API: `runtime.defaultVoiceProfile`, `runtime.setDefaultVoiceProfile(_:)`, optional `voiceProfile:` on generation calls, JSONL generation fallback when `voice_profile` is omitted, and the built-in `swift-signal` fallback. The proposed runtime overview stream from #45 was rejected as API bloat; the existing surface remains `runtime.overview()` for one snapshot, `runtime.statusEvents()` for runtime status events, and request-handle streams for request-specific lifecycle and generation events. The startup-side allocator-warning ticket #7 was ruled stale against current source and tests: resident preload stays playback-cold until first audible work, and playback environment observation is bound only during playback preparation.
+- Milestone 18 was condensed out of Active Milestones because the remaining package-docs work depended on the now-closed #45 decision. README, CONTRIBUTING, and DocC now document the default voice behavior and avoid describing speculative runtime overview streams.
+
 ### 2026-05-03 full roadmap active-item audit
 
 - Milestone 4 was condensed out of Active Milestones after auditing retained generated-file E2E coverage, generated-batch E2E coverage, worker EOF handling, shutdown cancellation behavior, malformed JSONL handling, and profile-store failure coverage. No current file-rendering or worker-ownership gap remained specific enough to justify an active milestone.
-- Milestone 9 was narrowed to the live-service items still backed by open evidence: #45 for runtime-level playback and overview streaming, #7 for the startup-side allocator-warning investigation, and the still-missing first-class default-profile concept. Completed `output_path`, state-root, profile-listing, runtime-overview, voice-profile provenance, downstream-adoption, and parent-process ownership documentation work no longer appears as open active work.
+- Milestone 9 was narrowed during this audit to the live-service items that still appeared backed by open evidence at the time: #45 for runtime-level playback and overview streaming, #7 for the startup-side allocator-warning investigation, and the still-missing first-class default-profile concept. That narrowing was later closed out in the 2026-05-03 Milestone 9 closeout entry above.
 - Milestone 13 was condensed out of Active Milestones after a second audit confirmed the package already has SemVer Git tags, GitHub SwiftPM dependency documentation, `.spi.yml`, a live Swift Package Index page, and a real adjacent Swift package consumer in `SpeakSwiftlyServer` using `https://github.com/gaelic-ghost/SpeakSwiftly.git` from `4.2.0`.
 - Milestone 17 was moved out of Active Milestones because notification-linked priority playback has no current issue, implementation branch, or package-ownership decision. It remains a backlog candidate only.
-- Milestone 18 was narrowed to documentation work that depends on still-open runtime observation decisions. Completed text-profile, retained-generation, request-completion, concern-handle, package-distribution, DocC, and SPI cleanup no longer appears as open active work.
+- Milestone 18 was narrowed during this audit to documentation work that depended on still-open runtime observation decisions. That remaining docs work was later closed out in the 2026-05-03 Milestone 9 closeout entry above.
 - Milestone 22 was narrowed to the Marvis work that still needs fresh target-machine evidence: resident-policy benchmark results, #13 reproduction or closure, and an evidence-backed decision about whether remaining instability belongs to upstream generation throughput, local wrapper behavior, playback policy, or machine pressure. The completed Marvis-reference comparison no longer appears as open active work.
 - Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path and has Qwen plus Chatterbox E2E coverage for provided and inferred transcripts.
 
@@ -237,10 +193,10 @@ In Progress
 - Milestone 20 was condensed out of Active Milestones because the runtime-owned request-event broker, `request(id:)`, `updates(for:)`, `generationEvents(for:)`, replay semantics, and lifecycle tests are now landed.
 - Milestone 27 was condensed out of Active Milestones because the public API simplification shipped in PR #46 with queue-control ownership cleanup, SpeakSwiftly-owned text-profile return models, typed request kind and completion, canonical retained `GenerationJob` inspection, and polished `Voices.create(...)` labels.
 - Milestone 13 no longer carries completed public-API-audit, semantic-identifier, `BatchItem`, or retained-generation-model decision tickets; those outcomes now live in `docs/maintainers/public-api-surface-audit-2026-05-02.md` and `docs/maintainers/milestone-27-migration-note.md`.
-- Milestone 18 no longer carries completed retained-generation-model or typed request-completion DocC tickets; the active docs work is now narrowed to remaining playback-control, runtime-level observation, package-discovery, text-profile, and SPI-facing polish.
+- Milestone 18 no longer carried completed retained-generation-model or typed request-completion DocC tickets after this audit; the later Milestone 9 closeout removed its remaining active docs work.
 - Milestone 26 no longer repeats completed E2E artifact, CPU-accounting, runtime-publication, launcher, resource-lookup, queue-control E2E pressure, or public-API-simplification tickets; the remaining release-hardening work is downstream adoption, unresolved active milestones, and final release-candidate validation.
-- Milestone 9 was corrected to acknowledge the existing `get_runtime_overview` / `runtime.overview()` inspection surface and now tracks the missing runtime-level playback or overview event stream separately in #45.
-- Open GitHub issues #7, #13, and #45 are now assigned to active roadmap milestones so the roadmap and issue tracker describe the same outstanding work.
+- Milestone 9 was corrected during this audit to acknowledge the existing `get_runtime_overview` / `runtime.overview()` inspection surface and to track the proposed runtime-level playback or overview event stream separately in #45. The later Milestone 9 closeout rejected that stream as API bloat.
+- Open GitHub issues #7, #13, and #45 were assigned to active roadmap milestones during this audit so the roadmap and issue tracker described the same outstanding work at that time. The later Milestone 9 closeout removes #7 and #45 from active roadmap work.
 
 ### 2026-04-18 release-history consolidation
 
