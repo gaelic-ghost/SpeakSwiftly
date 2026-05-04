@@ -130,7 +130,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch item with merged request path context`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","project":"SpeakSwiftly","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
     )
 
     #expect(
@@ -145,7 +145,6 @@ import TextForSpeech
                     sourceFormat: nil,
                     requestContext: .init(
                         source: "batch_export",
-                        project: "SpeakSwiftly",
                         topic: "release",
                         cwd: "/Users/galew/Workspace/SpeakSwiftly",
                         repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
@@ -218,7 +217,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with request context without attributes`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly"}} "#,
+        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","topic":"runtime"}} "#,
     )
 
     #expect(
@@ -231,8 +230,7 @@ import TextForSpeech
             sourceFormat: nil,
             requestContext: .init(
                 source: "status_panel",
-                app: "SpeakSwiftlyOperator",
-                project: "SpeakSwiftly",
+                topic: "runtime",
             ),
             qwenPreModelTextChunking: false,
         ),
@@ -666,6 +664,27 @@ import TextForSpeech
             #expect(error.message.contains("Generation context key"))
             #expect(error.message.contains("request_context"))
             #expect(error.message.contains("source_format"))
+        }
+    }
+}
+
+@Test func `rejects removed request context keys`() throws {
+    let removedKeyPayloads = [
+        #"{"id":"req-old-context-app","op":"generate_speech","text":"Hello","request_context":{"app":"SpeakSwiftlyOperator"}}"#,
+        #"{"id":"req-old-context-agent","op":"generate_speech","text":"Hello","request_context":{"agent":"Codex"}}"#,
+        #"{"id":"req-old-context-project","op":"generate_batch","items":[{"text":"Hello","request_context":{"project":"SpeakSwiftly"}}]}"#,
+    ]
+
+    for payload in removedKeyPayloads {
+        do {
+            _ = try WorkerRequest.decode(from: payload)
+            Issue.record("Expected removed request context key to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("Request context key"))
+            #expect(error.message.contains("request_context"))
+            #expect(error.message.contains("source"))
+            #expect(error.message.contains("repo_root"))
         }
     }
 }

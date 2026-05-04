@@ -108,8 +108,6 @@ let requestHandle = await runtime.generate.audio(
     textProfile: "logs",
     requestContext: .init(
         source: "release_panel",
-        app: "SpeakSwiftlyOperator",
-        project: "SpeakSwiftly",
         topic: "release-notes"
     )
 )
@@ -118,9 +116,9 @@ let requestHandle = await runtime.generate.audio(
 When a caller does not pass `voiceProfile:`, SpeakSwiftly uses the runtime default voice profile. The package default is `swift-signal`; callers can inspect or change it with `runtime.defaultVoiceProfile` and `runtime.setDefaultVoiceProfile(_:)`.
 
 The typed Swift surface uses `voiceProfile`, `textProfile`, `sourceFormat`, and `requestContext`.
-`SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so request-origin metadata and path context move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
+`SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so request source, topic, attributes, and path context move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
 The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `source_format`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
-Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format` are rejected with explicit invalid-request diagnostics instead of being treated as compatibility aliases.
+Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format`, plus removed request-context keys such as `app`, `agent`, and `project`, are rejected with explicit invalid-request diagnostics instead of being treated as compatibility aliases.
 
 The runtime is organized around stored concern handles that callers can keep and reuse:
 
