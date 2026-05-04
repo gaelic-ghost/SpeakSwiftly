@@ -44,6 +44,20 @@ bash scripts/repo-maintenance/validate-all.sh
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
+## Verification Performed
+
+- `swift test --filter WorkerProtocolTests` passed after the review-finding
+  fixes.
+- `swift build` passed.
+- `swift test` passed with 250 non-E2E tests in 11 suites.
+- `bash scripts/repo-maintenance/validate-all.sh` passed.
+- `sh scripts/repo-maintenance/run-e2e-full.sh` passed the release-safe E2E
+  suite set: `GeneratedFileE2ETests`, `GeneratedBatchE2ETests`,
+  `ChatterboxE2ETests`, `QueueControlE2ETests`, `MarvisE2ETests`, and
+  `QwenE2ETests`.
+- The full E2E wrapper unloaded live `SpeakSwiftlyServer` resident models
+  before the run and reloaded them after completion.
+
 ## Release Command
 
 After validation and full E2E pass:
