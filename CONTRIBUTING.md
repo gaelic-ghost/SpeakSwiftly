@@ -262,14 +262,14 @@ Current resident-status stages:
 ## JSONL Reference
 
 For generation requests, the worker now documents `voice_profile`, `text_profile`, `source_format`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names. When `voice_profile` is omitted, generation uses the runtime default voice profile, which falls back to `swift-signal`.
-`source_format` selects the whole-source normalization lane. Mixed prose, Markdown, logs, HTML, CLI output, and agent text should omit source hints and let `TextForSpeech` detect structure internally. `request_context` maps to `TextForSpeech.RequestContext`, including `cwd` and `repo_root` path context. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
+`source_format` selects the whole-source normalization lane. Mixed prose, Markdown, logs, HTML, CLI output, and agent text should omit source hints and let `TextForSpeech` detect structure internally. `request_context` maps to `TextForSpeech.RequestContext`, including `source`, `topic`, `attributes`, `cwd`, and `repo_root` context. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
 Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format` are intentionally rejected. That keeps stale callers from silently dropping path context or source-format intent after the `TextForSpeech` `0.19.0` simplification.
 
 Representative request shapes:
 
 ```json
 {"id":"req-1","op":"generate_speech","text":"Hello there"}
-{"id":"req-1b","op":"generate_speech","text":"Explain the latest runtime status.","request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime"}}
+{"id":"req-1b","op":"generate_speech","text":"Explain the latest runtime status.","request_context":{"source":"status_panel","topic":"runtime"}}
 {"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","text_profile":"logs","request_context":{"cwd":"./","repo_root":"./"}}
 {"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```"}
 {"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","source_format":"swift_source"}
@@ -333,7 +333,7 @@ Representative response and event shapes:
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
-{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","voice_profile":"swift-signal","text_profile":null,"source_format":null,"request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime","attributes":{}},"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","voice_profile":"swift-signal","text_profile":null,"state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile":null,"source_format":null,"request_context":null}]}}
+{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","voice_profile":"swift-signal","text_profile":null,"source_format":null,"request_context":{"source":"status_panel","topic":"runtime","attributes":{}},"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","voice_profile":"swift-signal","text_profile":null,"state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile":null,"source_format":null,"request_context":null}]}}
 ```
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. SpeakSwiftly resolves those paths against caller-provided context, not the worker launch directory.

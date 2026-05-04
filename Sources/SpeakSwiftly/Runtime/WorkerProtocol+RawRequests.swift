@@ -386,9 +386,6 @@ struct RawWorkerRequest: Decodable {
 
         return SpeakSwiftly.RequestContext(
             source: base?.source,
-            app: base?.app,
-            agent: base?.agent,
-            project: base?.project,
             topic: base?.topic,
             cwd: resolvedCWD,
             repoRoot: resolvedRepoRoot,

@@ -130,7 +130,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch item with merged request path context`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","project":"SpeakSwiftly","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
     )
 
     #expect(
@@ -145,7 +145,6 @@ import TextForSpeech
                     sourceFormat: nil,
                     requestContext: .init(
                         source: "batch_export",
-                        project: "SpeakSwiftly",
                         topic: "release",
                         cwd: "/Users/galew/Workspace/SpeakSwiftly",
                         repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
@@ -218,7 +217,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with request context without attributes`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly"}} "#,
+        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","topic":"runtime"}} "#,
     )
 
     #expect(
@@ -231,8 +230,7 @@ import TextForSpeech
             sourceFormat: nil,
             requestContext: .init(
                 source: "status_panel",
-                app: "SpeakSwiftlyOperator",
-                project: "SpeakSwiftly",
+                topic: "runtime",
             ),
             qwenPreModelTextChunking: false,
         ),
