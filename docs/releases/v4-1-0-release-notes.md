@@ -1,18 +1,19 @@
 # v4.1.0 Release Notes
 
+This historical release note was superseded by the `TextForSpeech 0.19.0`
+surface simplification. Current callers use `sourceFormat` for whole-source
+generation and `requestContext` for request metadata and path context.
+
 ## What changed
 
 - refreshed the `TextForSpeech` dependency to `0.18.9`
-- changed `SpeakSwiftly.InputTextContext.context` to use the shared
-  `TextForSpeech.InputContext` model
 - kept `SpeakSwiftly.RequestContext` on the shared `TextForSpeech.RequestContext`
-  model so text-shaping context and request-origin metadata now both come from
-  TextForSpeech
+  model so request-origin metadata comes from TextForSpeech
 - centralized generation normalization through
   `SpeakSwiftly.Normalizer.speechText(...)` for live playback and retained file
   output
-- preserved selected text profiles, active built-in style, source format, input
-  context, and TextForSpeech summarization-provider selection through the shared
+- preserved selected text profiles, active built-in style, source format,
+  request context, and TextForSpeech summarization-provider selection through the shared
   normalization path
 - kept JSONL text-profile payloads on the compatible `profile_id` field while
   mapping from the current `TextForSpeech.Runtime.Profiles.Details.id` source
@@ -24,15 +25,14 @@
 
 ## Breaking changes
 
-- Swift callers that explicitly constructed `SpeakSwiftly.InputTextContext` with
-  the old `TextForSpeech.Context` type should move to
-  `TextForSpeech.InputContext`
+- Swift callers should use `sourceFormat` only for whole-source generation and
+  `requestContext` for request metadata and path context
 - JSONL request and response compatibility is preserved
 
 ## Migration or upgrade notes
 
-- continue using `input_text_context.context` and `request_context` in JSONL
-  requests; their shapes are now the current TextForSpeech context models
+- continue using `request_context` in JSONL requests; use `source_format` only
+  for whole-source generation
 - use `runtime.cancel(.generation, requestID:)` or
   `runtime.cancel(.playback, requestID:)` when a cancellation must stay scoped
   to one queue

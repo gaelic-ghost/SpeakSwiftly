@@ -286,7 +286,7 @@ extension SpeakSwiftly.Runtime {
         profileName: String? = nil,
         newProfileName: String? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
         replacement: TextForSpeech.Replacement? = nil,
@@ -313,16 +313,13 @@ extension SpeakSwiftly.Runtime {
             profileName: profileName,
             newProfileName: newProfileName,
             textProfile: textProfile,
-            inputTextContext: inputTextContext,
+            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileStyle: textProfileStyle,
             replacement: replacement,
             replacementID: replacementID,
-            cwd: cwd ?? inputTextContext?.context?.cwd,
-            repoRoot: inputTextContext?.context?.repoRoot,
-            textFormat: inputTextContext?.context?.textFormat,
-            nestedSourceFormat: inputTextContext?.context?.nestedSourceFormat,
-            sourceFormat: inputTextContext?.sourceFormat,
+            cwd: cwd ?? requestContext?.cwd,
+            repoRoot: requestContext?.repoRoot,
             requestID: requestID,
             speechBackend: speechBackend,
             qwenPreModelTextChunking: qwenPreModelTextChunking,
@@ -350,14 +347,14 @@ extension SpeakSwiftly.Runtime {
 
     func submitRequest(_ request: WorkerRequest) async {
         switch request {
-            case let .queueSpeech(id, text, profileName, textProfileID, _, inputTextContext, requestContext, qwenPreModelTextChunking):
+            case let .queueSpeech(id, text, profileName, textProfileID, _, sourceFormat, requestContext, qwenPreModelTextChunking):
                 await submitRequest(
                     id: id,
                     op: request.opName,
                     text: text,
                     voiceProfile: profileName,
                     textProfile: textProfileID,
-                    inputTextContext: inputTextContext,
+                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )

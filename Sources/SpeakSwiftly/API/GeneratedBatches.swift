@@ -14,7 +14,7 @@ public extension SpeakSwiftly {
             case artifactID = "artifact_id"
             case text
             case textProfile = "text_profile"
-            case inputTextContext = "input_text_context"
+            case sourceFormat = "source_format"
             case requestContext = "request_context"
         }
 
@@ -23,7 +23,7 @@ public extension SpeakSwiftly {
         public let artifactID: String?
         public let text: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let sourceFormat: TextForSpeech.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
 
         // MARK: Lifecycle
@@ -32,13 +32,13 @@ public extension SpeakSwiftly {
             artifactID: String? = nil,
             text: String,
             textProfile: SpeakSwiftly.TextProfileID? = nil,
-            inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+            sourceFormat: TextForSpeech.SourceFormat? = nil,
             requestContext: SpeakSwiftly.RequestContext? = nil,
         ) {
             self.artifactID = artifactID
             self.text = text
             self.textProfile = textProfile
-            self.inputTextContext = inputTextContext
+            self.sourceFormat = sourceFormat
             self.requestContext = requestContext
         }
     }
@@ -132,7 +132,7 @@ extension SpeakSwiftly.Runtime {
                 artifactID: item.artifactID ?? "\(batchID)-artifact-\(index + 1)",
                 text: item.text,
                 textProfile: item.textProfile,
-                inputTextContext: item.inputTextContext,
+                sourceFormat: item.sourceFormat,
                 requestContext: item.requestContext,
             )
         }
@@ -149,7 +149,7 @@ extension SpeakSwiftly.GenerationArtifact {
             sampleRate: generatedFile.sampleRate,
             voiceProfile: generatedFile.voiceProfile,
             textProfile: generatedFile.textProfile,
-            inputTextContext: generatedFile.inputTextContext,
+            sourceFormat: generatedFile.sourceFormat,
             requestContext: generatedFile.requestContext,
         )
     }

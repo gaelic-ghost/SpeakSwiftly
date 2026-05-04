@@ -95,12 +95,12 @@ for try await event in handle.events {
 }
 ```
 
-When the input is source code rather than prose with embedded snippets, pass an `inputTextContext`:
+When the entire input is source code rather than prose with embedded snippets, pass `sourceFormat`:
 
 ```swift
 let sourceHandle = await runtime.generate.speech(
     text: "struct WorkerRuntime { let sampleRate: Int }",
-    inputTextContext: .init(sourceFormat: .swift)
+    sourceFormat: .swift
 )
 
 let requestHandle = await runtime.generate.audio(
@@ -117,9 +117,9 @@ let requestHandle = await runtime.generate.audio(
 
 When a caller does not pass `voiceProfile:`, SpeakSwiftly uses the runtime default voice profile. The package default is `swift-signal`; callers can inspect or change it with `runtime.defaultVoiceProfile` and `runtime.setDefaultVoiceProfile(_:)`.
 
-The typed Swift surface uses `voiceProfile`, `textProfile`, `inputTextContext`, and `requestContext`.
-`SpeakSwiftly.InputTextContext.context` is the shared `TextForSpeech.InputContext` model, and `SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so the same text-shaping and request-origin metadata shapes can move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
-The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `input_text_context`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
+The typed Swift surface uses `voiceProfile`, `textProfile`, `sourceFormat`, and `requestContext`.
+`SpeakSwiftly.RequestContext` is the shared `TextForSpeech.RequestContext` model, so request-origin metadata and path context move unchanged between normalization, generation, and downstream packages that import `SpeakSwiftly`.
+The JSONL worker now uses those same generation concepts with snake_case keys such as `voice_profile`, `text_profile`, `source_format`, and `request_context`. Older generation-request aliases like `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 The runtime is organized around stored concern handles that callers can keep and reuse:
 
@@ -220,8 +220,8 @@ The package publishes:
 
 Key typed runtime entry points include:
 
-- `runtime.generate.speech(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
-- `runtime.generate.audio(text:voiceProfile:textProfile:inputTextContext:requestContext:)`
+- `runtime.generate.speech(text:voiceProfile:textProfile:sourceFormat:requestContext:)`
+- `runtime.generate.audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)`
 - `runtime.generate.batch(_:voiceProfile:)`
 - `runtime.defaultVoiceProfile`
 - `runtime.setDefaultVoiceProfile(_:)`

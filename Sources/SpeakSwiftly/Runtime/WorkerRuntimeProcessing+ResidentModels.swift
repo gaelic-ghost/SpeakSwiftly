@@ -197,7 +197,7 @@ extension SpeakSwiftly.Runtime {
             profileName: let profileName,
             textProfileID: _,
             jobType: _,
-            inputTextContext: _,
+            sourceFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ):

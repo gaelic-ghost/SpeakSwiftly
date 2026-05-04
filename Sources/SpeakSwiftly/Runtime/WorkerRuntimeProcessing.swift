@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, inputTextContext: _, requestContext: _, qwenPreModelTextChunking: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -19,7 +19,7 @@ extension SpeakSwiftly.Runtime {
                 profileName: let profileName,
                 textProfileID: let textProfileID,
                 jobType: .file,
-                inputTextContext: let inputTextContext,
+                sourceFormat: let sourceFormat,
                 requestContext: let requestContext,
                 qwenPreModelTextChunking: _,
             ):
@@ -30,7 +30,7 @@ extension SpeakSwiftly.Runtime {
                         text: text,
                         voiceProfile: profileName,
                         textProfile: textProfileID,
-                        inputTextContext: inputTextContext,
+                        sourceFormat: sourceFormat,
                         requestContext: requestContext,
                     )
                     let completedJob = try generationJobStore.markCompleted(
@@ -44,7 +44,7 @@ extension SpeakSwiftly.Runtime {
                                 sampleRate: generatedFile.sampleRate,
                                 voiceProfile: generatedFile.voiceProfile,
                                 textProfile: generatedFile.textProfile,
-                                inputTextContext: generatedFile.inputTextContext,
+                                sourceFormat: generatedFile.sourceFormat,
                                 requestContext: generatedFile.requestContext,
                             ),
                         ],
@@ -80,7 +80,7 @@ extension SpeakSwiftly.Runtime {
                                 sampleRate: generatedFile.sampleRate,
                                 voiceProfile: generatedFile.voiceProfile,
                                 textProfile: generatedFile.textProfile,
-                                inputTextContext: generatedFile.inputTextContext,
+                                sourceFormat: generatedFile.sourceFormat,
                                 requestContext: generatedFile.requestContext,
                             )
                         },
@@ -362,7 +362,7 @@ extension SpeakSwiftly.Runtime {
                     text: item.text,
                     voiceProfile: profileName,
                     textProfile: item.textProfile,
-                    inputTextContext: item.inputTextContext,
+                    sourceFormat: item.sourceFormat,
                     requestContext: item.requestContext,
                 ),
             )

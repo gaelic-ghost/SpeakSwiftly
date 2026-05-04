@@ -29,6 +29,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
+- [Milestone 27: TextForSpeech 0.19 Surface Simplification](#milestone-27-textforspeech-019-surface-simplification)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -38,8 +39,32 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 21: Unified Logging With `Logger` - Planned
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
+- Milestone 27: TextForSpeech 0.19 Surface Simplification - In Progress
 
 ## Active Milestones
+
+## Milestone 27: TextForSpeech 0.19 Surface Simplification
+
+### Status
+
+In Progress
+
+### Scope
+
+- [x] Raise the package dependency floor to `TextForSpeech` `0.19.0` and resolve its parser-backed Markdown and HTML transitive dependencies through SwiftPM.
+- [x] Remove `SpeakSwiftly.InputTextContext` from the typed Swift surface and use `TextForSpeech.SourceFormat` directly only for whole-source generation.
+- [x] Move request path context onto `SpeakSwiftly.RequestContext`, which aliases `TextForSpeech.RequestContext`, so `cwd` and `repoRoot` follow the upstream model.
+- [x] Remove JSONL `input_text_context`, `text_format`, and `nested_source_format` from the current generation wire shape.
+- [x] Keep `source_format` as the one explicit whole-source selector and let `TextForSpeech` detect mixed prose, Markdown, HTML, logs, CLI output, and agent text internally.
+- [x] Carry `source_format` through retained generated files, generation jobs, batch items, request emission, request decoding, and typed tests.
+- [ ] Sweep downstream package adopters, especially `SpeakSwiftlyServer`, after this package change is released.
+
+### Exit Criteria
+
+- [x] `swift build` passes with `TextForSpeech` `0.19.0`.
+- [x] `swift test` passes with the simplified source/request context surface.
+- [ ] Release notes for the next SpeakSwiftly tag call out the source-breaking removal of `InputTextContext` and JSONL `input_text_context`.
+- [ ] Downstream adoption is handled through a separate branch and release bump.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
 

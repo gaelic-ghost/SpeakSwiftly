@@ -261,17 +261,17 @@ Current resident-status stages:
 
 ## JSONL Reference
 
-For generation requests, the worker now documents `voice_profile`, `text_profile`, `input_text_context`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names. When `voice_profile` is omitted, generation uses the runtime default voice profile, which falls back to `swift-signal`.
-`input_text_context.context` maps to `TextForSpeech.InputContext`, while `request_context` maps to `TextForSpeech.RequestContext`. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
+For generation requests, the worker now documents `voice_profile`, `text_profile`, `source_format`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names. When `voice_profile` is omitted, generation uses the runtime default voice profile, which falls back to `swift-signal`.
+`source_format` selects the whole-source normalization lane. Mixed prose, Markdown, logs, HTML, CLI output, and agent text should omit source hints and let `TextForSpeech` detect structure internally. `request_context` maps to `TextForSpeech.RequestContext`, including `cwd` and `repo_root` path context. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
 
 Representative request shapes:
 
 ```json
 {"id":"req-1","op":"generate_speech","text":"Hello there"}
 {"id":"req-1b","op":"generate_speech","text":"Explain the latest runtime status.","request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime"}}
-{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","text_profile":"logs","input_text_context":{"context":{"cwd":"./","repo_root":"./","text_format":"cli_output"}}}
-{"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","input_text_context":{"context":{"text_format":"markdown","nested_source_format":"swift_source"}}}
-{"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","input_text_context":{"source_format":"swift_source"}}
+{"id":"req-1c","op":"generate_speech","text":"stderr: broken pipe","text_profile":"logs","request_context":{"cwd":"./","repo_root":"./"}}
+{"id":"req-1d","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```"}
+{"id":"req-1e","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","source_format":"swift_source"}
 {"id":"req-1e-qwen-chunked","op":"generate_speech","text":"First paragraph.\n\nSecond paragraph.","qwen_pre_model_text_chunking":true}
 {"id":"req-1f","op":"generate_audio_file","text":"Save this one for later playback."}
 {"id":"req-1g","op":"generate_batch","items":[{"text":"First saved file."},{"artifact_id":"custom-batch-artifact","text":"Second saved file.","text_profile":"logs","request_context":{"source":"batch_export","topic":"follow-up"}}]}
@@ -332,7 +332,7 @@ Representative response and event shapes:
 {"id":"req-1","event":"progress","stage":"preroll_ready"}
 {"id":"req-1","event":"progress","stage":"playback_finished"}
 {"id":"req-1","ok":true}
-{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","voice_profile":"swift-signal","text_profile":null,"input_text_context":null,"request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime","attributes":{}},"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","voice_profile":"swift-signal","text_profile":null,"state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile":null,"input_text_context":null,"request_context":null}]}}
+{"id":"req-1f","ok":true,"generated_file":{"artifact_id":"req-1f-artifact-1","voice_profile":"swift-signal","text_profile":null,"source_format":null,"request_context":{"source":"status_panel","app":"SpeakSwiftlyOperator","project":"SpeakSwiftly","topic":"runtime","attributes":{}},"sample_rate":24000,"created_at":"2026-04-07T18:22:00Z","file_path":"/tmp/generated-files/7265712d31662d61727469666163742d31/generated.wav"},"generation_job":{"job_id":"req-1f","job_kind":"file","voice_profile":"swift-signal","text_profile":null,"state":"completed","items":[{"artifact_id":"req-1f-artifact-1","text":"Save this one for later playback.","text_profile":null,"source_format":null,"request_context":null}]}}
 ```
 
 Raw JSONL callers should send absolute filesystem paths for path fields, or include `cwd` when using relative paths. SpeakSwiftly resolves those paths against caller-provided context, not the worker launch directory.
@@ -344,7 +344,7 @@ When JSONL naming changes, update this file and `README.md` in the same pass so 
 Current live-playback behavior:
 
 - `generate_speech` loads the stored profile first, then routes resident generation through the active backend. `qwen3` uses stored profile reference audio and transcript, prepares missing per-model conditioning lazily when `.preparedConditioning` is active, and keeps Qwen live playback single-pass by default. A request can opt into SpeakSwiftly's pre-model Qwen text chunking with `qwen_pre_model_text_chunking: true`, which bounds long live requests by paragraph-group chunks before each model call. `chatterbox_turbo` uses stored profile reference audio with the resident model's built-in default conditioning as the no-clone fallback and now segments normalized text into speakable chunks for sequential live synthesis, and `marvis` uses stored profile vibe to select the already-warm built-in preset voice.
-- All live-speech and retained-file text normalization goes through `SpeakSwiftly.Normalizer.speechText(...)`, which delegates to the static async `TextForSpeech.Normalize` entry points with the selected stored or active custom profile, the active built-in style, source-format context, and the runtime summarization provider. Keep future generation call sites on this shared path instead of rebuilding TextForSpeech profile/style inputs locally.
+- All live-speech and retained-file text normalization goes through `SpeakSwiftly.Normalizer.speechText(...)`, which delegates to the static async `TextForSpeech.Normalize` entry points with the selected stored or active custom profile, the active built-in style, optional whole-source format, request context, and the runtime summarization provider. Keep future generation call sites on this shared path instead of rebuilding TextForSpeech profile/style inputs locally.
 - The built-in text style is a separate persisted runtime setting from the active custom text profile. JSONL callers can inspect it with `get_active_text_profile_style`, inspect the available choices with `list_text_profile_styles`, and update it with `set_active_text_profile_style`.
 - Live playback stays a single-speaker path on one worker. When one audible live request is already playing, later live requests can still be accepted and queued immediately, but their generation waits until the active live playback drains before the next live request starts.
 - `generate_audio_file` follows that same backend-routing path, then saves the completed WAV as a retained artifact instead of scheduling playback. The Qwen pre-model text chunking flag applies only to live playback; retained artifact generation stays on the single-pass Qwen rendering path.

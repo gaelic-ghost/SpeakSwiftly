@@ -203,33 +203,33 @@ import Darwin
 // MARK: - Runtime Helpers
 
 @Test func `public library surface exposes queueing helpers`() {
-    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, SpeakSwiftly.InputTextContext?) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
         textProfile,
-        inputTextContext in
+        sourceFormat in
         await generate.speech(
             text: text,
             voiceProfile: profileName,
             textProfile: textProfile,
-            inputTextContext: inputTextContext,
+            sourceFormat: sourceFormat,
         )
     }
     let speakWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
         await generate.speech(text: text)
     }
-    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, SpeakSwiftly.InputTextContext?) async -> SpeakSwiftly.RequestHandle = {
+    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
         textProfile,
-        inputTextContext in
+        sourceFormat in
         await generate.audio(
             text: text,
             voiceProfile: profileName,
             textProfile: textProfile,
-            inputTextContext: inputTextContext,
+            sourceFormat: sourceFormat,
         )
     }
     let generateAudioWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
@@ -658,7 +658,7 @@ import Darwin
     let sampleRate: KeyPath<SpeakSwiftly.GenerationArtifact, Int> = \.sampleRate
     let voiceProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String> = \.voiceProfile
     let textProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String?> = \.textProfile
-    let inputTextContext: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.InputTextContext?> = \.inputTextContext
+    let sourceFormat: KeyPath<SpeakSwiftly.GenerationArtifact, TextForSpeech.SourceFormat?> = \.sourceFormat
     let requestContext: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.RequestContext?> = \.requestContext
 
     _ = artifactID
@@ -668,7 +668,7 @@ import Darwin
     _ = sampleRate
     _ = voiceProfile
     _ = textProfile
-    _ = inputTextContext
+    _ = sourceFormat
     _ = requestContext
 }
 

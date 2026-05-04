@@ -34,7 +34,7 @@ private func makeLiveSpeechRequest(id: String) -> WorkerRequest {
         profileName: "testing-profile",
         textProfileID: nil,
         jobType: .live,
-        inputTextContext: nil,
+        sourceFormat: nil,
         requestContext: nil,
         qwenPreModelTextChunking: nil,
     )

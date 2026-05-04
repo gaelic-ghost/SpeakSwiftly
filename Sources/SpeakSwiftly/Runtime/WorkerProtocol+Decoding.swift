@@ -30,11 +30,12 @@ extension WorkerRequest {
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
-                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
-                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
+                    sourceFormat: raw.sourceFormat,
+                )
+                let requestContext = RawWorkerRequest.requestContext(
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    base: raw.requestContext,
                 )
                 return .queueSpeech(
                     id: id,
@@ -42,8 +43,8 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .live,
-                    inputTextContext: resolved.inputTextContext,
-                    requestContext: raw.requestContext,
+                    sourceFormat: resolved.sourceFormat,
+                    requestContext: requestContext,
                     qwenPreModelTextChunking: raw.qwenPreModelTextChunking ?? false,
                 )
 
@@ -53,11 +54,12 @@ extension WorkerRequest {
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    cwd: raw.cwd ?? raw.inputTextContext?.context?.cwd,
-                    repoRoot: raw.repoRoot ?? raw.inputTextContext?.context?.repoRoot,
-                    textFormat: raw.textFormat ?? raw.inputTextContext?.context?.textFormat,
-                    nestedSourceFormat: raw.nestedSourceFormat ?? raw.inputTextContext?.context?.nestedSourceFormat,
-                    sourceFormat: raw.sourceFormat ?? raw.inputTextContext?.sourceFormat,
+                    sourceFormat: raw.sourceFormat,
+                )
+                let requestContext = RawWorkerRequest.requestContext(
+                    cwd: raw.cwd,
+                    repoRoot: raw.repoRoot,
+                    base: raw.requestContext,
                 )
                 return .queueSpeech(
                     id: id,
@@ -65,8 +67,8 @@ extension WorkerRequest {
                     profileName: profileName,
                     textProfileID: resolved.textProfileID,
                     jobType: .file,
-                    inputTextContext: resolved.inputTextContext,
-                    requestContext: raw.requestContext,
+                    sourceFormat: resolved.sourceFormat,
+                    requestContext: requestContext,
                     qwenPreModelTextChunking: nil,
                 )
 

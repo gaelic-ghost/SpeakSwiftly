@@ -1486,7 +1486,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_id":"logs","text_format":"plain_text"}
+        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_id":"logs"}
         """#,
     )
 
@@ -1666,7 +1666,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     await runtime.accept(
         line: #"""
-        {"id":"req-chatterbox","op":"generate_speech","text":"Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing.","profile_name":"default-femme","text_format":"plain_text"}
+        {"id":"req-chatterbox","op":"generate_speech","text":"Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing.","profile_name":"default-femme"}
         """#,
     )
 
@@ -1741,7 +1741,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-live","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text"}
+        {"id":"req-qwen-live","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme"}
         """,
     )
 
@@ -1758,7 +1758,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-file","op":"generate_audio_file","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text"}
+        {"id":"req-qwen-file","op":"generate_audio_file","text":"\(escapedText)","profile_name":"default-femme"}
         """,
     )
 
@@ -1774,7 +1774,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","text_format":"plain_text","qwen_pre_model_text_chunking":true}
+        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","qwen_pre_model_text_chunking":true}
         """,
     )
 

@@ -14,7 +14,7 @@ public extension SpeakSwiftly {
             case artifactID = "artifact_id"
             case text
             case textProfile = "text_profile"
-            case inputTextContext = "input_text_context"
+            case sourceFormat = "source_format"
             case requestContext = "request_context"
         }
 
@@ -23,7 +23,7 @@ public extension SpeakSwiftly {
         public let artifactID: String
         public let text: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let sourceFormat: TextForSpeech.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
 
         // MARK: Lifecycle
@@ -32,13 +32,13 @@ public extension SpeakSwiftly {
             artifactID: String,
             text: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            inputTextContext: SpeakSwiftly.InputTextContext?,
+            sourceFormat: TextForSpeech.SourceFormat?,
             requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID
             self.text = text
             self.textProfile = textProfile
-            self.inputTextContext = inputTextContext
+            self.sourceFormat = sourceFormat
             self.requestContext = requestContext
         }
     }
@@ -100,7 +100,7 @@ public extension SpeakSwiftly {
             case sampleRate = "sample_rate"
             case voiceProfile = "voice_profile"
             case textProfile = "text_profile"
-            case inputTextContext = "input_text_context"
+            case sourceFormat = "source_format"
             case requestContext = "request_context"
         }
 
@@ -111,7 +111,7 @@ public extension SpeakSwiftly {
         public let sampleRate: Int
         public let voiceProfile: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let inputTextContext: SpeakSwiftly.InputTextContext?
+        public let sourceFormat: TextForSpeech.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
 
         init(
@@ -122,7 +122,7 @@ public extension SpeakSwiftly {
             sampleRate: Int,
             voiceProfile: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            inputTextContext: SpeakSwiftly.InputTextContext?,
+            sourceFormat: TextForSpeech.SourceFormat?,
             requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID
@@ -132,7 +132,7 @@ public extension SpeakSwiftly {
             self.sampleRate = sampleRate
             self.voiceProfile = voiceProfile
             self.textProfile = textProfile
-            self.inputTextContext = inputTextContext
+            self.sourceFormat = sourceFormat
             self.requestContext = requestContext
         }
     }

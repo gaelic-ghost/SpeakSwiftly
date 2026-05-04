@@ -151,7 +151,7 @@ For any single generation request, the mental model is:
 1. pick the built-in style
 2. pick the requested stored custom profile, or the active custom profile when the request does not name one
 3. snapshot the active TextForSpeech summarization provider
-4. normalize the input text with request-local source format and `TextForSpeech.InputContext`
+4. normalize the input text with optional whole-source format and `TextForSpeech.RequestContext`
 
 That is why the generation APIs now carry `textProfile` rather than `textProfileName`.
 
@@ -159,8 +159,8 @@ The generation request is selecting a stored profile by stable identifier, not b
 
 The typed generation surface also keeps text-shaping and caller metadata separate:
 
-- `inputTextContext`: how to interpret the text itself
-- `requestContext`: what app, agent, project, or topic the request belongs to
+- `sourceFormat`: the whole-source lane when the entire input is known source
+- `requestContext`: what app, agent, project, topic, or path context the request belongs to
 
 ## Persistence
 

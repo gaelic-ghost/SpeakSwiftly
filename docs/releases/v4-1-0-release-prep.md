@@ -5,6 +5,10 @@ Date: 2026-04-28
 This note captures the intended scope and validation story for the `v4.1.0`
 release.
 
+This historical prep note was superseded by the `TextForSpeech 0.19.0` surface
+simplification. Current callers use `sourceFormat` for whole-source generation
+and `requestContext` for request metadata and path context.
+
 ## Intended Scope
 
 The release should be framed as:
@@ -12,14 +16,12 @@ The release should be framed as:
 - a minor TextForSpeech integration refresh that adopts `TextForSpeech` `0.18.9`
 - a normalization simplification that routes live speech and retained file
   generation through one shared `SpeakSwiftly.Normalizer.speechText(...)` path
-- a package-surface alignment with the current `TextForSpeech.InputContext`,
-  `TextForSpeech.RequestContext`, and profile-details naming model
+- a package-surface alignment with the current `TextForSpeech.RequestContext`,
+  whole-source `TextForSpeech.SourceFormat`, and profile-details naming model
 
 Included work on the current branch:
 
 - update the `TextForSpeech` dependency floor and resolved pin to `0.18.9`
-- change `SpeakSwiftly.InputTextContext.context` to use
-  `TextForSpeech.InputContext`
 - keep JSONL text-profile payloads encoded as `profile_id` while mapping from
   `TextForSpeech.Runtime.Profiles.Details.id`
 - centralize normalization through the shared normalizer before live playback
@@ -43,10 +45,10 @@ Not included:
 
 - release this as `v4.1.0`
 - this is a minor release because it updates the public Swift normalization
-  typing around `TextForSpeech.InputContext` and simplifies the generation
+  typing around the shared TextForSpeech request context and simplifies the generation
   normalization path while preserving JSONL compatibility
-- JSONL callers can keep sending the existing `input_text_context`,
-  `request_context`, and `text_profile_id` compatibility keys
+- JSONL callers should use `request_context`, `source_format`, and
+  `text_profile_id` compatibility keys
 
 ## Validation Target
 

@@ -28,7 +28,7 @@ public extension SpeakSwiftly.Generate {
     ///   - text: The text to synthesize.
     ///   - voiceProfile: The stored voice profile to use. When omitted, SpeakSwiftly uses the runtime default.
     ///   - textProfile: An optional text-normalization profile override.
-    ///   - inputTextContext: Optional metadata that describes how the input text should be interpreted.
+    ///   - sourceFormat: Optional metadata that describes how the input text should be interpreted.
     ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
     ///   - qwenPreModelTextChunking: Whether Qwen live playback should split text before model generation.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
@@ -36,7 +36,7 @@ public extension SpeakSwiftly.Generate {
         text: String,
         voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         qwenPreModelTextChunking: Bool = false,
     ) async -> SpeakSwiftly.RequestHandle {
@@ -48,7 +48,7 @@ public extension SpeakSwiftly.Generate {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .live,
-                inputTextContext: inputTextContext,
+                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
@@ -63,7 +63,7 @@ public extension SpeakSwiftly.Generate {
         text: String,
         voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        inputTextContext: SpeakSwiftly.InputTextContext? = nil,
+        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
@@ -74,7 +74,7 @@ public extension SpeakSwiftly.Generate {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .file,
-                inputTextContext: inputTextContext,
+                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: nil,
             ),

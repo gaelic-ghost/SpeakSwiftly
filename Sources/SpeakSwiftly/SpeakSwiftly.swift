@@ -15,20 +15,6 @@ public enum SpeakSwiftly {
     /// A stable identifier for one stored text-normalization profile.
     public typealias TextProfileID = String
 
-    /// Describes how one input text payload should be interpreted before generation.
-    public struct InputTextContext: Codable, Sendable, Equatable {
-        public let context: TextForSpeech.InputContext?
-        public let sourceFormat: TextForSpeech.SourceFormat?
-
-        public init(
-            context: TextForSpeech.InputContext? = nil,
-            sourceFormat: TextForSpeech.SourceFormat? = nil,
-        ) {
-            self.context = context
-            self.sourceFormat = sourceFormat
-        }
-    }
-
     /// Describes where a generation request came from and what it is related to.
     ///
     /// `TextForSpeech` owns the concrete model so request metadata stays identical
@@ -275,7 +261,6 @@ typealias PlaybackState = SpeakSwiftly.PlaybackState
 typealias WorkerRequestStreamEvent = SpeakSwiftly.RequestEvent
 typealias WorkerRequestHandle = SpeakSwiftly.RequestHandle
 typealias WorkerRuntime = SpeakSwiftly.Runtime
-typealias SpeechNormalizationContext = TextForSpeech.InputContext
 typealias SpeechTextDeepTraceFeatures = SpeakSwiftly.DeepTrace.Features
 typealias SpeechTextDeepTraceSection = SpeakSwiftly.DeepTrace.Section
 typealias SpeechTextDeepTraceSectionWindow = SpeakSwiftly.DeepTrace.SectionWindow

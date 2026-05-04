@@ -14,9 +14,10 @@ surface.
   cross-queue entry points are removed.
 - Text-profile operations on `SpeakSwiftly.Normalizer` now return
   `SpeakSwiftly.TextProfileSummary`, `SpeakSwiftly.TextProfileDetails`, and
-  `SpeakSwiftly.TextProfileStyleOption`. `TextForSpeech.Replacement`,
-  `InputContext`, and `SourceFormat` remain where callers author real
-  TextForSpeech inputs.
+  `SpeakSwiftly.TextProfileStyleOption`. `TextForSpeech.Replacement` remains
+  where callers author real TextForSpeech replacement inputs, and
+  `TextForSpeech.SourceFormat` is used directly only for whole-source
+  generation.
 - Request observation now exposes typed `SpeakSwiftly.RequestKind` values on
   request handles, snapshots, active requests, and queued requests. JSONL `op`
   strings remain the transport representation.

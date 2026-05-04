@@ -15,7 +15,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -32,7 +32,7 @@ import TextForSpeech
             profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -51,7 +51,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .file,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -70,7 +70,7 @@ import TextForSpeech
             profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .file,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -91,14 +91,14 @@ import TextForSpeech
                     artifactID: "req-batch-artifact-1",
                     text: "First file",
                     textProfile: nil,
-                    inputTextContext: nil,
+                    sourceFormat: nil,
                     requestContext: nil,
                 ),
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "custom-artifact",
                     text: "Second file",
                     textProfile: "logs",
-                    inputTextContext: .init(sourceFormat: .swift),
+                    sourceFormat: .swift,
                     requestContext: nil,
                 ),
             ],
@@ -120,7 +120,7 @@ import TextForSpeech
                     artifactID: "req-batch-default-artifact-1",
                     text: "First file",
                     textProfile: nil,
-                    inputTextContext: nil,
+                    sourceFormat: nil,
                     requestContext: nil,
                 ),
             ],
@@ -128,9 +128,9 @@ import TextForSpeech
     )
 }
 
-@Test func `decodes speak live request with text context and profile`() throws {
+@Test func `decodes speak live request with request path context and profile`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly","text_format":"cli_output"}"#,
+        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
     )
 
     #expect(
@@ -140,23 +140,19 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: "logs",
             jobType: .live,
-            inputTextContext: .init(
-                context: TextForSpeech.InputContext(
-                    cwd: "/Users/galew/Workspace/SpeakSwiftly",
-                    repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
-                    textFormat: .cli,
-                ),
-                sourceFormat: nil,
+            sourceFormat: nil,
+            requestContext: .init(
+                cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
             ),
-            requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
     )
 }
 
-@Test func `decodes speak live request with nested source format`() throws {
+@Test func `decodes speak live request with mixed markdown text`() throws {
     let request = try WorkerRequest.decode(
-        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme","text_format":"markdown","nested_source_format":"swift_source"}"#,
+        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme"}"#,
     )
 
     #expect(
@@ -166,13 +162,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: .init(
-                context: TextForSpeech.InputContext(
-                    textFormat: .markdown,
-                    nestedSourceFormat: .swift,
-                ),
-                sourceFormat: nil,
-            ),
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -191,7 +181,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: .init(sourceFormat: .swift),
+            sourceFormat: .swift,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -210,7 +200,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: .init(
                 source: "status_panel",
                 app: "SpeakSwiftlyOperator",
@@ -233,28 +223,9 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: true,
-        ),
-    )
-}
-
-@Test func `decodes legacy whole source text format as source lane`() throws {
-    let request = try WorkerRequest.decode(
-        from: #"{"id":"req-legacy-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","text_format":"swift_source"}"#,
-    )
-
-    #expect(
-        request == .queueSpeech(
-            id: "req-legacy-source",
-            text: "struct WorkerRuntime { let sampleRate: Int }",
-            profileName: "default-femme",
-            textProfileID: nil,
-            jobType: .live,
-            inputTextContext: .init(sourceFormat: .swift),
-            requestContext: nil,
-            qwenPreModelTextChunking: false,
         ),
     )
 }
@@ -549,7 +520,7 @@ import TextForSpeech
         profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
         textProfileID: nil,
         jobType: .live,
-        inputTextContext: nil,
+        sourceFormat: nil,
         requestContext: nil,
         qwenPreModelTextChunking: false,
     )
@@ -562,7 +533,7 @@ import TextForSpeech
                 profileName: "swift-signal",
                 textProfileID: nil,
                 jobType: .live,
-                inputTextContext: nil,
+                sourceFormat: nil,
                 requestContext: nil,
                 qwenPreModelTextChunking: false,
             ),

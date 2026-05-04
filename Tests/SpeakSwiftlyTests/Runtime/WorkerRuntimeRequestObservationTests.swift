@@ -526,7 +526,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            inputTextContext: nil,
+            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
