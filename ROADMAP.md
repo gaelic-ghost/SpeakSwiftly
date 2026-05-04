@@ -29,7 +29,6 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
-- [Milestone 27: TextForSpeech 0.19 Surface Simplification](#milestone-27-textforspeech-019-surface-simplification)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -39,32 +38,8 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 21: Unified Logging With `Logger` - Planned
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
-- Milestone 27: TextForSpeech 0.19 Surface Simplification - In Progress
 
 ## Active Milestones
-
-## Milestone 27: TextForSpeech 0.19 Surface Simplification
-
-### Status
-
-In Progress
-
-### Scope
-
-- [x] Raise the package dependency floor to `TextForSpeech` `0.19.0` and resolve its parser-backed Markdown and HTML transitive dependencies through SwiftPM.
-- [x] Remove `SpeakSwiftly.InputTextContext` from the typed Swift surface and use `TextForSpeech.SourceFormat` directly only for whole-source generation.
-- [x] Move request path context onto `SpeakSwiftly.RequestContext`, which aliases `TextForSpeech.RequestContext`, so `cwd` and `repoRoot` follow the upstream model.
-- [x] Remove JSONL `input_text_context`, `text_format`, and `nested_source_format` from the current generation wire shape.
-- [x] Keep `source_format` as the one explicit whole-source selector and let `TextForSpeech` detect mixed prose, Markdown, HTML, logs, CLI output, and agent text internally.
-- [x] Carry `source_format` through retained generated files, generation jobs, batch items, request emission, request decoding, and typed tests.
-- [ ] Sweep downstream package adopters, especially `SpeakSwiftlyServer`, after this package change is released.
-
-### Exit Criteria
-
-- [x] `swift build` passes with `TextForSpeech` `0.19.0`.
-- [x] `swift test` passes with the simplified source/request context surface.
-- [ ] Release notes for the next SpeakSwiftly tag call out the source-breaking removal of `InputTextContext` and JSONL `input_text_context`.
-- [ ] Downstream adoption is handled through a separate branch and release bump.
 
 ## Milestone 16: `mlx-audio-swift` Upgrade Review
 
@@ -196,6 +171,13 @@ In Progress
 
 ## History
 
+### 2026-05-03 TextForSpeech 0.19 simplification
+
+- Milestone 27 was condensed out of Active Milestones after the `TextForSpeech` `0.19.0` simplification landed on the `v5.0.0-rc.1` release-candidate branch. The package now uses `TextForSpeech.SourceFormat` directly only for whole-source generation, carries request metadata and path context through `SpeakSwiftly.RequestContext`, and removes the public `SpeakSwiftly.InputTextContext` typed surface.
+- The current JSONL generation wire shape uses `source_format` for whole-source input and `request_context` for request metadata and path context. Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format` are rejected with an explicit invalid-request diagnostic instead of being silently ignored.
+- Release-candidate notes now live in `docs/releases/v5-0-0-rc-1-release-notes.md` and `docs/releases/v5-0-0-rc-1-release-prep.md`; the stale standalone Milestone 27 migration note and superseded `v4.1.0` draft release docs were removed.
+- Downstream adoption, especially `SpeakSwiftlyServer`, remains release-hardening work under Milestone 26 so this package does not carry temporary compatibility shims while consumers move to the current surface.
+
 ### 2026-05-03 Milestone 9 closeout
 
 - Milestone 9 was condensed out of Active Milestones after the default-profile work landed as a deliberately small API: `runtime.defaultVoiceProfile`, `runtime.setDefaultVoiceProfile(_:)`, optional `voiceProfile:` on generation calls, JSONL generation fallback when `voice_profile` is omitted, and the built-in `swift-signal` fallback. The proposed runtime overview stream from #45 was rejected as API bloat; the existing surface remains `runtime.overview()` for one snapshot, `runtime.statusEvents()` for runtime status events, and request-handle streams for request-specific lifecycle and generation events. The startup-side allocator-warning ticket #7 was ruled stale against current source and tests: resident preload stays playback-cold until first audible work, and playback environment observation is bound only during playback preparation.
@@ -217,7 +199,7 @@ In Progress
 - Milestone 26 no longer tracks queue-control E2E pressure as active release-hardening work because #47 closed after PR #49 reduced that suite's pressure while preserving its coverage intent.
 - Milestone 20 was condensed out of Active Milestones because the runtime-owned request-event broker, `request(id:)`, `updates(for:)`, `generationEvents(for:)`, replay semantics, and lifecycle tests are now landed.
 - Milestone 27 was condensed out of Active Milestones because the public API simplification shipped in PR #46 with queue-control ownership cleanup, SpeakSwiftly-owned text-profile return models, typed request kind and completion, canonical retained `GenerationJob` inspection, and polished `Voices.create(...)` labels.
-- Milestone 13 no longer carries completed public-API-audit, semantic-identifier, `BatchItem`, or retained-generation-model decision tickets; those outcomes now live in `docs/maintainers/public-api-surface-audit-2026-05-02.md` and `docs/maintainers/milestone-27-migration-note.md`.
+- Milestone 13 no longer carries completed public-API-audit, semantic-identifier, `BatchItem`, or retained-generation-model decision tickets; those outcomes now live in `docs/maintainers/public-api-surface-audit-2026-05-02.md` and the `v5.0.0-rc.1` release-candidate notes.
 - Milestone 18 no longer carried completed retained-generation-model or typed request-completion DocC tickets after this audit; the later Milestone 9 closeout removed its remaining active docs work.
 - Milestone 26 no longer repeats completed E2E artifact, CPU-accounting, runtime-publication, launcher, resource-lookup, queue-control E2E pressure, or public-API-simplification tickets; the remaining release-hardening work is downstream adoption, unresolved active milestones, and final release-candidate validation.
 - Milestone 9 was corrected during this audit to acknowledge the existing `get_runtime_overview` / `runtime.overview()` inspection surface and to track the proposed runtime-level playback or overview event stream separately in #45. The later Milestone 9 closeout rejected that stream as API bloat.

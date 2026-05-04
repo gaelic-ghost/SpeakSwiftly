@@ -337,9 +337,9 @@ types for Milestone 27 and applied the voice-creation label changes.
 
 ## Roadmap Hooks
 
-The actionable work is tracked in `ROADMAP.md` under:
+The actionable work from this audit was completed or moved into the current
+roadmap:
 
-- Milestone 13: Swift Package Distribution
-- Milestone 18: Package Docs And Distribution Polish
 - Milestone 26: Pre-v1 Release Hardening
-- Milestone 27: Public API Surface Simplification
+- History: 2026-05-03 roadmap accuracy audit
+- History: 2026-05-03 TextForSpeech 0.19 simplification

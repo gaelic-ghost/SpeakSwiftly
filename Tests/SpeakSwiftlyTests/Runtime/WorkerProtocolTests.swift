@@ -128,6 +128,34 @@ import TextForSpeech
     )
 }
 
+@Test func `decodes speak batch item with merged request path context`() throws {
+    let request = try WorkerRequest.decode(
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","project":"SpeakSwiftly","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+    )
+
+    #expect(
+        request == .queueBatch(
+            id: "req-batch-context",
+            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            items: [
+                SpeakSwiftly.GenerationJobItem(
+                    artifactID: "context-artifact",
+                    text: "File with path context.",
+                    textProfile: nil,
+                    sourceFormat: nil,
+                    requestContext: .init(
+                        source: "batch_export",
+                        project: "SpeakSwiftly",
+                        topic: "release",
+                        cwd: "/Users/galew/Workspace/SpeakSwiftly",
+                        repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
+                    ),
+                ),
+            ],
+        ),
+    )
+}
+
 @Test func `decodes speak live request with request path context and profile`() throws {
     let request = try WorkerRequest.decode(
         from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
@@ -619,6 +647,26 @@ import TextForSpeech
 @Test func `rejects missing required fields`() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
         try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","profile_name":"default-femme"}"#)
+    }
+}
+
+@Test func `rejects removed generation context keys`() throws {
+    let removedKeyPayloads = [
+        #"{"id":"req-old-context","op":"generate_speech","text":"Hello","input_text_context":{"source_format":"swift_source"}}"#,
+        #"{"id":"req-old-format","op":"generate_speech","text":"Hello","text_format":"source"}"#,
+        #"{"id":"req-old-nested-source","op":"generate_batch","items":[{"text":"Hello","nested_source_format":"swift_source"}]}"#,
+    ]
+
+    for payload in removedKeyPayloads {
+        do {
+            _ = try WorkerRequest.decode(from: payload)
+            Issue.record("Expected removed generation context key to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("Generation context key"))
+            #expect(error.message.contains("request_context"))
+            #expect(error.message.contains("source_format"))
+        }
     }
 }
 

@@ -263,6 +263,7 @@ Current resident-status stages:
 
 For generation requests, the worker now documents `voice_profile`, `text_profile`, `source_format`, and `request_context` as the current wire keys. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility, but new callers should prefer the newer names. When `voice_profile` is omitted, generation uses the runtime default voice profile, which falls back to `swift-signal`.
 `source_format` selects the whole-source normalization lane. Mixed prose, Markdown, logs, HTML, CLI output, and agent text should omit source hints and let `TextForSpeech` detect structure internally. `request_context` maps to `TextForSpeech.RequestContext`, including `cwd` and `repo_root` path context. Text-profile read payloads continue to encode the stable profile identifier as `profile_id` for JSONL compatibility even though the Swift-facing `SpeakSwiftly.TextProfileDetails` model exposes that same value as `profileID`.
+Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format` are intentionally rejected. That keeps stale callers from silently dropping path context or source-format intent after the `TextForSpeech` `0.19.0` simplification.
 
 Representative request shapes:
 

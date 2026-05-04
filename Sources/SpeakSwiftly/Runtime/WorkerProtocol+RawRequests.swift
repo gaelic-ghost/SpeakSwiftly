@@ -11,6 +11,9 @@ struct RawBatchItem: Decodable {
         case cwd
         case repoRoot = "repo_root"
         case sourceFormat = "source_format"
+        case inputTextContext = "input_text_context"
+        case textFormat = "text_format"
+        case nestedSourceFormat = "nested_source_format"
     }
 
     let artifactID: String?
@@ -23,6 +26,8 @@ struct RawBatchItem: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        try Self.rejectRemovedGenerationContextKeys(in: container)
+
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         textProfile = try container.decodeIfPresent(String.self, forKey: .textProfile)
@@ -61,6 +66,9 @@ struct RawWorkerRequest: Decodable {
         case cwd
         case repoRoot = "repo_root"
         case sourceFormat = "source_format"
+        case inputTextContext = "input_text_context"
+        case textFormat = "text_format"
+        case nestedSourceFormat = "nested_source_format"
         case requestID = "request_id"
         case vibe
         case voiceDescription = "voice_description"
@@ -253,6 +261,7 @@ struct RawWorkerRequest: Decodable {
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        try Self.rejectRemovedGenerationContextKeys(in: container)
 
         id = try container.decodeIfPresent(String.self, forKey: .id)
         op = try container.decodeIfPresent(String.self, forKey: .op)
@@ -340,7 +349,11 @@ struct RawWorkerRequest: Decodable {
                 textProfileID: rawItem.textProfile,
                 sourceFormat: rawItem.sourceFormat,
             )
-            let requestContext = rawItem.requestContext ?? requestContext(cwd: rawItem.cwd, repoRoot: rawItem.repoRoot)
+            let requestContext = requestContext(
+                cwd: rawItem.cwd,
+                repoRoot: rawItem.repoRoot,
+                base: rawItem.requestContext,
+            )
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 ?? "\(id)-artifact-\(index + 1)"
             guard seenArtifactIDs.insert(artifactID).inserted else {
@@ -450,6 +463,49 @@ struct RawWorkerRequest: Decodable {
                 .decodeIfPresent(LegacyReplacementPayload.self, forKey: key)?
                 .resolved()
         }
+    }
+}
+
+private extension RawBatchItem {
+    static func rejectRemovedGenerationContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedGenerationContextKeysInContainer(
+            in: container,
+            keys: [
+                .inputTextContext,
+                .textFormat,
+                .nestedSourceFormat,
+            ],
+        )
+    }
+}
+
+private extension RawWorkerRequest {
+    static func rejectRemovedGenerationContextKeys(
+        in container: KeyedDecodingContainer<CodingKeys>,
+    ) throws {
+        try rejectRemovedGenerationContextKeysInContainer(
+            in: container,
+            keys: [
+                .inputTextContext,
+                .textFormat,
+                .nestedSourceFormat,
+            ],
+        )
+    }
+}
+
+private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
+    in container: KeyedDecodingContainer<Key>,
+    keys: [Key],
+) throws {
+    for key in keys where container.contains(key) {
+        throw DecodingError.dataCorruptedError(
+            forKey: key,
+            in: container,
+            debugDescription: "Generation context key '\(key.stringValue)' was removed. Use 'source_format' only for whole-source input, move path and request metadata into 'request_context', and omit source hints for mixed prose, Markdown, HTML, logs, CLI output, and agent text.",
+        )
     }
 }
 
