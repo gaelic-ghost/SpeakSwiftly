@@ -29,6 +29,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
+- [Milestone 28: Typed Observation API Cleanup](#milestone-28-typed-observation-api-cleanup)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -38,6 +39,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 21: Unified Logging With `Logger` - Planned
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
+- Milestone 28: Typed Observation API Cleanup - Planned
 
 ## Active Milestones
 
@@ -155,8 +157,8 @@ In Progress
 
 ### Tickets
 
-- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially runtime observation, logging migration, and Marvis playback tuning.
-- [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 27 typed Swift API cleanup.
+- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially typed observation cleanup, logging migration, and Marvis playback tuning.
+- [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 28 typed observation API cleanup.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 
 ### Exit Criteria
@@ -164,6 +166,36 @@ In Progress
 - [ ] Tagged releases are operationally self-explanatory for local consumers and package consumers.
 - [ ] The package and worker surfaces are documented clearly enough that `v1.0.0` does not freeze accidental behavior.
 - [ ] Release verification proves both package correctness and published-runtime correctness.
+
+## Milestone 28: Typed Observation API Cleanup
+
+### Status
+
+Planned
+
+### Scope
+
+- [ ] Make typed Swift observation consistent across request, synthesis, generation queue, playback, and runtime.
+- [ ] Treat the existing `RequestEvent`, `RequestState`, `RequestUpdate`, and `RequestSnapshot` model as the naming and shape baseline.
+- [ ] Ship this as a breaking public API cleanup with no compatibility shims for old typed Swift names.
+
+### Tickets
+
+- [ ] Add the model families described in `docs/maintainers/observation-api-cleanup-plan-2026-05-06.md`.
+- [ ] Rename per-request `GenerationEvent` / `GenerationEventUpdate` to `SynthesisEvent` / `SynthesisUpdate`.
+- [ ] Rename `runtime.player` / `Player` to `runtime.playback` / `Playback`.
+- [ ] Replace public `StatusEvent`, `statusEvents()`, `RuntimeOverview`, and `PlaybackStateSnapshot` vocabulary with `RuntimeUpdate`, `RuntimeSnapshot`, `PlaybackUpdate`, and `PlaybackSnapshot`.
+- [ ] Add a small internal singleton observation broker for runtime, generate, and playback update streams so sequence, replay, and subscriber behavior do not drift.
+- [ ] Keep JSONL `worker_status` and `get_runtime_overview` stable unless a separate wire-contract decision is made.
+- [ ] Update DocC, `CONTRIBUTING.md`, `AGENTS.md`, and release migration notes in the same implementation branch as the public symbol changes.
+- [ ] Run `swift build`, targeted observation/runtime/playback tests, and `swift test` before release handoff.
+
+### Exit Criteria
+
+- [ ] `runtime.generate`, `runtime.playback`, and `runtime` expose consistent `updates()` and `snapshot()` surfaces.
+- [ ] Request-scoped synthesis events use synthesis naming instead of broad generation naming.
+- [ ] Public typed Swift docs no longer describe `runtime.player`, `RuntimeOverview`, `statusEvents()`, or `GenerationEventUpdate` as the current consumer-facing API.
+- [ ] Downstream adoption needs are captured before `v1.0.0`.
 
 ## Backlog Candidates
 
@@ -180,8 +212,8 @@ In Progress
 
 ### 2026-05-03 Milestone 9 closeout
 
-- Milestone 9 was condensed out of Active Milestones after the default-profile work landed as a deliberately small API: `runtime.defaultVoiceProfile`, `runtime.setDefaultVoiceProfile(_:)`, optional `voiceProfile:` on generation calls, JSONL generation fallback when `voice_profile` is omitted, and the built-in `swift-signal` fallback. The proposed runtime overview stream from #45 was rejected as API bloat; the existing surface remains `runtime.overview()` for one snapshot, `runtime.statusEvents()` for runtime status events, and request-handle streams for request-specific lifecycle and generation events. The startup-side allocator-warning ticket #7 was ruled stale against current source and tests: resident preload stays playback-cold until first audible work, and playback environment observation is bound only during playback preparation.
-- Milestone 18 was condensed out of Active Milestones because the remaining package-docs work depended on the now-closed #45 decision. README, CONTRIBUTING, and DocC now document the default voice behavior and avoid describing speculative runtime overview streams.
+- Milestone 9 was condensed out of Active Milestones after the default-profile work landed as a deliberately small API: `runtime.defaultVoiceProfile`, `runtime.setDefaultVoiceProfile(_:)`, optional `voiceProfile:` on generation calls, JSONL generation fallback when `voice_profile` is omitted, and the built-in `swift-signal` fallback. At that time, the proposed runtime overview stream from #45 was rejected because it did not yet have a clean package-wide observation vocabulary. The later Milestone 28 plan reopens typed Swift runtime observation as part of an across-the-board `Event` / `State` / `Update` / `Snapshot` cleanup instead of as a one-off overview stream.
+- Milestone 18 was condensed out of Active Milestones because the remaining package-docs work depended on the then-closed #45 decision. The later Milestone 28 plan owns the next typed observation documentation cleanup.
 
 ### 2026-05-03 full roadmap active-item audit
 
@@ -307,4 +339,4 @@ These notes were archived and removed as standalone maintainer docs because thei
 - Milestone 5 hardened the contract and added opt-in real-model end-to-end coverage.
 - Milestones 7 and 8 hardened playback and shutdown safety, then added grounded stderr observability.
 - Basic playback control, queue inspection, and normalization-replacement management are now part of the package surface instead of future concepts.
-- The typed Swift API breakout away from a kitchen-sink runtime surface landed, and the package now uses concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts`.
+- The typed Swift API breakout away from a kitchen-sink runtime surface landed, and the package now uses concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts`. Milestone 28 will rename `player` to `playback` as part of the breaking typed observation cleanup.

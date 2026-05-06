@@ -20,7 +20,7 @@ the JSONL worker operation names or runtime internals first.
 The concern-handle shape is still the right backbone for the package:
 
 - `runtime.generate`
-- `runtime.player`
+- `runtime.player` in the current implementation, with a planned breaking rename to `runtime.playback`
 - `runtime.voices`
 - `runtime.normalizer`
 - `runtime.jobs`
@@ -33,6 +33,10 @@ job they are trying to do.
 
 Milestone 27 preserved that shape. The cleanup kept callers on concern handles
 while reducing duplicate models, transport leakage, and queue-control ambiguity.
+
+The next cleanup keeps the same backbone but standardizes typed observation
+around `Event`, `State`, `Update`, and `Snapshot` families. That follow-up is
+tracked in [`observation-api-cleanup-plan-2026-05-06.md`](observation-api-cleanup-plan-2026-05-06.md).
 
 ## Improvement Areas
 
@@ -108,9 +112,11 @@ Relevant files:
 The intended queue-control model is already documented:
 
 - generation-queue inspection lives under `Jobs`
-- playback-queue inspection lives under `Player`
+- playback-queue inspection lives under `Player` today and should move under
+  `Playback` during the breaking observation cleanup
 - cross-queue controls live on `Runtime`
-- same-queue conveniences may live on `Jobs` and `Player`
+- same-queue conveniences may live on `Jobs` and, after the breaking rename,
+  `Playback`
 
 Milestone 27 removed the cross-queue `Player.clearQueue(_:)` and
 `Player.cancel(_:requestID:)` entry points, which could operate on queues the
@@ -122,8 +128,7 @@ Implemented direction:
 - keep `runtime.cancel(.generation, requestID:)` and
   `runtime.cancel(.playback, requestID:)`
 - keep `jobs.clearQueue()` and `jobs.cancel(_:)` as generation conveniences
-- keep `player.clearQueue()` as a playback convenience
-- keep `player.cancelRequest(_:)` for broad playback-request cancellation
+- keep the same-queue playback conveniences under the renamed `playback` handle
 
 Practical consequence: a caller can tell from the handle name whether an
 operation affects playback, generation, or both.
@@ -134,6 +139,41 @@ Relevant files:
 - [`Sources/SpeakSwiftly/API/QueueControls.swift`](../../Sources/SpeakSwiftly/API/QueueControls.swift)
 - [`Sources/SpeakSwiftly/API/GenerationJobs.swift`](../../Sources/SpeakSwiftly/API/GenerationJobs.swift)
 - [`CONTRIBUTING.md`](../../CONTRIBUTING.md)
+
+### 3a. Typed Observation Family
+
+The current request model is the cleanest observation model in the package:
+
+- `RequestEvent`
+- `RequestState`
+- `RequestUpdate`
+- `RequestSnapshot`
+
+New direction:
+
+- keep `Request*` as the per-request baseline
+- rename per-request `GenerationEvent` / `GenerationEventUpdate` to
+  `SynthesisEvent` / `SynthesisUpdate`
+- add `GenerateEvent`, `GenerateState`, `GenerateUpdate`, and
+  `GenerateSnapshot` for the global generation-queue concern
+- rename `Player` to `Playback` and add `PlaybackEvent`, `PlaybackState`,
+  `PlaybackUpdate`, and `PlaybackSnapshot`
+- replace public `StatusEvent`, `statusEvents()`, `RuntimeOverview`, and
+  `PlaybackStateSnapshot` vocabulary with `RuntimeUpdate`,
+  `RuntimeSnapshot`, and `PlaybackSnapshot`
+
+This is a breaking API cleanup. The typed Swift surface should not preserve
+legacy shims for the old names unless Gale explicitly approves that compromise.
+JSONL `worker_status` and `get_runtime_overview` are not renamed by this plan.
+
+Relevant files:
+
+- [`Sources/SpeakSwiftly/SpeakSwiftly.swift`](../../Sources/SpeakSwiftly/SpeakSwiftly.swift)
+- [`Sources/SpeakSwiftly/API/RequestObservation.swift`](../../Sources/SpeakSwiftly/API/RequestObservation.swift)
+- [`Sources/SpeakSwiftly/API/Generation.swift`](../../Sources/SpeakSwiftly/API/Generation.swift)
+- [`Sources/SpeakSwiftly/API/Playback.swift`](../../Sources/SpeakSwiftly/API/Playback.swift)
+- [`Sources/SpeakSwiftly/Runtime/WorkerRuntime+RequestObservation.swift`](../../Sources/SpeakSwiftly/Runtime/WorkerRuntime+RequestObservation.swift)
+- [`docs/maintainers/observation-api-cleanup-plan-2026-05-06.md`](observation-api-cleanup-plan-2026-05-06.md)
 
 ### 4. Request Operation Names
 
@@ -341,5 +381,6 @@ The actionable work from this audit was completed or moved into the current
 roadmap:
 
 - Milestone 26: Pre-v1 Release Hardening
+- Milestone 28: Typed Observation API Cleanup
 - History: 2026-05-03 roadmap accuracy audit
 - History: 2026-05-03 TextForSpeech 0.19 simplification
