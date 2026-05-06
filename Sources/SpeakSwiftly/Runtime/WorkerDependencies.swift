@@ -18,7 +18,6 @@ struct WorkerDependencies: @unchecked Sendable {
     let writeWAV: @Sendable (_ samples: [Float], _ sampleRate: Int, _ url: URL) throws -> Void
     let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
     let loadAudioFloats: @Sendable (_ url: URL, _ sampleRate: Int) throws -> [Float]
-    let writeStdout: @Sendable (Data) throws -> Void
     let writeStderr: @Sendable (String) -> Void
     let now: @Sendable () -> Date
     let readRuntimeMemory: @Sendable () -> RuntimeMemorySnapshot?
@@ -62,9 +61,6 @@ struct WorkerDependencies: @unchecked Sendable {
                 return audio
             },
             loadAudioFloats: loadFloatAudioSamples,
-            writeStdout: { data in
-                try FileHandle.standardOutput.write(contentsOf: data)
-            },
             writeStderr: { message in
                 do {
                     try FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))

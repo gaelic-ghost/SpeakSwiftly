@@ -464,18 +464,18 @@ import TextForSpeech
     #expect(firstUpdate?.state == .warmingResidentModel)
     #expect(secondUpdate?.state == .residentModelReady)
     #expect(await loadCounter.value() == 1)
-    #expect(
+    #expect(await waitUntil {
         output.countJSONObjects {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "warming_resident_model"
-        } == 1,
-    )
-    #expect(
+        } == 1
+    })
+    #expect(await waitUntil {
         output.countJSONObjects {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-        } == 1,
-    )
+        } == 1
+    })
 }
 
 @Test func `typed request stream keeps background acknowledgement and later completion separate`() async throws {

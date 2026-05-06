@@ -89,7 +89,7 @@ public extension SpeakSwiftly {
     }
 }
 
-extension SpeakSwiftly {
+package extension SpeakSwiftly {
     struct Success: Encodable, Equatable {
         enum CodingKeys: String, CodingKey {
             case id

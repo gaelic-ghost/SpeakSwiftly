@@ -390,7 +390,6 @@ enum BenchmarkHarness {
             writeWAV: liveDependencies.writeWAV,
             loadAudioSamples: liveDependencies.loadAudioSamples,
             loadAudioFloats: liveDependencies.loadAudioFloats,
-            writeStdout: { _ in },
             writeStderr: { message in
                 logRecorder.appendStderr(message)
                 fputs("SpeakSwiftly benchmark runtime stderr: \(message)\n", stderr)

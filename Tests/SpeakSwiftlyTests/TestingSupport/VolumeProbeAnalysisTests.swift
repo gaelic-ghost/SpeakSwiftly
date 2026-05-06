@@ -1,4 +1,4 @@
-import SpeakSwiftlyTestingSupport
+import SpeakSwiftlyTestSupport
 import Testing
 
 @Test func `volume analysis slices samples into fixed duration windows`() throws {
@@ -66,13 +66,13 @@ import Testing
 }
 
 @Test func `volume analysis rejects invalid input before slicing`() {
-    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because sampleRate must be greater than zero.")) {
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because sampleRate must be greater than zero.")) {
         try analyzeVolume(samples: [1], sampleRate: 0, windowSeconds: 1)
     }
-    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because windowSeconds must be greater than zero.")) {
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because windowSeconds must be greater than zero.")) {
         try analyzeVolume(samples: [1], sampleRate: 1, windowSeconds: 0)
     }
-    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because maxSampleCount must be zero or greater.")) {
+    #expect(throws: VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because maxSampleCount must be zero or greater.")) {
         try analyzeVolume(samples: [1], sampleRate: 1, windowSeconds: 1, maxSampleCount: -1)
     }
 }

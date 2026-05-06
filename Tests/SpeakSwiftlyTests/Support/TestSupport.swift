@@ -3,6 +3,7 @@ import Foundation
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 @testable import SpeakSwiftly
+@testable import SpeakSwiftlyTool
 import Testing
 import TextForSpeech
 
@@ -867,7 +868,6 @@ func makeRuntime(
         loadAudioFloats: { _, _ in
             loadedCloneAudioSamples
         },
-        writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,
         now: Date.init,
         readRuntimeMemory: readRuntimeMemory,
@@ -886,7 +886,20 @@ func makeRuntime(
         playbackController: PlaybackController(driver: playbackController),
     )
     await runtime.installPlaybackHooks()
+    await runtime.attachJSONLOutput(to: output)
     return runtime
+}
+
+extension SpeakSwiftly.Runtime {
+    func attachJSONLOutput(to output: OutputRecorder) async {
+        let encoder = ToolJSONLOutput(writeStdout: output.writeStdout)
+        let outputEvents = await tool.outputEvents()
+        Task {
+            for await event in outputEvents {
+                await encoder.write(event)
+            }
+        }
+    }
 }
 
 extension ProfileStore {

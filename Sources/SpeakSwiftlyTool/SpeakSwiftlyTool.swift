@@ -32,11 +32,24 @@ enum SpeakSwiftlyTool {
     }
 
     private static func run(runtime: SpeakSwiftly.Runtime) async {
+        let output = ToolJSONLOutput()
+        let outputEvents = await runtime.tool.outputEvents()
+        let outputTask = Task {
+            for await event in outputEvents {
+                await output.write(event)
+            }
+        }
+
         await runtime.start()
 
         do {
             for try await line in FileHandle.standardInput.bytes.lines {
-                await runtime.accept(line: line)
+                do {
+                    let request = try ToolRequest.decode(from: line)
+                    await request.submit(to: runtime)
+                } catch {
+                    await output.writeFailure(for: line, error: error)
+                }
             }
         } catch {
             let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -67,6 +80,9 @@ enum SpeakSwiftlyTool {
         }
 
         await runtime.shutdown()
+        await Task.yield()
+        await output.flush()
+        outputTask.cancel()
     }
 
     private static func parseStateRootURL(arguments: [String]) throws -> URL? {

@@ -3,10 +3,10 @@ import Foundation
 import MLXAudioCore
 import MLXAudioTTS
 import SpeakSwiftly
-import SpeakSwiftlyTestingSupport
+import SpeakSwiftlyTestSupport
 
 @main
-struct SpeakSwiftlyTestingMain {
+struct SpeakSwiftlyProbeToolMain {
     enum Command: String {
         case resources
         case status
@@ -140,7 +140,7 @@ struct SpeakSwiftlyTestingMain {
         do {
             try await run()
         } catch {
-            fputs("SpeakSwiftlyTesting failed: \(error.localizedDescription)\n", stderr)
+            fputs("SpeakSwiftlyProbeTool failed: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
     }
@@ -735,7 +735,7 @@ struct SpeakSwiftlyTestingMain {
     ) throws -> URL {
         let directory = FileManager.default
             .temporaryDirectory
-            .appendingPathComponent("SpeakSwiftlyTesting", isDirectory: true)
+            .appendingPathComponent("SpeakSwiftlyProbeTool", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent(name, isDirectory: false)
         try writeFloatWAV(samples: samples, sampleRate: sampleRate, to: url)
@@ -884,7 +884,7 @@ struct SpeakSwiftlyTestingMain {
     }
 }
 
-extension SpeakSwiftlyTestingMain {
+extension SpeakSwiftlyProbeToolMain {
     enum UsageError: LocalizedError {
         case missingCommand
         case unknownCommand(String)
@@ -907,45 +907,45 @@ extension SpeakSwiftlyTestingMain {
                 case .missingCommand:
                     usage
                 case let .unknownCommand(command):
-                    "Unknown SpeakSwiftlyTesting command '\(command)'.\n\(usage)"
+                    "Unknown SpeakSwiftlyProbeTool command '\(command)'.\n\(usage)"
                 case let .unexpectedArguments(arguments):
-                    "SpeakSwiftlyTesting received unexpected extra arguments: \(arguments).\n\(usage)"
+                    "SpeakSwiftlyProbeTool received unexpected extra arguments: \(arguments).\n\(usage)"
                 case let .missingOptionValue(option):
-                    "SpeakSwiftlyTesting expected a value after '\(option)'.\n\(usage)"
+                    "SpeakSwiftlyProbeTool expected a value after '\(option)'.\n\(usage)"
                 case let .missingRequiredOption(option):
-                    "SpeakSwiftlyTesting requires option '\(option)' for this command.\n\(usage)"
+                    "SpeakSwiftlyProbeTool requires option '\(option)' for this command.\n\(usage)"
                 case let .invalidOptionValue(option, value):
-                    "SpeakSwiftlyTesting could not use value '\(value)' for option '\(option)'.\n\(usage)"
+                    "SpeakSwiftlyProbeTool could not use value '\(value)' for option '\(option)'.\n\(usage)"
                 case .statusStreamEndedWithoutTerminalEvent:
-                    "SpeakSwiftlyTesting watched the runtime status stream, but it ended before an acknowledged or completed status payload arrived."
+                    "SpeakSwiftlyProbeTool watched the runtime status stream, but it ended before an acknowledged or completed status payload arrived."
                 case .volumeProbeEndedWithoutGeneratedFile:
-                    "SpeakSwiftlyTesting submitted a retained audio generation request, but the request stream ended before a generated file payload arrived."
+                    "SpeakSwiftlyProbeTool submitted a retained audio generation request, but the request stream ended before a generated file payload arrived."
                 case .createProfileEndedWithoutProfilePayload:
-                    "SpeakSwiftlyTesting submitted a voice-design profile creation request, but the request stream ended before a created profile payload arrived."
+                    "SpeakSwiftlyProbeTool submitted a voice-design profile creation request, but the request stream ended before a created profile payload arrived."
                 case .emptyProbeText:
-                    "SpeakSwiftlyTesting could not run the volume probe because the selected text input was empty after trimming whitespace."
+                    "SpeakSwiftlyProbeTool could not run the volume probe because the selected text input was empty after trimming whitespace."
                 case let .profileMissingQwenMaterialization(path):
-                    "SpeakSwiftlyTesting could not find a stored qwen3 backend materialization in '\(path)/profile.json'."
+                    "SpeakSwiftlyProbeTool could not find a stored qwen3 backend materialization in '\(path)/profile.json'."
                 case let .profileModelIsNotQwen(modelRepo):
-                    "SpeakSwiftlyTesting expected model repo '\(modelRepo)' to load as Qwen3TTSModel for the direct comparison path, but it resolved to a different speech model type."
+                    "SpeakSwiftlyProbeTool expected model repo '\(modelRepo)' to load as Qwen3TTSModel for the direct comparison path, but it resolved to a different speech model type."
                 case let .referenceAudioLoadFailed(path):
-                    "SpeakSwiftlyTesting could not decode any audio samples from '\(path)' for the direct Qwen comparison path."
+                    "SpeakSwiftlyProbeTool could not decode any audio samples from '\(path)' for the direct Qwen comparison path."
                 case let .comparisonSampleRateMismatch(streamed, direct):
-                    "SpeakSwiftlyTesting refused compare-volume because the retained-file path used sample rate \(streamed), but the direct path used sample rate \(direct). The two runs are not like-for-like."
+                    "SpeakSwiftlyProbeTool refused compare-volume because the retained-file path used sample rate \(streamed), but the direct path used sample rate \(direct). The two runs are not like-for-like."
                 case let .comparisonDurationMismatch(streamed, direct, sampleRate):
-                    "SpeakSwiftlyTesting refused compare-volume because the retained-file path analyzed \(streamed) samples and the direct path analyzed \(direct) samples at \(sampleRate) Hz. Use '--matched-duration trim-to-shorter' only when you explicitly want both sides trimmed to the same analyzed span."
+                    "SpeakSwiftlyProbeTool refused compare-volume because the retained-file path analyzed \(streamed) samples and the direct path analyzed \(direct) samples at \(sampleRate) Hz. Use '--matched-duration trim-to-shorter' only when you explicitly want both sides trimmed to the same analyzed span."
             }
         }
 
         var usage: String {
             """
             Usage:
-              swift run SpeakSwiftlyTesting resources
-              swift run SpeakSwiftlyTesting status
-              swift run SpeakSwiftlyTesting smoke
-              swift run SpeakSwiftlyTesting create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--state-root PATH]
-              swift run SpeakSwiftlyTesting volume-probe [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
-              swift run SpeakSwiftlyTesting compare-volume [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
+              swift run SpeakSwiftlyProbeTool resources
+              swift run SpeakSwiftlyProbeTool status
+              swift run SpeakSwiftlyProbeTool smoke
+              swift run SpeakSwiftlyProbeTool create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--state-root PATH]
+              swift run SpeakSwiftlyProbeTool volume-probe [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
+              swift run SpeakSwiftlyProbeTool compare-volume [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
             """
         }
     }

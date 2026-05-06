@@ -397,7 +397,6 @@ final class LockedFlag: @unchecked Sendable {
             },
             loadAudioSamples: { _, _ in nil },
             loadAudioFloats: { _, _ in [] },
-            writeStdout: output.writeStdout,
             writeStderr: output.writeStderr,
             now: Date.init,
             readRuntimeMemory: { nil },
@@ -413,6 +412,7 @@ final class LockedFlag: @unchecked Sendable {
         playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
     )
     await blockedRuntime.installPlaybackHooks()
+    await blockedRuntime.attachJSONLOutput(to: output)
     await blockedRuntime.start()
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -503,7 +503,6 @@ final class LockedFlag: @unchecked Sendable {
         },
         loadAudioSamples: { _, _ in nil },
         loadAudioFloats: { _, _ in [] },
-        writeStdout: output.writeStdout,
         writeStderr: output.writeStderr,
         now: Date.init,
         readRuntimeMemory: { nil },
@@ -520,6 +519,7 @@ final class LockedFlag: @unchecked Sendable {
         playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
     )
     await runtime.installPlaybackHooks()
+    await runtime.attachJSONLOutput(to: output)
 
     await runtime.start()
     #expect(await waitUntil {

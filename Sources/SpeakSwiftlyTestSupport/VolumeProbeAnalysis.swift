@@ -74,14 +74,14 @@ public func analyzeVolume(
     maxSampleCount: Int? = nil,
 ) throws -> ProbeAnalysis {
     guard sampleRate > 0 else {
-        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because sampleRate must be greater than zero.")
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because sampleRate must be greater than zero.")
     }
     guard windowSeconds > 0 else {
-        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because windowSeconds must be greater than zero.")
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because windowSeconds must be greater than zero.")
     }
 
     if let maxSampleCount, maxSampleCount < 0 {
-        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyTesting could not analyze volume because maxSampleCount must be zero or greater.")
+        throw VolumeProbeAnalysisError.invalidAnalysisInput("SpeakSwiftlyProbeTool could not analyze volume because maxSampleCount must be zero or greater.")
     }
 
     let analyzedSampleCount = min(maxSampleCount ?? samples.count, samples.count)
@@ -254,10 +254,10 @@ public func parseFloatWAV(_ data: Data) throws -> ParsedFloatWAV {
     }
 
     guard formatTag == 3 else {
-        throw VolumeProbeAnalysisError.invalidWAV("SpeakSwiftlyTesting expected 32-bit float WAV output, but found format tag \(formatTag ?? 0).")
+        throw VolumeProbeAnalysisError.invalidWAV("SpeakSwiftlyProbeTool expected 32-bit float WAV output, but found format tag \(formatTag ?? 0).")
     }
     guard bitsPerSample == 32 else {
-        throw VolumeProbeAnalysisError.invalidWAV("SpeakSwiftlyTesting expected 32-bit float WAV output, but found \(bitsPerSample ?? 0) bits per sample.")
+        throw VolumeProbeAnalysisError.invalidWAV("SpeakSwiftlyProbeTool expected 32-bit float WAV output, but found \(bitsPerSample ?? 0) bits per sample.")
     }
     guard let resolvedChannelCount = channelCount, let resolvedSampleRate = sampleRate, let payload = audioPayload else {
         throw VolumeProbeAnalysisError.invalidWAV("The WAV file is missing required fmt or data chunks.")
