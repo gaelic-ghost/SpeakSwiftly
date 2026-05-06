@@ -2,8 +2,8 @@ import Foundation
 import TextForSpeech
 
 public extension SpeakSwiftly {
-    /// Staging API used by the bundled JSONL executable while it moves onto
-    /// the same typed runtime surface as ordinary Swift package consumers.
+    /// Narrow adapter API used by the bundled JSONL executable for request-ID
+    /// preserving worker-contract operations.
     struct Tool: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }

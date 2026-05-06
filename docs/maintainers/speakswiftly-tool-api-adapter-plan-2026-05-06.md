@@ -2,6 +2,7 @@
 
 This note records the settled direction for moving the bundled executable
 surface out of the core library runtime and into the `SpeakSwiftlyTool` target.
+It also records the implementation state of that migration.
 
 ## Decision
 
@@ -18,6 +19,21 @@ normalization, jobs, artifacts, runtime state, and typed observation. The
 stderr, JSONL request parsing, JSONL response encoding, operation-name
 compatibility, worker launch arguments, and bundled-executable behavior.
 
+## Current State
+
+The migration is implemented on the branch that introduced this document.
+
+- `SpeakSwiftly.Tool` is the narrow request-ID-preserving adapter surface used
+  by `SpeakSwiftlyTool`.
+- Raw JSONL request structs, operation-name decoding, compatibility aliases, and
+  best-effort ID extraction live in the `SpeakSwiftlyTool` target.
+- JSONL success and failure encoding live in the `SpeakSwiftlyTool` target.
+- The runtime publishes typed worker-output events for the tool to encode.
+- The runtime no longer exposes `accept(line:)` as the worker ingestion path and
+  no longer owns a stdout JSONL fallback.
+- Worker-contract tests attach the same tool JSONL encoder used by the
+  executable instead of relying on a parallel runtime encoder.
+
 ## Namespace Rule
 
 When the tool needs a capability that is real and useful but does not yet have
@@ -32,9 +48,11 @@ Preferred temporary homes:
   move into a more specific public handle.
 
 These namespaces are allowed as conscious staging areas. They should not become
-permanent junk drawers. After the tool migration is stable, redistribute
-members into `Generate`, `Playback`, `Voices`, `Normalizer`, `Jobs`,
-`Artifacts`, or `Runtime` when the ownership becomes obvious.
+permanent junk drawers. `SpeakSwiftly.Tool` is intentionally narrow in this
+migration: it preserves external request IDs and worker-contract operations for
+the executable. Future cleanup can redistribute members into `Generate`,
+`Playback`, `Voices`, `Normalizer`, `Jobs`, `Artifacts`, or `Runtime` when the
+ownership becomes obvious.
 
 ## Target Shape
 
@@ -43,21 +61,21 @@ worker when launched with today's `SpeakSwiftlyTool` command path. Existing
 runtime publishing, launch wrappers, E2E tests, and external JSONL hosts should
 not need a command-line mode change for the first migration.
 
-Inside the executable, the flow should become:
+Inside the executable, the flow is now:
 
 1. `SpeakSwiftlyTool` reads one JSON object per line from stdin.
 2. `SpeakSwiftlyTool` decodes the JSONL worker operation into a tool-owned
    command value.
-3. `SpeakSwiftlyTool` calls the public `SpeakSwiftly` API through a runtime and
-   its concern handles.
-4. `SpeakSwiftlyTool` awaits request completions or subscribes to runtime and
-   request update streams as needed.
-5. `SpeakSwiftlyTool` maps typed Swift results back to the existing JSONL
+3. `SpeakSwiftlyTool` calls `SpeakSwiftly.Tool`, the narrow typed adapter
+   surface returned by `runtime.tool`.
+4. The runtime emits typed request and worker-output events.
+5. `SpeakSwiftlyTool` maps typed Swift output events back to the existing JSONL
    worker response contract.
-6. `SpeakSwiftlyTool` writes JSONL responses and logs to stdout and stderr.
+6. `SpeakSwiftlyTool` writes JSONL responses to stdout and structured logs to
+   stderr.
 
-The core library should no longer expose or require `accept(line:)` as the
-primary worker ingestion path.
+The core library no longer exposes or requires `accept(line:)` as the primary
+worker ingestion path.
 
 ## Boundary Rules
 
@@ -86,71 +104,66 @@ Most worker operations already map to typed handles:
 | request snapshots and streams | `runtime.request(id:)`, `runtime.updates(for:)`, and `runtime.synthesisUpdates(for:)` |
 | generation, playback, and runtime observation | `runtime.generate`, `runtime.playback`, and runtime observation APIs |
 
-Likely gaps to fill during migration:
+Gaps filled during migration:
 
-- Tool-owned request IDs. Public handle methods currently generate request IDs
-  internally, while JSONL callers provide explicit IDs that must be preserved in
-  responses. Add a `Tool` or `Dev` scoped way to submit with an explicit
-  external request ID instead of keeping the internal `WorkerRequest` path.
-- Runtime control snapshots and configuration mutations. Some JSONL operations
-  such as default voice profile reads/writes, backend switching, model reload,
-  and model unload may need clearer typed API homes.
-- Completion-to-JSON response mapping. Public completion models should stay
-  typed; the JSON envelope shape belongs in `SpeakSwiftlyTool`.
-- Structured logs and worker status events. The runtime may continue to expose
-  typed events, but JSON encoding and stderr formatting should be tool-owned.
+- Tool-owned request IDs. `SpeakSwiftly.Tool` now exposes request-ID-preserving
+  methods so JSONL callers keep stable response IDs without using
+  `Runtime.accept(line:)`.
+- Runtime control snapshots and configuration mutations. The tool adapter now
+  covers default voice profile reads/writes, backend switching, model reload,
+  model unload, queue clearing, cancellation, status, and overview operations.
+- Completion-to-JSON response mapping. Public completion models stay typed; the
+  JSON envelope shape belongs to `ToolJSONLOutput`.
+- Structured logs and worker status events. The runtime exposes typed output
+  events; JSON stdout encoding and tool output-error reporting are tool-owned.
 
 ## Operation Inventory
 
-This inventory is the migration checklist for moving JSONL request handling into
-`SpeakSwiftlyTool`. `Existing` means the operation already has a public typed API
-that represents the same behavior, though the tool may still need an explicit
-request-ID variant to preserve the JSONL contract. `Tool gap` means the behavior
-is real and should be exposed through `SpeakSwiftly.Tool` before the executable
-can leave `Runtime.accept(line:)` behind cleanly. `Dev gap` means the behavior is
-diagnostic or maintainer-facing enough that `SpeakSwiftly.Dev` is the better
-temporary staging home.
+This inventory records the coverage used to move JSONL request handling into
+`SpeakSwiftlyTool`. The current branch covers each operation through
+`SpeakSwiftly.Tool`, preserving caller-provided request IDs while leaving the
+long-term typed handle names available for future redistribution.
 
 ### Generation and Artifacts
 
 | JSONL `op` | Current worker request | Public API target | Migration status |
 | --- | --- | --- | --- |
-| `generate_speech` | `.queueSpeech(..., jobType: .live)` | `runtime.generate.speech(...)` | Existing; needs explicit request-ID access and JSONL decoding in tool |
-| `generate_audio_file` | `.queueSpeech(..., jobType: .file)` | `runtime.generate.audio(...)` | Existing; needs explicit request-ID access and JSONL decoding in tool |
-| `generate_batch` | `.queueBatch` | `runtime.generate.batch(...)` | Existing; needs explicit request-ID access and batch item decoding in tool |
-| `get_generated_file` | `.generatedFile` | `runtime.artifact(id:)` | Existing; needs explicit request-ID access |
-| `list_generated_files` | `.generatedFiles` | `runtime.artifacts.list()` | Existing; needs explicit request-ID access |
-| `get_generated_batch` | `.generatedBatch` | `runtime.jobs` or `runtime.artifacts` | Tool gap; batch lookup is public as a model but not yet a handle method |
-| `list_generated_batches` | `.generatedBatches` | `runtime.jobs` or `runtime.artifacts` | Tool gap; batch collection lookup is not yet public |
-| `expire_generation_job` | `.expireGenerationJob` | `runtime.jobs.expire(id:)` | Existing; needs explicit request-ID access |
-| `get_generation_job` | `.generationJob` | `runtime.jobs.job(id:)` | Existing; needs explicit request-ID access |
-| `list_generation_jobs` | `.generationJobs` | `runtime.jobs.list()` | Existing; needs explicit request-ID access |
-| `list_generation_queue` | `.listQueue(..., .generation)` | `runtime.jobs.generationQueue()` and `runtime.generate.snapshot()` | Existing; JSONL response can use the typed snapshot once encoding moves to tool |
-| `clear_generation_queue` | `.clearQueue(..., .generation)` | `runtime.jobs.clearQueue()` or `runtime.clearQueue(.generation)` | Existing; needs explicit request-ID access |
-| `cancel_generation` | `.cancelRequest(..., .generation)` | `runtime.jobs.cancel(_:)` or `runtime.cancel(.generation, requestID:)` | Existing; needs explicit request-ID access |
+| `generate_speech` | `.queueSpeech(..., jobType: .live)` | `runtime.generate.speech(...)` | Implemented through `SpeakSwiftly.Tool.speech(...)` |
+| `generate_audio_file` | `.queueSpeech(..., jobType: .file)` | `runtime.generate.audio(...)` | Implemented through `SpeakSwiftly.Tool.audio(...)` |
+| `generate_batch` | `.queueBatch` | `runtime.generate.batch(...)` | Implemented through `SpeakSwiftly.Tool.batch(...)` |
+| `get_generated_file` | `.generatedFile` | `runtime.artifact(id:)` | Implemented through `SpeakSwiftly.Tool.artifact(...)` |
+| `list_generated_files` | `.generatedFiles` | `runtime.artifacts.list()` | Implemented through `SpeakSwiftly.Tool.artifacts(...)` |
+| `get_generated_batch` | `.generatedBatch` | `runtime.jobs` or `runtime.artifacts` | Implemented through `SpeakSwiftly.Tool.generatedBatch(...)` |
+| `list_generated_batches` | `.generatedBatches` | `runtime.jobs` or `runtime.artifacts` | Implemented through `SpeakSwiftly.Tool.generatedBatches(...)` |
+| `expire_generation_job` | `.expireGenerationJob` | `runtime.jobs.expire(id:)` | Implemented through `SpeakSwiftly.Tool.expireGenerationJob(...)` |
+| `get_generation_job` | `.generationJob` | `runtime.jobs.job(id:)` | Implemented through `SpeakSwiftly.Tool.generationJob(...)` |
+| `list_generation_jobs` | `.generationJobs` | `runtime.jobs.list()` | Implemented through `SpeakSwiftly.Tool.generationJobs(...)` |
+| `list_generation_queue` | `.listQueue(..., .generation)` | `runtime.jobs.generationQueue()` and `runtime.generate.snapshot()` | Implemented through `SpeakSwiftly.Tool.generationQueue(...)` |
+| `clear_generation_queue` | `.clearQueue(..., .generation)` | `runtime.jobs.clearQueue()` or `runtime.clearQueue(.generation)` | Implemented through `SpeakSwiftly.Tool.clearQueue(..., queueType: .generation)` |
+| `cancel_generation` | `.cancelRequest(..., .generation)` | `runtime.jobs.cancel(_:)` or `runtime.cancel(.generation, requestID:)` | Implemented through `SpeakSwiftly.Tool.cancelRequest(..., queueType: .generation)` |
 
 ### Playback
 
 | JSONL `op` | Current worker request | Public API target | Migration status |
 | --- | --- | --- | --- |
-| `list_playback_queue` | `.listQueue(..., .playback)` | `runtime.playback.snapshot()` | Existing; tool should encode the snapshot to the legacy queue payload |
-| `playback_pause` | `.playback(..., .pause)` | `runtime.playback.pause()` | Existing; needs explicit request-ID access |
-| `playback_resume` | `.playback(..., .resume)` | `runtime.playback.resume()` | Existing; needs explicit request-ID access |
-| `get_playback_state` | `.playback(..., .state)` | `runtime.playback.snapshot()` | Existing; tool can answer from typed playback state without queueing a request |
-| `clear_playback_queue` | `.clearQueue(..., .playback)` | `runtime.playback.clearQueue()` or `runtime.clearQueue(.playback)` | Existing; needs explicit request-ID access |
-| `cancel_playback` | `.cancelRequest(..., .playback)` | `runtime.playback.cancelRequest(_:)` or `runtime.cancel(.playback, requestID:)` | Existing; needs explicit request-ID access |
+| `list_playback_queue` | `.listQueue(..., .playback)` | `runtime.playback.snapshot()` | Implemented through `SpeakSwiftly.Tool.playbackQueue(...)` |
+| `playback_pause` | `.playback(..., .pause)` | `runtime.playback.pause()` | Implemented through `SpeakSwiftly.Tool.pausePlayback(...)` |
+| `playback_resume` | `.playback(..., .resume)` | `runtime.playback.resume()` | Implemented through `SpeakSwiftly.Tool.resumePlayback(...)` |
+| `get_playback_state` | `.playback(..., .state)` | `runtime.playback.snapshot()` | Implemented through `SpeakSwiftly.Tool.playbackState(...)` |
+| `clear_playback_queue` | `.clearQueue(..., .playback)` | `runtime.playback.clearQueue()` or `runtime.clearQueue(.playback)` | Implemented through `SpeakSwiftly.Tool.clearQueue(..., queueType: .playback)` |
+| `cancel_playback` | `.cancelRequest(..., .playback)` | `runtime.playback.cancelRequest(_:)` or `runtime.cancel(.playback, requestID:)` | Implemented through `SpeakSwiftly.Tool.cancelRequest(..., queueType: .playback)` |
 
 ### Voice Profiles
 
 | JSONL `op` | Current worker request | Public API target | Migration status |
 | --- | --- | --- | --- |
-| `create_voice_profile_from_description` | `.createProfile(..., author: .user)` | `runtime.voices.create(design:from:vibe:voiceDescription:outputPath:)` | Existing; needs explicit request-ID access and cwd handling |
-| `create_system_voice_profile_from_description` | `.createProfile(..., author: .system)` | `runtime.voices.create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)` | Existing; needs explicit request-ID access, seed decoding, and cwd handling |
-| `create_voice_profile_from_audio` | `.createClone` | `runtime.voices.create(clone:from:vibe:transcript:)` | Existing; needs explicit request-ID access and cwd handling |
-| `list_voice_profiles` | `.listProfiles` | `runtime.voices.list()` | Existing; needs explicit request-ID access |
-| `update_voice_profile_name` | `.renameProfile` | `runtime.voices.rename(_:to:)` | Existing; needs explicit request-ID access |
-| `reroll_voice_profile` | `.rerollProfile` | `runtime.voices.reroll(_:)` | Existing; needs explicit request-ID access |
-| `delete_voice_profile` | `.removeProfile` | `runtime.voices.delete(named:)` | Existing; needs explicit request-ID access |
+| `create_voice_profile_from_description` | `.createProfile(..., author: .user)` | `runtime.voices.create(design:from:vibe:voiceDescription:outputPath:)` | Implemented through `SpeakSwiftly.Tool.createVoiceProfile(design:...)` |
+| `create_system_voice_profile_from_description` | `.createProfile(..., author: .system)` | `runtime.voices.create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)` | Implemented through `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)` |
+| `create_voice_profile_from_audio` | `.createClone` | `runtime.voices.create(clone:from:vibe:transcript:)` | Implemented through `SpeakSwiftly.Tool.createVoiceProfile(clone:...)` |
+| `list_voice_profiles` | `.listProfiles` | `runtime.voices.list()` | Implemented through `SpeakSwiftly.Tool.voiceProfiles(...)` |
+| `update_voice_profile_name` | `.renameProfile` | `runtime.voices.rename(_:to:)` | Implemented through `SpeakSwiftly.Tool.renameVoiceProfile(...)` |
+| `reroll_voice_profile` | `.rerollProfile` | `runtime.voices.reroll(_:)` | Implemented through `SpeakSwiftly.Tool.rerollVoiceProfile(...)` |
+| `delete_voice_profile` | `.removeProfile` | `runtime.voices.delete(named:)` | Implemented through `SpeakSwiftly.Tool.deleteVoiceProfile(...)` |
 
 ### Text Normalization
 
@@ -180,19 +193,19 @@ temporary staging home.
 
 | JSONL `op` | Current worker request | Public API target | Migration status |
 | --- | --- | --- | --- |
-| `get_status` | `.status` | `runtime.snapshot()` | Existing for typed state; Tool gap for legacy status-event payload encoding |
-| `get_runtime_overview` | `.overview` | `runtime.snapshot()` plus storage/profile summary APIs | Tool gap; overview is still assembled by runtime internals |
-| `get_default_voice_profile` | `.defaultVoiceProfile` | `runtime.defaultVoiceProfile` | Existing |
-| `set_default_voice_profile` | `.setDefaultVoiceProfile` | `runtime.setDefaultVoiceProfile(_:)` | Existing |
-| `set_speech_backend` | `.switchSpeechBackend` | `runtime.switchSpeechBackend(to:)` | Existing; needs explicit request-ID access |
-| `reload_models` | `.reloadModels` | `runtime.reloadModels()` | Existing; needs explicit request-ID access |
-| `unload_models` | `.unloadModels` | `runtime.unloadModels()` | Existing; needs explicit request-ID access |
-| `clear_queue` | `.clearQueue(..., nil)` | `runtime.clearQueue(_:)` for each queue | Tool gap; cross-queue clear should be one public tool operation so the JSONL response has one request ID and one cleared count |
-| `cancel_request` | `.cancelRequest(..., nil)` | `runtime.cancel(_:requestID:)` for a specific queue | Tool gap; cross-queue cancel should remain one public tool operation so callers do not need to know the target queue |
+| `get_status` | `.status` | `runtime.snapshot()` | Implemented through `SpeakSwiftly.Tool.status(...)` |
+| `get_runtime_overview` | `.overview` | `runtime.snapshot()` plus storage/profile summary APIs | Implemented through `SpeakSwiftly.Tool.overview(...)` |
+| `get_default_voice_profile` | `.defaultVoiceProfile` | `runtime.defaultVoiceProfile` | Implemented through `SpeakSwiftly.Tool.defaultVoiceProfile(...)` |
+| `set_default_voice_profile` | `.setDefaultVoiceProfile` | `runtime.setDefaultVoiceProfile(_:)` | Implemented through `SpeakSwiftly.Tool.setDefaultVoiceProfile(...)` |
+| `set_speech_backend` | `.switchSpeechBackend` | `runtime.switchSpeechBackend(to:)` | Implemented through `SpeakSwiftly.Tool.switchSpeechBackend(...)` |
+| `reload_models` | `.reloadModels` | `runtime.reloadModels()` | Implemented through `SpeakSwiftly.Tool.reloadModels(...)` |
+| `unload_models` | `.unloadModels` | `runtime.unloadModels()` | Implemented through `SpeakSwiftly.Tool.unloadModels(...)` |
+| `clear_queue` | `.clearQueue(..., nil)` | `runtime.clearQueue(_:)` for each queue | Implemented through `SpeakSwiftly.Tool.clearQueue(...)` |
+| `cancel_request` | `.cancelRequest(..., nil)` | `runtime.cancel(_:requestID:)` for a specific queue | Implemented through `SpeakSwiftly.Tool.cancelRequest(...)` |
 
 ### Decoder and Encoder Ownership
 
-`SpeakSwiftlyTool` should move these transport-only pieces out of the library:
+`SpeakSwiftlyTool` now owns these transport-only pieces:
 
 - Raw JSONL structs: `RawWorkerRequest`, `RawBatchItem`, and legacy replacement
   payload decoding.
@@ -211,19 +224,16 @@ The library should keep typed runtime concepts that are not JSONL-specific:
 - Typed `Generate`, `Playback`, `Runtime`, `Voices`, `Normalizer`, `Jobs`, and
   `Artifacts` handles and their public models.
 
-## First Implementation Moves
+## Implementation Moves
 
-1. Add `SpeakSwiftly.Tool` as a public staging handle returned by
+1. Added `SpeakSwiftly.Tool` as a narrow adapter handle returned by
    `runtime.tool`.
-2. Add request-ID-preserving `Tool` methods for the existing queueing operations
-   first: generation, voice-profile generation, resident-model controls,
-   playback controls, queue clear, and cancellation.
-3. Add `Tool` batch and artifact lookups that are missing from the public handle
-   surface only where the JSONL contract already depends on them.
-4. Move JSONL raw decoding into `SpeakSwiftlyTool` after the tool can call public
-   API without losing request IDs.
-5. Move JSONL response encoding last, because stdout/stderr behavior is the
-   externally visible worker contract.
+2. Added request-ID-preserving `Tool` methods for generation, artifacts, jobs,
+   voice profiles, text profiles, resident-model controls, playback controls,
+   queue clear, and cancellation.
+3. Moved JSONL raw decoding into `SpeakSwiftlyTool`.
+4. Moved JSONL response encoding into `SpeakSwiftlyTool`.
+5. Removed the runtime-owned stdout JSONL fallback.
 
 ## Migration Slices
 
@@ -232,6 +242,10 @@ The library should keep typed runtime concepts that are not JSONL-specific:
 Create an operation matrix that lists every current JSONL `op`, the public API
 call it should use, and any missing `Tool` or `Dev` API required to preserve the
 worker contract.
+
+Status: implemented in the `docs: plan tool public api adapter` slice. The
+operation inventory above remains the branch-local map between JSONL operations,
+typed public targets, and the adapter methods used by `SpeakSwiftlyTool`.
 
 Validation:
 
@@ -247,6 +261,11 @@ the migration gaps. Start with explicit request-ID submission and runtime
 control operations that do not fit existing concern handles yet.
 
 Keep the namespace narrow and documented as an adapter staging surface.
+
+Status: implemented in the `api: add tool adapter staging surface` slice.
+`SpeakSwiftly.Tool` now covers the request-ID-preserving operations the JSONL
+worker contract needs. No `SpeakSwiftly.Dev` namespace was needed for this
+migration.
 
 Validation:
 
@@ -308,12 +327,15 @@ swift test --filter WorkerRuntimeControlSurfaceTests
 Run the executable publishing and worker verification lanes after the adapter
 path owns JSONL input and output.
 
+Status: pending for release closeout. Run the debug publish and verify lane, then
+run the full E2E wrapper before tagging or releasing.
+
 Validation:
 
 ```bash
 sh scripts/repo-maintenance/publish-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
-sh scripts/repo-maintenance/run-e2e.sh --suite quick
+sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
 ## Done State
@@ -328,4 +350,4 @@ This migration is complete when:
   intentionally narrow.
 - The existing `SpeakSwiftlyTool` worker contract remains compatible for hosts
   that communicate over newline-delimited JSON.
-- Runtime publishing and quick E2E validation pass through the new adapter path.
+- Runtime publishing and full E2E validation pass through the new adapter path.
