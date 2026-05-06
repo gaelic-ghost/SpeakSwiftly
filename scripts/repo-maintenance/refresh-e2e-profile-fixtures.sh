@@ -31,7 +31,7 @@ create_design_profile() {
   log "Creating fixture profile: $profile_name"
   (
     cd "$REPO_ROOT"
-    swift run SpeakSwiftlyTesting create-design-profile \
+    swift run SpeakSwiftlyProbeTool create-design-profile \
       --profile "$profile_name" \
       --vibe "$vibe" \
       --voice "$voice_description" \

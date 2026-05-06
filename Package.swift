@@ -19,8 +19,8 @@ let package = Package(
             targets: ["SpeakSwiftlyTool"],
         ),
         .executable(
-            name: "SpeakSwiftlyTesting",
-            targets: ["SpeakSwiftlyTesting"],
+            name: "SpeakSwiftlyProbeTool",
+            targets: ["SpeakSwiftlyProbeTool"],
         ),
     ],
     dependencies: [
@@ -59,7 +59,7 @@ let package = Package(
             name: "SpeakSwiftlyTests",
             dependencies: [
                 "SpeakSwiftly",
-                "SpeakSwiftlyTestingSupport",
+                "SpeakSwiftlyTestSupport",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
             resources: [
@@ -68,13 +68,13 @@ let package = Package(
             ],
         ),
         .target(
-            name: "SpeakSwiftlyTestingSupport",
+            name: "SpeakSwiftlyTestSupport",
         ),
         .executableTarget(
-            name: "SpeakSwiftlyTesting",
+            name: "SpeakSwiftlyProbeTool",
             dependencies: [
                 "SpeakSwiftly",
-                "SpeakSwiftlyTestingSupport",
+                "SpeakSwiftlyTestSupport",
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLX", package: "mlx-swift"),

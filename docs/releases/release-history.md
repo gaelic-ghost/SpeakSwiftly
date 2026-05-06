@@ -57,13 +57,13 @@ without preserving one stale document per patch release.
 
 ## v4.0.5
 
-- Hardened `SpeakSwiftlyTesting volume-probe` with explicit analyzed duration,
+- Hardened `SpeakSwiftlyProbeTool volume-probe` with explicit analyzed duration,
   sample-count, and span reporting.
 - Renamed the endpoint drop metric to `endpoint_rms_delta_pct`.
 - Added versioned JSON artifacts for `volume-probe` and `compare-volume`.
 - Made `compare-volume` reject mismatched sample rates or counts unless an
   explicit matched-duration mode is requested.
-- Moved reusable probe math into `SpeakSwiftlyTestingSupport`.
+- Moved reusable probe math into `SpeakSwiftlyTestSupport`.
 
 ## v5.0.0-rc.1
 
