@@ -19,6 +19,13 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 
 ## Working Rules
 
+### Documentation Ownership
+
+- Keep `README.md` short, nontechnical, and focused on end users and agents deciding whether SpeakSwiftly fits a local speech workflow.
+- Keep contributor workflow, maintainer operations, validation lanes, release workflow, and technical reference pointers in `CONTRIBUTING.md` or `docs/maintainers/`, not in `README.md`.
+- Keep agent-facing maintainer guidance in this `AGENTS.md` file so future agents do not need to infer operating rules from public-facing docs.
+- Leave `README.md` Overview subsections that need Gale's own wording as `TBD` until Gale provides the replacement text.
+
 ### Change Scope
 
 - Use Swift Package Manager as the source of truth for package structure and dependencies.
@@ -44,7 +51,7 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 - For JSONL reads, use `get_*` for one resource or snapshot and `list_*` for collections and queue snapshots.
 - For JSONL writes, prefer `create_*`, `update_*`, `replace_*`, and `delete_*` when those verbs fit the real semantics.
 - Keep literal lifecycle and control verbs like `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, `cancel_*`, `load_*`, `save_*`, and `reset_*` when the operation is not best modeled as CRUD.
-- When adding or renaming a JSONL operation, update both `README.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented.
+- When adding or renaming a JSONL operation, update `Sources/SpeakSwiftly/SpeakSwiftly.docc/WorkerContract.md` and `CONTRIBUTING.md` in the same pass so the wire naming convention stays documented without making `README.md` technical.
 - Keep `SpeakSwiftly.liftoff(configuration:)` as the single public startup entry point, with optional configuration carrying startup-time choices such as `speechBackend` and an optional `textNormalizer`.
 - Expose stored concern handles such as `generate`, `player`, `voices`, `normalizer`, `jobs`, and `artifacts` from `SpeakSwiftly.Runtime` instead of growing one monolithic method namespace.
 - Keep those concern handles lightweight views over shared runtime state, not separate subsystems with their own lifecycle or duplicated ownership.
