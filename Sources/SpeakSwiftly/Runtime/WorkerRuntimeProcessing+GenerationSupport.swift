@@ -276,6 +276,7 @@ extension SpeakSwiftly.Runtime {
 
         activeGenerations.removeValue(forKey: token)
         await generationController.finishActive(token: token)
+        await publishGenerateUpdate()
         await logMarvisGenerationLaneReleasedIfNeeded(
             for: activeGeneration.request,
             activeJobs: generationController.activeJobsOrdered(),

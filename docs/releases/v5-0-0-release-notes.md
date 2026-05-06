@@ -18,12 +18,24 @@
 - Updated release E2E live-service helpers to prefer the current
   `SpeakSwiftlyServer` `/models/unload` and `/models/reload` routes while
   retaining fallback support for the older `/runtime/models/...` routes.
+- Standardized typed Swift observation around `Event`, `State`, `Update`, and
+  `Snapshot` families for Request, Synthesis, Generate, Playback, and Runtime.
+- Kept JSONL `worker_status` and `get_runtime_overview` compatibility while
+  making native Swift runtime, generation, and playback snapshots direct reads.
 
 ## Breaking Changes
 
 - Swift callers must replace `inputTextContext:` with `sourceFormat:` and
   `requestContext:`.
 - `SpeakSwiftly.InputTextContext` is removed.
+- `runtime.player` and `SpeakSwiftly.Player` are removed; use
+  `runtime.playback` and `SpeakSwiftly.Playback`.
+- Per-request `GenerationEvent` / `GenerationEventUpdate` are removed; use
+  `SynthesisEvent` / `SynthesisUpdate`.
+- `runtime.status()`, `runtime.overview()`, `Player.list()`, `Player.state()`,
+  and `runtime.statusEvents()` are removed from the typed Swift surface; use
+  `runtime.snapshot()`, `runtime.generate.snapshot()`,
+  `runtime.playback.snapshot()`, and `updates()` streams.
 - JSONL generation callers must stop sending `input_text_context`,
   `text_format`, and `nested_source_format`.
 - Mixed prose, Markdown, HTML, logs, CLI output, and agent text should omit
@@ -37,6 +49,12 @@
   topic, `cwd`, and `repo_root` metadata.
 - Keep using `voice_profile` and `text_profile` on new JSONL callers.
   Compatibility aliases `profile_name` and `text_profile_id` remain accepted.
+- Native Swift callers should use `handle.synthesisUpdates` or
+  `runtime.synthesisUpdates(for:)` for request-scoped model-side telemetry.
+- Native Swift callers should use `runtime.updates()`, `runtime.snapshot()`,
+  `runtime.generate.updates()`, `runtime.generate.snapshot()`,
+  `runtime.playback.updates()`, and `runtime.playback.snapshot()` for singleton
+  observation.
 
 ## Verification
 

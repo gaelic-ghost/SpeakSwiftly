@@ -196,15 +196,59 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func runtimeOverviewSnapshot() async -> SpeakSwiftly.RuntimeOverview {
-        await SpeakSwiftly.RuntimeOverview(
+    func runtimeSnapshot() -> SpeakSwiftly.RuntimeSnapshot {
+        SpeakSwiftly.RuntimeSnapshot(
+            sequence: runtimeObservationBroker.sequence,
+            capturedAt: dependencies.now(),
+            state: currentRuntimeState,
+            speechBackend: speechBackend,
+            residentState: residentStateSummary,
+            defaultVoiceProfile: defaultVoiceProfileName,
+            storage: runtimeStorageSnapshot(),
+        )
+    }
+
+    func runtimeOverviewSnapshot() async -> SpeakSwiftly.WorkerRuntimeOverview {
+        await SpeakSwiftly.WorkerRuntimeOverview(
             status: currentStatusSnapshot(),
             speechBackend: speechBackend,
             storage: runtimeStorageSnapshot(),
             generationQueue: queueSnapshot(for: .generation),
             playbackQueue: queueSnapshot(for: .playback),
-            playbackState: playbackController.stateSnapshot(),
+            playbackState: playbackController.workerStateSnapshot(),
             defaultVoiceProfile: defaultVoiceProfileName,
+        )
+    }
+
+    var currentRuntimeState: SpeakSwiftly.RuntimeState {
+        switch residentState {
+            case .warming:
+                .warmingResidentModel
+            case .ready:
+                .residentModelReady
+            case .unloaded:
+                .residentModelsUnloaded
+            case .failed:
+                .residentModelFailed
+        }
+    }
+
+    func generateSnapshot() async -> SpeakSwiftly.GenerateSnapshot {
+        let activeRequests = generationActiveRequestSummaries()
+        let queuedRequests = await queuedRequestSummaries(for: .generation)
+        return SpeakSwiftly.GenerateSnapshot(
+            sequence: generateObservationBroker.sequence,
+            capturedAt: dependencies.now(),
+            state: currentGenerateState(activeRequests: activeRequests, queuedRequests: queuedRequests),
+            activeRequests: activeRequests,
+            queuedRequests: queuedRequests,
+        )
+    }
+
+    func playbackSnapshot() async -> SpeakSwiftly.PlaybackSnapshot {
+        await playbackController.stateSnapshot(
+            sequence: playbackObservationBroker.sequence,
+            capturedAt: dependencies.now(),
         )
     }
 
@@ -258,7 +302,36 @@ extension SpeakSwiftly.Runtime {
             speechBackend: speechBackend,
         )
         await emit(status)
-        broadcastStatus(status)
+        let update = recordRuntimeUpdate(state: stage)
+        broadcastRuntimeUpdate(update)
+    }
+
+    func recordRuntimeUpdate(state: SpeakSwiftly.RuntimeState) -> SpeakSwiftly.RuntimeUpdate {
+        runtimeObservationBroker.makeUpdate { sequence in
+            SpeakSwiftly.RuntimeUpdate(
+                sequence: sequence,
+                date: dependencies.now(),
+                state: state,
+                event: .stateChanged(state),
+            )
+        }
+    }
+
+    func currentGenerateState(
+        activeRequests: [ActiveWorkerRequestSummary],
+        queuedRequests: [QueuedWorkerRequestSummary],
+    ) -> SpeakSwiftly.GenerateState {
+        if !activeRequests.isEmpty {
+            return .running
+        }
+
+        if let firstQueued = queuedRequests.first,
+           let parkReason = lastQueuedGenerationParkReason[firstQueued.id],
+           let blockReason = SpeakSwiftly.GenerateBlockReason(rawValue: parkReason.rawValue) {
+            return .blocked(blockReason)
+        }
+
+        return queuedRequests.isEmpty ? .idle : .blocked(.waitingForActiveRequest)
     }
 
     func emitFailure(id: String, error: WorkerError) async {

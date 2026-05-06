@@ -10,7 +10,7 @@ extension SpeakSwiftly.Runtime {
             voiceProfile: request.voiceProfile,
             requestContext: request.requestContext,
             events: makeLegacyRequestEventStream(for: request.id),
-            generationEvents: makeGenerationEventStream(for: request.id),
+            synthesisUpdates: makeSynthesisUpdateStream(for: request.id),
         )
     }
 
@@ -67,10 +67,10 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func makeGenerationEventStream(
+    func makeSynthesisUpdateStream(
         for requestID: String,
         replayBuffered: Bool = true,
-    ) -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> {
+    ) -> AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error> {
         guard let broker = requestBrokers[requestID] else {
             return AsyncThrowingStream { continuation in
                 continuation.finish()
@@ -78,7 +78,7 @@ extension SpeakSwiftly.Runtime {
         }
 
         let subscriberID = UUID()
-        let replayEvents = replayBuffered ? broker.replayGenerationEvents : []
+        let replayEvents = replayBuffered ? broker.replaySynthesisUpdates : []
         let isTerminal = broker.isTerminal
 
         return AsyncThrowingStream { continuation in
@@ -89,10 +89,10 @@ extension SpeakSwiftly.Runtime {
                 return
             }
 
-            requestBrokers[requestID]?.generationContinuations[subscriberID] = continuation
+            requestBrokers[requestID]?.synthesisContinuations[subscriberID] = continuation
             continuation.onTermination = { [weak self] _ in
                 Task {
-                    await self?.removeGenerationEventSubscriber(subscriberID, for: requestID)
+                    await self?.removeSynthesisUpdateSubscriber(subscriberID, for: requestID)
                 }
             }
         }
@@ -160,18 +160,18 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
-    func recordGenerationEvent(
-        _ event: SpeakSwiftly.GenerationEvent,
+    func recordSynthesisEvent(
+        _ event: SpeakSwiftly.SynthesisEvent,
         for requestID: String,
     ) {
         guard var broker = requestBrokers[requestID] else { return }
 
-        let update = broker.recordGenerationEvent(
+        let update = broker.recordSynthesisEvent(
             event,
             date: dependencies.now(),
             maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates,
         )
-        let continuations = Array(broker.generationContinuations.values)
+        let continuations = Array(broker.synthesisContinuations.values)
         requestBrokers[requestID] = broker
 
         continuations.forEach { continuation in
@@ -203,12 +203,12 @@ extension SpeakSwiftly.Runtime {
             maxReplayUpdates: RequestObservationConfiguration.maxReplayUpdates,
         )
         let continuations = Array(broker.subscriberContinuations.values)
-        let generationContinuations = Array(broker.generationContinuations.values)
+        let synthesisContinuations = Array(broker.synthesisContinuations.values)
 
         if terminal {
             broker.isTerminal = true
             broker.subscriberContinuations.removeAll()
-            broker.generationContinuations.removeAll()
+            broker.synthesisContinuations.removeAll()
         }
 
         requestBrokers[requestID] = broker
@@ -221,7 +221,7 @@ extension SpeakSwiftly.Runtime {
         }
 
         if terminal {
-            generationContinuations.forEach { continuation in
+            synthesisContinuations.forEach { continuation in
                 continuation.finish()
             }
         }
@@ -247,14 +247,98 @@ extension SpeakSwiftly.Runtime {
         requestBrokers[requestID]?.subscriberContinuations.removeValue(forKey: subscriberID)
     }
 
-    func removeGenerationEventSubscriber(_ subscriberID: UUID, for requestID: String) {
-        requestBrokers[requestID]?.generationContinuations.removeValue(forKey: subscriberID)
+    func removeSynthesisUpdateSubscriber(_ subscriberID: UUID, for requestID: String) {
+        requestBrokers[requestID]?.synthesisContinuations.removeValue(forKey: subscriberID)
     }
 
-    func broadcastStatus(_ status: WorkerStatusEvent) {
-        for continuation in statusContinuations.values {
-            continuation.yield(status)
+    func generateUpdates() async -> AsyncStream<SpeakSwiftly.GenerateUpdate> {
+        let subscriptionID = UUID()
+        let snapshot = await generateSnapshot()
+        let latestUpdate = if let latestGenerateUpdate = generateObservationBroker.latestUpdate {
+            latestGenerateUpdate
+        } else {
+            makeGenerateUpdate(state: snapshot.state, advanceSequence: false)
         }
+
+        return AsyncStream { continuation in
+            generateObservationBroker.subscribe(id: subscriptionID, continuation: continuation)
+            continuation.yield(latestUpdate)
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeGenerateUpdateContinuation(subscriptionID)
+                }
+            }
+        }
+    }
+
+    func playbackUpdates() async -> AsyncStream<SpeakSwiftly.PlaybackUpdate> {
+        let subscriptionID = UUID()
+        let snapshot = await playbackSnapshot()
+        let latestUpdate = if let latestPlaybackUpdate = playbackObservationBroker.latestUpdate {
+            latestPlaybackUpdate
+        } else {
+            makePlaybackUpdate(state: snapshot.state, advanceSequence: false)
+        }
+
+        return AsyncStream { continuation in
+            playbackObservationBroker.subscribe(id: subscriptionID, continuation: continuation)
+            continuation.yield(latestUpdate)
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removePlaybackUpdateContinuation(subscriptionID)
+                }
+            }
+        }
+    }
+
+    func publishGenerateUpdate() async {
+        let update = await makeGenerateUpdate(state: generateSnapshot().state)
+        generateObservationBroker.broadcast(update)
+    }
+
+    func publishPlaybackUpdate() async {
+        let update = await makePlaybackUpdate(state: playbackSnapshot().state)
+        playbackObservationBroker.broadcast(update)
+    }
+
+    func makeGenerateUpdate(
+        state: SpeakSwiftly.GenerateState,
+        advanceSequence: Bool = true,
+    ) -> SpeakSwiftly.GenerateUpdate {
+        generateObservationBroker.makeUpdate(advanceSequence: advanceSequence) { sequence in
+            SpeakSwiftly.GenerateUpdate(
+                sequence: sequence,
+                date: dependencies.now(),
+                state: state,
+                event: .stateChanged(state),
+            )
+        }
+    }
+
+    func makePlaybackUpdate(
+        state: SpeakSwiftly.PlaybackState,
+        advanceSequence: Bool = true,
+    ) -> SpeakSwiftly.PlaybackUpdate {
+        playbackObservationBroker.makeUpdate(advanceSequence: advanceSequence) { sequence in
+            SpeakSwiftly.PlaybackUpdate(
+                sequence: sequence,
+                date: dependencies.now(),
+                state: state,
+                event: .stateChanged(state),
+            )
+        }
+    }
+
+    func removeGenerateUpdateContinuation(_ id: UUID) {
+        generateObservationBroker.removeSubscriber(id: id)
+    }
+
+    func removePlaybackUpdateContinuation(_ id: UUID) {
+        playbackObservationBroker.removeSubscriber(id: id)
+    }
+
+    func broadcastRuntimeUpdate(_ update: SpeakSwiftly.RuntimeUpdate) {
+        runtimeObservationBroker.broadcast(update)
     }
 
     func currentStatusSnapshot() -> WorkerStatusEvent? {
@@ -302,6 +386,6 @@ extension SpeakSwiftly.Runtime {
     }
 
     func removeStatusContinuation(_ id: UUID) {
-        statusContinuations.removeValue(forKey: id)
+        runtimeObservationBroker.removeSubscriber(id: id)
     }
 }

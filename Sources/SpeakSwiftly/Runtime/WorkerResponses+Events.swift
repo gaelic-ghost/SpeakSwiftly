@@ -3,13 +3,6 @@ import Foundation
 // MARK: - Response Events
 
 public extension SpeakSwiftly {
-    enum StatusStage: String, Codable, Sendable {
-        case warmingResidentModel = "warming_resident_model"
-        case residentModelReady = "resident_model_ready"
-        case residentModelsUnloaded = "resident_models_unloaded"
-        case residentModelFailed = "resident_model_failed"
-    }
-
     enum ResidentModelState: String, Codable, Sendable {
         case warming
         case ready
@@ -46,26 +39,6 @@ public extension SpeakSwiftly {
         case waitingForActiveRequest = "waiting_for_active_request"
         case waitingForPlaybackStability = "waiting_for_playback_stability"
         case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
-    }
-
-    struct StatusEvent: Encodable, Sendable, Equatable {
-        public let event = "worker_status"
-        public let stage: StatusStage
-        public let residentState: ResidentModelState
-        public let speechBackend: SpeechBackend
-
-        enum CodingKeys: String, CodingKey {
-            case event
-            case stage
-            case residentState = "resident_state"
-            case speechBackend = "speech_backend"
-        }
-
-        public init(stage: StatusStage, residentState: ResidentModelState, speechBackend: SpeechBackend) {
-            self.stage = stage
-            self.residentState = residentState
-            self.speechBackend = speechBackend
-        }
     }
 
     struct QueuedEvent: Encodable, Sendable, Equatable {
@@ -113,6 +86,37 @@ public extension SpeakSwiftly {
         public init(id: String, stage: ProgressStage) {
             self.id = id
             self.stage = stage
+        }
+    }
+}
+
+extension SpeakSwiftly {
+    struct WorkerStatusEvent: Encodable, Equatable {
+        let event = "worker_status"
+        let stage: RuntimeState
+        let residentState: ResidentModelState
+        let speechBackend: SpeechBackend
+
+        enum CodingKeys: String, CodingKey {
+            case event
+            case stage
+            case residentState = "resident_state"
+            case speechBackend = "speech_backend"
+        }
+
+        init(stage: RuntimeState, residentState: ResidentModelState, speechBackend: SpeechBackend) {
+            self.stage = stage
+            self.residentState = residentState
+            self.speechBackend = speechBackend
+        }
+
+        func runtimeUpdate(sequence: Int, date: Date) -> RuntimeUpdate {
+            RuntimeUpdate(
+                sequence: sequence,
+                date: date,
+                state: stage,
+                event: .stateChanged(stage),
+            )
         }
     }
 }

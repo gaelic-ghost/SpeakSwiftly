@@ -1,10 +1,10 @@
 import Foundation
 
 public extension SpeakSwiftly {
-    // MARK: Player Handle
+    // MARK: Playback Handle
 
     /// Manages the live playback queue and player state.
-    struct Player: Sendable {
+    struct Playback: Sendable {
         let runtime: SpeakSwiftly.Runtime
     }
 }
@@ -13,17 +13,22 @@ public extension SpeakSwiftly.Runtime {
     // MARK: Runtime Accessors
 
     /// Returns the playback-control surface for this runtime.
-    nonisolated var player: SpeakSwiftly.Player {
-        SpeakSwiftly.Player(runtime: self)
+    nonisolated var playback: SpeakSwiftly.Playback {
+        SpeakSwiftly.Playback(runtime: self)
     }
 }
 
-public extension SpeakSwiftly.Player {
+public extension SpeakSwiftly.Playback {
     // MARK: Operations
 
-    /// Lists the queued and active playback requests.
-    func list() async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.listQueue(id: UUID().uuidString, queueType: .playback))
+    /// Subscribes to sequenced playback-state updates.
+    func updates() async -> AsyncStream<SpeakSwiftly.PlaybackUpdate> {
+        await runtime.playbackUpdates()
+    }
+
+    /// Returns a point-in-time read of live playback state and queued playback work.
+    func snapshot() async -> SpeakSwiftly.PlaybackSnapshot {
+        await runtime.playbackSnapshot()
     }
 
     /// Pauses live playback.
@@ -34,11 +39,6 @@ public extension SpeakSwiftly.Player {
     /// Resumes live playback after a pause.
     func resume() async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.playback(id: UUID().uuidString, action: .resume))
-    }
-
-    /// Retrieves the current playback-state snapshot.
-    func state() async -> SpeakSwiftly.RequestHandle {
-        await runtime.submit(.playback(id: UUID().uuidString, action: .state))
     }
 
     /// Clears queued playback work that has not started yet.

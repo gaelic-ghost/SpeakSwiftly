@@ -335,10 +335,11 @@ extension SpeakSwiftly.Runtime {
 
                 case let .playback(id, action):
                     _ = await playbackController.handle(action)
+                    await publishPlaybackUpdate()
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            playbackState: playbackController.stateSnapshot(),
+                            playbackState: playbackController.workerStateSnapshot(),
                         ),
                     )
 
@@ -348,6 +349,15 @@ extension SpeakSwiftly.Runtime {
                         cancelledByRequestID: id,
                         reason: "queued work was cleared from the SpeakSwiftly queue",
                     )
+                    switch queueType {
+                        case .generation:
+                            await publishGenerateUpdate()
+                        case .playback:
+                            await publishPlaybackUpdate()
+                        case nil:
+                            await publishGenerateUpdate()
+                            await publishPlaybackUpdate()
+                    }
                     result = .success(WorkerSuccessPayload(id: id, clearedCount: clearedCount))
 
                 case let .cancelRequest(id, targetRequestID, queueType):
@@ -356,6 +366,8 @@ extension SpeakSwiftly.Runtime {
                         queueType: queueType,
                         cancelledByRequestID: id,
                     )
+                    await publishGenerateUpdate()
+                    await publishPlaybackUpdate()
                     result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))
 
                 case .queueSpeech,

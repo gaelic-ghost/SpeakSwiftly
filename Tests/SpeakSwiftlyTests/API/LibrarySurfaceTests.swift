@@ -239,8 +239,8 @@ import Darwin
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
         runtime.generate
     }
-    let playerHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Player = { runtime in
-        runtime.player
+    let playbackHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Playback = { runtime in
+        runtime.playback
     }
     let voicesHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Voices = { runtime in
         runtime.voices
@@ -461,11 +461,17 @@ import Darwin
         requestID in
         await runtime.cancel(queueType, requestID: requestID)
     }
-    let status: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.status()
+    let runtimeUpdates: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.RuntimeUpdate> = { runtime in
+        await runtime.updates()
     }
-    let overview: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
-        await runtime.overview()
+    let runtimeSnapshot: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RuntimeSnapshot = { runtime in
+        await runtime.snapshot()
+    }
+    let generateUpdates: @Sendable (SpeakSwiftly.Generate) async -> AsyncStream<SpeakSwiftly.GenerateUpdate> = { generate in
+        await generate.updates()
+    }
+    let generateSnapshot: @Sendable (SpeakSwiftly.Generate) async -> SpeakSwiftly.GenerateSnapshot = { generate in
+        await generate.snapshot()
     }
     let defaultVoiceProfile: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.Name = { runtime in
         await runtime.defaultVoiceProfile
@@ -481,10 +487,10 @@ import Darwin
         requestID in
         await runtime.updates(for: requestID)
     }
-    let generationEvents: @Sendable (SpeakSwiftly.Runtime, String) async -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> = {
+    let synthesisUpdates: @Sendable (SpeakSwiftly.Runtime, String) async -> AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error> = {
         runtime,
         requestID in
-        await runtime.generationEvents(for: requestID)
+        await runtime.synthesisUpdates(for: requestID)
     }
     let completion: @Sendable (SpeakSwiftly.RequestHandle) async throws -> SpeakSwiftly.RequestCompletion = { handle in
         try await handle.completion()
@@ -500,20 +506,20 @@ import Darwin
     let unloadModels: @Sendable (SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle = { runtime in
         await runtime.unloadModels()
     }
-    let playbackQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
-        await player.list()
+    let playbackUpdates: @Sendable (SpeakSwiftly.Playback) async -> AsyncStream<SpeakSwiftly.PlaybackUpdate> = { playback in
+        await playback.updates()
     }
-    let playbackPause: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
-        await player.pause()
+    let playbackSnapshot: @Sendable (SpeakSwiftly.Playback) async -> SpeakSwiftly.PlaybackSnapshot = { playback in
+        await playback.snapshot()
     }
-    let clearQueue: @Sendable (SpeakSwiftly.Player) async -> SpeakSwiftly.RequestHandle = { player in
-        await player.clearQueue()
+    let playbackPause: @Sendable (SpeakSwiftly.Playback) async -> SpeakSwiftly.RequestHandle = { playback in
+        await playback.pause()
     }
-    let cancelRequest: @Sendable (SpeakSwiftly.Player, String) async -> SpeakSwiftly.RequestHandle = { player, requestID in
-        await player.cancelRequest(requestID)
+    let clearQueue: @Sendable (SpeakSwiftly.Playback) async -> SpeakSwiftly.RequestHandle = { playback in
+        await playback.clearQueue()
     }
-    let statusEvents: @Sendable (SpeakSwiftly.Runtime) async -> AsyncStream<SpeakSwiftly.StatusEvent> = { runtime in
-        await runtime.statusEvents()
+    let cancelRequest: @Sendable (SpeakSwiftly.Playback, String) async -> SpeakSwiftly.RequestHandle = { playback, requestID in
+        await playback.cancelRequest(requestID)
     }
 
     _ = speak
@@ -521,7 +527,7 @@ import Darwin
     _ = generateAudio
     _ = generateAudioWithDefaultVoice
     _ = generateHandle
-    _ = playerHandle
+    _ = playbackHandle
     _ = voicesHandle
     _ = jobsHandle
     _ = artifactsHandle
@@ -569,13 +575,15 @@ import Darwin
     _ = removeActiveReplacement
     _ = removeStoredReplacement
     _ = generationQueue
-    _ = status
-    _ = overview
+    _ = runtimeUpdates
+    _ = runtimeSnapshot
+    _ = generateUpdates
+    _ = generateSnapshot
     _ = defaultVoiceProfile
     _ = setDefaultVoiceProfile
     _ = requestSnapshot
     _ = updates
-    _ = generationEvents
+    _ = synthesisUpdates
     _ = completion
     _ = clearGenerationQueue
     _ = cancelGeneration
@@ -584,11 +592,11 @@ import Darwin
     _ = switchSpeechBackend
     _ = reloadModels
     _ = unloadModels
-    _ = playbackQueue
+    _ = playbackUpdates
+    _ = playbackSnapshot
     _ = playbackPause
     _ = clearQueue
     _ = cancelRequest
-    _ = statusEvents
 }
 
 // MARK: - Handle Metadata
@@ -597,25 +605,25 @@ import Darwin
     let kind: KeyPath<SpeakSwiftly.RequestHandle, SpeakSwiftly.RequestKind> = \.kind
     let voiceProfile: KeyPath<SpeakSwiftly.RequestHandle, String?> = \.voiceProfile
     let events: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>> = \.events
-    let generationEvents: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>> = \.generationEvents
+    let synthesisUpdates: KeyPath<SpeakSwiftly.RequestHandle, AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error>> = \.synthesisUpdates
 
     _ = kind
     _ = voiceProfile
     _ = events
-    _ = generationEvents
+    _ = synthesisUpdates
 }
 
 @Test func `public request observation surface exposes stable metadata`() {
-    let generationInfoPromptTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.promptTokenCount
-    let generationInfoGenerationTokenCount: KeyPath<SpeakSwiftly.GenerationEventInfo, Int> = \.generationTokenCount
-    let generationInfoPrefillTime: KeyPath<SpeakSwiftly.GenerationEventInfo, TimeInterval> = \.prefillTime
-    let generationInfoGenerateTime: KeyPath<SpeakSwiftly.GenerationEventInfo, TimeInterval> = \.generateTime
-    let generationInfoTokensPerSecond: KeyPath<SpeakSwiftly.GenerationEventInfo, Double> = \.tokensPerSecond
-    let generationInfoPeakMemoryUsage: KeyPath<SpeakSwiftly.GenerationEventInfo, Double> = \.peakMemoryUsage
-    let generationUpdateID: KeyPath<SpeakSwiftly.GenerationEventUpdate, String> = \.id
-    let generationUpdateSequence: KeyPath<SpeakSwiftly.GenerationEventUpdate, Int> = \.sequence
-    let generationUpdateDate: KeyPath<SpeakSwiftly.GenerationEventUpdate, Date> = \.date
-    let generationUpdateEvent: KeyPath<SpeakSwiftly.GenerationEventUpdate, SpeakSwiftly.GenerationEvent> = \.event
+    let generationInfoPromptTokenCount: KeyPath<SpeakSwiftly.SynthesisEventInfo, Int> = \.promptTokenCount
+    let generationInfoGenerationTokenCount: KeyPath<SpeakSwiftly.SynthesisEventInfo, Int> = \.generationTokenCount
+    let generationInfoPrefillTime: KeyPath<SpeakSwiftly.SynthesisEventInfo, TimeInterval> = \.prefillTime
+    let generationInfoGenerateTime: KeyPath<SpeakSwiftly.SynthesisEventInfo, TimeInterval> = \.generateTime
+    let generationInfoTokensPerSecond: KeyPath<SpeakSwiftly.SynthesisEventInfo, Double> = \.tokensPerSecond
+    let generationInfoPeakMemoryUsage: KeyPath<SpeakSwiftly.SynthesisEventInfo, Double> = \.peakMemoryUsage
+    let generationUpdateID: KeyPath<SpeakSwiftly.SynthesisUpdate, String> = \.id
+    let generationUpdateSequence: KeyPath<SpeakSwiftly.SynthesisUpdate, Int> = \.sequence
+    let generationUpdateDate: KeyPath<SpeakSwiftly.SynthesisUpdate, Date> = \.date
+    let generationUpdateEvent: KeyPath<SpeakSwiftly.SynthesisUpdate, SpeakSwiftly.SynthesisEvent> = \.event
     let updateID: KeyPath<SpeakSwiftly.RequestUpdate, String> = \.id
     let updateSequence: KeyPath<SpeakSwiftly.RequestUpdate, Int> = \.sequence
     let updateDate: KeyPath<SpeakSwiftly.RequestUpdate, Date> = \.date
@@ -709,10 +717,20 @@ import Darwin
     #expect(SpeakSwiftly.RequestKind.listArtifacts.rawValue == generatedFilesOperation)
 }
 
-@Test func `public status surface exposes stable metadata`() {
-    let speechBackend: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.SpeechBackend> = \.speechBackend
-    let residentState: KeyPath<SpeakSwiftly.StatusEvent, SpeakSwiftly.ResidentModelState> = \.residentState
-    let overviewStorage: KeyPath<SpeakSwiftly.RuntimeOverview, SpeakSwiftly.RuntimeStorageSnapshot> = \.storage
+@Test func `public observation surfaces expose stable metadata`() {
+    let generateUpdateSequence: KeyPath<SpeakSwiftly.GenerateUpdate, Int> = \.sequence
+    let generateUpdateState: KeyPath<SpeakSwiftly.GenerateUpdate, SpeakSwiftly.GenerateState> = \.state
+    let generateSnapshotActive: KeyPath<SpeakSwiftly.GenerateSnapshot, [SpeakSwiftly.ActiveRequest]> = \.activeRequests
+    let generateSnapshotQueued: KeyPath<SpeakSwiftly.GenerateSnapshot, [SpeakSwiftly.QueuedRequest]> = \.queuedRequests
+    let playbackUpdateSequence: KeyPath<SpeakSwiftly.PlaybackUpdate, Int> = \.sequence
+    let playbackUpdateState: KeyPath<SpeakSwiftly.PlaybackUpdate, SpeakSwiftly.PlaybackState> = \.state
+    let playbackSnapshotActive: KeyPath<SpeakSwiftly.PlaybackSnapshot, SpeakSwiftly.ActiveRequest?> = \.activeRequest
+    let playbackSnapshotQueued: KeyPath<SpeakSwiftly.PlaybackSnapshot, [SpeakSwiftly.QueuedRequest]> = \.queuedRequests
+    let runtimeUpdateSequence: KeyPath<SpeakSwiftly.RuntimeUpdate, Int> = \.sequence
+    let runtimeUpdateState: KeyPath<SpeakSwiftly.RuntimeUpdate, SpeakSwiftly.RuntimeState> = \.state
+    let runtimeSpeechBackend: KeyPath<SpeakSwiftly.RuntimeSnapshot, SpeakSwiftly.SpeechBackend> = \.speechBackend
+    let runtimeResidentState: KeyPath<SpeakSwiftly.RuntimeSnapshot, SpeakSwiftly.ResidentModelState> = \.residentState
+    let runtimeStorage: KeyPath<SpeakSwiftly.RuntimeSnapshot, SpeakSwiftly.RuntimeStorageSnapshot> = \.storage
     let stateRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.stateRootPath
     let profileStoreRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.profileStoreRootPath
     let configurationPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.configurationPath
@@ -720,9 +738,19 @@ import Darwin
     let generatedFilesRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.generatedFilesRootPath
     let generationJobsRootPath: KeyPath<SpeakSwiftly.RuntimeStorageSnapshot, String> = \.generationJobsRootPath
 
-    _ = speechBackend
-    _ = residentState
-    _ = overviewStorage
+    _ = generateUpdateSequence
+    _ = generateUpdateState
+    _ = generateSnapshotActive
+    _ = generateSnapshotQueued
+    _ = playbackUpdateSequence
+    _ = playbackUpdateState
+    _ = playbackSnapshotActive
+    _ = playbackSnapshotQueued
+    _ = runtimeUpdateSequence
+    _ = runtimeUpdateState
+    _ = runtimeSpeechBackend
+    _ = runtimeResidentState
+    _ = runtimeStorage
     _ = stateRootPath
     _ = profileStoreRootPath
     _ = configurationPath

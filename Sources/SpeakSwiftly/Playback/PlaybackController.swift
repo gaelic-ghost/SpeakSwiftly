@@ -271,17 +271,25 @@ actor PlaybackController {
         }
     }
 
-    func stateSnapshot() async -> SpeakSwiftly.PlaybackStateSnapshot {
+    func workerStateSnapshot() async -> SpeakSwiftly.WorkerPlaybackStateSnapshot {
         let activeRequest = activeRequestSummary()
         let telemetry = coordinationTelemetrySnapshot()
         let driverState = await driver.state()
-        return SpeakSwiftly.PlaybackStateSnapshot(
+        return SpeakSwiftly.WorkerPlaybackStateSnapshot(
             state: resolvedPlaybackState(driverState: driverState, activeRequest: activeRequest),
             activeRequest: activeRequest,
             isStableForConcurrentGeneration: telemetry.isStableForConcurrentGeneration,
             isRebuffering: telemetry.isRebuffering,
             stableBufferedAudioMS: telemetry.stableBufferedAudioMS,
             stableBufferTargetMS: telemetry.stableBufferTargetMS,
+        )
+    }
+
+    func stateSnapshot(sequence: Int, capturedAt: Date) async -> SpeakSwiftly.PlaybackSnapshot {
+        await workerStateSnapshot().playbackSnapshot(
+            sequence: sequence,
+            capturedAt: capturedAt,
+            queuedRequests: queuedRequestSummaries(),
         )
     }
 

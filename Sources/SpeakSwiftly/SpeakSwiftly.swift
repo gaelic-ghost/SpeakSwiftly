@@ -5,7 +5,7 @@ import TextForSpeech
 ///
 /// Use ``liftoff(configuration:stateRootURL:)`` to create a shared ``Runtime`` and then work
 /// through the runtime's typed concern handles such as ``SpeakSwiftly/Runtime/generate``
-/// and ``SpeakSwiftly/Runtime/player``.
+/// and ``SpeakSwiftly/Runtime/playback``.
 public enum SpeakSwiftly {
     // MARK: Names
 
@@ -98,6 +98,8 @@ public enum SpeakSwiftly {
         case idle
         case playing
         case paused
+        case interrupted
+        case recovering
     }
 
     /// A high-level request lifecycle event emitted by a request handle.
@@ -120,8 +122,8 @@ public enum SpeakSwiftly {
         case cancelled(Failure)
     }
 
-    /// Summary metrics reported for a generation run.
-    public struct GenerationEventInfo: Sendable, Equatable {
+    /// Summary metrics reported while a request is being synthesized.
+    public struct SynthesisEventInfo: Sendable, Equatable {
         public let promptTokenCount: Int
         public let generationTokenCount: Int
         public let prefillTime: TimeInterval
@@ -130,11 +132,106 @@ public enum SpeakSwiftly {
         public let peakMemoryUsage: Double
     }
 
-    /// A generation-side event emitted while speech is being produced.
-    public enum GenerationEvent: Sendable, Equatable {
+    /// A request-scoped synthesis event emitted while speech is being produced.
+    public enum SynthesisEvent: Sendable, Equatable {
         case token(Int)
-        case info(GenerationEventInfo)
+        case info(SynthesisEventInfo)
         case audioChunk(sampleCount: Int)
+    }
+
+    /// A meaningful event in the global generation queue.
+    public enum GenerateEvent: Codable, Sendable, Equatable {
+        case stateChanged(GenerateState)
+    }
+
+    /// Describes why global generation is not currently accepting another runnable request.
+    public enum GenerateBlockReason: String, Codable, Sendable, Equatable {
+        case waitingForResidentModel = "waiting_for_resident_model"
+        case waitingForResidentModels = "waiting_for_resident_models"
+        case waitingForActiveRequest = "waiting_for_active_request"
+        case waitingForPlaybackStability = "waiting_for_playback_stability"
+        case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
+    }
+
+    /// The current semantic state of the global generation queue.
+    public enum GenerateState: Codable, Sendable, Equatable {
+        case idle
+        case running
+        case blocked(GenerateBlockReason)
+    }
+
+    /// A sequenced generation-queue state publication.
+    public struct GenerateUpdate: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let date: Date
+        public let state: GenerateState
+        public let event: GenerateEvent
+    }
+
+    /// A point-in-time read of the global generation queue.
+    public struct GenerateSnapshot: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let capturedAt: Date
+        public let state: GenerateState
+        public let activeRequests: [ActiveRequest]
+        public let queuedRequests: [QueuedRequest]
+    }
+
+    /// A meaningful event in the live playback surface.
+    public enum PlaybackEvent: Codable, Sendable, Equatable {
+        case stateChanged(PlaybackState)
+    }
+
+    /// A sequenced playback-state publication.
+    public struct PlaybackUpdate: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let date: Date
+        public let state: PlaybackState
+        public let event: PlaybackEvent
+    }
+
+    /// A point-in-time read of live playback state and queued playback work.
+    public struct PlaybackSnapshot: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let capturedAt: Date
+        public let state: PlaybackState
+        public let activeRequest: ActiveRequest?
+        public let queuedRequests: [QueuedRequest]
+        public let isRebuffering: Bool
+        public let stableBufferedAudioMS: Int?
+        public let stableBufferTargetMS: Int?
+    }
+
+    /// A meaningful event in runtime resident-model state.
+    public enum RuntimeEvent: Codable, Sendable, Equatable {
+        case stateChanged(RuntimeState)
+    }
+
+    /// The current semantic state of runtime resident-model readiness.
+    public enum RuntimeState: String, Codable, Sendable, Equatable {
+        case warmingResidentModel = "warming_resident_model"
+        case residentModelReady = "resident_model_ready"
+        case residentModelsUnloaded = "resident_models_unloaded"
+        case residentModelFailed = "resident_model_failed"
+    }
+
+    /// A sequenced runtime-state publication.
+    public struct RuntimeUpdate: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let date: Date
+        public let state: RuntimeState
+        public let event: RuntimeEvent
+    }
+
+    /// A point-in-time read of runtime resident-model and storage state.
+    public struct RuntimeSnapshot: Codable, Sendable, Equatable {
+        public let sequence: Int
+        public let capturedAt: Date
+        public let state: RuntimeState
+        public let speechBackend: SpeechBackend
+        public let residentState: ResidentModelState
+        public let defaultVoiceProfile: String
+        public let storage: RuntimeStorageSnapshot
     }
 
     /// A sequenced request-state update produced by the runtime's observation stream.
@@ -145,12 +242,12 @@ public enum SpeakSwiftly {
         public let state: RequestState
     }
 
-    /// A sequenced generation event update produced by the runtime's observation stream.
-    public struct GenerationEventUpdate: Sendable, Equatable {
+    /// A sequenced synthesis event update produced by the runtime's observation stream.
+    public struct SynthesisUpdate: Sendable, Equatable {
         public let id: String
         public let sequence: Int
         public let date: Date
-        public let event: GenerationEvent
+        public let event: SynthesisEvent
     }
 
     /// A retained snapshot of the most recent known state for one request.
@@ -182,8 +279,8 @@ public enum SpeakSwiftly {
         public let requestContext: RequestContext?
         /// A stream of lifecycle events such as queueing, start, progress, and completion.
         public let events: AsyncThrowingStream<RequestEvent, any Swift.Error>
-        /// A stream of generation-specific updates such as token counts and audio chunks.
-        public let generationEvents: AsyncThrowingStream<GenerationEventUpdate, any Swift.Error>
+        /// A stream of synthesis-specific updates such as token counts and audio chunks.
+        public let synthesisUpdates: AsyncThrowingStream<SynthesisUpdate, any Swift.Error>
 
         init(
             id: String,
@@ -191,14 +288,14 @@ public enum SpeakSwiftly {
             voiceProfile: String?,
             requestContext: RequestContext?,
             events: AsyncThrowingStream<RequestEvent, any Swift.Error>,
-            generationEvents: AsyncThrowingStream<GenerationEventUpdate, any Swift.Error>,
+            synthesisUpdates: AsyncThrowingStream<SynthesisUpdate, any Swift.Error>,
         ) {
             self.id = id
             self.kind = kind
             self.voiceProfile = voiceProfile
             self.requestContext = requestContext
             self.events = events
-            self.generationEvents = generationEvents
+            self.synthesisUpdates = synthesisUpdates
         }
 
         /// Waits until the request reaches a terminal completion and returns its typed payload.
@@ -264,16 +361,16 @@ typealias WorkerRuntime = SpeakSwiftly.Runtime
 typealias SpeechTextDeepTraceFeatures = SpeakSwiftly.DeepTrace.Features
 typealias SpeechTextDeepTraceSection = SpeakSwiftly.DeepTrace.Section
 typealias SpeechTextDeepTraceSectionWindow = SpeakSwiftly.DeepTrace.SectionWindow
-typealias WorkerStatusStage = SpeakSwiftly.StatusStage
+typealias WorkerStatusStage = SpeakSwiftly.RuntimeState
 typealias WorkerRequestEventName = SpeakSwiftly.RequestEventName
 typealias WorkerProgressStage = SpeakSwiftly.ProgressStage
 typealias WorkerQueuedReason = SpeakSwiftly.QueuedReason
-typealias WorkerStatusEvent = SpeakSwiftly.StatusEvent
+typealias WorkerStatusEvent = SpeakSwiftly.WorkerStatusEvent
 typealias WorkerQueuedEvent = SpeakSwiftly.QueuedEvent
 typealias WorkerStartedEvent = SpeakSwiftly.StartedEvent
 typealias WorkerProgressEvent = SpeakSwiftly.ProgressEvent
 typealias WorkerSuccessResponse = SpeakSwiftly.Success
-typealias PlaybackStateSummary = SpeakSwiftly.PlaybackStateSnapshot
+typealias PlaybackStateSummary = SpeakSwiftly.WorkerPlaybackStateSnapshot
 typealias ActiveWorkerRequestSummary = SpeakSwiftly.ActiveRequest
 typealias QueuedWorkerRequestSummary = SpeakSwiftly.QueuedRequest
 typealias WorkerFailureResponse = SpeakSwiftly.Failure

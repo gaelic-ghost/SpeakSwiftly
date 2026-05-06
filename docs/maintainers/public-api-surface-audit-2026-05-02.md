@@ -20,7 +20,7 @@ the JSONL worker operation names or runtime internals first.
 The concern-handle shape is still the right backbone for the package:
 
 - `runtime.generate`
-- `runtime.player` in the current implementation, with a planned breaking rename to `runtime.playback`
+- `runtime.playback`
 - `runtime.voices`
 - `runtime.normalizer`
 - `runtime.jobs`
@@ -111,16 +111,14 @@ Relevant files:
 
 The intended queue-control model is already documented:
 
-- generation-queue inspection lives under `Jobs`
-- playback-queue inspection lives under `Player` today and should move under
-  `Playback` during the breaking observation cleanup
+- generation-queue inspection lives under `Generate`
+- playback-queue inspection lives under `Playback`
 - cross-queue controls live on `Runtime`
-- same-queue conveniences may live on `Jobs` and, after the breaking rename,
-  `Playback`
+- same-queue conveniences may live on `Jobs` and `Playback`
 
-Milestone 27 removed the cross-queue `Player.clearQueue(_:)` and
-`Player.cancel(_:requestID:)` entry points, which could operate on queues the
-playback handle did not own.
+Milestone 27 removed the cross-queue playback controls that could operate on
+queues the playback handle did not own. Milestone 28 then renamed `Player` to
+`Playback`.
 
 Implemented direction:
 
@@ -128,7 +126,7 @@ Implemented direction:
 - keep `runtime.cancel(.generation, requestID:)` and
   `runtime.cancel(.playback, requestID:)`
 - keep `jobs.clearQueue()` and `jobs.cancel(_:)` as generation conveniences
-- keep the same-queue playback conveniences under the renamed `playback` handle
+- keep the same-queue playback conveniences under the `playback` handle
 
 Practical consequence: a caller can tell from the handle name whether an
 operation affects playback, generation, or both.
@@ -149,16 +147,16 @@ The current request model is the cleanest observation model in the package:
 - `RequestUpdate`
 - `RequestSnapshot`
 
-New direction:
+Implemented direction:
 
 - keep `Request*` as the per-request baseline
-- rename per-request `GenerationEvent` / `GenerationEventUpdate` to
+- renamed per-request `GenerationEvent` / `GenerationEventUpdate` to
   `SynthesisEvent` / `SynthesisUpdate`
-- add `GenerateEvent`, `GenerateState`, `GenerateUpdate`, and
+- added `GenerateEvent`, `GenerateState`, `GenerateUpdate`, and
   `GenerateSnapshot` for the global generation-queue concern
-- rename `Player` to `Playback` and add `PlaybackEvent`, `PlaybackState`,
+- renamed `Player` to `Playback` and added `PlaybackEvent`, `PlaybackState`,
   `PlaybackUpdate`, and `PlaybackSnapshot`
-- replace public `StatusEvent`, `statusEvents()`, `RuntimeOverview`, and
+- replaced public `StatusEvent`, `statusEvents()`, `RuntimeOverview`, and
   `PlaybackStateSnapshot` vocabulary with `RuntimeUpdate`,
   `RuntimeSnapshot`, and `PlaybackSnapshot`
 
@@ -302,7 +300,7 @@ Relevant files:
 
 Cleaned up public controls where the desired owner was already documented.
 
-- removed cross-queue controls from `Player`
+- removed cross-queue controls from playback
 - updated README, CONTRIBUTING, DocC, and API tests to match the queue-control
   ownership model
 - kept JSONL queue operation names unchanged

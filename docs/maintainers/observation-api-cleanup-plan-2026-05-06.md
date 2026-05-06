@@ -1,21 +1,26 @@
-# Observation API Cleanup Plan
+# Observation API Cleanup Plan And Implementation Record
 
-This note records the agreed breaking public API cleanup for SpeakSwiftly's typed Swift observation surfaces.
+This note records the agreed breaking public API cleanup for SpeakSwiftly's typed Swift observation surfaces and the implemented shape that landed from that plan.
+
+## Status
+
+Implemented in the typed Swift package surface. Downstream `SpeakSwiftlyServer`
+adoption remains separate release-hardening work before `v1.0.0`.
 
 ## Decision
 
-The package will standardize observable state around one vocabulary:
+The package standardizes observable state around one vocabulary:
 
 - `Event`: something meaningful that just happened.
 - `State`: the current semantic condition of an observable surface.
 - `Update`: a sequenced, timestamped state publication.
 - `Snapshot`: a point-in-time read of the full surface.
 
-`RequestEvent`, `RequestState`, `RequestUpdate`, and `RequestSnapshot` are the model to copy. The cleanup should adapt that shape across request-scoped synthesis, the generation queue, playback, and runtime resident-model state.
+`RequestEvent`, `RequestState`, `RequestUpdate`, and `RequestSnapshot` are the model copied across request-scoped synthesis, the generation queue, playback, and runtime resident-model state.
 
-This is a breaking API cleanup. Do not leave compatibility shims for old typed Swift names unless Gale explicitly approves that compromise before implementation.
+This is a breaking API cleanup. The package does not provide compatibility shims for old typed Swift names.
 
-## Target Public Families
+## Public Families
 
 ### Request
 
@@ -31,14 +36,14 @@ Keep this model as the source of truth for individual submitted operations. A re
 
 ### Synthesis
 
-The current per-request `GenerationEvent` and `GenerationEventUpdate` names are too broad because `Generate` should become the global generation-queue concern. Rename the per-request model to synthesis-specific names:
+The old per-request `GenerationEvent` and `GenerationEventUpdate` names were too broad because `Generate` is now the global generation-queue concern. The per-request model uses synthesis-specific names:
 
 - `SynthesisEvent`
 - `SynthesisUpdate`
 
 These events describe model-side production for one request: token ids, generation metrics, and audio chunk sample counts. They do not describe the global generation queue.
 
-Target request-handle shape:
+Request-handle shape:
 
 ```swift
 public struct RequestHandle: Sendable {
@@ -47,7 +52,7 @@ public struct RequestHandle: Sendable {
 }
 ```
 
-Target runtime lookup:
+Runtime lookup:
 
 ```swift
 func synthesisUpdates(
@@ -57,16 +62,16 @@ func synthesisUpdates(
 
 ### Generate
 
-`runtime.generate` should own the global generation-queue observation surface. It should describe whether generation is idle, running, or blocked and expose the active and queued generation requests.
+`runtime.generate` owns the global generation-queue observation surface. It describes whether generation is idle, running, or blocked and exposes the active and queued generation requests.
 
-Target family:
+Family:
 
 - `GenerateEvent`
 - `GenerateState`
 - `GenerateUpdate`
 - `GenerateSnapshot`
 
-Target surface:
+Surface:
 
 ```swift
 extension SpeakSwiftly.Generate {
@@ -80,9 +85,9 @@ inspection for the generation queue. Keep the JSONL `list_generation_queue`
 operation stable, but do not keep a parallel public Swift queue-inspection verb
 when `runtime.generate.snapshot()` can answer the same caller question directly.
 
-`GenerateState` should stay semantic and compact. The rich queue details belong in `GenerateSnapshot`.
+`GenerateState` stays semantic and compact. The rich queue details belong in `GenerateSnapshot`.
 
-Candidate shape:
+Shape:
 
 ```swift
 enum GenerateState: Sendable, Equatable {
@@ -106,20 +111,20 @@ struct GenerateSnapshot: Sendable, Equatable {
 }
 ```
 
-`GenerateBlockReason` should be the Swift-facing equivalent of generation park reasons such as resident-model warmup, resident-model unload, active generation, playback stability, and Marvis lane serialization.
+`GenerateBlockReason` is the Swift-facing equivalent of generation park reasons such as resident-model warmup, resident-model unload, active generation, playback stability, and Marvis lane serialization.
 
 ### Playback
 
-Rename the public handle from `runtime.player` to `runtime.playback`. The public noun should match the domain and the model family.
+The public handle is `runtime.playback`. The public noun matches the domain and the model family.
 
-Target family:
+Family:
 
 - `PlaybackEvent`
 - `PlaybackState`
 - `PlaybackUpdate`
 - `PlaybackSnapshot`
 
-Target surface:
+Surface:
 
 ```swift
 extension SpeakSwiftly.Runtime {
@@ -141,9 +146,9 @@ extension SpeakSwiftly.Playback {
 for the worker contract, but make the native Swift inspection path direct and
 snapshot-shaped.
 
-`PlaybackState` should remain small enough for UI and agent consumers to branch on directly. Snapshot carries richer telemetry.
+`PlaybackState` remains small enough for UI and agent consumers to branch on directly. Snapshot carries richer telemetry.
 
-Candidate shape:
+Shape:
 
 ```swift
 enum PlaybackState: Sendable, Equatable {
@@ -172,20 +177,20 @@ struct PlaybackSnapshot: Sendable, Equatable {
 }
 ```
 
-Raw playback-driver events such as trace samples, buffer-shape summaries, route-change internals, and rebuffer warnings should stay internal diagnostics unless a concrete Swift consumer needs them. The public update stream should publish domain states, not driver chatter.
+Raw playback-driver events such as trace samples, buffer-shape summaries, route-change internals, and rebuffer warnings stay internal diagnostics unless a concrete Swift consumer needs them. The public update stream publishes domain states, not driver chatter.
 
 ### Runtime
 
 Replace the public `StatusEvent` and `RuntimeOverview` vocabulary with runtime observation names.
 
-Target family:
+Family:
 
 - `RuntimeEvent`
 - `RuntimeState`
 - `RuntimeUpdate`
 - `RuntimeSnapshot`
 
-Target surface:
+Surface:
 
 ```swift
 extension SpeakSwiftly.Runtime {
@@ -200,7 +205,7 @@ extension SpeakSwiftly.Runtime {
 Swift runtime inspection direct instead of returning a request handle for a
 snapshot read.
 
-Candidate shape:
+Shape:
 
 ```swift
 enum RuntimeState: Sendable, Equatable {
@@ -227,11 +232,11 @@ struct RuntimeSnapshot: Sendable, Equatable {
 }
 ```
 
-`RuntimeSnapshot` replaces the public role of `RuntimeOverview`. Queue and playback details should be available through `runtime.generate.snapshot()` and `runtime.playback.snapshot()` instead of making the runtime snapshot a mixed owner for every domain.
+`RuntimeSnapshot` replaces the public role of `RuntimeOverview`. Queue and playback details are available through `runtime.generate.snapshot()` and `runtime.playback.snapshot()` instead of making the runtime snapshot a mixed owner for every domain.
 
 ## Singleton Observation Broker
 
-Add one small internal broker for singleton observable surfaces. This is a durable building-block change because generation queue, playback, and runtime all need the same mechanics:
+The runtime uses one small internal broker for singleton observable surfaces. This is a durable building-block change because generation queue, playback, and runtime all need the same mechanics:
 
 - monotonically increasing sequence
 - latest state
@@ -246,30 +251,32 @@ Do not expose this broker publicly. It is an implementation detail that lets the
 
 ## Migration Rules
 
-- Remove `runtime.player`; replace it with `runtime.playback`.
-- Remove public `Player`; replace it with `Playback`.
-- Remove typed Swift snapshot-read request-handle methods that are superseded by
+- Removed `runtime.player`; replaced it with `runtime.playback`.
+- Removed public `Player`; replaced it with `Playback`.
+- Removed typed Swift snapshot-read request-handle methods that are superseded by
   direct snapshots:
   - `runtime.status()` -> `runtime.snapshot()`
   - `runtime.overview()` -> `runtime.snapshot()`
   - `Player.list()` -> `runtime.playback.snapshot()`
   - `Player.state()` -> `runtime.playback.snapshot()`
-- Rename current per-request `GenerationEvent` and `GenerationEventUpdate` to `SynthesisEvent` and `SynthesisUpdate`.
-- Replace `RuntimeOverview` with `RuntimeSnapshot` in the typed Swift surface.
-- Replace `PlaybackStateSnapshot` with `PlaybackSnapshot`.
-- Replace `statusEvents()` with `updates()` on `Runtime`.
-- Replace `RequestCompletion` cases that currently expose old observation
+- Renamed current per-request `GenerationEvent` and `GenerationEventUpdate` to `SynthesisEvent` and `SynthesisUpdate`.
+- Replaced `RuntimeOverview` with `RuntimeSnapshot` in the typed Swift surface.
+- Replaced `PlaybackStateSnapshot` with `PlaybackSnapshot`.
+- Replaced `statusEvents()` with `updates()` on `Runtime`.
+- Replaced `RequestCompletion` cases that exposed old observation
   vocabulary so typed completion payloads also use `RuntimeSnapshot`,
   `RuntimeUpdate`, and `PlaybackSnapshot`.
-- Keep JSONL `worker_status` and `get_runtime_overview` stable unless a separate wire-contract decision is made. This plan is about the typed Swift API.
-- Update DocC and tests in the same implementation pass as the public symbols.
+- Kept JSONL `worker_status` and `get_runtime_overview` stable. This plan was about the typed Swift API.
+- Updated DocC and tests in the same implementation pass as the public symbols.
 - Update `SpeakSwiftlyServer` adoption separately before release.
 
 ## Implementation Slices
 
+These slices record the implementation path that was used.
+
 ### Slice 1: Model Contract
 
-Add the new public model families and tests for their intended shape.
+Added the new public model families and tests for their intended shape.
 
 Expected files:
 
@@ -282,13 +289,13 @@ Expected files:
 
 ### Slice 2: Internal Observation Broker
 
-Add the internal singleton observation broker and unit coverage for sequence, replay, snapshot, subscriber removal, and terminal behavior where relevant.
+Added the internal singleton observation broker and covered sequence, replay, snapshot, and subscriber behavior through the typed runtime, generation, playback, and request-observation tests.
 
-The broker should live under `Runtime/` or a small support file if it is genuinely shared by runtime, generation, and playback.
+The broker lives under `Runtime/` because it is shared by runtime, generation, and playback observation.
 
 ### Slice 3: Runtime Observation
 
-Wire runtime resident-model transitions into `RuntimeUpdate` and `RuntimeSnapshot`.
+Wired runtime resident-model transitions into `RuntimeUpdate` and `RuntimeSnapshot`.
 
 Publish updates for:
 
@@ -302,25 +309,25 @@ Publish updates for:
 
 ### Slice 4: Playback Observation
 
-Rename `Player` to `Playback`, convert playback snapshot naming, and publish playback updates from meaningful playback-state transitions.
+Renamed `Player` to `Playback`, converted playback snapshot naming, and published playback updates from meaningful playback-state transitions.
 
 Keep raw playback trace detail internal unless a concrete consumer need appears.
 
 ### Slice 5: Generate Observation
 
-Add queue-level generation updates and snapshots from generation queue changes.
+Added queue-level generation updates and snapshots from generation queue changes.
 
-Publish updates when generation becomes idle, running, or blocked. Snapshot should carry active and queued request summaries.
+Published updates when generation becomes idle, running, or blocked. Snapshot carries active and queued request summaries.
 
 ### Slice 6: Per-Request Synthesis Rename
 
-Rename the current per-request generation event stream to synthesis naming.
+Renamed the current per-request generation event stream to synthesis naming.
 
-This should touch request handle fields, runtime lookup methods, tests, and DocC in one pass so consumers get one coherent vocabulary.
+This touched request handle fields, runtime lookup methods, tests, and DocC in one pass so consumers get one coherent vocabulary.
 
 ### Slice 7: Cleanup And Documentation
 
-Remove stale typed Swift symbols and update:
+Removed stale typed Swift symbols and updated:
 
 - DocC
 - `CONTRIBUTING.md`
@@ -328,14 +335,14 @@ Remove stale typed Swift symbols and update:
 - `ROADMAP.md`
 - release notes or migration notes for the next breaking release
 
-Run the ordinary package validation lane after implementation:
+Ran the ordinary package validation lane after implementation:
 
 ```bash
 swift build
 swift test
 ```
 
-Use targeted tests between slices when the implementation touches request observation, runtime lifecycle, playback, or generation scheduling.
+Used targeted tests for request observation, runtime control, worker protocol encoding, and library surface shape before the full package test run.
 
 ## Non-Goals
 
@@ -345,15 +352,15 @@ Use targeted tests between slices when the implementation touches request observ
 - Do not make runtime snapshots own generation and playback details that belong to `GenerateSnapshot` and `PlaybackSnapshot`.
 - Do not replace request-scoped observation; the `Request` family remains the per-request source of truth.
 
-## Open Checks Before Implementation
+## Implementation Notes
 
 - Public singleton `Event` enums are part of the named family, but the first
-  implementation pass should keep them compact and meaningful. Add cases only
+  implementation pass kept them compact and meaningful. Add cases only
   for events consumers can branch on usefully now; do not expose internal
   scheduler or playback-driver chatter just to fill the enum.
-- Singleton `updates()` streams should replay the latest update by default,
-  matching the practical behavior of current `statusEvents()` and making late UI
+- Singleton `updates()` streams replay the latest update by default,
+  matching the practical behavior of the removed `statusEvents()` and making late UI
   or agent subscribers useful immediately.
-- `RequestHandle.completion()` should keep returning `RequestCompletion` in this
+- `RequestHandle.completion()` still returns `RequestCompletion` in this
   pass. Operation-specific typed wait helpers can be considered later if real
   call sites show that the single completion enum is still too broad.

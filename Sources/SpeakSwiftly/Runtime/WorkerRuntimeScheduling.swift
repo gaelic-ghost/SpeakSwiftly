@@ -35,6 +35,7 @@ extension SpeakSwiftly.Runtime {
         guard !decision.runnableJobs.isEmpty else { return }
 
         let jobs = await generationController.reserveQueuedJobs(tokens: decision.runnableJobs.map { $0.token })
+        await publishGenerateUpdate()
 
         for job in jobs {
             lastQueuedGenerationParkReason.removeValue(forKey: job.request.id)

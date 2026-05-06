@@ -68,6 +68,6 @@ During startup warmup, queued work uses `waiting_for_resident_model`. After an e
 
 ## Choose Between Swift And JSONL
 
-Use the typed Swift runtime when you want a native library surface, direct async streams, and focused concern handles like ``SpeakSwiftly/Runtime/generate`` or ``SpeakSwiftly/Runtime/player``.
+Use the typed Swift runtime when you want a native library surface, direct async streams, and focused concern handles like ``SpeakSwiftly/Runtime/generate`` or ``SpeakSwiftly/Runtime/playback``.
 
 Use the worker contract when your host process is not Swift-native, when you want a narrow process boundary, or when you want to supervise the runtime as an external executable.

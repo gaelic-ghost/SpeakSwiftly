@@ -32,80 +32,6 @@ public extension SpeakSwiftly {
         }
     }
 
-    struct PlaybackStateSnapshot: Codable, Sendable, Equatable {
-        public let state: PlaybackState
-        public let activeRequest: ActiveRequest?
-        /// These fields remain part of the runtime overview as playback telemetry for operators.
-        /// Runtime scheduling no longer depends directly on this richer surface.
-        public let isStableForConcurrentGeneration: Bool
-        public let isRebuffering: Bool
-        public let stableBufferedAudioMS: Int?
-        public let stableBufferTargetMS: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case state
-            case activeRequest = "active_request"
-            case isStableForConcurrentGeneration = "is_stable_for_concurrent_generation"
-            case isRebuffering = "is_rebuffering"
-            case stableBufferedAudioMS = "stable_buffered_audio_ms"
-            case stableBufferTargetMS = "stable_buffer_target_ms"
-        }
-
-        public init(
-            state: PlaybackState,
-            activeRequest: ActiveRequest?,
-            isStableForConcurrentGeneration: Bool = false,
-            isRebuffering: Bool = false,
-            stableBufferedAudioMS: Int? = nil,
-            stableBufferTargetMS: Int? = nil,
-        ) {
-            self.state = state
-            self.activeRequest = activeRequest
-            self.isStableForConcurrentGeneration = isStableForConcurrentGeneration
-            self.isRebuffering = isRebuffering
-            self.stableBufferedAudioMS = stableBufferedAudioMS
-            self.stableBufferTargetMS = stableBufferTargetMS
-        }
-    }
-
-    struct RuntimeOverview: Encodable, Sendable, Equatable {
-        public let status: StatusEvent?
-        public let speechBackend: SpeechBackend
-        public let storage: RuntimeStorageSnapshot
-        public let generationQueue: QueueSnapshot
-        public let playbackQueue: QueueSnapshot
-        public let playbackState: PlaybackStateSnapshot
-        public let defaultVoiceProfile: String
-
-        enum CodingKeys: String, CodingKey {
-            case status
-            case speechBackend = "speech_backend"
-            case storage
-            case generationQueue = "generation_queue"
-            case playbackQueue = "playback_queue"
-            case playbackState = "playback_state"
-            case defaultVoiceProfile = "default_voice_profile"
-        }
-
-        public init(
-            status: StatusEvent?,
-            speechBackend: SpeechBackend,
-            storage: RuntimeStorageSnapshot,
-            generationQueue: QueueSnapshot,
-            playbackQueue: QueueSnapshot,
-            playbackState: PlaybackStateSnapshot,
-            defaultVoiceProfile: String,
-        ) {
-            self.status = status
-            self.speechBackend = speechBackend
-            self.storage = storage
-            self.generationQueue = generationQueue
-            self.playbackQueue = playbackQueue
-            self.playbackState = playbackState
-            self.defaultVoiceProfile = defaultVoiceProfile
-        }
-    }
-
     struct RuntimeStorageSnapshot: Codable, Sendable, Equatable {
         public let stateRootPath: String
         public let profileStoreRootPath: String
@@ -222,6 +148,109 @@ public extension SpeakSwiftly {
             try container.encodeIfPresent(voiceProfile, forKey: .voiceProfile)
             try container.encodeIfPresent(requestContext, forKey: .requestContext)
             try container.encode(queuePosition, forKey: .queuePosition)
+        }
+    }
+}
+
+extension SpeakSwiftly {
+    struct WorkerPlaybackStateSnapshot: Codable, Equatable {
+        enum CodingKeys: String, CodingKey {
+            case state
+            case activeRequest = "active_request"
+            case isStableForConcurrentGeneration = "is_stable_for_concurrent_generation"
+            case isRebuffering = "is_rebuffering"
+            case stableBufferedAudioMS = "stable_buffered_audio_ms"
+            case stableBufferTargetMS = "stable_buffer_target_ms"
+        }
+
+        let state: PlaybackState
+        let activeRequest: ActiveRequest?
+        let isStableForConcurrentGeneration: Bool
+        let isRebuffering: Bool
+        let stableBufferedAudioMS: Int?
+        let stableBufferTargetMS: Int?
+
+        init(
+            state: PlaybackState,
+            activeRequest: ActiveRequest?,
+            isStableForConcurrentGeneration: Bool = false,
+            isRebuffering: Bool = false,
+            stableBufferedAudioMS: Int? = nil,
+            stableBufferTargetMS: Int? = nil,
+        ) {
+            self.state = state
+            self.activeRequest = activeRequest
+            self.isStableForConcurrentGeneration = isStableForConcurrentGeneration
+            self.isRebuffering = isRebuffering
+            self.stableBufferedAudioMS = stableBufferedAudioMS
+            self.stableBufferTargetMS = stableBufferTargetMS
+        }
+
+        func playbackSnapshot(
+            sequence: Int,
+            capturedAt: Date,
+            queuedRequests: [QueuedRequest] = [],
+        ) -> PlaybackSnapshot {
+            PlaybackSnapshot(
+                sequence: sequence,
+                capturedAt: capturedAt,
+                state: state,
+                activeRequest: activeRequest,
+                queuedRequests: queuedRequests,
+                isRebuffering: isRebuffering,
+                stableBufferedAudioMS: stableBufferedAudioMS,
+                stableBufferTargetMS: stableBufferTargetMS,
+            )
+        }
+    }
+
+    struct WorkerRuntimeOverview: Encodable, Equatable {
+        enum CodingKeys: String, CodingKey {
+            case status
+            case speechBackend = "speech_backend"
+            case storage
+            case generationQueue = "generation_queue"
+            case playbackQueue = "playback_queue"
+            case playbackState = "playback_state"
+            case defaultVoiceProfile = "default_voice_profile"
+        }
+
+        let status: WorkerStatusEvent?
+        let speechBackend: SpeechBackend
+        let storage: RuntimeStorageSnapshot
+        let generationQueue: QueueSnapshot
+        let playbackQueue: QueueSnapshot
+        let playbackState: WorkerPlaybackStateSnapshot
+        let defaultVoiceProfile: String
+
+        init(
+            status: WorkerStatusEvent?,
+            speechBackend: SpeechBackend,
+            storage: RuntimeStorageSnapshot,
+            generationQueue: QueueSnapshot,
+            playbackQueue: QueueSnapshot,
+            playbackState: WorkerPlaybackStateSnapshot,
+            defaultVoiceProfile: String,
+        ) {
+            self.status = status
+            self.speechBackend = speechBackend
+            self.storage = storage
+            self.generationQueue = generationQueue
+            self.playbackQueue = playbackQueue
+            self.playbackState = playbackState
+            self.defaultVoiceProfile = defaultVoiceProfile
+        }
+
+        func runtimeSnapshot(sequence: Int, capturedAt: Date) -> RuntimeSnapshot {
+            RuntimeSnapshot(
+                sequence: sequence,
+                capturedAt: capturedAt,
+                state: status?.stage ?? .residentModelsUnloaded,
+                speechBackend: speechBackend,
+                residentState: status?.residentState ?? .unloaded,
+                defaultVoiceProfile: defaultVoiceProfile,
+                storage: storage,
+            )
         }
     }
 }

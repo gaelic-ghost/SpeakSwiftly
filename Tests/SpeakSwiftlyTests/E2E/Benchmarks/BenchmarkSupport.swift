@@ -437,12 +437,12 @@ enum BenchmarkHarness {
     static func awaitResidentReady(on runtime: SpeakSwiftly.Runtime) async throws -> Double {
         let clock = ContinuousClock()
         let startedAt = clock.now
-        let statuses = await runtime.statusEvents()
+        let updates = await runtime.updates()
 
         await runtime.start()
 
-        for await status in statuses {
-            switch status.stage {
+        for await update in updates {
+            switch update.state {
                 case .residentModelReady:
                     return milliseconds(since: startedAt, clock: clock)
                 case .residentModelFailed:
@@ -474,7 +474,7 @@ enum BenchmarkHarness {
             clock: clock,
         )
         async let generation = collectGenerationMetrics(
-            from: handle.generationEvents,
+            from: handle.synthesisUpdates,
             submittedAt: submittedAt,
             clock: clock,
         )
@@ -599,7 +599,7 @@ enum BenchmarkHarness {
     }
 
     private static func collectGenerationMetrics(
-        from events: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>,
+        from events: AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
     ) async throws -> BenchmarkRequestGenerationMetrics {

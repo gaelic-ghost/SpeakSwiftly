@@ -147,5 +147,6 @@ extension SpeakSwiftly.Runtime {
         result: Result<WorkerSuccessPayload, WorkerError>,
     ) async {
         await completeRequest(request: speechRequest.request, result: result)
+        await publishPlaybackUpdate()
     }
 }
