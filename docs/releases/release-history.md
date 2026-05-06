@@ -4,6 +4,21 @@ Git tags and GitHub releases are the authoritative release history. This file
 keeps durable context from older local release-prep and release-note snapshots
 without preserving one stale document per patch release.
 
+## v7.0.0
+
+- Renamed the probe executable product and reusable support target to
+  `SpeakSwiftlyProbeTool` and `SpeakSwiftlyTestSupport`.
+- Moved public API declarations out of `SpeakSwiftly.swift` and into focused
+  files under `Sources/SpeakSwiftly/API`.
+- Added `SpeakSwiftly.Tool` as the narrow request-ID-preserving adapter surface
+  used by the bundled JSONL executable.
+- Moved raw JSONL request decoding and JSONL response encoding into the
+  `SpeakSwiftlyTool` target.
+- Removed the runtime-owned JSONL stdout fallback and kept worker-contract tests
+  on the same encoder used by the executable.
+- Documented the `SpeakSwiftlyTool` adapter boundary and full release-safe E2E
+  verification gate for this cleanup.
+
 ## v3.0.9
 
 - Added an iOS Simulator compile-and-smoke validation lane.
