@@ -36,7 +36,7 @@ while reducing duplicate models, transport leakage, and queue-control ambiguity.
 
 The next cleanup keeps the same backbone but standardizes typed observation
 around `Event`, `State`, `Update`, and `Snapshot` families. That follow-up is
-tracked in [`observation-api-cleanup-plan-2026-05-06.md`](observation-api-cleanup-plan-2026-05-06.md).
+tracked in [`typed-observation-api.md`](typed-observation-api.md).
 
 ## Improvement Areas
 
@@ -171,7 +171,7 @@ Relevant files:
 - [`Sources/SpeakSwiftly/API/Generation.swift`](../../Sources/SpeakSwiftly/API/Generation.swift)
 - [`Sources/SpeakSwiftly/API/Playback.swift`](../../Sources/SpeakSwiftly/API/Playback.swift)
 - [`Sources/SpeakSwiftly/Runtime/WorkerRuntime+RequestObservation.swift`](../../Sources/SpeakSwiftly/Runtime/WorkerRuntime+RequestObservation.swift)
-- [`docs/maintainers/observation-api-cleanup-plan-2026-05-06.md`](observation-api-cleanup-plan-2026-05-06.md)
+- [`docs/maintainers/typed-observation-api.md`](typed-observation-api.md)
 
 ### 4. Request Operation Names
 

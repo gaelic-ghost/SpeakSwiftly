@@ -1,4 +1,4 @@
-# Observation API Cleanup Plan And Implementation Record
+# Typed Observation API
 
 This note records the agreed breaking public API cleanup for SpeakSwiftly's typed Swift observation surfaces and the implemented shape that landed from that plan.
 

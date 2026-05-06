@@ -138,8 +138,8 @@ extension SpeakSwiftly.Runtime {
         return false
     }
 
-    func generationActiveRequestSummaries() -> [ActiveWorkerRequestSummary] {
-        activeGenerations.values
+    func generationActiveRequestSummaries() async -> [ActiveWorkerRequestSummary] {
+        await generationController.activeJobsOrdered()
             .map(\.request)
             .sorted { $0.id < $1.id }
             .map {
@@ -181,7 +181,7 @@ extension SpeakSwiftly.Runtime {
     func queueSummaryActiveRequest(for queueType: WorkerQueueType) async -> ActiveWorkerRequestSummary? {
         switch queueType {
             case .generation:
-                generationActiveRequestSummaries().first
+                await generationActiveRequestSummaries().first
             case .playback:
                 await playbackController.activeRequestSummary()
         }
@@ -190,7 +190,7 @@ extension SpeakSwiftly.Runtime {
     func queueSummaryActiveRequests(for queueType: WorkerQueueType) async -> [ActiveWorkerRequestSummary] {
         switch queueType {
             case .generation:
-                generationActiveRequestSummaries()
+                await generationActiveRequestSummaries()
             case .playback:
                 await queueSummaryActiveRequest(for: .playback).map { [$0] } ?? []
         }
@@ -234,7 +234,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func generateSnapshot() async -> SpeakSwiftly.GenerateSnapshot {
-        let activeRequests = generationActiveRequestSummaries()
+        let activeRequests = await generationActiveRequestSummaries()
         let queuedRequests = await queuedRequestSummaries(for: .generation)
         return SpeakSwiftly.GenerateSnapshot(
             sequence: generateObservationBroker.sequence,

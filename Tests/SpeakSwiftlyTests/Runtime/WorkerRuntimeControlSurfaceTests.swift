@@ -104,6 +104,76 @@ import TextForSpeech
     await playbackDrain.open()
 }
 
+@Test func `generation updates report running after a queued request is reserved`() async throws {
+    let output = OutputRecorder()
+    let generationDrain = AsyncGate()
+    let updateRecorder = GenerateUpdateRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
+        residentModelLoader: { _ in
+            AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in [0.1, 0.2] },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.yield(Array(repeating: 0.1, count: 24000))
+                        Task {
+                            await generationDrain.wait()
+                            continuation.finish()
+                        }
+                    }
+                },
+            )
+        },
+    )
+
+    let updates = await runtime.generate.updates()
+    let collector = Task {
+        for await update in updates {
+            updateRecorder.record(update.state)
+        }
+    }
+    defer {
+        collector.cancel()
+        Task { await generationDrain.open() }
+    }
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    _ = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
+
+    #expect(
+        await waitUntil {
+            updateRecorder.contains(.running)
+        },
+        "Expected generation updates to include running; observed \(updateRecorder.statesDescription())",
+    )
+
+    await generationDrain.open()
+}
+
 @Test func `runtime overview captures serialized marvis generation`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
@@ -1014,4 +1084,27 @@ import TextForSpeech
     })
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:generate_speech", "req-3:list_voice_profiles"])
+}
+
+private final class GenerateUpdateRecorder: @unchecked Sendable {
+    private var states = [SpeakSwiftly.GenerateState]()
+    private let lock = NSLock()
+
+    func record(_ state: SpeakSwiftly.GenerateState) {
+        lock.withLock {
+            states.append(state)
+        }
+    }
+
+    func contains(_ state: SpeakSwiftly.GenerateState) -> Bool {
+        lock.withLock {
+            states.contains(state)
+        }
+    }
+
+    func statesDescription() -> String {
+        lock.withLock {
+            String(describing: states)
+        }
+    }
 }

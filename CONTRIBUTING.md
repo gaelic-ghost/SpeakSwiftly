@@ -79,7 +79,7 @@ If a standalone worker run reports `default.metallib` or `mlx-swift_Cmlx.bundle`
 
 The typed Swift surface uses Cocoa-style names rooted at `SpeakSwiftly.liftoff(...)` and `SpeakSwiftly.Runtime` concern handles such as `generate`, `playback`, `voices`, `normalizer`, `jobs`, and `artifacts`.
 
-Typed observation follows the `RequestEvent`, `RequestState`, `RequestUpdate`, and `RequestSnapshot` convention. Generate, Playback, Runtime, and per-request Synthesis observation families should keep rhyming with that model; see [docs/maintainers/observation-api-cleanup-plan-2026-05-06.md](./docs/maintainers/observation-api-cleanup-plan-2026-05-06.md).
+Typed observation follows the `RequestEvent`, `RequestState`, `RequestUpdate`, and `RequestSnapshot` convention. Generate, Playback, Runtime, and per-request Synthesis observation families should keep rhyming with that model; see [docs/maintainers/typed-observation-api.md](./docs/maintainers/typed-observation-api.md).
 
 The JSONL worker surface uses snake_case, verb-first operation names. Use `get_*` for one resource, `list_*` for collections, `create_*`, `update_*`, `replace_*`, and `delete_*` for CRUD-shaped mutations, and literal control verbs such as `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, and `cancel_*` when those words match the real operation.
 
