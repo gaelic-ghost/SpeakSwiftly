@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Voice Profile Reroll Logic
+// MARK: - Voice Profile Rerolling
 
 extension SpeakSwiftly.Runtime {
     func rerollGeneratedProfile(

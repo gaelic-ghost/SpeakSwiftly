@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Generation Queue
 
-actor SpeechGenerationController {
+actor GenerationQueue {
     enum QueueReadiness: Equatable {
         case preparing
         case ready

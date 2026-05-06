@@ -14,7 +14,7 @@ struct WorkerDependencies: @unchecked Sendable {
     let loadResidentModels: @Sendable (_ backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel
     let loadCloneTranscriptionModel: @Sendable () async throws -> AnyCloneTranscriptionModel
-    let makePlaybackController: @MainActor @Sendable () -> AnyPlaybackController
+    let makePlaybackDriver: @MainActor @Sendable () -> AnyPlaybackDriver
     let writeWAV: @Sendable (_ samples: [Float], _ sampleRate: Int, _ url: URL) throws -> Void
     let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
     let loadAudioFloats: @Sendable (_ url: URL, _ sampleRate: Int) throws -> [Float]
@@ -40,12 +40,12 @@ struct WorkerDependencies: @unchecked Sendable {
             },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
             loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
-            makePlaybackController: {
+            makePlaybackDriver: {
                 if environment[Environment.silentPlayback] == "1" {
                     return .silent(traceEnabled: environment[Environment.playbackTrace] == "1")
                 }
 
-                return AnyPlaybackController(
+                return AnyPlaybackDriver(
                     AudioPlaybackDriver(traceEnabled: environment[Environment.playbackTrace] == "1"),
                 )
             },

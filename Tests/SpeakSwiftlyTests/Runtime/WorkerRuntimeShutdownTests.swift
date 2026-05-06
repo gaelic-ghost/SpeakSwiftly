@@ -386,7 +386,7 @@ final class LockedFlag: @unchecked Sendable {
             loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
             loadProfileModel: { makeProfileModel() },
             loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
-            makePlaybackController: { AnyPlaybackController.silent() },
+            makePlaybackDriver: { AnyPlaybackDriver.silent() },
             writeWAV: { samples, _, url in
                 writeCoordinator.markEntered()
                 writeCoordinator.blockUntilReleased()
@@ -409,7 +409,7 @@ final class LockedFlag: @unchecked Sendable {
         normalizer: SpeakSwiftly.Normalizer(
             persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName),
         ),
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
+        playbackQueue: PlaybackQueue(driver: AnyPlaybackDriver.silent()),
     )
     await blockedRuntime.installPlaybackHooks()
     await blockedRuntime.attachJSONLOutput(to: output)
@@ -494,7 +494,7 @@ final class LockedFlag: @unchecked Sendable {
         loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
         loadProfileModel: { makeProfileModel() },
         loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
-        makePlaybackController: { AnyPlaybackController.silent() },
+        makePlaybackDriver: { AnyPlaybackDriver.silent() },
         writeWAV: { samples, _, url in
             let bytes = samples.map(\.bitPattern).flatMap { value in
                 withUnsafeBytes(of: value.littleEndian, Array.init)
@@ -516,7 +516,7 @@ final class LockedFlag: @unchecked Sendable {
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
+        playbackQueue: PlaybackQueue(driver: AnyPlaybackDriver.silent()),
     )
     await runtime.installPlaybackHooks()
     await runtime.attachJSONLOutput(to: output)

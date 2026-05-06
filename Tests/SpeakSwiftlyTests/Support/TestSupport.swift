@@ -311,8 +311,8 @@ final class PlaybackSpy: @unchecked Sendable {
         self.environmentEvents = environmentEvents
     }
 
-    func controller() -> AnyPlaybackController {
-        AnyPlaybackController(
+    func driver() -> AnyPlaybackDriver {
+        AnyPlaybackDriver(
             prepare: { [self] _ in
                 lock.withLock { prepareCount += 1 }
                 return prepareCount == 1
@@ -822,7 +822,7 @@ func makeRuntime(
     let normalizer = try SpeakSwiftly.Normalizer(
         persistenceURL: rootURL.appending(path: ProfileStore.textProfilesFileName),
     )
-    let playbackController = playback.controller()
+    let playbackQueue = playback.driver()
     let dependencies = WorkerDependencies(
         fileManager: .default,
         loadResidentModels: { backend in
@@ -854,7 +854,7 @@ func makeRuntime(
         },
         loadProfileModel: profileModelLoader,
         loadCloneTranscriptionModel: cloneTranscriptionModelLoader,
-        makePlaybackController: { playbackController },
+        makePlaybackDriver: { playbackQueue },
         writeWAV: { samples, _, url in
             let bytes = samples.map(\.bitPattern).flatMap { value in
                 withUnsafeBytes(of: value.littleEndian, Array.init)
@@ -883,7 +883,7 @@ func makeRuntime(
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,
-        playbackController: PlaybackController(driver: playbackController),
+        playbackQueue: PlaybackQueue(driver: playbackQueue),
     )
     await runtime.installPlaybackHooks()
     await runtime.attachJSONLOutput(to: output)

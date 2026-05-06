@@ -179,7 +179,7 @@ public extension SpeakSwiftly {
         }
 
         struct GenerationScheduleDecision {
-            let runnableJobs: [SpeechGenerationController.Job]
+            let runnableJobs: [GenerationQueue.Job]
             let parkReasons: [UUID: GenerationParkReason]
         }
 
@@ -284,8 +284,8 @@ public extension SpeakSwiftly {
         let generatedFileStore: GeneratedFileStore
         let generationJobStore: GenerationJobStore
         let normalizerRef: SpeakSwiftly.Normalizer
-        let playbackController: PlaybackController
-        let generationController = SpeechGenerationController()
+        let playbackQueue: PlaybackQueue
+        let generationQueue = GenerationQueue()
         let logTimestampFormatter = ISO8601DateFormatter()
         let maxAcceptedSpeechJobs = 24
 
@@ -319,7 +319,7 @@ public extension SpeakSwiftly {
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
             normalizer: SpeakSwiftly.Normalizer,
-            playbackController: PlaybackController,
+            playbackQueue: PlaybackQueue,
         ) {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
@@ -331,7 +331,7 @@ public extension SpeakSwiftly {
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore
             normalizerRef = normalizer
-            self.playbackController = playbackController
+            self.playbackQueue = playbackQueue
             encoder.outputFormatting = [.sortedKeys]
         }
     }

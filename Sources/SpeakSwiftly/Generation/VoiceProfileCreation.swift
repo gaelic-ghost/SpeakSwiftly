@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Voice Profile Generation Logic
+// MARK: - Voice Profile Creation
 
 extension SpeakSwiftly.Runtime {
     struct ResolvedCloneTranscript: Equatable {

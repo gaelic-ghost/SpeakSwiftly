@@ -4,7 +4,7 @@ import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 import TextForSpeech
 
-// MARK: - Generated File Logic
+// MARK: - Generated Audio Files
 
 extension SpeakSwiftly.Runtime {
     func handleQueueSpeechFileGeneration(

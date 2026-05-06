@@ -379,12 +379,12 @@ enum BenchmarkHarness {
             loadResidentModels: liveDependencies.loadResidentModels,
             loadProfileModel: liveDependencies.loadProfileModel,
             loadCloneTranscriptionModel: liveDependencies.loadCloneTranscriptionModel,
-            makePlaybackController: {
+            makePlaybackDriver: {
                 switch playbackMode {
                     case .silent:
                         .silent(traceEnabled: playbackTrace)
                     case .audible:
-                        AnyPlaybackController(AudioPlaybackDriver(traceEnabled: playbackTrace))
+                        AnyPlaybackDriver(AudioPlaybackDriver(traceEnabled: playbackTrace))
                 }
             },
             writeWAV: liveDependencies.writeWAV,
@@ -416,7 +416,7 @@ enum BenchmarkHarness {
                 stateRootOverride: profileRootURL.path,
             ),
         )
-        let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
+        let playbackQueue = await PlaybackQueue(driver: dependencies.makePlaybackDriver())
 
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
@@ -427,7 +427,7 @@ enum BenchmarkHarness {
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
-            playbackController: playbackController,
+            playbackQueue: playbackQueue,
         )
         await runtime.installPlaybackHooks()
         return BenchmarkRuntimeSession(runtime: runtime, logRecorder: logRecorder)

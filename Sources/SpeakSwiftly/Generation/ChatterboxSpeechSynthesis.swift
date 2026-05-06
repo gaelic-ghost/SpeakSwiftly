@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import MLX
 @preconcurrency import MLXLMCommon
 
-// MARK: - Chatterbox Speech Generation
+// MARK: - Chatterbox Speech Synthesis
 
 extension SpeakSwiftly.Runtime {
     func chatterboxGenerationStream(

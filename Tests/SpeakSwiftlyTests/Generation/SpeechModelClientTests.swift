@@ -185,7 +185,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -330,12 +330,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `first drained live marvis requires extra reserve before overlap opens`() {
-    let standardAdmission = PlaybackController.concurrencyAdmissionThresholds(
+    let standardAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
         tuningProfile: .standard,
         startupBufferTargetMS: 2320,
         lowWaterTargetMS: 1040,
     )
-    let firstRequestAdmission = PlaybackController.concurrencyAdmissionThresholds(
+    let firstRequestAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
         tuningProfile: .firstDrainedLiveMarvis,
         startupBufferTargetMS: 2320,
         lowWaterTargetMS: 1040,
@@ -347,18 +347,18 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
-    let configuration = PlaybackController.fragileOverlapWindowConfiguration(
+    let configuration = PlaybackQueue.fragileOverlapWindowConfiguration(
         tuningProfile: .firstDrainedLiveMarvis,
         concurrentGenerationTargetMS: 3160,
         lowWaterTargetMS: 1040,
     )
 
-    #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
+    #expect(configuration == PlaybackQueue.FragileOverlapWindowConfiguration(
         holdBufferTargetMS: 3680,
         requiredStableBufferEventCount: 4,
     ))
     #expect(
-        PlaybackController.fragileOverlapWindowConfiguration(
+        PlaybackQueue.fragileOverlapWindowConfiguration(
             tuningProfile: .standard,
             concurrentGenerationTargetMS: 3160,
             lowWaterTargetMS: 1040,
@@ -368,13 +368,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 @Test func `concurrent generation stays closed below the claimed reserve target`() {
     #expect(
-        PlaybackController.allowsConcurrentGeneration(
+        PlaybackQueue.allowsConcurrentGeneration(
             bufferedAudioMS: 2160,
             targetMS: 3160,
         ) == false,
     )
     #expect(
-        PlaybackController.allowsConcurrentGeneration(
+        PlaybackQueue.allowsConcurrentGeneration(
             bufferedAudioMS: 3200,
             targetMS: 3160,
         ) == true,
@@ -382,7 +382,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `fragile overlap window requires a brief healthy hold and re closes when reserve sags`() {
-    let progress = PlaybackController.FragileOverlapWindowProgress(
+    let progress = PlaybackQueue.FragileOverlapWindowProgress(
         configuration: .init(
             holdBufferTargetMS: 3800,
             requiredStableBufferEventCount: 4,
@@ -391,7 +391,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         hasSatisfiedHold: false,
     )
 
-    let firstHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let firstHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3900,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: progress,
@@ -401,7 +401,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 1)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let secondHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let secondHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3920,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
@@ -411,7 +411,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(secondHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 2)
     #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let thirdHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let thirdHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3940,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
@@ -421,7 +421,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 3)
     #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let fourthHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let fourthHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3960,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: thirdHealthyEvent.fragileOverlapWindowProgress,
@@ -430,7 +430,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(fourthHealthyEvent.effectiveTargetMS == 3160)
     #expect(fourthHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
 
-    let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let collapsingReserveEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3600,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: fourthHealthyEvent.fragileOverlapWindowProgress,
@@ -445,7 +445,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -483,7 +483,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -505,7 +505,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 // MARK: - Runtime Playback Integration
 
-@Test func `speak live uses stored profile data waits for playback drain and reuses playback controller`() async throws {
+@Test func `speak live uses stored profile data waits for playback drain and reuses playback queue`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))

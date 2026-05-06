@@ -302,7 +302,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    let preparingLiveJob = SpeechGenerationController.Job(
+    let preparingLiveJob = GenerationQueue.Job(
         request: .queueSpeech(
             id: "req-preparing-live",
             text: "Hello while playback state is still preparing.",
@@ -314,7 +314,7 @@ import TextForSpeech
             qwenPreModelTextChunking: nil,
         ),
     )
-    let reloadJob = SpeechGenerationController.Job(
+    let reloadJob = GenerationQueue.Job(
         request: .reloadModels(id: "req-reload-models"),
     )
 
@@ -322,7 +322,7 @@ import TextForSpeech
         activeJobs: [],
         queuedJobs: [preparingLiveJob, reloadJob],
         preparingJobTokens: [preparingLiveJob.token],
-        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot(
+        playbackAdmission: PlaybackQueue.GenerationAdmissionSnapshot(
             activeRequestID: nil,
             activeRequestTuningProfile: nil,
             allowsConcurrentGeneration: true,

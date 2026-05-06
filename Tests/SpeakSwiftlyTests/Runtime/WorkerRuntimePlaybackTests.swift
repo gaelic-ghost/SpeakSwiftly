@@ -163,7 +163,7 @@ private actor EnvironmentEventRecorder {
             behavior: .throw(
                 WorkerError(
                     code: .audioPlaybackFailed,
-                    message: "Background playback failed in the test playback controller after the request had already been accepted.",
+                    message: "Background playback failed in the test playback driver after the request had already been accepted.",
                 ),
             ),
         ),

@@ -117,7 +117,7 @@ extension SpeakSwiftly.Runtime {
                 persistenceURL: textProfilesURL,
                 dependencies: dependencies,
             )
-        let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
+        let playbackQueue = await PlaybackQueue(driver: dependencies.makePlaybackDriver())
 
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
@@ -130,7 +130,7 @@ extension SpeakSwiftly.Runtime {
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
-            playbackController: playbackController,
+            playbackQueue: playbackQueue,
         )
         await runtime.installPlaybackHooks()
         return runtime

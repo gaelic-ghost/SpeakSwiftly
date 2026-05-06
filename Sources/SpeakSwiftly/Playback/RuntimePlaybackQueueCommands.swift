@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Playback Runtime Glue
+// MARK: - Runtime Playback Queue Commands
 
 extension SpeakSwiftly.Runtime {
     // MARK: - Queue Management
@@ -11,14 +11,14 @@ extension SpeakSwiftly.Runtime {
         reason: String,
     ) async -> Int {
         let queuedJobs = if queueType == nil || queueType == .generation {
-            await generationController.clearQueued()
+            await generationQueue.clearQueued()
         } else {
-            [SpeechGenerationController.Job]()
+            [GenerationQueue.Job]()
         }
-        let activePlaybackRequestID = await playbackController.activeRequestSummary()?.id
+        let activePlaybackRequestID = await playbackQueue.activeRequestSummary()?.id
         let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
         let waitingPlaybackJobs = if queueType == nil || queueType == .playback {
-            await playbackController.clearQueued(excluding: protectedRequestIDs)
+            await playbackQueue.clearQueued(excluding: protectedRequestIDs)
         } else {
             [LiveSpeechPlaybackState]()
         }
@@ -30,7 +30,7 @@ extension SpeakSwiftly.Runtime {
 
         for job in queuedJobs {
             if job.request.requiresPlayback {
-                _ = await playbackController.discard(requestID: job.request.id)
+                _ = await playbackQueue.discard(requestID: job.request.id)
             }
             markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
             await failRequestStream(for: job.request.id, error: cancellation)
@@ -58,9 +58,9 @@ extension SpeakSwiftly.Runtime {
     }
 
     func failWaitingPlaybackRequests(with error: WorkerError) async {
-        let activePlaybackRequestID = await playbackController.activeRequestSummary()?.id
+        let activePlaybackRequestID = await playbackQueue.activeRequestSummary()?.id
         let protectedRequestIDs = Set(activeGenerations.values.map(\.request.id) + [activePlaybackRequestID].compactMap { $0 })
-        let waitingPlaybackJobs = await playbackController.clearQueued(excluding: protectedRequestIDs)
+        let waitingPlaybackJobs = await playbackQueue.clearQueued(excluding: protectedRequestIDs)
 
         for playbackState in waitingPlaybackJobs {
             playbackState.execution.generationTask?.cancel()
@@ -81,15 +81,15 @@ extension SpeakSwiftly.Runtime {
         )
 
         if queueType == nil || queueType == .playback,
-           let playbackState = await playbackController.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
-            let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID, removeActive: false)
+           let playbackState = await playbackQueue.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
+            let cancelledGenerationTarget = await generationQueue.cancel(requestID: targetRequestID, removeActive: false)
             if case let .active(job) = cancelledGenerationTarget {
                 activeGenerationCancellations[job.request.id] = cancellation
             }
             playbackState.execution.continuation.finish(throwing: cancellation)
             await completePlaybackJob(playbackState.request, result: .failure(cancellation))
             try? await startNextGenerationIfPossible()
-            await playbackController.startNextIfPossible()
+            await playbackQueue.startNextIfPossible()
             return targetRequestID
         }
 
@@ -97,20 +97,20 @@ extension SpeakSwiftly.Runtime {
             throw requestNotFoundError(targetRequestID, queueType: queueType, cancelledByRequestID: cancelledByRequestID)
         }
 
-        let cancelledGenerationTarget = await generationController.cancel(requestID: targetRequestID, removeActive: false)
+        let cancelledGenerationTarget = await generationQueue.cancel(requestID: targetRequestID, removeActive: false)
 
         switch cancelledGenerationTarget {
             case let .active(job):
                 activeGenerationCancellations[job.request.id] = cancellation
                 if job.request.requiresPlayback,
-                   let playbackState = await playbackController.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
+                   let playbackState = await playbackQueue.cancel(requestID: targetRequestID, cancelGenerationTask: false) {
                     playbackState.execution.continuation.finish(throwing: cancellation)
                     await completePlaybackJob(playbackState.request, result: .failure(cancellation))
                 }
                 return targetRequestID
             case let .queued(job):
                 if job.request.requiresPlayback {
-                    _ = await playbackController.discard(requestID: job.request.id)
+                    _ = await playbackQueue.discard(requestID: job.request.id)
                 }
                 markGenerationJobFailedIfNeeded(for: job.request, error: cancellation)
                 await failRequestStream(for: targetRequestID, error: cancellation)
