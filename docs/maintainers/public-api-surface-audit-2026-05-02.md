@@ -40,6 +40,28 @@ tracked in [`typed-observation-api.md`](typed-observation-api.md).
 
 ## Improvement Areas
 
+### 0. `SpeakSwiftlyTool` as Public API Consumer
+
+Settled direction: `SpeakSwiftlyTool` should be a CLI and bundled-executable
+adapter over the public Swift library API, not a privileged runtime-internal
+entry point.
+
+The JSONL worker contract remains supported, but JSONL request parsing,
+operation-name compatibility, response encoding, stdin/stdout/stderr behavior,
+and launch-argument handling belong to the `SpeakSwiftlyTool` target. The
+`SpeakSwiftly` library should own typed capabilities and observation models.
+
+If the tool needs a capability that does not yet have a clear public handle,
+add it under a temporary `SpeakSwiftly.Tool` or `SpeakSwiftly.Dev` namespace
+instead of reaching through internal runtime types. Those namespaces are
+staging surfaces only; redistribute members into `Generate`, `Playback`,
+`Voices`, `Normalizer`, `Jobs`, `Artifacts`, or `Runtime` when the long-term
+ownership becomes clear.
+
+Implementation plan:
+
+- [`speakswiftly-tool-api-adapter-plan-2026-05-06.md`](speakswiftly-tool-api-adapter-plan-2026-05-06.md)
+
 ### 1. Retained Generation Models
 
 The retained generation surface now treats `GenerationJob` as the canonical
