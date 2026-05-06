@@ -4,7 +4,7 @@ Inspect retained artifacts and generation jobs after synthesis finishes, without
 
 ## Overview
 
-SpeakSwiftly separates live playback control from retained generation output. Playback work belongs to ``SpeakSwiftly/Player``. Retained output belongs to ``SpeakSwiftly/Jobs`` and ``SpeakSwiftly/Artifacts``.
+SpeakSwiftly separates live playback control from retained generation output. Playback work belongs to ``SpeakSwiftly/Playback``. Retained output belongs to ``SpeakSwiftly/Jobs`` and ``SpeakSwiftly/Artifacts``.
 
 That split keeps the public API honest about ownership. A request may pass through the generation queue even when you never plan to play the result immediately, and a playback request may not leave behind the same retained output you care about for later inspection or reuse.
 
@@ -78,4 +78,4 @@ Reach for the retained-artifacts surface when you need any of the following:
 - You want grouped retained output from one batch request.
 - You need stored metadata without coupling your code to runtime internals.
 
-When the work is really about current speaker behavior instead of stored output, go back to ``SpeakSwiftly/Player`` or the request stream on ``SpeakSwiftly/RequestHandle``.
+When the work is really about current speaker behavior instead of stored output, go back to ``SpeakSwiftly/Playback`` or the request stream on ``SpeakSwiftly/RequestHandle``.

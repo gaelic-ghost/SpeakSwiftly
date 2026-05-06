@@ -44,11 +44,11 @@ extension SpeakSwiftly.Runtime {
                         for try await event in eventStream {
                             switch event {
                                 case let .token(token):
-                                    recordGenerationEvent(.token(token), for: requestID)
+                                    recordSynthesisEvent(.token(token), for: requestID)
                                 case let .info(info):
-                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                    recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
                                 case let .audio(samples):
-                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
                                     continuation.yield(samples)
                             }
                         }

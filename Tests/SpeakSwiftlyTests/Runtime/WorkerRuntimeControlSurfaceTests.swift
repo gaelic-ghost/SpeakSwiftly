@@ -46,25 +46,11 @@ import TextForSpeech
 
     let queuedHandle = await runtime.generate.speech(text: "Hi there", voiceProfile: "default-femme")
 
-    let listID = await runtime.player.list().id
-
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            guard
-                $0["id"] as? String == listID,
-                $0["ok"] as? Bool == true,
-                let active = $0["active_request"] as? [String: Any],
-                let queue = $0["queue"] as? [[String: Any]]
-            else {
-                return false
-            }
-
-            return active["id"] as? String == activeHandle.id
-                && queue.count == 1
-                && queue[0]["id"] as? String == queuedHandle.id
-                && queue[0]["queue_position"] as? Int == 1
-        }
-    })
+    let snapshot = await runtime.playback.snapshot()
+    #expect(snapshot.activeRequest?.id == activeHandle.id)
+    #expect(snapshot.queuedRequests.count == 1)
+    #expect(snapshot.queuedRequests[0].id == queuedHandle.id)
+    #expect(snapshot.queuedRequests[0].queuePosition == 1)
 
     await playbackDrain.open()
 }
@@ -111,25 +97,81 @@ import TextForSpeech
     })
 
     _ = await runtime.generate.speech(text: "Hi there", voiceProfile: "default-femme")
-    let stateID = await runtime.player.state().id
+    let snapshot = await runtime.playback.snapshot()
+    #expect(snapshot.state == .playing)
+    #expect(snapshot.activeRequest?.id == activeHandle.id)
 
+    await playbackDrain.open()
+}
+
+@Test func `generation updates report running after a queued request is reserved`() async throws {
+    let output = OutputRecorder()
+    let generationDrain = AsyncGate()
+    let updateRecorder = GenerateUpdateRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
+        residentModelLoader: { _ in
+            AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in [0.1, 0.2] },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.yield(Array(repeating: 0.1, count: 24000))
+                        Task {
+                            await generationDrain.wait()
+                            continuation.finish()
+                        }
+                    }
+                },
+            )
+        },
+    )
+
+    let updates = await runtime.generate.updates()
+    let collector = Task {
+        for await update in updates {
+            updateRecorder.record(update.state)
+        }
+    }
+    defer {
+        collector.cancel()
+        Task { await generationDrain.open() }
+    }
+
+    await runtime.start()
     #expect(await waitUntil {
         output.containsJSONObject {
-            guard
-                $0["id"] as? String == stateID,
-                $0["ok"] as? Bool == true,
-                let playbackState = $0["playback_state"] as? [String: Any],
-                let activeRequest = playbackState["active_request"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return playbackState["state"] as? String == "playing"
-                && activeRequest["id"] as? String == activeHandle.id
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
         }
     })
 
-    await playbackDrain.open()
+    _ = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
+
+    #expect(
+        await waitUntil {
+            updateRecorder.contains(.running)
+        },
+        "Expected generation updates to include running; observed \(updateRecorder.statesDescription())",
+    )
+
+    await generationDrain.open()
 }
 
 @Test func `runtime overview captures serialized marvis generation`() async throws {
@@ -221,42 +263,25 @@ import TextForSpeech
                     || ($0["reason"] as? String == "waiting_for_active_request"))
         }
     })
-    let overviewID = await runtime.overview().id
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            guard
-                $0["id"] as? String == overviewID,
-                $0["ok"] as? Bool == true,
-                let overview = $0["runtime_overview"] as? [String: Any],
-                let storage = overview["storage"] as? [String: Any],
-                let generationQueue = overview["generation_queue"] as? [String: Any],
-                let activeRequests = generationQueue["active_requests"] as? [[String: Any]],
-                let queuedRequests = generationQueue["queue"] as? [[String: Any]],
-                let playbackState = overview["playback_state"] as? [String: Any],
-                let playbackActiveRequest = playbackState["active_request"] as? [String: Any]
-            else {
-                return false
-            }
+    let runtimeSnapshot = await runtime.snapshot()
+    let generateSnapshot = await runtime.generate.snapshot()
+    let playbackSnapshot = await runtime.playback.snapshot()
+    let activeIDs = Set(generateSnapshot.activeRequests.map(\.id))
+    let queuedIDs = Set(generateSnapshot.queuedRequests.map(\.id))
 
-            let activeIDs = Set(activeRequests.compactMap { $0["id"] as? String })
-            let queuedIDs = Set(queuedRequests.compactMap { $0["id"] as? String })
-            return overview["speech_backend"] as? String == "marvis"
-                && storage["state_root_path"] as? String == storeRoot.standardizedFileURL.path
-                && storage["profile_store_root_path"] as? String == storeRoot.standardizedFileURL.path
-                && storage["configuration_path"] as? String == storeRoot.appendingPathComponent("configuration.json").path
-                && storage["text_profiles_path"] as? String == storeRoot.appendingPathComponent("text-profiles.json").path
-                && storage["generated_files_root_path"] as? String == storeRoot.appendingPathComponent("generated-files").path
-                && storage["generation_jobs_root_path"] as? String == storeRoot.appendingPathComponent("generation-jobs").path
-                && activeIDs == Set([firstHandle.id])
-                && queuedIDs == Set([secondHandle.id])
-                && playbackState["state"] as? String == "playing"
-                && (playbackState["is_stable_for_concurrent_generation"] as? Bool) != nil
-                && (playbackState["is_rebuffering"] as? Bool) != nil
-                && (playbackState["stable_buffered_audio_ms"] as? Int ?? 0) >= 0
-                && (playbackState["stable_buffer_target_ms"] as? Int ?? 0) >= 0
-                && playbackActiveRequest["id"] as? String == firstHandle.id
-        }
-    })
+    #expect(runtimeSnapshot.speechBackend == .marvis)
+    #expect(runtimeSnapshot.storage.stateRootPath == storeRoot.standardizedFileURL.path)
+    #expect(runtimeSnapshot.storage.profileStoreRootPath == storeRoot.standardizedFileURL.path)
+    #expect(runtimeSnapshot.storage.configurationPath == storeRoot.appendingPathComponent("configuration.json").path)
+    #expect(runtimeSnapshot.storage.textProfilesPath == storeRoot.appendingPathComponent("text-profiles.json").path)
+    #expect(runtimeSnapshot.storage.generatedFilesRootPath == storeRoot.appendingPathComponent("generated-files").path)
+    #expect(runtimeSnapshot.storage.generationJobsRootPath == storeRoot.appendingPathComponent("generation-jobs").path)
+    #expect(activeIDs == Set([firstHandle.id]))
+    #expect(queuedIDs == Set([secondHandle.id]))
+    #expect(playbackSnapshot.state == .playing)
+    #expect((playbackSnapshot.stableBufferedAudioMS ?? 0) >= 0)
+    #expect((playbackSnapshot.stableBufferTargetMS ?? 0) >= 0)
+    #expect(playbackSnapshot.activeRequest?.id == firstHandle.id)
 
     await laneAGenerationDrain.open()
     await laneBGenerationDrain.open()
@@ -281,23 +306,10 @@ import TextForSpeech
         }
     })
 
-    let statusID = await runtime.status().id
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            guard
-                $0["id"] as? String == statusID,
-                $0["ok"] as? Bool == true,
-                $0["speech_backend"] as? String == "qwen3",
-                let status = $0["status"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return status["stage"] as? String == "resident_model_ready"
-                && status["resident_state"] as? String == "ready"
-                && status["speech_backend"] as? String == "qwen3"
-        }
-    })
+    let snapshot = await runtime.snapshot()
+    #expect(snapshot.state == .residentModelReady)
+    #expect(snapshot.residentState == .ready)
+    #expect(snapshot.speechBackend == .qwen3)
 }
 
 @Test func `switch speech backend reloads resident models without restarting runtime`() async throws {
@@ -830,7 +842,7 @@ import TextForSpeech
         }
     }
 
-    let cancelID = await runtime.player.cancelRequest("req-active").id
+    let cancelID = await runtime.playback.cancelRequest("req-active").id
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -1072,4 +1084,27 @@ import TextForSpeech
     })
     let startedOps = output.startedEvents()
     #expect(startedOps == ["req-1:create_voice_profile_from_description", "req-2:generate_speech", "req-3:list_voice_profiles"])
+}
+
+private final class GenerateUpdateRecorder: @unchecked Sendable {
+    private var states = [SpeakSwiftly.GenerateState]()
+    private let lock = NSLock()
+
+    func record(_ state: SpeakSwiftly.GenerateState) {
+        lock.withLock {
+            states.append(state)
+        }
+    }
+
+    func contains(_ state: SpeakSwiftly.GenerateState) -> Bool {
+        lock.withLock {
+            states.contains(state)
+        }
+    }
+
+    func statesDescription() -> String {
+        lock.withLock {
+            String(describing: states)
+        }
+    }
 }

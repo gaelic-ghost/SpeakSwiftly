@@ -72,6 +72,8 @@ extension SpeakSwiftly.Runtime {
                 playbackAdmission: playbackAdmission,
             )
         }
+
+        await publishGenerateUpdate()
     }
 
     func evaluateGenerationSchedule(

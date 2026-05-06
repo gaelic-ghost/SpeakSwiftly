@@ -56,7 +56,7 @@ import TextForSpeech
         voiceProfile: "default-femme",
     )
 
-    let runtimeEvents = await runtime.generationEvents(for: handle.id)
+    let runtimeEvents = await runtime.synthesisUpdates(for: handle.id)
     var runtimeIterator = runtimeEvents.makeAsyncIterator()
 
     if case let .token(token)? = try await runtimeIterator.next()?.event {
@@ -90,7 +90,7 @@ import TextForSpeech
 
     #expect(try await runtimeIterator.next() == nil)
 
-    var handleIterator = handle.generationEvents.makeAsyncIterator()
+    var handleIterator = handle.synthesisUpdates.makeAsyncIterator()
     if case let .token(token)? = try await handleIterator.next()?.event {
         #expect(token == 202)
     } else {
@@ -297,7 +297,7 @@ import TextForSpeech
         Issue.record("Expected the reconnecting observer to replay the queued state first.")
     }
 
-    let cancelID = await runtime.player.cancelRequest("req-cancelled").id
+    let cancelID = await runtime.playback.cancelRequest("req-cancelled").id
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == cancelID
@@ -402,13 +402,13 @@ import TextForSpeech
         }
     })
 
-    let statuses = await runtime.statusEvents()
-    var iterator = statuses.makeAsyncIterator()
+    let updates = await runtime.updates()
+    var iterator = updates.makeAsyncIterator()
 
-    #expect(await iterator.next() == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
+    #expect(await iterator.next()?.state == .residentModelReady)
 }
 
-@Test func `dropping status subscription does not retain runtime`() async throws {
+@Test func `dropping runtime update subscription does not retain runtime`() async throws {
     let output = OutputRecorder()
     let weakRuntime = WeakRuntimeBox()
 
@@ -419,10 +419,10 @@ import TextForSpeech
     )
     weakRuntime.value = runtime
 
-    var statuses: AsyncStream<SpeakSwiftly.StatusEvent>? = await runtime?.statusEvents()
-    _ = statuses?.makeAsyncIterator()
+    var updates: AsyncStream<SpeakSwiftly.RuntimeUpdate>? = await runtime?.updates()
+    _ = updates?.makeAsyncIterator()
 
-    statuses = nil
+    updates = nil
     runtime = nil
 
     #expect(await waitUntil { weakRuntime.value == nil })
@@ -452,17 +452,17 @@ import TextForSpeech
         },
     )
 
-    let statuses = await runtime.statusEvents()
-    var iterator = statuses.makeAsyncIterator()
+    let updates = await runtime.updates()
+    var iterator = updates.makeAsyncIterator()
 
     await runtime.start()
     await runtime.start()
 
-    let firstStatus = await iterator.next()
-    let secondStatus = await iterator.next()
+    let firstUpdate = await iterator.next()
+    let secondUpdate = await iterator.next()
 
-    #expect(firstStatus == WorkerStatusEvent(stage: .warmingResidentModel, residentState: .warming, speechBackend: .qwen3))
-    #expect(secondStatus == WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3))
+    #expect(firstUpdate?.state == .warmingResidentModel)
+    #expect(secondUpdate?.state == .residentModelReady)
     #expect(await loadCounter.value() == 1)
     #expect(
         output.countJSONObjects {

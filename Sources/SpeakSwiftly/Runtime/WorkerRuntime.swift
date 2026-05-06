@@ -105,12 +105,12 @@ public extension SpeakSwiftly {
             let acceptedAt: Date
             var lastUpdatedAt: Date
             var stateSequence = 0
-            var generationSequence = 0
+            var synthesisSequence = 0
             var latestState: SpeakSwiftly.RequestState?
             var replayUpdates = [SpeakSwiftly.RequestUpdate]()
             var subscriberContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.RequestUpdate, any Swift.Error>.Continuation]()
-            var replayGenerationEvents = [SpeakSwiftly.GenerationEventUpdate]()
-            var generationContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error>.Continuation]()
+            var replaySynthesisUpdates = [SpeakSwiftly.SynthesisUpdate]()
+            var synthesisContinuations = [UUID: AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error>.Continuation]()
             var isTerminal = false
 
             mutating func recordState(
@@ -135,22 +135,22 @@ public extension SpeakSwiftly {
                 return update
             }
 
-            mutating func recordGenerationEvent(
-                _ event: SpeakSwiftly.GenerationEvent,
+            mutating func recordSynthesisEvent(
+                _ event: SpeakSwiftly.SynthesisEvent,
                 date: Date,
                 maxReplayUpdates: Int,
-            ) -> SpeakSwiftly.GenerationEventUpdate {
-                generationSequence += 1
+            ) -> SpeakSwiftly.SynthesisUpdate {
+                synthesisSequence += 1
 
-                let update = SpeakSwiftly.GenerationEventUpdate(
+                let update = SpeakSwiftly.SynthesisUpdate(
                     id: id,
-                    sequence: generationSequence,
+                    sequence: synthesisSequence,
                     date: date,
                     event: event,
                 )
-                replayGenerationEvents.append(update)
-                if replayGenerationEvents.count > maxReplayUpdates {
-                    replayGenerationEvents.removeFirst(replayGenerationEvents.count - maxReplayUpdates)
+                replaySynthesisUpdates.append(update)
+                if replaySynthesisUpdates.count > maxReplayUpdates {
+                    replaySynthesisUpdates.removeFirst(replaySynthesisUpdates.count - maxReplayUpdates)
                 }
                 return update
             }
@@ -203,7 +203,7 @@ public extension SpeakSwiftly {
             let activeRequests: [ActiveWorkerRequestSummary]?
             let queue: [QueuedWorkerRequestSummary]?
             let playbackState: PlaybackStateSummary?
-            let runtimeOverview: SpeakSwiftly.RuntimeOverview?
+            let runtimeOverview: SpeakSwiftly.WorkerRuntimeOverview?
             let status: WorkerStatusEvent?
             let speechBackend: SpeakSwiftly.SpeechBackend?
             let defaultVoiceProfile: SpeakSwiftly.Name?
@@ -230,7 +230,7 @@ public extension SpeakSwiftly {
                 activeRequests: [ActiveWorkerRequestSummary]? = nil,
                 queue: [QueuedWorkerRequestSummary]? = nil,
                 playbackState: PlaybackStateSummary? = nil,
-                runtimeOverview: SpeakSwiftly.RuntimeOverview? = nil,
+                runtimeOverview: SpeakSwiftly.WorkerRuntimeOverview? = nil,
                 status: WorkerStatusEvent? = nil,
                 speechBackend: SpeakSwiftly.SpeechBackend? = nil,
                 defaultVoiceProfile: SpeakSwiftly.Name? = nil,
@@ -384,7 +384,9 @@ public extension SpeakSwiftly {
         var preloadTask: Task<Void, Never>?
         var residentPreloadToken: UUID?
         var lastQueuedGenerationParkReason = [String: GenerationParkReason]()
-        var statusContinuations = [UUID: AsyncStream<WorkerStatusEvent>.Continuation]()
+        var runtimeObservationBroker = SingletonObservationBroker<SpeakSwiftly.RuntimeUpdate>()
+        var generateObservationBroker = SingletonObservationBroker<SpeakSwiftly.GenerateUpdate>()
+        var playbackObservationBroker = SingletonObservationBroker<SpeakSwiftly.PlaybackUpdate>()
         var requestBrokers = [String: RequestBroker]()
         var terminalRequestBrokerOrder = [String]()
         var activeGenerations = [UUID: ActiveRequest]()

@@ -22,6 +22,16 @@ public extension SpeakSwiftly.Runtime {
 public extension SpeakSwiftly.Generate {
     // MARK: Operations
 
+    /// Subscribes to sequenced generation-queue updates.
+    func updates() async -> AsyncStream<SpeakSwiftly.GenerateUpdate> {
+        await runtime.generateUpdates()
+    }
+
+    /// Returns a point-in-time read of the global generation queue.
+    func snapshot() async -> SpeakSwiftly.GenerateSnapshot {
+        await runtime.generateSnapshot()
+    }
+
     /// Queues text for live speech playback.
     ///
     /// - Parameters:

@@ -220,14 +220,14 @@ public extension SpeakSwiftly {
 public extension SpeakSwiftly.Runtime {
     // MARK: Runtime Control
 
-    /// Retrieves a compact runtime status snapshot.
-    func status() async -> SpeakSwiftly.RequestHandle {
-        await submit(.status(id: UUID().uuidString))
+    /// Subscribes to sequenced runtime-state updates.
+    func updates() -> AsyncStream<SpeakSwiftly.RuntimeUpdate> {
+        runtimeUpdates()
     }
 
-    /// Retrieves a richer runtime overview snapshot.
-    func overview() async -> SpeakSwiftly.RequestHandle {
-        await submit(.overview(id: UUID().uuidString))
+    /// Returns a point-in-time read of runtime resident-model and storage state.
+    func snapshot() -> SpeakSwiftly.RuntimeSnapshot {
+        runtimeSnapshot()
     }
 
     /// Returns the voice profile name used when a caller omits an explicit voice profile.

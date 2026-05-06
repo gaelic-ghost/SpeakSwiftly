@@ -6,8 +6,8 @@ import MLXAudioTTS
 // MARK: - Qwen Speech Generation
 
 extension SpeakSwiftly.Runtime {
-    func generationEventInfo(from info: ModelGenerationEvent.Info) -> SpeakSwiftly.GenerationEventInfo {
-        SpeakSwiftly.GenerationEventInfo(
+    func synthesisEventInfo(from info: ModelGenerationEvent.Info) -> SpeakSwiftly.SynthesisEventInfo {
+        SpeakSwiftly.SynthesisEventInfo(
             promptTokenCount: info.promptTokenCount,
             generationTokenCount: info.generationTokenCount,
             prefillTime: info.prefillTime,
@@ -44,11 +44,11 @@ extension SpeakSwiftly.Runtime {
 
                         switch event {
                             case let .token(token):
-                                recordGenerationEvent(.token(token), for: requestID)
+                                recordSynthesisEvent(.token(token), for: requestID)
                             case let .info(info):
-                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
                             case let .audio(samples):
-                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
                                 continuation.yield(samples)
                         }
                     }
@@ -117,13 +117,13 @@ extension SpeakSwiftly.Runtime {
                         for try await event in eventStream {
                             switch event {
                                 case let .token(token):
-                                    recordGenerationEvent(.token(token), for: requestID)
+                                    recordSynthesisEvent(.token(token), for: requestID)
                                 case let .info(info):
-                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                    recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
                                 case let .audio(samples):
                                     audioChunkCount += 1
                                     sampleCount += samples.count
-                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
                                     if !sawFirstAudio {
                                         sawFirstAudio = true
                                         await logQwenLiveChunkFirstAudio(
@@ -189,11 +189,11 @@ extension SpeakSwiftly.Runtime {
 
                         switch event {
                             case let .token(token):
-                                recordGenerationEvent(.token(token), for: requestID)
+                                recordSynthesisEvent(.token(token), for: requestID)
                             case let .info(info):
-                                recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
                             case let .audio(samples):
-                                recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
                                 continuation.yield(samples)
                         }
                     }
@@ -258,13 +258,13 @@ extension SpeakSwiftly.Runtime {
                         for try await event in eventStream {
                             switch event {
                                 case let .token(token):
-                                    recordGenerationEvent(.token(token), for: requestID)
+                                    recordSynthesisEvent(.token(token), for: requestID)
                                 case let .info(info):
-                                    recordGenerationEvent(.info(generationEventInfo(from: info)), for: requestID)
+                                    recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
                                 case let .audio(samples):
                                     audioChunkCount += 1
                                     sampleCount += samples.count
-                                    recordGenerationEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                                    recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
                                     if !sawFirstAudio {
                                         sawFirstAudio = true
                                         await logQwenLiveChunkFirstAudio(

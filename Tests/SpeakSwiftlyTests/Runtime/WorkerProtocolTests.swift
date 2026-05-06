@@ -727,7 +727,7 @@ import TextForSpeech
     #expect(prerollReady["stage"] as? String == "preroll_ready")
 
     let status = try jsonObject(
-        SpeakSwiftly.StatusEvent(
+        SpeakSwiftly.WorkerStatusEvent(
             stage: .residentModelReady,
             residentState: .ready,
             speechBackend: .marvis,
@@ -751,7 +751,7 @@ import TextForSpeech
                 SpeakSwiftly.ActiveRequest(id: "req-active-2", kind: .generateSpeech, voiceProfile: "default-masc", requestContext: nil),
             ],
             queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", kind: .listVoiceProfiles, voiceProfile: nil, requestContext: nil, queuePosition: 1)],
-            playbackState: SpeakSwiftly.PlaybackStateSnapshot(
+            playbackState: SpeakSwiftly.WorkerPlaybackStateSnapshot(
                 state: .playing,
                 activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
                 isStableForConcurrentGeneration: true,
@@ -759,8 +759,8 @@ import TextForSpeech
                 stableBufferedAudioMS: 840,
                 stableBufferTargetMS: 600,
             ),
-            runtimeOverview: SpeakSwiftly.RuntimeOverview(
-                status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
+            runtimeOverview: SpeakSwiftly.WorkerRuntimeOverview(
+                status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
                 speechBackend: .qwen3,
                 storage: SpeakSwiftly.RuntimeStorageSnapshot(
                     stateRootPath: "/tmp/SpeakSwiftly",
@@ -785,7 +785,7 @@ import TextForSpeech
                     ],
                     queue: [SpeakSwiftly.QueuedRequest(id: "req-queued", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil, queuePosition: 1)],
                 ),
-                playbackState: SpeakSwiftly.PlaybackStateSnapshot(
+                playbackState: SpeakSwiftly.WorkerPlaybackStateSnapshot(
                     state: .playing,
                     activeRequest: SpeakSwiftly.ActiveRequest(id: "req-active", kind: .generateSpeech, voiceProfile: "default-femme", requestContext: nil),
                     isStableForConcurrentGeneration: true,
@@ -795,7 +795,7 @@ import TextForSpeech
                 ),
                 defaultVoiceProfile: "swift-signal",
             ),
-            status: SpeakSwiftly.StatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
+            status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
             speechBackend: .qwen3,
             clearedCount: 2,
             cancelledRequestID: "req-queued",

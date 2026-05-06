@@ -307,31 +307,7 @@ struct SpeakSwiftlyTestingMain {
         let runtime = await SpeakSwiftly.liftoff()
         await runtime.start()
 
-        let handle = await runtime.status()
-        print("request_id: \(handle.id)")
-        print("request_kind: \(handle.kind.rawValue)")
-
-        for try await event in handle.events {
-            switch event {
-                case let .queued(queued):
-                    print("queued: position=\(queued.queuePosition) reason=\(queued.reason.rawValue)")
-                case let .acknowledged(acknowledgement):
-                    print("acknowledged: kind=\(acknowledgement.kind.rawValue)")
-                case let .started(started):
-                    print("started: kind=\(started.kind.rawValue)")
-                case let .progress(progress):
-                    print("progress: stage=\(progress.stage.rawValue)")
-                case let .completed(completion):
-                    if case let .runtimeStatus(status, _) = completion {
-                        print("completed: \(formatStatus(status))")
-                    } else {
-                        print("completed: no status payload")
-                    }
-                    return
-            }
-        }
-
-        throw UsageError.statusStreamEndedWithoutTerminalEvent
+        await print(formatStatus(runtime.snapshot()))
     }
 
     static func runVolumeProbe(options: VolumeProbeOptions) async throws {
@@ -903,12 +879,8 @@ struct SpeakSwiftlyTestingMain {
         return String(format: "%016llx", value)
     }
 
-    static func formatStatus(_ status: SpeakSwiftly.StatusEvent?) -> String {
-        guard let status else {
-            return "status payload missing"
-        }
-
-        return "stage=\(status.stage.rawValue) resident_state=\(status.residentState.rawValue) speech_backend=\(status.speechBackend.rawValue)"
+    static func formatStatus(_ snapshot: SpeakSwiftly.RuntimeSnapshot) -> String {
+        "state=\(snapshot.state.rawValue) resident_state=\(snapshot.residentState.rawValue) speech_backend=\(snapshot.speechBackend.rawValue)"
     }
 }
 

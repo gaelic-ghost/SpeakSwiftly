@@ -17,10 +17,10 @@ public extension SpeakSwiftly.Runtime {
         makeRequestUpdateStream(for: requestID)
     }
 
-    /// Subscribes to sequenced generation events for one request.
-    func generationEvents(
+    /// Subscribes to sequenced synthesis updates for one request.
+    func synthesisUpdates(
         for requestID: String,
-    ) -> AsyncThrowingStream<SpeakSwiftly.GenerationEventUpdate, any Swift.Error> {
-        makeGenerationEventStream(for: requestID)
+    ) -> AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error> {
+        makeSynthesisUpdateStream(for: requestID)
     }
 }

@@ -19,9 +19,9 @@ public extension SpeakSwiftly {
             persistencePath: String?,
         )
         case queue(activeRequests: [ActiveRequest], queuedRequests: [QueuedRequest])
-        case playbackState(PlaybackStateSnapshot)
-        case runtimeOverview(RuntimeOverview)
-        case runtimeStatus(status: StatusEvent?, speechBackend: SpeechBackend?)
+        case playbackSnapshot(PlaybackSnapshot)
+        case runtimeSnapshot(RuntimeSnapshot)
+        case runtimeUpdate(RuntimeUpdate)
         case defaultVoiceProfile(String)
         case queueCleared(count: Int)
         case requestCancelled(id: String)
@@ -62,11 +62,20 @@ public extension SpeakSwiftly {
                     queuedRequests: success.queue ?? [],
                 )
             } else if let playbackState = success.playbackState {
-                self = .playbackState(playbackState)
+                self = .playbackSnapshot(playbackState.playbackSnapshot(sequence: 0, capturedAt: Date()))
             } else if let runtimeOverview = success.runtimeOverview {
-                self = .runtimeOverview(runtimeOverview)
-            } else if success.status != nil || success.speechBackend != nil {
-                self = .runtimeStatus(status: success.status, speechBackend: success.speechBackend)
+                self = .runtimeSnapshot(runtimeOverview.runtimeSnapshot(sequence: 0, capturedAt: Date()))
+            } else if let status = success.status {
+                self = .runtimeUpdate(status.runtimeUpdate(sequence: 0, date: Date()))
+            } else if success.speechBackend != nil {
+                self = .runtimeUpdate(
+                    RuntimeUpdate(
+                        sequence: 0,
+                        date: Date(),
+                        state: .residentModelsUnloaded,
+                        event: .stateChanged(.residentModelsUnloaded),
+                    ),
+                )
             } else if let defaultVoiceProfile = success.defaultVoiceProfile {
                 self = .defaultVoiceProfile(defaultVoiceProfile)
             } else if let clearedCount = success.clearedCount {
@@ -130,9 +139,9 @@ extension SpeakSwiftly {
         let activeRequest: ActiveRequest?
         let activeRequests: [ActiveRequest]?
         let queue: [QueuedRequest]?
-        let playbackState: PlaybackStateSnapshot?
-        let runtimeOverview: RuntimeOverview?
-        let status: StatusEvent?
+        let playbackState: WorkerPlaybackStateSnapshot?
+        let runtimeOverview: WorkerRuntimeOverview?
+        let status: WorkerStatusEvent?
         let speechBackend: SpeechBackend?
         let defaultVoiceProfile: String?
         let clearedCount: Int?
@@ -167,9 +176,9 @@ extension SpeakSwiftly {
             activeRequest: ActiveRequest? = nil,
             activeRequests: [ActiveRequest]? = nil,
             queue: [QueuedRequest]? = nil,
-            playbackState: PlaybackStateSnapshot? = nil,
-            runtimeOverview: RuntimeOverview? = nil,
-            status: StatusEvent? = nil,
+            playbackState: WorkerPlaybackStateSnapshot? = nil,
+            runtimeOverview: WorkerRuntimeOverview? = nil,
+            status: WorkerStatusEvent? = nil,
             speechBackend: SpeechBackend? = nil,
             defaultVoiceProfile: String? = nil,
             clearedCount: Int? = nil,

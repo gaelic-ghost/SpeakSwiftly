@@ -35,12 +35,17 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
-    public func statusEvents() -> AsyncStream<SpeakSwiftly.StatusEvent> {
+    func runtimeUpdates() -> AsyncStream<SpeakSwiftly.RuntimeUpdate> {
         let subscriptionID = UUID()
+        let latestUpdate = runtimeObservationBroker.latestUpdate ?? currentStatusSnapshot()?.runtimeUpdate(
+            sequence: runtimeObservationBroker.sequence,
+            date: dependencies.now(),
+        )
+
         return AsyncStream { continuation in
-            statusContinuations[subscriptionID] = continuation
-            if let status = currentStatusSnapshot() {
-                continuation.yield(status)
+            runtimeObservationBroker.subscribe(id: subscriptionID, continuation: continuation)
+            if let latestUpdate {
+                continuation.yield(latestUpdate)
             }
             continuation.onTermination = { [weak self] _ in
                 Task {
@@ -257,6 +262,7 @@ extension SpeakSwiftly.Runtime {
             request,
             readiness: request.requiresPlayback ? .preparing : .ready,
         )
+        await publishGenerateUpdate()
         await logRequestEvent(
             "request_accepted",
             requestID: request.id,
@@ -318,6 +324,7 @@ extension SpeakSwiftly.Runtime {
                 return
             }
             await playbackController.enqueue(speechJob)
+            await publishPlaybackUpdate()
             guard await generationController.markReady(token: job.token) != nil else {
                 _ = await playbackController.discard(requestID: request.id)
                 return

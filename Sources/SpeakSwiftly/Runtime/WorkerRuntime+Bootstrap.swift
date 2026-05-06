@@ -202,6 +202,7 @@ extension SpeakSwiftly.Runtime {
             fileManager: dependencies.fileManager,
             stateRootOverride: profileStore.stateRootURL.path,
         )
+        broadcastRuntimeUpdate(recordRuntimeUpdate(state: currentRuntimeState))
     }
 
     func currentConfiguration() -> SpeakSwiftly.Configuration {
