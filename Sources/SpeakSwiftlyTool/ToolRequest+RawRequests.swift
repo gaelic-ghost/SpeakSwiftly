@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftly
 import TextForSpeech
 
 struct RawBatchItem: Decodable {
@@ -321,7 +322,7 @@ struct RawWorkerRequest: Decodable {
         textProfileID: SpeakSwiftly.TextProfileID?,
         sourceFormat: TextForSpeech.SourceFormat?,
     ) {
-        let resolvedText = try WorkerRequest.requireNonEmpty(text, field: "text", id: id)
+        let resolvedText = try ToolRequest.requireNonEmpty(text, field: "text", id: id)
         let resolvedTextProfileID = textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
 
         return (
@@ -334,9 +335,9 @@ struct RawWorkerRequest: Decodable {
     static func resolveBatchItems(
         id: String,
         rawItems: [RawBatchItem]?,
-    ) throws -> [SpeakSwiftly.GenerationJobItem] {
+    ) throws -> [SpeakSwiftly.BatchItem] {
         guard let rawItems, !rawItems.isEmpty else {
-            throw WorkerError(
+            throw SpeakSwiftly.Error(
                 code: .invalidRequest,
                 message: "Request '\(id)' must include a non-empty 'items' array for batch generation.",
             )
@@ -359,13 +360,13 @@ struct RawWorkerRequest: Decodable {
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 ?? "\(id)-artifact-\(index + 1)"
             guard seenArtifactIDs.insert(artifactID).inserted else {
-                throw WorkerError(
+                throw SpeakSwiftly.Error(
                     code: .invalidRequest,
                     message: "Request '\(id)' contains duplicate batch artifact id '\(artifactID)'. Each batch item must resolve to a unique artifact id.",
                 )
             }
 
-            return SpeakSwiftly.GenerationJobItem(
+            return SpeakSwiftly.BatchItem(
                 artifactID: artifactID,
                 text: resolved.text,
                 textProfile: resolved.textProfileID,
@@ -400,15 +401,15 @@ struct RawWorkerRequest: Decodable {
         raw: RawWorkerRequest,
         fallbackProfileName: String,
     ) throws -> SpeakSwiftly.ProfileSeed {
-        let seedID = try WorkerRequest.requireNonEmpty(raw.seedID, field: "seed_id", id: id)
-        let seedVersion = try WorkerRequest.requireNonEmpty(raw.seedVersion, field: "seed_version", id: id)
-        let sourcePackage = try WorkerRequest.requireNonEmpty(raw.sourcePackage, field: "source_package", id: id)
+        let seedID = try ToolRequest.requireNonEmpty(raw.seedID, field: "seed_id", id: id)
+        let seedVersion = try ToolRequest.requireNonEmpty(raw.seedVersion, field: "seed_version", id: id)
+        let sourcePackage = try ToolRequest.requireNonEmpty(raw.sourcePackage, field: "source_package", id: id)
         let intendedProfileName = raw.intendedProfileName?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
             ?? fallbackProfileName
         let installedAt: Date
         if let rawInstalledAt = raw.installedAt?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil {
             guard let parsedDate = ISO8601DateFormatter().date(from: rawInstalledAt) else {
-                throw WorkerError(
+                throw SpeakSwiftly.Error(
                     code: .invalidRequest,
                     message: "Request '\(id)' has an invalid 'installed_at' value. Use an ISO 8601 timestamp such as '2026-05-02T12:00:00Z'.",
                 )

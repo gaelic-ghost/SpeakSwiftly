@@ -19,6 +19,24 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Tool {
+    // MARK: Invalid Requests
+
+    /// Emits the JSONL failure response for a request line that the tool could not decode.
+    func reject(line: String, error: any Swift.Error) async {
+        let id = await runtime.bestEffortID(from: line)
+        let toolError: SpeakSwiftly.Error = if let error = error as? SpeakSwiftly.Error {
+            error
+        } else {
+            SpeakSwiftly.Error(
+                code: .internalError,
+                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
+            )
+        }
+
+        await runtime.failRequestStream(for: id, error: toolError)
+        await runtime.emitFailure(id: id, error: toolError)
+    }
+
     // MARK: Generation
 
     /// Queues live speech playback using a caller-provided request identifier.
@@ -140,6 +158,11 @@ public extension SpeakSwiftly.Tool {
         await runtime.submit(.listQueue(id: requestID, queueType: .generation))
     }
 
+    /// Lists the playback queue using a caller-provided request identifier.
+    func playbackQueue(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.listQueue(id: requestID, queueType: .playback))
+    }
+
     // MARK: Voice Profiles
 
     /// Creates a voice-design profile using a caller-provided request identifier.
@@ -250,7 +273,185 @@ public extension SpeakSwiftly.Tool {
         await runtime.submit(.removeProfile(id: requestID, profileName: profileName))
     }
 
+    // MARK: Text Profiles
+
+    /// Retrieves the active text profile using a caller-provided request identifier.
+    func activeTextProfile(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfileActive(id: requestID))
+    }
+
+    /// Retrieves one text profile using a caller-provided request identifier.
+    func textProfile(
+        requestID: String,
+        profileID: SpeakSwiftly.TextProfileID,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfile(id: requestID, profileID: profileID))
+    }
+
+    /// Lists text profiles using a caller-provided request identifier.
+    func textProfiles(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfiles(id: requestID))
+    }
+
+    /// Retrieves the active text-profile style using a caller-provided request identifier.
+    func activeTextProfileStyle(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.activeTextProfileStyle(id: requestID))
+    }
+
+    /// Lists available text-profile styles using a caller-provided request identifier.
+    func textProfileStyles(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfileStyleOptions(id: requestID))
+    }
+
+    /// Retrieves the effective text profile using a caller-provided request identifier.
+    func effectiveTextProfile(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfileEffective(id: requestID))
+    }
+
+    /// Retrieves text-profile persistence details using a caller-provided request identifier.
+    func textProfilePersistence(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.textProfilePersistence(id: requestID))
+    }
+
+    /// Loads text profiles from persistence using a caller-provided request identifier.
+    func loadTextProfiles(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.loadTextProfiles(id: requestID))
+    }
+
+    /// Saves text profiles to persistence using a caller-provided request identifier.
+    func saveTextProfiles(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.saveTextProfiles(id: requestID))
+    }
+
+    /// Sets the active text-profile style using a caller-provided request identifier.
+    func setActiveTextProfileStyle(
+        requestID: String,
+        to style: TextForSpeech.BuiltInProfileStyle,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.setActiveTextProfileStyle(id: requestID, style: style))
+    }
+
+    /// Creates a text profile using a caller-provided request identifier.
+    func createTextProfile(
+        requestID: String,
+        name profileName: String,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.createTextProfile(id: requestID, profileName: profileName))
+    }
+
+    /// Renames a text profile using a caller-provided request identifier.
+    func renameTextProfile(
+        requestID: String,
+        profileID: SpeakSwiftly.TextProfileID,
+        to profileName: String,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .renameTextProfile(
+                id: requestID,
+                profileID: profileID,
+                profileName: profileName,
+            ),
+        )
+    }
+
+    /// Sets the active text profile using a caller-provided request identifier.
+    func setActiveTextProfile(
+        requestID: String,
+        profileID: SpeakSwiftly.TextProfileID,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.setActiveTextProfile(id: requestID, profileID: profileID))
+    }
+
+    /// Deletes a text profile using a caller-provided request identifier.
+    func deleteTextProfile(
+        requestID: String,
+        profileID: SpeakSwiftly.TextProfileID,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.deleteTextProfile(id: requestID, profileID: profileID))
+    }
+
+    /// Restores all text profiles to package defaults using a caller-provided request identifier.
+    func factoryResetTextProfiles(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.factoryResetTextProfiles(id: requestID))
+    }
+
+    /// Resets one text profile using a caller-provided request identifier.
+    func resetTextProfile(
+        requestID: String,
+        profileID: SpeakSwiftly.TextProfileID,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.resetTextProfile(id: requestID, profileID: profileID))
+    }
+
+    /// Adds a text replacement using a caller-provided request identifier.
+    func addTextReplacement(
+        requestID: String,
+        _ replacement: TextForSpeech.Replacement,
+        profileID: SpeakSwiftly.TextProfileID? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .addTextReplacement(
+                id: requestID,
+                replacement: replacement,
+                profileID: profileID,
+            ),
+        )
+    }
+
+    /// Replaces a text replacement using a caller-provided request identifier.
+    func replaceTextReplacement(
+        requestID: String,
+        _ replacement: TextForSpeech.Replacement,
+        profileID: SpeakSwiftly.TextProfileID? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .replaceTextReplacement(
+                id: requestID,
+                replacement: replacement,
+                profileID: profileID,
+            ),
+        )
+    }
+
+    /// Removes a text replacement using a caller-provided request identifier.
+    func deleteTextReplacement(
+        requestID: String,
+        replacementID: String,
+        profileID: SpeakSwiftly.TextProfileID? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .removeTextReplacement(
+                id: requestID,
+                replacementID: replacementID,
+                profileID: profileID,
+            ),
+        )
+    }
+
     // MARK: Runtime and Queues
+
+    /// Retrieves the runtime status event using a caller-provided request identifier.
+    func status(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.status(id: requestID))
+    }
+
+    /// Retrieves the runtime overview using a caller-provided request identifier.
+    func overview(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.overview(id: requestID))
+    }
+
+    /// Retrieves the default voice profile using a caller-provided request identifier.
+    func defaultVoiceProfile(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.defaultVoiceProfile(id: requestID))
+    }
+
+    /// Sets the default voice profile using a caller-provided request identifier.
+    func setDefaultVoiceProfile(
+        requestID: String,
+        to profileName: SpeakSwiftly.Name,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.setDefaultVoiceProfile(id: requestID, profileName: profileName))
+    }
 
     /// Switches the active speech backend using a caller-provided request identifier.
     func switchSpeechBackend(
@@ -303,5 +504,10 @@ public extension SpeakSwiftly.Tool {
     /// Resumes live playback using a caller-provided request identifier.
     func resumePlayback(requestID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.playback(id: requestID, action: .resume))
+    }
+
+    /// Retrieves playback state using a caller-provided request identifier.
+    func playbackState(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.playback(id: requestID, action: .state))
     }
 }

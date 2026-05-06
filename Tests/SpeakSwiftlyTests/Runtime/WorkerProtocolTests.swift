@@ -1,12 +1,13 @@
 import Foundation
 @testable import SpeakSwiftly
+@testable import SpeakSwiftlyTool
 import Testing
 import TextForSpeech
 
 // MARK: - Request Decoding
 
 @Test func `decodes speak live request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme"}"#)
 
     #expect(
         request == .queueSpeech(
@@ -23,13 +24,13 @@ import TextForSpeech
 }
 
 @Test func `decodes speak live request without voice profile as runtime default`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-default","op":"generate_speech","text":"Hello"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-default","op":"generate_speech","text":"Hello"}"#)
 
     #expect(
         request == .queueSpeech(
             id: "req-default",
             text: "Hello",
-            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .live,
             sourceFormat: nil,
@@ -40,7 +41,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak file request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-file","op":"generate_audio_file","text":"Hello","profile_name":"default-femme"}"#,
     )
 
@@ -59,7 +60,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak file request without voice profile as runtime default`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-file-default","op":"generate_audio_file","text":"Hello"}"#,
     )
 
@@ -67,7 +68,7 @@ import TextForSpeech
         request == .queueSpeech(
             id: "req-file-default",
             text: "Hello",
-            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .file,
             sourceFormat: nil,
@@ -78,7 +79,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak batch request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_id":"logs","source_format":"swift_source"}]}"#,
     )
 
@@ -107,14 +108,14 @@ import TextForSpeech
 }
 
 @Test func `decodes speak batch request without voice profile as runtime default`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-batch-default","op":"generate_batch","items":[{"text":"First file"}]}"#,
     )
 
     #expect(
         request == .queueBatch(
             id: "req-batch-default",
-            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             items: [
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "req-batch-default-artifact-1",
@@ -129,14 +130,14 @@ import TextForSpeech
 }
 
 @Test func `decodes speak batch item with merged request path context`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
     )
 
     #expect(
         request == .queueBatch(
             id: "req-batch-context",
-            profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+            profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             items: [
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "context-artifact",
@@ -156,7 +157,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak live request with request path context and profile`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
     )
 
@@ -178,7 +179,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak live request with mixed markdown text`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme"}"#,
     )
 
@@ -197,7 +198,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak live request with whole source format`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#,
     )
 
@@ -216,7 +217,7 @@ import TextForSpeech
 }
 
 @Test func `decodes speak live request with request context without attributes`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","topic":"runtime"}} "#,
     )
 
@@ -238,7 +239,7 @@ import TextForSpeech
 }
 
 @Test func `decodes qwen pre-model text chunking opt in`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-qwen-chunking","op":"generate_speech","text":"Hello","profile_name":"default-femme","qwen_pre_model_text_chunking":true}"#,
     )
 
@@ -257,7 +258,7 @@ import TextForSpeech
 }
 
 @Test func `decodes create profile request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-2","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav"}"#,
     )
 
@@ -277,7 +278,7 @@ import TextForSpeech
 }
 
 @Test func `decodes create profile request with caller working directory`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-2b","op":"create_voice_profile_from_description","profile_name":"bright-guide","text":"Hello","vibe":"femme","voice_description":"Warm and bright","output_path":"./voice.wav","cwd":"/tmp/export-base"}"#,
     )
 
@@ -297,7 +298,7 @@ import TextForSpeech
 }
 
 @Test func `decodes create system profile request with seed metadata`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-system","op":"create_system_voice_profile_from_description","profile_name":"swift-signal","text":"Hello","vibe":"femme","voice_description":"Bright and clear","seed_id":"swift.signal","seed_version":"1","source_package":"SpeakSwiftlyServer","source_version":"4.2.0","installed_at":"2026-05-02T12:00:00Z"}"#,
     )
 
@@ -324,7 +325,7 @@ import TextForSpeech
 }
 
 @Test func `decodes create clone request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-clone","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio"}"#,
     )
 
@@ -341,7 +342,7 @@ import TextForSpeech
 }
 
 @Test func `decodes create clone request with caller working directory`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-clone-cwd","op":"create_voice_profile_from_audio","profile_name":"ghost-copy","reference_audio_path":"./voice.m4a","vibe":"masc","transcript":"Hello from imported audio","cwd":"file:///tmp/clone-base"}"#,
     )
 
@@ -358,89 +359,89 @@ import TextForSpeech
 }
 
 @Test func `decodes list profiles request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-3","op":"list_voice_profiles"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-3","op":"list_voice_profiles"}"#)
     #expect(request == .listProfiles(id: "req-3"))
 }
 
 @Test func `decodes rename profile request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-rename","op":"update_voice_profile_name","profile_name":"bright-guide","new_profile_name":"clear-guide"}"#,
     )
     #expect(request == .renameProfile(id: "req-rename", profileName: "bright-guide", newProfileName: "clear-guide"))
 }
 
 @Test func `decodes reroll profile request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-reroll","op":"reroll_voice_profile","profile_name":"bright-guide"}"#,
     )
     #expect(request == .rerollProfile(id: "req-reroll", profileName: "bright-guide"))
 }
 
 @Test func `decodes generated file requests`() throws {
-    let file = try WorkerRequest.decode(
+    let file = try ToolRequest.decode(
         from: #"{"id":"req-generated-file","op":"get_generated_file","artifact_id":"req-file"}"#,
     )
     #expect(file == .generatedFile(id: "req-generated-file", artifactID: "req-file"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-generated-files","op":"list_generated_files"}"#)
+    let list = try ToolRequest.decode(from: #"{"id":"req-generated-files","op":"list_generated_files"}"#)
     #expect(list == .generatedFiles(id: "req-generated-files"))
 
-    let batch = try WorkerRequest.decode(
+    let batch = try ToolRequest.decode(
         from: #"{"id":"req-generated-batch","op":"get_generated_batch","batch_id":"batch-job-1"}"#,
     )
     #expect(batch == .generatedBatch(id: "req-generated-batch", batchID: "batch-job-1"))
 
-    let batchList = try WorkerRequest.decode(from: #"{"id":"req-generated-batches","op":"list_generated_batches"}"#)
+    let batchList = try ToolRequest.decode(from: #"{"id":"req-generated-batches","op":"list_generated_batches"}"#)
     #expect(batchList == .generatedBatches(id: "req-generated-batches"))
 }
 
 @Test func `decodes generation job requests`() throws {
-    let job = try WorkerRequest.decode(
+    let job = try ToolRequest.decode(
         from: #"{"id":"req-generation-job","op":"get_generation_job","job_id":"job-file-1"}"#,
     )
     #expect(job == .generationJob(id: "req-generation-job", jobID: "job-file-1"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-generation-jobs","op":"list_generation_jobs"}"#)
+    let list = try ToolRequest.decode(from: #"{"id":"req-generation-jobs","op":"list_generation_jobs"}"#)
     #expect(list == .generationJobs(id: "req-generation-jobs"))
 
-    let expire = try WorkerRequest.decode(
+    let expire = try ToolRequest.decode(
         from: #"{"id":"req-expire-job","op":"expire_generation_job","job_id":"job-file-1"}"#,
     )
     #expect(expire == .expireGenerationJob(id: "req-expire-job", jobID: "job-file-1"))
 }
 
 @Test func `decodes remove profile request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}"#)
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))
 }
 
 @Test func `decodes text profile read requests`() throws {
-    let active = try WorkerRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
+    let active = try ToolRequest.decode(from: #"{"id":"req-text-active","op":"get_active_text_profile"}"#)
     #expect(active == .textProfileActive(id: "req-text-active"))
 
-    let style = try WorkerRequest.decode(from: #"{"id":"req-text-style","op":"get_active_text_profile_style"}"#)
+    let style = try ToolRequest.decode(from: #"{"id":"req-text-style","op":"get_active_text_profile_style"}"#)
     #expect(style == .activeTextProfileStyle(id: "req-text-style"))
 
-    let styles = try WorkerRequest.decode(from: #"{"id":"req-text-styles","op":"list_text_profile_styles"}"#)
+    let styles = try ToolRequest.decode(from: #"{"id":"req-text-styles","op":"list_text_profile_styles"}"#)
     #expect(styles == .textProfileStyleOptions(id: "req-text-styles"))
 
-    let named = try WorkerRequest.decode(
+    let named = try ToolRequest.decode(
         from: #"{"id":"req-text-one","op":"get_text_profile","text_profile_id":"logs"}"#,
     )
     #expect(named == .textProfile(id: "req-text-one", profileID: "logs"))
 
-    let list = try WorkerRequest.decode(from: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
+    let list = try ToolRequest.decode(from: #"{"id":"req-text-list","op":"list_text_profiles"}"#)
     #expect(list == .textProfiles(id: "req-text-list"))
 
-    let effective = try WorkerRequest.decode(from: #"{"id":"req-text-effective","op":"get_effective_text_profile"}"#)
+    let effective = try ToolRequest.decode(from: #"{"id":"req-text-effective","op":"get_effective_text_profile"}"#)
     #expect(effective == .textProfileEffective(id: "req-text-effective"))
 
-    let persistence = try WorkerRequest.decode(from: #"{"id":"req-text-persistence","op":"get_text_profile_persistence"}"#)
+    let persistence = try ToolRequest.decode(from: #"{"id":"req-text-persistence","op":"get_text_profile_persistence"}"#)
     #expect(persistence == .textProfilePersistence(id: "req-text-persistence"))
 }
 
 @Test func `decodes text profile mutation requests`() throws {
-    let setStyle = try WorkerRequest.decode(
+    let setStyle = try ToolRequest.decode(
         from: #"{"id":"req-text-style-set","op":"set_active_text_profile_style","text_profile_style":"compact"}"#,
     )
     #expect(
@@ -450,37 +451,37 @@ import TextForSpeech
         ),
     )
 
-    let create = try WorkerRequest.decode(
+    let create = try ToolRequest.decode(
         from: #"{"id":"req-text-create","op":"create_text_profile","profile_name":"Logs"}"#,
     )
     #expect(create == .createTextProfile(id: "req-text-create", profileName: "Logs"))
 
-    let rename = try WorkerRequest.decode(
+    let rename = try ToolRequest.decode(
         from: #"{"id":"req-text-rename","op":"update_text_profile_name","text_profile_id":"logs","new_profile_name":"Ops Logs"}"#,
     )
     #expect(rename == .renameTextProfile(id: "req-text-rename", profileID: "logs", profileName: "Ops Logs"))
 
-    let setActive = try WorkerRequest.decode(
+    let setActive = try ToolRequest.decode(
         from: #"{"id":"req-text-set-active","op":"set_active_text_profile","text_profile_id":"logs"}"#,
     )
     #expect(setActive == .setActiveTextProfile(id: "req-text-set-active", profileID: "logs"))
 
-    let delete = try WorkerRequest.decode(
+    let delete = try ToolRequest.decode(
         from: #"{"id":"req-text-delete","op":"delete_text_profile","text_profile_id":"logs"}"#,
     )
     #expect(delete == .deleteTextProfile(id: "req-text-delete", profileID: "logs"))
 
-    let factoryReset = try WorkerRequest.decode(
+    let factoryReset = try ToolRequest.decode(
         from: #"{"id":"req-text-factory-reset","op":"factory_reset_text_profiles"}"#,
     )
     #expect(factoryReset == .factoryResetTextProfiles(id: "req-text-factory-reset"))
 
-    let reset = try WorkerRequest.decode(
+    let reset = try ToolRequest.decode(
         from: #"{"id":"req-text-reset","op":"reset_text_profile","text_profile_id":"logs"}"#,
     )
     #expect(reset == .resetTextProfile(id: "req-text-reset", profileID: "logs"))
 
-    let add = try WorkerRequest.decode(
+    let add = try ToolRequest.decode(
         from: #"{"id":"req-text-add","op":"create_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
     )
     #expect(
@@ -491,7 +492,7 @@ import TextForSpeech
         ),
     )
 
-    let replace = try WorkerRequest.decode(
+    let replace = try ToolRequest.decode(
         from: #"{"id":"req-text-replace","op":"replace_text_replacement","text_profile_id":"logs","replacement":{"id":"logs-rule","text":"stderr","replacement":"standard standard error","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
     )
     #expect(
@@ -502,7 +503,7 @@ import TextForSpeech
         ),
     )
 
-    let remove = try WorkerRequest.decode(
+    let remove = try ToolRequest.decode(
         from: #"{"id":"req-text-remove-replacement","op":"delete_text_replacement","replacement_id":"logs-rule","text_profile_id":"logs"}"#,
     )
     #expect(
@@ -515,23 +516,23 @@ import TextForSpeech
 }
 
 @Test func `decodes list queue request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-5","op":"list_generation_queue"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-5","op":"list_generation_queue"}"#)
     #expect(request == .listQueue(id: "req-5", queueType: .generation))
 }
 
 @Test func `decodes status request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-status","op":"get_status"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-status","op":"get_status"}"#)
     #expect(request == .status(id: "req-status"))
 }
 
 @Test func `decodes runtime overview request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-overview","op":"get_runtime_overview"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-overview","op":"get_runtime_overview"}"#)
     #expect(request == .overview(id: "req-overview"))
 }
 
 @Test func `decodes default voice profile requests`() throws {
-    let get = try WorkerRequest.decode(from: #"{"id":"req-default-get","op":"get_default_voice_profile"}"#)
-    let set = try WorkerRequest.decode(
+    let get = try ToolRequest.decode(from: #"{"id":"req-default-get","op":"get_default_voice_profile"}"#)
+    let set = try ToolRequest.decode(
         from: #"{"id":"req-default-set","op":"set_default_voice_profile","voice_profile":"swift-anchor"}"#,
     )
 
@@ -540,10 +541,10 @@ import TextForSpeech
 }
 
 @Test func `resolves omitted generation voice profile against runtime default`() {
-    let request = WorkerRequest.queueSpeech(
+    let request = ToolRequest.queueSpeech(
         id: "req-default",
         text: "Hello",
-        profileName: WorkerRequest.runtimeDefaultVoiceProfilePlaceholder,
+        profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
         textProfileID: nil,
         jobType: .live,
         sourceFormat: nil,
@@ -567,62 +568,62 @@ import TextForSpeech
 }
 
 @Test func `decodes switch speech backend request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}"#,
     )
     #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .marvis))
 }
 
 @Test func `decodes chatterbox turbo switch speech backend request`() throws {
-    let request = try WorkerRequest.decode(
+    let request = try ToolRequest.decode(
         from: #"{"id":"req-switch-chatterbox","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}"#,
     )
     #expect(request == .switchSpeechBackend(id: "req-switch-chatterbox", speechBackend: .chatterboxTurbo))
 }
 
 @Test func `decodes reload models request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-reload","op":"reload_models"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-reload","op":"reload_models"}"#)
     #expect(request == .reloadModels(id: "req-reload"))
 }
 
 @Test func `decodes unload models request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-unload","op":"unload_models"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-unload","op":"unload_models"}"#)
     #expect(request == .unloadModels(id: "req-unload"))
 }
 
 @Test func `decodes playback queue request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-5b","op":"list_playback_queue"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-5b","op":"list_playback_queue"}"#)
     #expect(request == .listQueue(id: "req-5b", queueType: .playback))
 }
 
 @Test func `decodes playback pause request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-pause","op":"playback_pause"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-pause","op":"playback_pause"}"#)
     #expect(request == .playback(id: "req-pause", action: .pause))
 }
 
 @Test func `decodes clear queue request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-6","op":"clear_queue"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-6","op":"clear_queue"}"#)
     #expect(request == .clearQueue(id: "req-6", queueType: nil))
 }
 
 @Test func `decodes queue scoped clear requests`() throws {
-    let generation = try WorkerRequest.decode(from: #"{"id":"req-clear-generation","op":"clear_generation_queue"}"#)
-    let playback = try WorkerRequest.decode(from: #"{"id":"req-clear-playback","op":"clear_playback_queue"}"#)
+    let generation = try ToolRequest.decode(from: #"{"id":"req-clear-generation","op":"clear_generation_queue"}"#)
+    let playback = try ToolRequest.decode(from: #"{"id":"req-clear-playback","op":"clear_playback_queue"}"#)
 
     #expect(generation == .clearQueue(id: "req-clear-generation", queueType: .generation))
     #expect(playback == .clearQueue(id: "req-clear-playback", queueType: .playback))
 }
 
 @Test func `decodes cancel request`() throws {
-    let request = try WorkerRequest.decode(from: #"{"id":"req-7","op":"cancel_request","request_id":"req-target"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-7","op":"cancel_request","request_id":"req-target"}"#)
     #expect(request == .cancelRequest(id: "req-7", requestID: "req-target", queueType: nil))
 }
 
 @Test func `decodes queue scoped cancel requests`() throws {
-    let generation = try WorkerRequest.decode(
+    let generation = try ToolRequest.decode(
         from: #"{"id":"req-cancel-generation","op":"cancel_generation","request_id":"req-target"}"#,
     )
-    let playback = try WorkerRequest.decode(
+    let playback = try ToolRequest.decode(
         from: #"{"id":"req-cancel-playback","op":"cancel_playback","request_id":"req-target"}"#,
     )
 
@@ -632,19 +633,19 @@ import TextForSpeech
 
 @Test func `rejects malformed JSON`() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech""#)
+        try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech""#)
     }
 }
 
 @Test func `rejects unknown operation`() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"dance"}"#)
+        try ToolRequest.decode(from: #"{"id":"req-1","op":"dance"}"#)
     }
 }
 
 @Test func `rejects missing required fields`() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try WorkerRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","profile_name":"default-femme"}"#)
+        try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","profile_name":"default-femme"}"#)
     }
 }
 
@@ -657,7 +658,7 @@ import TextForSpeech
 
     for payload in removedKeyPayloads {
         do {
-            _ = try WorkerRequest.decode(from: payload)
+            _ = try ToolRequest.decode(from: payload)
             Issue.record("Expected removed generation context key to be rejected.")
         } catch let error as SpeakSwiftly.Error {
             #expect(error.code == .invalidRequest)
@@ -677,7 +678,7 @@ import TextForSpeech
 
     for payload in removedKeyPayloads {
         do {
-            _ = try WorkerRequest.decode(from: payload)
+            _ = try ToolRequest.decode(from: payload)
             Issue.record("Expected removed request context key to be rejected.")
         } catch let error as SpeakSwiftly.Error {
             #expect(error.code == .invalidRequest)

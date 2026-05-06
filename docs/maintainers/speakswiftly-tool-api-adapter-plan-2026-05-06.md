@@ -264,6 +264,13 @@ call public API methods instead of `Runtime.accept(line:)`.
 `WorkerProtocolTests` should either move to a tool-target test surface or become
 tests for the tool-owned JSONL command decoder.
 
+Status: implemented in the `api: move jsonl decoding into tool` slice. The raw
+JSONL request structs and operation decoder now live under `Sources/SpeakSwiftlyTool`.
+`SpeakSwiftlyTool` decodes each stdin line into `ToolRequest` and submits through
+`runtime.tool`. The library runtime no longer exposes `accept(line:)`; tests that
+still need JSONL-shaped inputs use a test-only helper that exercises the tool
+decoder.
+
 Validation:
 
 ```bash

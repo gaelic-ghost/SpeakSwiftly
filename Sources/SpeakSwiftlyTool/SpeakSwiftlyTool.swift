@@ -36,7 +36,12 @@ enum SpeakSwiftlyTool {
 
         do {
             for try await line in FileHandle.standardInput.bytes.lines {
-                await runtime.accept(line: line)
+                do {
+                    let request = try ToolRequest.decode(from: line)
+                    await request.submit(to: runtime)
+                } catch {
+                    await runtime.tool.reject(line: line, error: error)
+                }
             }
         } catch {
             let timestamp = ISO8601DateFormatter().string(from: Date())

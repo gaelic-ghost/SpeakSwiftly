@@ -159,31 +159,7 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    public func accept(line: String) async {
-        let request: WorkerRequest
-
-        do {
-            request = try WorkerRequest.decode(from: line)
-                .resolvingRuntimeDefaultVoiceProfile(defaultVoiceProfileName)
-        } catch let workerError as WorkerError {
-            let id = bestEffortID(from: line)
-            await failRequestStream(for: id, error: workerError)
-            await emitFailure(id: id, error: workerError)
-            return
-        } catch {
-            let id = bestEffortID(from: line)
-            let workerError = WorkerError(
-                code: .internalError,
-                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
-            )
-            await failRequestStream(for: id, error: workerError)
-            await emitFailure(
-                id: id,
-                error: workerError,
-            )
-            return
-        }
-
+    func submitDecodedRequest(_ request: WorkerRequest) async {
         ensureRequestBroker(for: request)
 
         if isShuttingDown {

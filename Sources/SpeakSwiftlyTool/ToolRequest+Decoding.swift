@@ -1,26 +1,27 @@
 import Foundation
+import SpeakSwiftly
 
-extension WorkerRequest {
-    static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> WorkerRequest {
+extension ToolRequest {
+    static func decode(from line: String, decoder: JSONDecoder = JSONDecoder()) throws -> ToolRequest {
         let data = Data(line.utf8)
         let raw: RawWorkerRequest
 
         do {
             raw = try decoder.decode(RawWorkerRequest.self, from: data)
         } catch let error as DecodingError {
-            throw WorkerError(
+            throw SpeakSwiftly.Error(
                 code: .invalidRequest,
                 message: "The request line contains an invalid field value or shape. \(describeDecodingError(error))",
             )
         } catch {
-            throw WorkerError(code: .invalidJSON, message: "The request line is not valid JSON. Each request must be a single JSON object on one line.")
+            throw SpeakSwiftly.Error(code: .invalidJSON, message: "The request line is not valid JSON. Each request must be a single JSON object on one line.")
         }
 
         guard let id = raw.id?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty else {
-            throw WorkerError(code: .invalidRequest, message: "The request is missing a non-empty 'id' field.")
+            throw SpeakSwiftly.Error(code: .invalidRequest, message: "The request is missing a non-empty 'id' field.")
         }
         guard let op = raw.op?.trimmingCharacters(in: .whitespacesAndNewlines), !op.isEmpty else {
-            throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty 'op' field.")
+            throw SpeakSwiftly.Error(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty 'op' field.")
         }
 
         switch op {
@@ -37,12 +38,11 @@ extension WorkerRequest {
                     repoRoot: raw.repoRoot,
                     base: raw.requestContext,
                 )
-                return .queueSpeech(
+                return .speech(
                     id: id,
                     text: resolved.text,
-                    profileName: profileName,
+                    voiceProfile: profileName,
                     textProfileID: resolved.textProfileID,
-                    jobType: .live,
                     sourceFormat: resolved.sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: raw.qwenPreModelTextChunking ?? false,
@@ -61,21 +61,19 @@ extension WorkerRequest {
                     repoRoot: raw.repoRoot,
                     base: raw.requestContext,
                 )
-                return .queueSpeech(
+                return .audio(
                     id: id,
                     text: resolved.text,
-                    profileName: profileName,
+                    voiceProfile: profileName,
                     textProfileID: resolved.textProfileID,
-                    jobType: .file,
                     sourceFormat: resolved.sourceFormat,
                     requestContext: requestContext,
-                    qwenPreModelTextChunking: nil,
                 )
 
             case "generate_batch":
                 let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
-                return .queueBatch(id: id, profileName: profileName, items: items)
+                return .batch(id: id, voiceProfile: profileName, items: items)
 
             case "get_generated_file":
                 let artifactID = try requireNonEmpty(raw.artifactID, field: "artifact_id", id: id)
@@ -108,14 +106,12 @@ extension WorkerRequest {
                 let vibe = try require(raw.vibe, field: "vibe", id: id)
                 let voiceDescription = try requireNonEmpty(raw.voiceDescription, field: "voice_description", id: id)
                 let outputPath = raw.outputPath?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
-                return .createProfile(
+                return .createVoiceProfile(
                     id: id,
                     profileName: profileName,
                     text: text,
                     vibe: vibe,
                     voiceDescription: voiceDescription,
-                    author: .user,
-                    seed: nil,
                     outputPath: outputPath,
                     cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
                 )
@@ -131,13 +127,12 @@ extension WorkerRequest {
                     raw: raw,
                     fallbackProfileName: profileName,
                 )
-                return .createProfile(
+                return .createBuiltInVoiceProfile(
                     id: id,
                     profileName: profileName,
                     text: text,
                     vibe: vibe,
                     voiceDescription: voiceDescription,
-                    author: .system,
                     seed: seed,
                     outputPath: outputPath,
                     cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
@@ -148,7 +143,7 @@ extension WorkerRequest {
                 let referenceAudioPath = try requireNonEmpty(raw.referenceAudioPath, field: "reference_audio_path", id: id)
                 let vibe = try require(raw.vibe, field: "vibe", id: id)
                 let transcript = raw.transcript?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
-                return .createClone(
+                return .createVoiceClone(
                     id: id,
                     profileName: profileName,
                     referenceAudioPath: referenceAudioPath,
@@ -231,7 +226,7 @@ extension WorkerRequest {
 
             case "create_text_replacement":
                 guard let replacement = raw.replacement else {
-                    throw WorkerError(
+                    throw SpeakSwiftly.Error(
                         code: .invalidRequest,
                         message: "Request '\(id)' is missing a 'replacement' object.",
                     )
@@ -244,7 +239,7 @@ extension WorkerRequest {
 
             case "replace_text_replacement":
                 guard let replacement = raw.replacement else {
-                    throw WorkerError(
+                    throw SpeakSwiftly.Error(
                         code: .invalidRequest,
                         message: "Request '\(id)' is missing a 'replacement' object.",
                     )
@@ -322,13 +317,13 @@ extension WorkerRequest {
                 return .cancelRequest(id: id, requestID: requestID, queueType: .playback)
 
             default:
-                throw WorkerError(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")
+                throw SpeakSwiftly.Error(code: .unknownOperation, message: "Request '\(id)' uses unsupported operation '\(op)'.")
         }
     }
 
     static func requireNonEmpty(_ value: String?, field: String, id: String) throws -> String {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
+            throw SpeakSwiftly.Error(code: .invalidRequest, message: "Request '\(id)' is missing a non-empty '\(field)' field.")
         }
 
         return trimmed
@@ -336,7 +331,7 @@ extension WorkerRequest {
 
     static func require<T>(_ value: T?, field: String, id: String) throws -> T {
         guard let value else {
-            throw WorkerError(code: .invalidRequest, message: "Request '\(id)' is missing a '\(field)' field.")
+            throw SpeakSwiftly.Error(code: .invalidRequest, message: "Request '\(id)' is missing a '\(field)' field.")
         }
 
         return value
@@ -357,13 +352,13 @@ extension WorkerRequest {
 }
 
 private extension RawWorkerRequest {
-    func resolvedVoiceProfileOrRuntimeDefault(id: String) throws -> String {
+    func resolvedVoiceProfileOrRuntimeDefault(id: String) throws -> SpeakSwiftly.Name? {
         let candidate = voiceProfile ?? profileName
         guard let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return WorkerRequest.runtimeDefaultVoiceProfilePlaceholder
+            return nil
         }
 
-        return try WorkerRequest.requireNonEmpty(trimmed, field: "voice_profile", id: id)
+        return try ToolRequest.requireNonEmpty(trimmed, field: "voice_profile", id: id)
     }
 }
 
