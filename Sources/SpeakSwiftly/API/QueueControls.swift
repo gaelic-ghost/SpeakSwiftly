@@ -1,5 +1,13 @@
 import Foundation
 
+public extension SpeakSwiftly {
+    /// Identifies a runtime work queue for queue-specific controls.
+    enum QueueType: String, Codable, Sendable, Equatable {
+        case generation
+        case playback
+    }
+}
+
 public extension SpeakSwiftly.Runtime {
     // MARK: Queue Control
 
