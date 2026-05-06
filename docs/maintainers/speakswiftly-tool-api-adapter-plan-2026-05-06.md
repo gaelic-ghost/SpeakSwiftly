@@ -287,11 +287,13 @@ those results into the worker contract.
 This is the riskiest slice because stdout/stderr behavior is part of the worker
 contract and release runtime publication.
 
-Status: implemented in the `tool: move jsonl output encoding into tool` slice.
-The runtime now publishes package-scoped typed worker-output events and can
-disable its own JSONL stdout fallback. `SpeakSwiftlyTool` subscribes to that
-typed output before startup, owns stdout JSONL encoding for the executable path,
-and writes decode-failure responses directly from the tool.
+Status: implemented in the `tool: move jsonl output encoding into tool` and
+`tool: remove runtime jsonl fallback` slices. The runtime now publishes
+package-scoped typed worker-output events only. `SpeakSwiftlyTool` subscribes to
+that typed output before startup, owns stdout JSONL encoding for the executable
+path, and writes decode-failure responses directly from the tool. Tests that
+assert worker-contract JSONL attach the same tool output encoder to the runtime
+instead of relying on runtime-owned stdout encoding.
 
 Validation:
 

@@ -25,10 +25,6 @@ public extension SpeakSwiftly.Tool {
         await runtime.workerOutputEvents()
     }
 
-    package func useExternalJSONLOutput() async {
-        await runtime.setWorkerJSONLEmissionEnabled(false)
-    }
-
     // MARK: Generation
 
     /// Queues live speech playback using a caller-provided request identifier.

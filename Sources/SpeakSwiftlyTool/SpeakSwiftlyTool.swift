@@ -33,7 +33,6 @@ enum SpeakSwiftlyTool {
 
     private static func run(runtime: SpeakSwiftly.Runtime) async {
         let output = ToolJSONLOutput()
-        await runtime.tool.useExternalJSONLOutput()
         let outputEvents = await runtime.tool.outputEvents()
         let outputTask = Task {
             for await event in outputEvents {

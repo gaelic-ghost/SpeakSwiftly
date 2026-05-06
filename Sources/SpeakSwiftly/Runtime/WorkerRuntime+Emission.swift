@@ -346,10 +346,6 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    package func setWorkerJSONLEmissionEnabled(_ enabled: Bool) {
-        emitsWorkerJSONL = enabled
-    }
-
     func removeWorkerOutputContinuation(_ id: UUID) {
         workerOutputContinuations.removeValue(forKey: id)
     }
@@ -381,36 +377,6 @@ extension SpeakSwiftly.Runtime {
     func emitOutput(_ event: SpeakSwiftly.WorkerOutputEvent) async {
         for continuation in workerOutputContinuations.values {
             continuation.yield(event)
-        }
-
-        guard emitsWorkerJSONL else { return }
-
-        await writeWorkerJSONL(event)
-    }
-
-    func writeWorkerJSONL(_ event: SpeakSwiftly.WorkerOutputEvent) async {
-        switch event {
-            case let .status(status):
-                await writeWorkerJSONL(status)
-            case let .queued(queued):
-                await writeWorkerJSONL(queued)
-            case let .started(started):
-                await writeWorkerJSONL(started)
-            case let .progress(progress):
-                await writeWorkerJSONL(progress)
-            case let .success(success):
-                await writeWorkerJSONL(success)
-            case let .failure(failure):
-                await writeWorkerJSONL(failure)
-        }
-    }
-
-    func writeWorkerJSONL(_ value: some Encodable) async {
-        do {
-            let data = try encoder.encode(value) + Data("\n".utf8)
-            try dependencies.writeStdout(data)
-        } catch {
-            await logError("SpeakSwiftly could not write a JSONL event to stdout. \(error.localizedDescription)")
         }
     }
 
