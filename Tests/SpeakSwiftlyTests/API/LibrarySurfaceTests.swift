@@ -251,6 +251,9 @@ import Darwin
     let artifactsHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Artifacts = { runtime in
         runtime.artifacts
     }
+    let toolHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Tool = { runtime in
+        runtime.tool
+    }
     let normalizer: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Normalizer = { runtime in
         runtime.normalizer
     }
@@ -521,6 +524,129 @@ import Darwin
     let cancelRequest: @Sendable (SpeakSwiftly.Playback, String) async -> SpeakSwiftly.RequestHandle = { playback, requestID in
         await playback.cancelRequest(requestID)
     }
+    let toolSpeech: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, text in
+        await tool.speech(requestID: requestID, text: text)
+    }
+    let toolAudio: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, text in
+        await tool.audio(requestID: requestID, text: text)
+    }
+    let toolBatch: @Sendable (SpeakSwiftly.Tool, String, [SpeakSwiftly.BatchItem]) async -> SpeakSwiftly.RequestHandle = { tool, requestID, items in
+        await tool.batch(requestID: requestID, items)
+    }
+    let toolArtifact: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, artifactID in
+        await tool.artifact(requestID: requestID, artifactID: artifactID)
+    }
+    let toolArtifacts: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.artifacts(requestID: requestID)
+    }
+    let toolGeneratedBatch: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, batchID in
+        await tool.generatedBatch(requestID: requestID, batchID: batchID)
+    }
+    let toolGeneratedBatches: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.generatedBatches(requestID: requestID)
+    }
+    let toolExpireJob: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, jobID in
+        await tool.expireGenerationJob(requestID: requestID, jobID: jobID)
+    }
+    let toolGenerationJob: @Sendable (SpeakSwiftly.Tool, String, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID, jobID in
+        await tool.generationJob(requestID: requestID, jobID: jobID)
+    }
+    let toolGenerationJobs: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.generationJobs(requestID: requestID)
+    }
+    let toolGenerationQueue: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.generationQueue(requestID: requestID)
+    }
+    let toolCreateProfile: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String) async -> SpeakSwiftly.RequestHandle = {
+        tool,
+        requestID,
+        profileName,
+        text,
+        vibe,
+        voiceDescription in
+        await tool.createVoiceProfile(
+            requestID: requestID,
+            design: profileName,
+            from: text,
+            vibe: vibe,
+            voiceDescription: voiceDescription,
+        )
+    }
+    let toolCreateBuiltInProfile: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name, String, SpeakSwiftly.Vibe, String, SpeakSwiftly.ProfileSeed) async -> SpeakSwiftly.RequestHandle = {
+        tool,
+        requestID,
+        profileName,
+        text,
+        vibe,
+        voiceDescription,
+        seed in
+        await tool.createBuiltInVoiceProfile(
+            requestID: requestID,
+            design: profileName,
+            from: text,
+            vibe: vibe,
+            voiceDescription: voiceDescription,
+            seed: seed,
+        )
+    }
+    let toolCreateClone: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name, URL, SpeakSwiftly.Vibe) async -> SpeakSwiftly.RequestHandle = {
+        tool,
+        requestID,
+        profileName,
+        referenceAudioURL,
+        vibe in
+        await tool.createVoiceProfile(
+            requestID: requestID,
+            clone: profileName,
+            from: referenceAudioURL,
+            vibe: vibe,
+        )
+    }
+    let toolVoiceProfiles: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.voiceProfiles(requestID: requestID)
+    }
+    let toolRenameVoiceProfile: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = {
+        tool,
+        requestID,
+        profileName,
+        newProfileName in
+        await tool.renameVoiceProfile(requestID: requestID, profileName, to: newProfileName)
+    }
+    let toolRerollVoiceProfile: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = { tool, requestID, profileName in
+        await tool.rerollVoiceProfile(requestID: requestID, profileName)
+    }
+    let toolDeleteVoiceProfile: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.Name) async -> SpeakSwiftly.RequestHandle = { tool, requestID, profileName in
+        await tool.deleteVoiceProfile(requestID: requestID, named: profileName)
+    }
+    let toolSwitchBackend: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.SpeechBackend) async -> SpeakSwiftly.RequestHandle = { tool, requestID, speechBackend in
+        await tool.switchSpeechBackend(requestID: requestID, to: speechBackend)
+    }
+    let toolReloadModels: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.reloadModels(requestID: requestID)
+    }
+    let toolUnloadModels: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.unloadModels(requestID: requestID)
+    }
+    let toolClearQueue: @Sendable (SpeakSwiftly.Tool, String, SpeakSwiftly.QueueType?) async -> SpeakSwiftly.RequestHandle = { tool, requestID, queueType in
+        await tool.clearQueue(requestID: requestID, queueType: queueType)
+    }
+    let toolCancelRequest: @Sendable (SpeakSwiftly.Tool, String, String, SpeakSwiftly.QueueType?) async -> SpeakSwiftly.RequestHandle = {
+        tool,
+        requestID,
+        targetRequestID,
+        queueType in
+        await tool.cancelRequest(
+            requestID: requestID,
+            targetRequestID: targetRequestID,
+            queueType: queueType,
+        )
+    }
+    let toolPausePlayback: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.pausePlayback(requestID: requestID)
+    }
+    let toolResumePlayback: @Sendable (SpeakSwiftly.Tool, String) async -> SpeakSwiftly.RequestHandle = { tool, requestID in
+        await tool.resumePlayback(requestID: requestID)
+    }
 
     _ = speak
     _ = speakWithDefaultVoice
@@ -531,6 +657,7 @@ import Darwin
     _ = voicesHandle
     _ = jobsHandle
     _ = artifactsHandle
+    _ = toolHandle
     _ = normalizer
     _ = profilesHandle
     _ = styleHandle
@@ -597,6 +724,31 @@ import Darwin
     _ = playbackPause
     _ = clearQueue
     _ = cancelRequest
+    _ = toolSpeech
+    _ = toolAudio
+    _ = toolBatch
+    _ = toolArtifact
+    _ = toolArtifacts
+    _ = toolGeneratedBatch
+    _ = toolGeneratedBatches
+    _ = toolExpireJob
+    _ = toolGenerationJob
+    _ = toolGenerationJobs
+    _ = toolGenerationQueue
+    _ = toolCreateProfile
+    _ = toolCreateBuiltInProfile
+    _ = toolCreateClone
+    _ = toolVoiceProfiles
+    _ = toolRenameVoiceProfile
+    _ = toolRerollVoiceProfile
+    _ = toolDeleteVoiceProfile
+    _ = toolSwitchBackend
+    _ = toolReloadModels
+    _ = toolUnloadModels
+    _ = toolClearQueue
+    _ = toolCancelRequest
+    _ = toolPausePlayback
+    _ = toolResumePlayback
 }
 
 // MARK: - Handle Metadata
