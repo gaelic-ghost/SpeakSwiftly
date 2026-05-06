@@ -865,3 +865,58 @@ import TextForSpeech
     #expect(failure["ok"] as? Bool == false)
     #expect(failure["code"] as? String == "audio_playback_timeout")
 }
+
+@Test func `tool jsonl output encodes worker output events`() async throws {
+    let buffer = ToolOutputBuffer()
+    let output = ToolJSONLOutput(writeStdout: buffer.write)
+
+    await output.write(
+        .success(SpeakSwiftly.Success(id: "req-tool-output", defaultVoiceProfile: "swift-signal")),
+    )
+    await output.writeFailure(for: #"{"id":"bad-request","op":"nope"}"#, error: SpeakSwiftly.Error(
+        code: .unknownOperation,
+        message: "Request 'bad-request' uses unsupported operation 'nope'.",
+    ))
+
+    let lines = buffer.lines()
+    #expect(lines.count == 2)
+
+    let success = try jsonLineObject(lines[0])
+    #expect(success["id"] as? String == "req-tool-output")
+    #expect(success["ok"] as? Bool == true)
+    #expect(success["default_voice_profile"] as? String == "swift-signal")
+
+    let failure = try jsonLineObject(lines[1])
+    #expect(failure["id"] as? String == "bad-request")
+    #expect(failure["ok"] as? Bool == false)
+    #expect(failure["code"] as? String == "unknown_operation")
+}
+
+private func jsonLineObject(_ line: String) throws -> [String: Any] {
+    let data = try #require(line.data(using: .utf8))
+    return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+}
+
+private final class ToolOutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values = [String]()
+
+    func write(_ data: Data) throws {
+        guard let line = String(data: data, encoding: .utf8) else {
+            throw SpeakSwiftly.Error(
+                code: .internalError,
+                message: "The test output buffer could not decode a JSONL write as UTF-8.",
+            )
+        }
+
+        lock.lock()
+        values.append(line.trimmingCharacters(in: .newlines))
+        lock.unlock()
+    }
+
+    func lines() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
+}

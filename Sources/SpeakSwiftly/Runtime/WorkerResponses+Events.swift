@@ -90,7 +90,7 @@ public extension SpeakSwiftly {
     }
 }
 
-extension SpeakSwiftly {
+package extension SpeakSwiftly {
     struct WorkerStatusEvent: Encodable, Equatable {
         let event = "worker_status"
         let stage: RuntimeState

@@ -333,11 +333,79 @@ extension SpeakSwiftly.Runtime {
         return queuedRequests.isEmpty ? .idle : .blocked(.waitingForActiveRequest)
     }
 
-    func emitFailure(id: String, error: WorkerError) async {
-        await emit(WorkerFailureResponse(id: id, code: error.code, message: error.message))
+    package func workerOutputEvents() -> AsyncStream<SpeakSwiftly.WorkerOutputEvent> {
+        let subscriptionID = UUID()
+
+        return AsyncStream { continuation in
+            workerOutputContinuations[subscriptionID] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeWorkerOutputContinuation(subscriptionID)
+                }
+            }
+        }
     }
 
-    func emit(_ value: some Encodable) async {
+    package func setWorkerJSONLEmissionEnabled(_ enabled: Bool) {
+        emitsWorkerJSONL = enabled
+    }
+
+    func removeWorkerOutputContinuation(_ id: UUID) {
+        workerOutputContinuations.removeValue(forKey: id)
+    }
+
+    func emit(_ event: WorkerStatusEvent) async {
+        await emitOutput(.status(event))
+    }
+
+    func emit(_ event: WorkerQueuedEvent) async {
+        await emitOutput(.queued(event))
+    }
+
+    func emit(_ event: WorkerStartedEvent) async {
+        await emitOutput(.started(event))
+    }
+
+    func emit(_ event: WorkerProgressEvent) async {
+        await emitOutput(.progress(event))
+    }
+
+    func emit(_ response: WorkerSuccessResponse) async {
+        await emitOutput(.success(response))
+    }
+
+    func emitFailure(id: String, error: WorkerError) async {
+        await emitOutput(.failure(WorkerFailureResponse(id: id, code: error.code, message: error.message)))
+    }
+
+    func emitOutput(_ event: SpeakSwiftly.WorkerOutputEvent) async {
+        for continuation in workerOutputContinuations.values {
+            continuation.yield(event)
+        }
+
+        guard emitsWorkerJSONL else { return }
+
+        await writeWorkerJSONL(event)
+    }
+
+    func writeWorkerJSONL(_ event: SpeakSwiftly.WorkerOutputEvent) async {
+        switch event {
+            case let .status(status):
+                await writeWorkerJSONL(status)
+            case let .queued(queued):
+                await writeWorkerJSONL(queued)
+            case let .started(started):
+                await writeWorkerJSONL(started)
+            case let .progress(progress):
+                await writeWorkerJSONL(progress)
+            case let .success(success):
+                await writeWorkerJSONL(success)
+            case let .failure(failure):
+                await writeWorkerJSONL(failure)
+        }
+    }
+
+    func writeWorkerJSONL(_ value: some Encodable) async {
         do {
             let data = try encoder.encode(value) + Data("\n".utf8)
             try dependencies.writeStdout(data)

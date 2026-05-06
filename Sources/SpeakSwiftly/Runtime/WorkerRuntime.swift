@@ -299,6 +299,8 @@ public extension SpeakSwiftly {
         var playbackObservationBroker = SingletonObservationBroker<SpeakSwiftly.PlaybackUpdate>()
         var requestBrokers = [String: RequestBroker]()
         var terminalRequestBrokerOrder = [String]()
+        var emitsWorkerJSONL = true
+        var workerOutputContinuations = [UUID: AsyncStream<SpeakSwiftly.WorkerOutputEvent>.Continuation]()
         var activeGenerations = [UUID: ActiveRequest]()
         var activeGenerationCancellations = [String: WorkerError]()
         var lastLoggedMarvisSchedulerState: String?

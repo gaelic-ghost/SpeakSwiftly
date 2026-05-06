@@ -19,22 +19,14 @@ public extension SpeakSwiftly.Runtime {
 }
 
 public extension SpeakSwiftly.Tool {
-    // MARK: Invalid Requests
+    // MARK: Output
 
-    /// Emits the JSONL failure response for a request line that the tool could not decode.
-    func reject(line: String, error: any Swift.Error) async {
-        let id = await runtime.bestEffortID(from: line)
-        let toolError: SpeakSwiftly.Error = if let error = error as? SpeakSwiftly.Error {
-            error
-        } else {
-            SpeakSwiftly.Error(
-                code: .internalError,
-                message: "The request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
-            )
-        }
+    package func outputEvents() async -> AsyncStream<SpeakSwiftly.WorkerOutputEvent> {
+        await runtime.workerOutputEvents()
+    }
 
-        await runtime.failRequestStream(for: id, error: toolError)
-        await runtime.emitFailure(id: id, error: toolError)
+    package func useExternalJSONLOutput() async {
+        await runtime.setWorkerJSONLEmissionEnabled(false)
     }
 
     // MARK: Generation

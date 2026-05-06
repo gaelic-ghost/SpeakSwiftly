@@ -7,7 +7,13 @@ extension SpeakSwiftly.Runtime {
             let request = try ToolRequest.decode(from: line)
             await request.submit(to: self)
         } catch {
-            await tool.reject(line: line, error: error)
+            let requestID = bestEffortID(from: line)
+            let workerError = error as? WorkerError ?? WorkerError(
+                code: .internalError,
+                message: "The test JSONL request could not be decoded due to an unexpected internal error. \(error.localizedDescription)",
+            )
+            await failRequestStream(for: requestID, error: workerError)
+            await emitFailure(id: requestID, error: workerError)
         }
     }
 }
