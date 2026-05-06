@@ -75,6 +75,11 @@ extension SpeakSwiftly.Generate {
 }
 ```
 
+`GenerateSnapshot` replaces the typed Swift role of request-handle queue
+inspection for the generation queue. Keep the JSONL `list_generation_queue`
+operation stable, but do not keep a parallel public Swift queue-inspection verb
+when `runtime.generate.snapshot()` can answer the same caller question directly.
+
 `GenerateState` should stay semantic and compact. The rich queue details belong in `GenerateSnapshot`.
 
 Candidate shape:
@@ -131,6 +136,11 @@ extension SpeakSwiftly.Playback {
 }
 ```
 
+`PlaybackSnapshot` replaces the typed Swift role of `Player.list()` and
+`Player.state()`. Keep JSONL playback queue and playback-state operations stable
+for the worker contract, but make the native Swift inspection path direct and
+snapshot-shaped.
+
 `PlaybackState` should remain small enough for UI and agent consumers to branch on directly. Snapshot carries richer telemetry.
 
 Candidate shape:
@@ -184,6 +194,12 @@ extension SpeakSwiftly.Runtime {
 }
 ```
 
+`RuntimeSnapshot` replaces the typed Swift role of `runtime.status()` and
+`runtime.overview()`. Keep JSONL `get_status`, `worker_status`, and
+`get_runtime_overview` stable for process-boundary consumers, but make native
+Swift runtime inspection direct instead of returning a request handle for a
+snapshot read.
+
 Candidate shape:
 
 ```swift
@@ -232,10 +248,19 @@ Do not expose this broker publicly. It is an implementation detail that lets the
 
 - Remove `runtime.player`; replace it with `runtime.playback`.
 - Remove public `Player`; replace it with `Playback`.
+- Remove typed Swift snapshot-read request-handle methods that are superseded by
+  direct snapshots:
+  - `runtime.status()` -> `runtime.snapshot()`
+  - `runtime.overview()` -> `runtime.snapshot()`
+  - `Player.list()` -> `runtime.playback.snapshot()`
+  - `Player.state()` -> `runtime.playback.snapshot()`
 - Rename current per-request `GenerationEvent` and `GenerationEventUpdate` to `SynthesisEvent` and `SynthesisUpdate`.
 - Replace `RuntimeOverview` with `RuntimeSnapshot` in the typed Swift surface.
 - Replace `PlaybackStateSnapshot` with `PlaybackSnapshot`.
 - Replace `statusEvents()` with `updates()` on `Runtime`.
+- Replace `RequestCompletion` cases that currently expose old observation
+  vocabulary so typed completion payloads also use `RuntimeSnapshot`,
+  `RuntimeUpdate`, and `PlaybackSnapshot`.
 - Keep JSONL `worker_status` and `get_runtime_overview` stable unless a separate wire-contract decision is made. This plan is about the typed Swift API.
 - Update DocC and tests in the same implementation pass as the public symbols.
 - Update `SpeakSwiftlyServer` adoption separately before release.
@@ -322,6 +347,13 @@ Use targeted tests between slices when the implementation touches request observ
 
 ## Open Checks Before Implementation
 
-- Confirm whether `RuntimeEvent`, `GenerateEvent`, and `PlaybackEvent` need public payload cases immediately, or whether `State`/`Update`/`Snapshot` is enough for the first breaking pass.
-- Decide whether singleton `updates()` streams should replay the latest update by default, matching the practical behavior of current `statusEvents()`.
-- Decide whether `RequestHandle.completion()` should keep returning `RequestCompletion` or whether operation-specific typed wait helpers should be introduced later.
+- Public singleton `Event` enums are part of the named family, but the first
+  implementation pass should keep them compact and meaningful. Add cases only
+  for events consumers can branch on usefully now; do not expose internal
+  scheduler or playback-driver chatter just to fill the enum.
+- Singleton `updates()` streams should replay the latest update by default,
+  matching the practical behavior of current `statusEvents()` and making late UI
+  or agent subscribers useful immediately.
+- `RequestHandle.completion()` should keep returning `RequestCompletion` in this
+  pass. Operation-specific typed wait helpers can be considered later if real
+  call sites show that the single completion enum is still too broad.

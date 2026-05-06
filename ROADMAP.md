@@ -185,6 +185,8 @@ Planned
 - [ ] Rename per-request `GenerationEvent` / `GenerationEventUpdate` to `SynthesisEvent` / `SynthesisUpdate`.
 - [ ] Rename `runtime.player` / `Player` to `runtime.playback` / `Playback`.
 - [ ] Replace public `StatusEvent`, `statusEvents()`, `RuntimeOverview`, and `PlaybackStateSnapshot` vocabulary with `RuntimeUpdate`, `RuntimeSnapshot`, `PlaybackUpdate`, and `PlaybackSnapshot`.
+- [ ] Remove typed Swift request-handle snapshot reads that are superseded by direct snapshots: `runtime.status()`, `runtime.overview()`, `Player.list()`, and `Player.state()`.
+- [ ] Update `RequestCompletion` payload cases so typed completions use the new snapshot/update vocabulary instead of old observation names.
 - [ ] Add a small internal singleton observation broker for runtime, generate, and playback update streams so sequence, replay, and subscriber behavior do not drift.
 - [ ] Keep JSONL `worker_status` and `get_runtime_overview` stable unless a separate wire-contract decision is made.
 - [ ] Update DocC, `CONTRIBUTING.md`, `AGENTS.md`, and release migration notes in the same implementation branch as the public symbol changes.
