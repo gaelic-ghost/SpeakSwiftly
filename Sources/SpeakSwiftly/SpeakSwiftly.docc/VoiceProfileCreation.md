@@ -63,10 +63,10 @@ library creation surface. Ordinary rename, delete, and in-place reroll operation
 reject them with explicit errors. If a user rerolls a system profile, SpeakSwiftly
 creates a user-owned copy instead so the built-in default remains stable.
 
-Consumer packages can author system profiles with the SwiftPM command plugin:
+Consumer packages can insert or update system profiles with the SwiftPM command plugin:
 
 ```bash
-swift package plugin --allow-writing-to-package-directory create-system-voice-profile \
+swift package plugin --allow-writing-to-package-directory upsert-system-voice-profile \
   --target SpeakSwiftlyServer \
   --name server-announcer \
   --text "A clear server status voice." \

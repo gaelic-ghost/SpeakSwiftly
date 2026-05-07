@@ -618,6 +618,135 @@ struct ProfileStore: @unchecked Sendable {
         )
     }
 
+    func upsertSystemProfile(
+        named profileName: String,
+        vibe: SpeakSwiftly.Vibe,
+        modelRepo: String,
+        voiceDescription: String,
+        sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
+        sampleRate: Int,
+        canonicalAudioData: Data,
+        createdAt: Date,
+    ) throws -> StoredProfile {
+        let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
+        let materializations = [
+            ProfileMaterializationDraft(
+                backend: .qwen3_smol,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
+                referenceAudioFile: Self.audioFileName,
+                referenceText: sourceText,
+                sampleRate: sampleRate,
+                audioData: canonicalAudioData,
+            ),
+        ]
+
+        return try upsertSystemProfile(
+            named: profileName,
+            vibe: vibe,
+            sourceKind: sourceKind,
+            sourceModelRepo: modelRepo,
+            voiceDescription: voiceDescription,
+            sourceText: sourceText,
+            transcriptProvenance: transcriptProvenance,
+            seed: seed,
+            sampleRate: sampleRate,
+            materializations: materializations,
+            createdAt: createdAt,
+        )
+    }
+
+    func upsertSystemProfile(
+        named profileName: String,
+        vibe: SpeakSwiftly.Vibe,
+        sourceKind: ProfileSourceKind,
+        sourceModelRepo: String,
+        voiceDescription: String,
+        sourceText: String,
+        transcriptProvenance: TranscriptProvenance? = nil,
+        seed: SpeakSwiftly.ProfileSeed? = nil,
+        sampleRate: Int,
+        materializations: [ProfileMaterializationDraft],
+        createdAt: Date,
+    ) throws -> StoredProfile {
+        try ensureRootExists()
+        try validateProfileName(profileName)
+
+        return try withExclusiveStoreAccess(operation: "upserting profile '\(profileName)'") {
+            guard !materializations.isEmpty else {
+                throw WorkerError(
+                    code: .internalError,
+                    message: "Profile '\(profileName)' could not be upserted because no backend materializations were supplied. This indicates a SpeakSwiftly runtime bug.",
+                )
+            }
+
+            try cleanupStagedProfileDirectories(for: profileName)
+
+            let directoryURL = profileDirectoryURL(for: profileName)
+            let stagedDirectoryURL = temporaryProfileDirectoryURL(for: profileName, purpose: "upsert")
+            let backupDirectoryURL = temporaryProfileDirectoryURL(for: profileName, purpose: "backup")
+            let manifest = ProfileManifest(
+                version: Self.manifestVersion,
+                profileName: profileName,
+                vibe: vibe,
+                createdAt: createdAt,
+                sourceKind: sourceKind,
+                modelRepo: sourceModelRepo,
+                voiceDescription: voiceDescription,
+                sourceText: sourceText,
+                transcriptProvenance: transcriptProvenance,
+                author: .system,
+                seed: seed,
+                sampleRate: sampleRate,
+                backendMaterializations: materializations.map {
+                    ProfileMaterializationManifest(
+                        backend: $0.backend,
+                        modelRepo: $0.modelRepo,
+                        createdAt: createdAt,
+                        referenceAudioFile: $0.referenceAudioFile,
+                        referenceText: $0.referenceText,
+                        sampleRate: $0.sampleRate,
+                    )
+                },
+                qwenConditioningArtifacts: [],
+            )
+
+            do {
+                try fileManager.createDirectory(at: stagedDirectoryURL, withIntermediateDirectories: false)
+                try writeMaterializationFiles(materializations, to: stagedDirectoryURL)
+                try writeManifest(manifest, to: stagedDirectoryURL)
+
+                if fileManager.fileExists(atPath: directoryURL.path) {
+                    try fileManager.moveItem(at: directoryURL, to: backupDirectoryURL)
+                    do {
+                        try fileManager.moveItem(at: stagedDirectoryURL, to: directoryURL)
+                    } catch let moveInError {
+                        try? fileManager.moveItem(at: backupDirectoryURL, to: directoryURL)
+                        throw WorkerError(
+                            code: .filesystemError,
+                            message: "Profile '\(profileName)' could not be updated after staging succeeded. \(moveInError.localizedDescription)",
+                        )
+                    }
+                    try fileManager.removeItem(at: backupDirectoryURL)
+                } else {
+                    try fileManager.moveItem(at: stagedDirectoryURL, to: directoryURL)
+                }
+            } catch let workerError as WorkerError {
+                try? fileManager.removeItem(at: stagedDirectoryURL)
+                throw workerError
+            } catch {
+                try? fileManager.removeItem(at: stagedDirectoryURL)
+                throw WorkerError(
+                    code: .filesystemError,
+                    message: "Profile '\(profileName)' could not be upserted. \(error.localizedDescription)",
+                )
+            }
+
+            return try loadProfile(named: profileName)
+        }
+    }
+
     func replaceProfile(
         named profileName: String,
         vibe: SpeakSwiftly.Vibe,

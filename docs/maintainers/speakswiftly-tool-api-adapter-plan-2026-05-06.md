@@ -158,7 +158,7 @@ long-term typed handle names available for future redistribution.
 | JSONL `op` | Current worker request | Public API target | Migration status |
 | --- | --- | --- | --- |
 | `create_voice_profile_from_description` | `.createProfile(..., author: .user)` | `runtime.voices.create(design:from:vibe:voiceDescription:outputPath:)` | Implemented through `SpeakSwiftly.Tool.createVoiceProfile(design:...)` |
-| `create_system_voice_profile_from_description` | `.createProfile(..., author: .system)` | Tool-only bundled resource authoring | Implemented through `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`; intentionally not exposed on `runtime.voices`; requires `SpeakSwiftlyTool --system-profile-resource-root PATH` so generated system profiles are written under bundled profile resources |
+| `upsert_system_voice_profile_from_description` | `.createProfile(..., author: .system)` | Tool-only bundled resource authoring | Implemented through `SpeakSwiftly.Tool.upsertBuiltInVoiceProfile(...)`; intentionally not exposed on `runtime.voices`; requires `SpeakSwiftlyTool --system-profile-resource-root PATH` so generated system profiles are inserted or updated under bundled profile resources |
 | `create_voice_profile_from_audio` | `.createClone` | `runtime.voices.create(clone:from:vibe:transcript:)` | Implemented through `SpeakSwiftly.Tool.createVoiceProfile(clone:...)` |
 | `list_voice_profiles` | `.listProfiles` | `runtime.voices.list()` | Implemented through `SpeakSwiftly.Tool.voiceProfiles(...)` |
 | `update_voice_profile_name` | `.renameProfile` | `runtime.voices.rename(_:to:)` | Implemented through `SpeakSwiftly.Tool.renameVoiceProfile(...)` |

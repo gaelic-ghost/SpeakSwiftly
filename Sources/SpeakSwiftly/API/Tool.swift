@@ -178,8 +178,8 @@ public extension SpeakSwiftly.Tool {
         )
     }
 
-    /// Creates a built-in voice-design profile using a caller-provided request identifier.
-    func createBuiltInVoiceProfile(
+    /// Inserts or updates a built-in voice-design profile using a caller-provided request identifier.
+    func upsertBuiltInVoiceProfile(
         requestID: String,
         design named: SpeakSwiftly.Name,
         from text: String,

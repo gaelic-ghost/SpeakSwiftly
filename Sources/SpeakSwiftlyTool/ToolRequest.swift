@@ -48,7 +48,7 @@ enum ToolRequest: Equatable {
         outputPath: String?,
         cwd: String?,
     )
-    case createBuiltInVoiceProfile(
+    case upsertBuiltInVoiceProfile(
         id: String,
         profileName: SpeakSwiftly.Name,
         text: String,
@@ -116,7 +116,7 @@ enum ToolRequest: Equatable {
                  let .generationJob(id, _),
                  let .generationJobs(id),
                  let .createVoiceProfile(id, _, _, _, _, _, _),
-                 let .createBuiltInVoiceProfile(id, _, _, _, _, _, _, _),
+                 let .upsertBuiltInVoiceProfile(id, _, _, _, _, _, _, _),
                  let .createVoiceClone(id, _, _, _, _, _),
                  let .listProfiles(id),
                  let .renameProfile(id, _, _),
@@ -205,8 +205,8 @@ enum ToolRequest: Equatable {
                     outputPath: outputPath,
                     cwd: cwd,
                 )
-            case let .createBuiltInVoiceProfile(id, profileName, text, vibe, voiceDescription, seed, outputPath, cwd):
-                return await tool.createBuiltInVoiceProfile(
+            case let .upsertBuiltInVoiceProfile(id, profileName, text, vibe, voiceDescription, seed, outputPath, cwd):
+                return await tool.upsertBuiltInVoiceProfile(
                     requestID: id,
                     design: profileName,
                     from: text,
@@ -381,7 +381,7 @@ extension ToolRequest {
                     cwd: cwd,
                 )
             case .system:
-                .createBuiltInVoiceProfile(
+                .upsertBuiltInVoiceProfile(
                     id: id,
                     profileName: profileName,
                     text: text,

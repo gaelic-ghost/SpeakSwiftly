@@ -363,7 +363,7 @@ import TextForSpeech
         intendedProfileName: "swift-signal",
         sourcePackage: "SpeakSwiftlyTests",
     )
-    _ = await runtime.tool.createBuiltInVoiceProfile(
+    _ = await runtime.tool.upsertBuiltInVoiceProfile(
         requestID: "req-system",
         design: "swift-signal",
         from: "Hello there",
@@ -388,6 +388,36 @@ import TextForSpeech
     #expect(created.manifest.seed?.sourcePackage == seed.sourcePackage)
     #expect(created.manifest.qwenConditioningArtifacts.isEmpty)
 
+    let updatedSeed = SpeakSwiftly.ProfileSeed(
+        seedID: "swift.signal",
+        seedVersion: "2",
+        intendedProfileName: "swift-signal",
+        sourcePackage: "SpeakSwiftlyTests",
+    )
+    _ = await runtime.tool.upsertBuiltInVoiceProfile(
+        requestID: "req-system-update",
+        design: "swift-signal",
+        from: "Updated hello there",
+        vibe: .femme,
+        voiceDescription: "Bright, clear, and updated.",
+        seed: updatedSeed,
+    )
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == "req-system-update"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "swift-signal"
+        }
+    })
+
+    let updated = try systemResourceStore.loadProfile(named: "swift-signal")
+    #expect(updated.manifest.author == .system)
+    #expect(updated.manifest.sourceText == "Updated hello there")
+    #expect(updated.manifest.voiceDescription == "Bright, clear, and updated.")
+    #expect(updated.manifest.seed?.seedVersion == updatedSeed.seedVersion)
+    #expect(updated.manifest.qwenConditioningArtifacts.isEmpty)
+
     let writableStore = ProfileStore(rootURL: stateRoot, fileManager: .default)
     #expect(throws: WorkerError.self) {
         _ = try writableStore.loadProfile(named: "swift-signal")
@@ -409,7 +439,7 @@ import TextForSpeech
     await runtime.start()
 
     let createID = await runtime.tool
-        .createBuiltInVoiceProfile(
+        .upsertBuiltInVoiceProfile(
             requestID: "req-system-no-root",
             design: "swift-signal",
             from: "Hello there",

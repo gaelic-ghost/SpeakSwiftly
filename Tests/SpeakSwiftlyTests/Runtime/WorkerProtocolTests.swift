@@ -297,9 +297,9 @@ import TextForSpeech
     )
 }
 
-@Test func `decodes create system profile request with seed metadata`() throws {
+@Test func `decodes upsert system profile request with seed metadata`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-system","op":"create_system_voice_profile_from_description","profile_name":"swift-signal","text":"Hello","vibe":"femme","voice_description":"Bright and clear","seed_id":"swift.signal","seed_version":"1","source_package":"SpeakSwiftlyServer","source_version":"4.2.0","installed_at":"2026-05-02T12:00:00Z"}"#,
+        from: #"{"id":"req-system","op":"upsert_system_voice_profile_from_description","profile_name":"swift-signal","text":"Hello","vibe":"femme","voice_description":"Bright and clear","seed_id":"swift.signal","seed_version":"1","source_package":"SpeakSwiftlyServer","source_version":"4.2.0","installed_at":"2026-05-02T12:00:00Z"}"#,
     )
 
     #expect(

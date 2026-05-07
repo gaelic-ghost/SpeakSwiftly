@@ -13,7 +13,7 @@ public extension SpeakSwiftly {
         public static let expireGenerationJob = Self(rawValue: "expire_generation_job")
         public static let createVoiceProfileFromDescription = Self(rawValue: "create_voice_profile_from_description")
         public static let createVoiceProfileFromAudio = Self(rawValue: "create_voice_profile_from_audio")
-        public static let createSystemVoiceProfileFromDescription = Self(rawValue: "create_system_voice_profile_from_description")
+        public static let upsertSystemVoiceProfileFromDescription = Self(rawValue: "upsert_system_voice_profile_from_description")
         public static let listVoiceProfiles = Self(rawValue: "list_voice_profiles")
         public static let updateVoiceProfileName = Self(rawValue: "update_voice_profile_name")
         public static let rerollVoiceProfile = Self(rawValue: "reroll_voice_profile")

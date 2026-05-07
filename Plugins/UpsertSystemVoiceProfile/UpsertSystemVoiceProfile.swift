@@ -2,7 +2,7 @@ import Foundation
 import PackagePlugin
 
 @main
-struct CreateSystemVoiceProfilePlugin: CommandPlugin {
+struct UpsertSystemVoiceProfilePlugin: CommandPlugin {
     func performCommand(context: PluginContext, arguments: [String]) async throws {
         let options = try Options(arguments: arguments)
         guard let target = context.package.targets.first(where: { $0.name == options.target }) else {
@@ -16,7 +16,7 @@ struct CreateSystemVoiceProfilePlugin: CommandPlugin {
         try FileManager.default.createDirectory(at: resourceRootURL, withIntermediateDirectories: true)
 
         let request = ToolRequest(
-            id: "create-system-voice-profile-\(UUID().uuidString)",
+            id: "upsert-system-voice-profile-\(UUID().uuidString)",
             profileName: options.name,
             text: options.text,
             vibe: options.vibe,
@@ -30,7 +30,7 @@ struct CreateSystemVoiceProfilePlugin: CommandPlugin {
         try runTool(at: tool.url, resourceRootURL: resourceRootURL, request: request)
 
         Diagnostics.remark(
-            "Created SpeakSwiftly system voice profile '\(options.name)' under \(resourceRootURL.path)/profiles. Ensure target '\(options.target)' declares .copy(\"Resources/SystemProfiles\") and passes SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module) through SpeakSwiftly.Configuration(systemProfileResourceRoots:).",
+            "Upserted SpeakSwiftly system voice profile '\(options.name)' under \(resourceRootURL.path)/profiles. Ensure target '\(options.target)' declares .copy(\"Resources/SystemProfiles\") and passes SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module) through SpeakSwiftly.Configuration(systemProfileResourceRoots:).",
         )
     }
 
@@ -210,7 +210,7 @@ private struct Options {
 
 private struct ToolRequest: Encodable {
     let id: String
-    let op = "create_system_voice_profile_from_description"
+    let op = "upsert_system_voice_profile_from_description"
     let profileName: String
     let text: String
     let vibe: String
@@ -260,7 +260,7 @@ private enum PluginError: Error, CustomStringConvertible {
         switch self {
             case .helpRequested:
                 """
-                Usage: swift package plugin --allow-writing-to-package-directory create-system-voice-profile --target TARGET --name PROFILE_NAME --text TEXT --vibe femme|masc --voice-description DESCRIPTION [--seed-id ID] [--seed-version VERSION] [--source-version VERSION]
+                Usage: swift package plugin --allow-writing-to-package-directory upsert-system-voice-profile --target TARGET --name PROFILE_NAME --text TEXT --vibe femme|masc --voice-description DESCRIPTION [--seed-id ID] [--seed-version VERSION] [--source-version VERSION]
                 """
             case let .missingRequiredOption(option):
                 "Missing required option \(option). Run with --help for usage."
@@ -271,11 +271,11 @@ private enum PluginError: Error, CustomStringConvertible {
             case let .unknownArgument(argument):
                 "Unknown argument '\(argument)'. Run with --help for usage."
             case .requestEncodingFailed:
-                "CreateSystemVoiceProfile could not encode the JSONL request for SpeakSwiftlyTool."
+                "UpsertSystemVoiceProfile could not encode the JSONL request for SpeakSwiftlyTool."
             case let .toolClosedBeforeResponse(requestID):
                 "SpeakSwiftlyTool exited before returning a result for system-profile request '\(requestID)'."
             case let .toolFailed(status):
-                "SpeakSwiftlyTool exited with status \(status) while creating the system voice profile."
+                "SpeakSwiftlyTool exited with status \(status) while upserting the system voice profile."
             case let .requestFailed(message):
                 message
         }

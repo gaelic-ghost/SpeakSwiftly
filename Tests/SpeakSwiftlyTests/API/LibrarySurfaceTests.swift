@@ -673,7 +673,7 @@ import Darwin
         vibe,
         voiceDescription,
         seed in
-        await tool.createBuiltInVoiceProfile(
+        await tool.upsertBuiltInVoiceProfile(
             requestID: requestID,
             design: profileName,
             from: text,
