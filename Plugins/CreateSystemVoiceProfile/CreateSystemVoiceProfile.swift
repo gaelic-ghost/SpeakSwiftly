@@ -50,6 +50,17 @@ struct CreateSystemVoiceProfilePlugin: CommandPlugin {
         let output = Pipe()
         process.standardInput = input
         process.standardOutput = output
+
+        var inputIsOpen = true
+        defer {
+            if inputIsOpen {
+                try? input.fileHandleForWriting.close()
+            }
+            if process.isRunning {
+                process.waitUntilExit()
+            }
+        }
+
         try process.run()
 
         let requestLine = try request.encodedLine()
@@ -57,7 +68,11 @@ struct CreateSystemVoiceProfilePlugin: CommandPlugin {
 
         let result = try waitForToolResult(requestID: request.id, output: output)
         try input.fileHandleForWriting.close()
-        process.waitUntilExit()
+        inputIsOpen = false
+
+        if process.isRunning {
+            process.waitUntilExit()
+        }
 
         guard process.terminationStatus == 0 else {
             throw PluginError.toolFailed(status: process.terminationStatus)
