@@ -8,6 +8,7 @@ struct WorkerDependencies: @unchecked Sendable {
     private enum Environment {
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
         static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
+        static let allowProfileCPUFallback = "SPEAKSWIFTLY_ALLOW_PROFILE_CPU_FALLBACK"
     }
 
     let fileManager: FileManager
@@ -24,9 +25,12 @@ struct WorkerDependencies: @unchecked Sendable {
 
     static func live(
         fileManager: FileManager = .default,
+        allowsProfileModelCPUFallback: Bool? = nil,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
+        let allowsProfileModelCPUFallback = allowsProfileModelCPUFallback
+            ?? (environment[Environment.allowProfileCPUFallback] == "1")
 
         return WorkerDependencies(
             fileManager: fileManager,
@@ -36,7 +40,11 @@ struct WorkerDependencies: @unchecked Sendable {
                     marvisResidentPolicy: marvisResidentPolicy,
                 )
             },
-            loadProfileModel: { try await ModelFactory.loadProfileModel() },
+            loadProfileModel: {
+                try await ModelFactory.loadProfileModel(
+                    allowsCPUFallback: allowsProfileModelCPUFallback,
+                )
+            },
             loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
             makePlaybackDriver: {
                 if environment[Environment.silentPlayback] == "1" {

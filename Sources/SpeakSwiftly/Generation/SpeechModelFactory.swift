@@ -66,10 +66,18 @@ enum ModelFactory {
     }
 
     static func loadProfileModel(
+        allowsCPUFallback: Bool = false,
         hasDefaultMetalDevice: @Sendable () -> Bool = defaultMetalDeviceIsAvailable,
         modelLoader: @Sendable (String) async throws -> AnySpeechModel = loadModel,
     ) async throws -> AnySpeechModel {
         guard hasDefaultMetalDevice() else {
+            guard allowsCPUFallback else {
+                throw WorkerError(
+                    code: .modelLoading,
+                    message: "SpeakSwiftly could not load the voice-design profile model because Metal did not provide a default GPU device for this process. Fix the launch context so Metal is available, or explicitly allow CPU profile-model fallback for system-profile authoring.",
+                )
+            }
+
             do {
                 let model = try await Device.withDefaultDevice(.cpu) {
                     try await modelLoader(profileModelRepo)

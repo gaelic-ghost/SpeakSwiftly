@@ -39,10 +39,27 @@ private actor ProfileModelLoadObservation {
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
 }
 
-@Test func `profile model load uses cpu fallback when metal device is unavailable`() async throws {
+@Test func `profile model load rejects missing metal device by default`() async throws {
+    do {
+        _ = try await ModelFactory.loadProfileModel(
+            hasDefaultMetalDevice: { false },
+            modelLoader: { _ in makeProfileModel() },
+        )
+        Issue.record("Expected profile model loading to reject missing Metal without explicit CPU fallback.")
+    } catch let error as WorkerError {
+        #expect(error.code == .modelLoading)
+        #expect(error.message.contains("Metal did not provide a default GPU device"))
+        #expect(error.message.contains("explicitly allow CPU profile-model fallback"))
+    } catch {
+        Issue.record("Expected WorkerError, got \(error).")
+    }
+}
+
+@Test func `profile model load uses cpu fallback only when explicitly allowed`() async throws {
     let observation = ProfileModelLoadObservation()
 
     let model = try await ModelFactory.loadProfileModel(
+        allowsCPUFallback: true,
         hasDefaultMetalDevice: { false },
         modelLoader: { repo in
             await observation.recordLoad(repo: repo, deviceType: Device.defaultDevice().deviceType)
