@@ -75,15 +75,20 @@ xcodebuild test-without-building -quiet \
   -only-testing:'SpeakSwiftlyTests/WorkerRuntimePlaybackTests'
 ```
 
-For GitHub Actions, keep the manifest sanity check as:
+For GitHub Actions pull requests and `main` pushes, keep the protected remote
+gate light. The required check is the `validate` job in
+`.github/workflows/validate-repo-maintenance.yml`, which runs the repo-maintenance
+validation wrapper.
+
+The heavier Swift workflow in `.github/workflows/swift.yml` is release-grade CI
+for manual dispatch and tagged releases. It keeps the manifest sanity check as:
 
 ```bash
 swift package dump-package
 ```
 
-GitHub Actions currently keeps build-and-test coverage on the Xcode-backed
-package lane even though local ordinary package work starts with SwiftPM. The
-current macOS CI target set is:
+That workflow also keeps build-and-test coverage on the Xcode-backed package
+lane. The current macOS target set is:
 
 - `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
 - `SpeakSwiftlyTests/LibrarySurfaceTests`
