@@ -53,6 +53,7 @@ Suite names:
   chatterbox | ChatterboxE2ETests
   marvis | MarvisE2ETests
   qwen | QwenE2ETests
+  qwen-backends | QwenE2ETests with backend-variant coverage enabled
   queue-control | QueueControlE2ETests
   qwen-longform | QwenLongFormE2ETests
   trace | TraceCaptureE2ETests
@@ -84,7 +85,7 @@ resolve_suite_name() {
     generated-batch|GeneratedBatchE2ETests) printf '%s\n' "GeneratedBatchE2ETests" ;;
     chatterbox|ChatterboxE2ETests) printf '%s\n' "ChatterboxE2ETests" ;;
     marvis|MarvisE2ETests) printf '%s\n' "MarvisE2ETests" ;;
-    qwen|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
+    qwen|qwen-backends|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
     queue-control|QueueControlE2ETests) printf '%s\n' "QueueControlE2ETests" ;;
     qwen-longform|QwenLongFormE2ETests) printf '%s\n' "QwenLongFormE2ETests" ;;
     trace|TraceCaptureE2ETests) printf '%s\n' "TraceCaptureE2ETests" ;;
@@ -132,6 +133,10 @@ fi
 
 if [ "$suite_name" = "QwenLongFormE2ETests" ]; then
   export SPEAKSWIFTLY_QWEN_LONGFORM_E2E=1
+fi
+
+if [ "$suite_arg" = "qwen-backends" ]; then
+  export SPEAKSWIFTLY_QWEN_BACKEND_E2E=1
 fi
 
 if [ -n "$benchmark_iterations" ]; then

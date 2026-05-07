@@ -27,6 +27,10 @@ func speakSwiftlyQwenLongFormE2ETestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_LONGFORM_E2E"] == "1"
 }
 
+func speakSwiftlyQwenBackendE2ETestsEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BACKEND_E2E"] == "1"
+}
+
 func speakSwiftlyQwenBenchmarkIterations() -> Int {
     let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS"] ?? ""
     if let parsed = Int(rawValue) {

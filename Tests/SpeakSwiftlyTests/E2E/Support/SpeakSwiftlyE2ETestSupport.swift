@@ -508,6 +508,57 @@ enum E2EHarness {
         return try #require(success["generated_batch"] as? [String: Any])
     }
 
+    static func switchSpeechBackend(
+        on worker: WorkerProcess,
+        id: String,
+        to backend: SpeakSwiftly.SpeechBackend,
+    ) async throws {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"set_speech_backend","speech_backend":"\(backend.rawValue)"}
+            """,
+        )
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: e2eTimeout) {
+                guard
+                    $0["id"] as? String == id,
+                    $0["ok"] as? Bool == true,
+                    let status = $0["status"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return status["stage"] as? String == "resident_model_ready"
+                    && status["resident_state"] as? String == "ready"
+                    && status["speech_backend"] as? String == backend.rawValue
+            },
+        )
+
+        #expect(success["speech_backend"] as? String == backend.rawValue)
+    }
+
+    static func rerollProfile(
+        on worker: WorkerProcess,
+        id: String,
+        profileName: String,
+    ) async throws {
+        try worker.sendJSON(
+            """
+            {"id":"\(id)","op":"reroll_voice_profile","profile_name":"\(profileName)"}
+            """,
+        )
+
+        let success = try #require(
+            try await worker.waitForJSONObject(timeout: e2eTimeout) {
+                $0["id"] as? String == id
+                    && $0["ok"] as? Bool == true
+            },
+        )
+
+        #expect(success["profile_name"] as? String == profileName)
+    }
+
     static func compactJSONArrayString(_ source: String) throws -> String {
         guard let data = source.data(using: .utf8) else {
             throw WorkerProcessError(
