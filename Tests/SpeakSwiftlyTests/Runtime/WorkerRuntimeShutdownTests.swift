@@ -383,7 +383,7 @@ final class LockedFlag: @unchecked Sendable {
     let blockedRuntime = try WorkerRuntime(
         dependencies: WorkerDependencies(
             fileManager: .default,
-            loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+            loadResidentModels: { _ in makeResidentModels(for: .qwen3_smol) },
             loadProfileModel: { makeProfileModel() },
             loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
             makePlaybackDriver: { AnyPlaybackDriver.silent() },
@@ -401,7 +401,7 @@ final class LockedFlag: @unchecked Sendable {
             now: Date.init,
             readRuntimeMemory: { nil },
         ),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         qwenConditioningStrategy: .legacyRaw,
         profileStore: makeProfileStore(rootURL: storeRoot),
         generatedFileStore: makeGeneratedFileStore(rootURL: storeRoot),
@@ -491,7 +491,7 @@ final class LockedFlag: @unchecked Sendable {
 
     let dependencies = WorkerDependencies(
         fileManager: fileManager,
-        loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+        loadResidentModels: { _ in makeResidentModels(for: .qwen3_smol) },
         loadProfileModel: { makeProfileModel() },
         loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
         makePlaybackDriver: { AnyPlaybackDriver.silent() },
@@ -510,7 +510,7 @@ final class LockedFlag: @unchecked Sendable {
 
     let runtime = WorkerRuntime(
         dependencies: dependencies,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         qwenConditioningStrategy: .legacyRaw,
         profileStore: profileStore,
         generatedFileStore: generatedFileStore,

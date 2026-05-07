@@ -75,7 +75,7 @@ import Testing
         jobID: "job-file-readable",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-readable",
             text: "Readable retained job.",

@@ -50,11 +50,19 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         switch speechBackend {
-            case .qwen3:
+            case .qwen3_smol,
+                 .qwen3_smol_6bit,
+                 .qwen3_smol_8bit,
+                 .qwen3_smol_bf16,
+                 .qwen3_BIG,
+                 .qwen3_BIG_6bit,
+                 .qwen3_BIG_8bit,
+                 .qwen3_BIG_bf16:
+                let backend = speechBackend
                 let residentModel = try residentQwenModelOrThrow()
                 switch qwenConditioningStrategy {
                     case .legacyRaw:
-                        let materialization = try profile.qwenMaterialization(for: speechBackend)
+                        let materialization = try profile.qwenMaterialization(for: backend)
                         let refAudioLoadStartedAt = dependencies.now()
                         let refAudio = try dependencies.loadAudioSamples(materialization.referenceAudioURL, residentModel.sampleRate)
                         await logRequestEvent(
@@ -83,6 +91,7 @@ extension SpeakSwiftly.Runtime {
                             requestID: id,
                             op: op,
                             profile: profile,
+                            backend: backend,
                             model: residentModel,
                         )
                         return .qwenPrepared(
@@ -140,14 +149,12 @@ extension SpeakSwiftly.Runtime {
         requestID id: String,
         op: String,
         profile: StoredProfile,
+        backend: SpeakSwiftly.SpeechBackend,
         model: AnySpeechModel,
     ) async throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
-        let activeModelRepo = ModelFactory.residentModelRepo(
-            for: speechBackend,
-            qwenResidentModel: qwenResidentModel,
-        )
+        let activeModelRepo = ModelFactory.residentModelRepo(for: backend)
 
-        if let storedArtifact = profile.qwenConditioningArtifact(for: speechBackend, modelRepo: activeModelRepo) {
+        if let storedArtifact = profile.qwenConditioningArtifact(for: backend, modelRepo: activeModelRepo) {
             let cacheKey = qwenConditioningCacheKey(
                 for: profile.manifest.profileName,
                 artifact: storedArtifact,
@@ -159,7 +166,7 @@ extension SpeakSwiftly.Runtime {
                     op: op,
                     profileName: profile.manifest.profileName,
                     details: [
-                        "speech_backend": .string(speechBackend.rawValue),
+                        "speech_backend": .string(backend.rawValue),
                         "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
                         "artifact_path": .string(storedArtifact.artifactURL.path),
                     ],
@@ -176,7 +183,7 @@ extension SpeakSwiftly.Runtime {
                 op: op,
                 profileName: profile.manifest.profileName,
                 details: [
-                    "speech_backend": .string(speechBackend.rawValue),
+                    "speech_backend": .string(backend.rawValue),
                     "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
                     "artifact_path": .string(storedArtifact.artifactURL.path),
                     "duration_ms": .int(elapsedMS(since: artifactLoadStartedAt)),
@@ -185,7 +192,7 @@ extension SpeakSwiftly.Runtime {
             return loadedConditioning
         }
 
-        let materialization = try profile.qwenMaterialization(for: speechBackend)
+        let materialization = try profile.qwenMaterialization(for: backend)
         let refAudioLoadStartedAt = dependencies.now()
         let refAudio = try dependencies.loadAudioSamples(materialization.referenceAudioURL, model.sampleRate)
         guard let refAudio else {
@@ -201,7 +208,7 @@ extension SpeakSwiftly.Runtime {
             op: op,
             profileName: profile.manifest.profileName,
             details: [
-                "speech_backend": .string(speechBackend.rawValue),
+                "speech_backend": .string(backend.rawValue),
                 "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
                 "path": .string(materialization.referenceAudioURL.path),
                 "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
@@ -222,7 +229,7 @@ extension SpeakSwiftly.Runtime {
             op: op,
             profileName: profile.manifest.profileName,
             details: [
-                "speech_backend": .string(speechBackend.rawValue),
+                "speech_backend": .string(backend.rawValue),
                 "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
                 "duration_ms": .int(elapsedMS(since: preparationStartedAt)),
             ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
@@ -232,14 +239,14 @@ extension SpeakSwiftly.Runtime {
         let persistenceStartedAt = dependencies.now()
         let updatedProfile = try profileStore.storeQwenConditioningArtifact(
             named: profile.manifest.profileName,
-            backend: speechBackend,
+            backend: backend,
             modelRepo: activeModelRepo,
             conditioning: preparedConditioning,
         )
-        guard let storedArtifact = updatedProfile.qwenConditioningArtifact(for: speechBackend, modelRepo: activeModelRepo) else {
+        guard let storedArtifact = updatedProfile.qwenConditioningArtifact(for: backend, modelRepo: activeModelRepo) else {
             throw WorkerError(
                 code: .filesystemError,
-                message: "Profile '\(profile.manifest.profileName)' was updated after Qwen conditioning preparation, but SpeakSwiftly could not find the stored conditioning artifact for the '\(speechBackend.rawValue)' backend and '\(activeModelRepo)' model. This indicates a profile-store bug.",
+                message: "Profile '\(profile.manifest.profileName)' was updated after Qwen conditioning preparation, but SpeakSwiftly could not find the stored conditioning artifact for the '\(backend.rawValue)' backend and '\(activeModelRepo)' model. This indicates a profile-store bug.",
             )
         }
 
@@ -254,7 +261,7 @@ extension SpeakSwiftly.Runtime {
             op: op,
             profileName: updatedProfile.manifest.profileName,
             details: [
-                "speech_backend": .string(speechBackend.rawValue),
+                "speech_backend": .string(backend.rawValue),
                 "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
                 "artifact_path": .string(storedArtifact.artifactURL.path),
                 "duration_ms": .int(elapsedMS(since: persistenceStartedAt)),

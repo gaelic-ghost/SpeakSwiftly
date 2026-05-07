@@ -183,7 +183,16 @@ extension SpeakSwiftly.Runtime {
         switch backend {
             case .marvis:
                 1
-            case .qwen3, .chatterboxTurbo:
+            case .qwen3_smol,
+                 .qwen3_smol_6bit,
+                 .qwen3_smol_8bit,
+                 .qwen3_smol_bf16,
+                 .qwen3_BIG,
+                 .qwen3_BIG_6bit,
+                 .qwen3_BIG_8bit,
+                 .qwen3_BIG_bf16:
+                1
+            case .chatterboxTurbo:
                 1
         }
     }

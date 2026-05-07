@@ -5,8 +5,12 @@ import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
 enum ModelFactory {
+    static let qwen06B6BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-6bit"
     static let qwen06B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
+    static let qwen06BBF16ResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"
+    static let qwen17B6BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-6bit"
     static let qwen17B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
+    static let qwen17BBF16ResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
     static let qwenResidentModelRepo = qwen06B8BitResidentModelRepo
     static let chatterboxResidentModelRepo = "mlx-community/chatterbox-turbo-8bit"
     static let legacyQwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
@@ -21,12 +25,18 @@ enum ModelFactory {
 
     static func loadResidentModels(
         for backend: SpeakSwiftly.SpeechBackend,
-        qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy,
     ) async throws -> ResidentSpeechModels {
         switch backend {
-            case .qwen3:
-                return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend, qwenResidentModel: qwenResidentModel)))
+            case .qwen3_smol,
+                 .qwen3_smol_6bit,
+                 .qwen3_smol_8bit,
+                 .qwen3_smol_bf16,
+                 .qwen3_BIG,
+                 .qwen3_BIG_6bit,
+                 .qwen3_BIG_8bit,
+                 .qwen3_BIG_bf16:
+                return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .chatterboxTurbo:
                 return try await .chatterboxTurbo(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .marvis:
@@ -52,18 +62,6 @@ enum ModelFactory {
 
     static func residentModelRepo(for backend: SpeakSwiftly.SpeechBackend) -> String {
         backend.residentModelRepo
-    }
-
-    static func residentModelRepo(
-        for backend: SpeakSwiftly.SpeechBackend,
-        qwenResidentModel: SpeakSwiftly.QwenResidentModel,
-    ) -> String {
-        switch backend {
-            case .qwen3:
-                qwenResidentModel.modelRepo
-            case .chatterboxTurbo, .marvis:
-                residentModelRepo(for: backend)
-        }
     }
 
     static func loadProfileModel() async throws -> AnySpeechModel {

@@ -193,7 +193,7 @@ struct ProfileStore: @unchecked Sendable {
         for backend: SpeakSwiftly.SpeechBackend,
         modelRepo: String,
     ) -> String {
-        if backend == .qwen3, modelRepo == ModelFactory.qwenResidentModelRepo {
+        if backend == .qwen3_smol, modelRepo == ModelFactory.qwenResidentModelRepo {
             return "qwen-conditioning-\(backend.rawValue).json"
         }
 
@@ -237,8 +237,8 @@ struct ProfileStore: @unchecked Sendable {
         let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
         let materializations = [
             ProfileMaterializationDraft(
-                backend: .qwen3,
-                modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                backend: .qwen3_smol,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
                 referenceAudioFile: Self.audioFileName,
                 referenceText: sourceText,
                 sampleRate: sampleRate,
@@ -593,8 +593,8 @@ struct ProfileStore: @unchecked Sendable {
         let sourceKind: ProfileSourceKind = modelRepo == ModelFactory.importedCloneModelRepo ? .importedClone : .generated
         let materializations = [
             ProfileMaterializationDraft(
-                backend: .qwen3,
-                modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                backend: .qwen3_smol,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
                 referenceAudioFile: Self.audioFileName,
                 referenceText: sourceText,
                 sampleRate: sampleRate,

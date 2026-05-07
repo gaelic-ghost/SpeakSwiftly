@@ -197,7 +197,7 @@ extension SpeakSwiftly.Runtime {
             textProfileID: textProfileID,
         )
         let normalizedLiveChunks: [LiveSpeechTextChunk]?
-        if speechBackend == .qwen3, request.qwenPreModelTextChunking == true {
+        if speechBackend.isQwenFamily, request.qwenPreModelTextChunking == true {
             let plannedChunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
                 strategy: .smartParagraphGroups(),

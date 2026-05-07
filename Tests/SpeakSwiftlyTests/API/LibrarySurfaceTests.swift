@@ -40,7 +40,6 @@ import Darwin
     )
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
     #expect(configuration.textNormalizer == nil)
@@ -49,9 +48,8 @@ import Darwin
 @Test func `public configuration defaults qwen to prepared conditioning`() {
     let configuration = SpeakSwiftly.Configuration()
 
-    #expect(configuration.speechBackend == .qwen3)
+    #expect(configuration.speechBackend == .qwen3_smol)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
@@ -61,7 +59,6 @@ import Darwin
 
     #expect(configuration.speechBackend == .chatterboxTurbo)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
@@ -73,9 +70,8 @@ import Darwin
 
     let persistenceURL = rootURL.appendingPathComponent("configuration.json")
     let configuration = SpeakSwiftly.Configuration(
-        speechBackend: .marvis,
+        speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
-        qwenResidentModel: .base17B8Bit,
         marvisResidentPolicy: .singleResidentDynamic,
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
     )
@@ -85,7 +81,6 @@ import Darwin
 
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
-    #expect(loaded.qwenResidentModel == configuration.qwenResidentModel)
     #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
     #expect(loaded.textNormalizer == nil)
@@ -119,11 +114,31 @@ import Darwin
 
     let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
 
-    #expect(loaded.speechBackend == .qwen3)
+    #expect(loaded.speechBackend == .qwen3_smol)
     #expect(loaded.qwenConditioningStrategy == .legacyRaw)
-    #expect(loaded.qwenResidentModel == .base06B8Bit)
     #expect(loaded.marvisResidentPolicy == .dualResidentSerialized)
     #expect(loaded.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+}
+
+@Test func `public configuration migrates legacy qwen resident model into speech backend`() throws {
+    let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let persistenceURL = rootURL.appendingPathComponent("configuration.json")
+    let legacyConfigurationJSON = """
+    {
+      "qwenResidentModel" : "base_1_7b_8bit",
+      "speechBackend" : "qwen3"
+    }
+    """
+
+    try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+    try Data(legacyConfigurationJSON.utf8).write(to: persistenceURL, options: .atomic)
+
+    let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
+
+    #expect(loaded.speechBackend == .qwen3_BIG)
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {
@@ -137,7 +152,6 @@ import Darwin
 
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .legacyRaw)
-    #expect(configuration.qwenResidentModel == .base06B8Bit)
     #expect(configuration.marvisResidentPolicy == .singleResidentDynamic)
     #expect(configuration.textNormalizer != nil)
 }

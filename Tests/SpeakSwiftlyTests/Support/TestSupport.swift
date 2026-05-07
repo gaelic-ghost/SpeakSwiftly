@@ -725,7 +725,14 @@ func makeResidentModels(
     chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
     switch backend {
-        case .qwen3:
+        case .qwen3_smol,
+             .qwen3_smol_6bit,
+             .qwen3_smol_8bit,
+             .qwen3_smol_bf16,
+             .qwen3_BIG,
+             .qwen3_BIG_6bit,
+             .qwen3_BIG_8bit,
+             .qwen3_BIG_bf16:
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .chatterboxTurbo:
             .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
@@ -800,9 +807,8 @@ func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
     playback: PlaybackSpy,
-    speechBackend: SpeakSwiftly.SpeechBackend = .qwen3,
+    speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-    qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
     marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
@@ -832,7 +838,14 @@ func makeRuntime(
             }
             if let model = loaded as? AnySpeechModel {
                 switch backend {
-                    case .qwen3:
+                    case .qwen3_smol,
+                         .qwen3_smol_6bit,
+                         .qwen3_smol_8bit,
+                         .qwen3_smol_bf16,
+                         .qwen3_BIG,
+                         .qwen3_BIG_6bit,
+                         .qwen3_BIG_8bit,
+                         .qwen3_BIG_bf16:
                         return .qwen3(model)
                     case .chatterboxTurbo:
                         return .chatterboxTurbo(model)
@@ -877,7 +890,6 @@ func makeRuntime(
         dependencies: dependencies,
         speechBackend: speechBackend,
         qwenConditioningStrategy: qwenConditioningStrategy,
-        qwenResidentModel: qwenResidentModel,
         marvisResidentPolicy: marvisResidentPolicy,
         profileStore: store,
         generatedFileStore: generatedFileStore,

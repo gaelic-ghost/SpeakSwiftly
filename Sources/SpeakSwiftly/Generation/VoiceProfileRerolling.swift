@@ -100,10 +100,11 @@ extension SpeakSwiftly.Runtime {
             ],
         )
         try Task.checkCancellation()
-        rerolledProfile = try await prepareInitialQwenConditioningIfNeeded(
+        rerolledProfile = try await prepareQwenConditioningAfterRerollIfNeeded(
             requestID: id,
             op: op,
-            profile: rerolledProfile,
+            sourceProfile: storedProfile,
+            rerolledProfile: rerolledProfile,
         )
         return rerolledProfile
     }
@@ -166,10 +167,11 @@ extension SpeakSwiftly.Runtime {
             ],
         )
         try Task.checkCancellation()
-        rerolledProfile = try await prepareInitialQwenConditioningIfNeeded(
+        rerolledProfile = try await prepareQwenConditioningAfterRerollIfNeeded(
             requestID: id,
             op: op,
-            profile: rerolledProfile,
+            sourceProfile: storedProfile,
+            rerolledProfile: rerolledProfile,
         )
         return rerolledProfile
     }

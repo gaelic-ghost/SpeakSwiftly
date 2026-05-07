@@ -4,7 +4,14 @@ public extension SpeakSwiftly {
     // MARK: Backend Enumeration
 
     enum SpeechBackend: String, Codable, Sendable, Equatable, CaseIterable {
-        case qwen3
+        case qwen3_smol
+        case qwen3_smol_6bit
+        case qwen3_smol_8bit
+        case qwen3_smol_bf16
+        case qwen3_BIG = "qwen3_big"
+        case qwen3_BIG_6bit = "qwen3_big_6bit"
+        case qwen3_BIG_8bit = "qwen3_big_8bit"
+        case qwen3_BIG_bf16 = "qwen3_big_bf16"
         case chatterboxTurbo = "chatterbox_turbo"
         case marvis
     }
@@ -14,7 +21,23 @@ public extension SpeakSwiftly.SpeechBackend {
     // MARK: Environment
 
     static let environmentVariable = "SPEAKSWIFTLY_SPEECH_BACKEND"
+    static let legacyQwenResidentModelEnvironmentVariable = "SPEAKSWIFTLY_QWEN_RESIDENT_MODEL"
+    static let legacyQwenRawValue = "qwen3"
+    static let legacyQwen17B8BitBackendRawValue = "qwen3_base_1_7b_8bit"
     static let legacyQwenCustomVoiceRawValue = "qwen3_custom_voice"
+    static let legacyQwen06B8BitRawValue = "base_0_6b_8bit"
+    static let legacyQwen17B8BitRawValue = "base_1_7b_8bit"
+
+    static let qwenFamilyBackends: [Self] = [
+        .qwen3_smol,
+        .qwen3_smol_6bit,
+        .qwen3_smol_8bit,
+        .qwen3_smol_bf16,
+        .qwen3_BIG,
+        .qwen3_BIG_6bit,
+        .qwen3_BIG_8bit,
+        .qwen3_BIG_bf16,
+    ]
 
     static func normalized(rawValue: String) -> Self? {
         let normalizedValue = rawValue
@@ -22,8 +45,13 @@ public extension SpeakSwiftly.SpeechBackend {
             .lowercased()
 
         switch normalizedValue {
-            case legacyQwenCustomVoiceRawValue:
-                return .qwen3
+            case legacyQwenRawValue,
+                 legacyQwenCustomVoiceRawValue,
+                 legacyQwen06B8BitRawValue:
+                return .qwen3_smol
+            case legacyQwen17B8BitBackendRawValue,
+                 legacyQwen17B8BitRawValue:
+                return .qwen3_BIG
             default:
                 return Self(rawValue: normalizedValue)
         }
@@ -37,14 +65,44 @@ public extension SpeakSwiftly.SpeechBackend {
         return normalized(rawValue: rawValue)
     }
 
+    static func configuredFromLegacyQwenResidentModelEnvironment(in environment: [String: String]) -> Self? {
+        guard
+            let rawValue = environment[legacyQwenResidentModelEnvironmentVariable],
+            !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case legacyQwen06B8BitRawValue:
+                return .qwen3_smol
+            case legacyQwen17B8BitRawValue:
+                return .qwen3_BIG
+            default:
+                return nil
+        }
+    }
+
     static func fromEnvironment(_ environment: [String: String]) -> Self {
-        configured(in: environment) ?? .qwen3
+        configured(in: environment)
+            ?? configuredFromLegacyQwenResidentModelEnvironment(in: environment)
+            ?? .qwen3_smol
     }
 
     internal var residentModelRepo: String {
         switch self {
-            case .qwen3:
-                ModelFactory.qwenResidentModelRepo
+            case .qwen3_smol, .qwen3_smol_8bit:
+                ModelFactory.qwen06B8BitResidentModelRepo
+            case .qwen3_smol_6bit:
+                ModelFactory.qwen06B6BitResidentModelRepo
+            case .qwen3_smol_bf16:
+                ModelFactory.qwen06BBF16ResidentModelRepo
+            case .qwen3_BIG, .qwen3_BIG_8bit:
+                ModelFactory.qwen17B8BitResidentModelRepo
+            case .qwen3_BIG_6bit:
+                ModelFactory.qwen17B6BitResidentModelRepo
+            case .qwen3_BIG_bf16:
+                ModelFactory.qwen17BBF16ResidentModelRepo
             case .chatterboxTurbo:
                 ModelFactory.chatterboxResidentModelRepo
             case .marvis:
@@ -53,35 +111,11 @@ public extension SpeakSwiftly.SpeechBackend {
     }
 
     internal var isQwenFamily: Bool {
-        switch self {
-            case .qwen3:
-                true
-            case .chatterboxTurbo, .marvis:
-                false
-        }
-    }
-}
-
-public extension SpeakSwiftly.QwenResidentModel {
-    // MARK: Environment
-
-    static let environmentVariable = "SPEAKSWIFTLY_QWEN_RESIDENT_MODEL"
-
-    static func configured(in environment: [String: String]) -> Self? {
-        guard let rawValue = environment[environmentVariable], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
-
-        return Self(rawValue: rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        Self.qwenFamilyBackends.contains(self)
     }
 
-    internal var modelRepo: String {
-        switch self {
-            case .base06B8Bit:
-                ModelFactory.qwen06B8BitResidentModelRepo
-            case .base17B8Bit:
-                ModelFactory.qwen17B8BitResidentModelRepo
-        }
+    internal static func qwenBackend(forResidentModelRepo modelRepo: String) -> Self? {
+        qwenFamilyBackends.first { $0.residentModelRepo == modelRepo }
     }
 }
 

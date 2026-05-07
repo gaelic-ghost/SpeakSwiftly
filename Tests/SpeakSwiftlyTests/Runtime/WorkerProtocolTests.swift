@@ -761,8 +761,8 @@ import TextForSpeech
                 stableBufferTargetMS: 600,
             ),
             runtimeOverview: SpeakSwiftly.WorkerRuntimeOverview(
-                status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
-                speechBackend: .qwen3,
+                status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3_smol),
+                speechBackend: .qwen3_smol,
                 storage: SpeakSwiftly.RuntimeStorageSnapshot(
                     stateRootPath: "/tmp/SpeakSwiftly",
                     profileStoreRootPath: "/tmp/SpeakSwiftly/profiles",
@@ -796,8 +796,8 @@ import TextForSpeech
                 ),
                 defaultVoiceProfile: "swift-signal",
             ),
-            status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3),
-            speechBackend: .qwen3,
+            status: SpeakSwiftly.WorkerStatusEvent(stage: .residentModelReady, residentState: .ready, speechBackend: .qwen3_smol),
+            speechBackend: .qwen3_smol,
             clearedCount: 2,
             cancelledRequestID: "req-queued",
         ),
@@ -811,13 +811,13 @@ import TextForSpeech
     #expect(((success["queue"] as? [[String: Any]])?.first)?["queue_position"] as? Int == 1)
     #expect((success["playback_state"] as? [String: Any])?["is_stable_for_concurrent_generation"] as? Bool == true)
     #expect((success["playback_state"] as? [String: Any])?["stable_buffered_audio_ms"] as? Int == 840)
-    #expect((success["runtime_overview"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
+    #expect((success["runtime_overview"] as? [String: Any])?["speech_backend"] as? String == "qwen3_smol")
     #expect(((success["runtime_overview"] as? [String: Any])?["storage"] as? [String: Any])?["state_root_path"] as? String == "/tmp/SpeakSwiftly")
     #expect(((success["runtime_overview"] as? [String: Any])?["storage"] as? [String: Any])?["profile_store_root_path"] as? String == "/tmp/SpeakSwiftly/profiles")
     #expect((((success["runtime_overview"] as? [String: Any])?["generation_queue"] as? [String: Any])?["active_requests"] as? [[String: Any]])?.count == 2)
     #expect((success["status"] as? [String: Any])?["resident_state"] as? String == "ready")
-    #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3")
-    #expect(success["speech_backend"] as? String == "qwen3")
+    #expect((success["status"] as? [String: Any])?["speech_backend"] as? String == "qwen3_smol")
+    #expect(success["speech_backend"] as? String == "qwen3_smol")
     #expect(success["cleared_count"] as? Int == 2)
     #expect(success["cancelled_request_id"] as? String == "req-queued")
 

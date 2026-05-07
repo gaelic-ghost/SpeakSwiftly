@@ -278,7 +278,7 @@ struct StoredProfile: Equatable {
 
     var referenceAudioURL: URL {
         get throws {
-            try qwenMaterialization(for: .qwen3).referenceAudioURL
+            try qwenMaterialization(for: .qwen3_smol).referenceAudioURL
         }
     }
 
@@ -298,13 +298,14 @@ struct StoredProfile: Equatable {
     }
 
     func qwenMaterialization() throws -> StoredProfileMaterialization {
-        try qwenMaterialization(for: .qwen3)
+        try qwenMaterialization(for: .qwen3_smol)
     }
 
     func qwenConditioningArtifact(
         for backend: SpeakSwiftly.SpeechBackend,
     ) -> StoredQwenConditioningArtifact? {
         conditioningArtifacts.first(where: { $0.manifest.backend == backend })
+            ?? conditioningArtifacts.first(where: { $0.manifest.backend.isQwenFamily && backend.isQwenFamily })
     }
 
     func qwenConditioningArtifact(
@@ -313,6 +314,8 @@ struct StoredProfile: Equatable {
     ) -> StoredQwenConditioningArtifact? {
         conditioningArtifacts.first {
             $0.manifest.backend == backend && $0.manifest.modelRepo == modelRepo
+        } ?? conditioningArtifacts.first {
+            $0.manifest.backend.isQwenFamily && backend.isQwenFamily && $0.manifest.modelRepo == modelRepo
         }
     }
 }

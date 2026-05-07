@@ -69,7 +69,7 @@ struct QwenE2ETests {
         defer { sandbox.cleanup() }
         let profileName = "prepared-conditioning-profile"
         let runtimeConfiguration = SpeakSwiftly.Configuration(
-            speechBackend: .qwen3,
+            speechBackend: .qwen3_smol,
             qwenConditioningStrategy: .preparedConditioning,
         )
 
@@ -110,7 +110,7 @@ struct QwenE2ETests {
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
         let storedProfile = try store.loadProfile(named: profileName)
-        #expect(storedProfile.qwenConditioningArtifact(for: .qwen3) != nil)
+        #expect(storedProfile.qwenConditioningArtifact(for: .qwen3_smol) != nil)
 
         do {
             let worker = try WorkerProcess(

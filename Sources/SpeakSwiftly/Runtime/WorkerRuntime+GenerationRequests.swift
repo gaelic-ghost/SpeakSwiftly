@@ -303,7 +303,7 @@ extension SpeakSwiftly.Runtime {
         playbackState.execution.sampleRate = Double(residentModel.sampleRate)
         await playbackQueue.startNextIfPossible()
         try? await startNextGenerationIfPossible()
-        if speechBackend == .qwen3 {
+        if speechBackend.isQwenFamily {
             await logQwenLiveChunkPlan(for: playbackState.request)
         }
 

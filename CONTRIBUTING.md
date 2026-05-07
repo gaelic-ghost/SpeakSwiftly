@@ -63,8 +63,8 @@ Useful environment variables include:
 
 - `SPEAKSWIFTLY_STATE_ROOT` for an isolated worker state root when startup arguments are not available
 - `SPEAKSWIFTLY_PROFILE_ROOT` is a deprecated compatibility alias for older hosts; do not use it in new integrations
-- `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback
-- `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` for Qwen resident model selection fallback
+- `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback, including `qwen3_smol`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, `qwen3_smol_bf16`, `qwen3_big`, `qwen3_big_6bit`, `qwen3_big_8bit`, and `qwen3_big_bf16`
+- `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` is a deprecated compatibility alias for older hosts; choose a Qwen backend value instead
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests
 - `SPEAKSWIFTLY_PLAYBACK_TRACE=1` for playback trace diagnostics
 
