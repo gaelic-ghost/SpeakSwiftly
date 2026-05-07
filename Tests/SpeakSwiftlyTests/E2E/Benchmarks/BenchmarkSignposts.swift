@@ -10,11 +10,11 @@ struct BenchmarkSignpostRecorder {
 
     init(
         backend: SpeakSwiftly.SpeechBackend,
-        workload: String,
+        playbackMode: BenchmarkPlaybackMode,
     ) {
         signposter = OSSignposter(
             subsystem: Self.subsystem,
-            category: "qwen-quant.\(backend.rawValue).\(workload)",
+            category: "benchmark.\(backend.rawValue).\(playbackMode.rawValue)",
         )
     }
 
@@ -42,6 +42,10 @@ struct BenchmarkSignpostRecorder {
         signposter.emitEvent("Request Started", id: id)
     }
 
+    func emitBufferingAudio(id: OSSignpostID) {
+        signposter.emitEvent("Buffering Audio", id: id)
+    }
+
     func emitPrerollReady(id: OSSignpostID) {
         signposter.emitEvent("Preroll Ready", id: id)
     }
@@ -56,6 +60,10 @@ struct BenchmarkSignpostRecorder {
 
     func emitFirstToken(id: OSSignpostID) {
         signposter.emitEvent("First Token", id: id)
+    }
+
+    func emitGenerationInfo(id: OSSignpostID) {
+        signposter.emitEvent("Generation Info", id: id)
     }
 
     func emitFirstAudioChunk(id: OSSignpostID) {

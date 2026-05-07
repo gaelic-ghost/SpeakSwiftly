@@ -75,7 +75,10 @@ private extension QwenBenchmarkE2ETests {
             backend: .qwen3_smol,
             qwenConditioningStrategy: .preparedConditioning,
         ) { session in
-            _ = try await BenchmarkHarness.awaitResidentReady(on: session.runtime)
+            _ = try await BenchmarkHarness.awaitResidentReady(
+                on: session.runtime,
+                signposts: session.signposts,
+            )
 
             let handle = await session.runtime.voices.create(
                 design: benchmarkProfileName,
@@ -98,12 +101,19 @@ private extension QwenBenchmarkE2ETests {
             qwenConditioningStrategy: strategy,
             playbackMode: BenchmarkHarness.effectivePlaybackMode(),
         ) { session in
-            let preloadMS = try await BenchmarkHarness.awaitResidentReady(on: session.runtime)
+            let sampleSignpost = session.signposts.beginSample()
+            defer { sampleSignpost.end() }
+
+            let preloadMS = try await BenchmarkHarness.awaitResidentReady(
+                on: session.runtime,
+                signposts: session.signposts,
+            )
             let generatedFile = try await BenchmarkHarness.runRequestBenchmark(
                 handle: session.runtime.generate.audio(
                     text: E2EHarness.testingPlaybackText,
                     voiceProfile: benchmarkProfileName,
                 ),
+                signposts: session.signposts,
                 logRecorder: session.logRecorder,
             )
             let liveSpeech = try await BenchmarkHarness.runRequestBenchmark(
@@ -111,6 +121,7 @@ private extension QwenBenchmarkE2ETests {
                     text: E2EHarness.testingPlaybackText,
                     voiceProfile: benchmarkProfileName,
                 ),
+                signposts: session.signposts,
                 logRecorder: session.logRecorder,
             )
 
