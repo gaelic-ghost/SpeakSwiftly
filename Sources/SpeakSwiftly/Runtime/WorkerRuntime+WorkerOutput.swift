@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Runtime Emission
+// MARK: - Worker Output
 
 extension SpeakSwiftly.Runtime {
     func completeRequest(request: WorkerRequest, result: Result<WorkerSuccessPayload, WorkerError>) async {
@@ -70,10 +70,10 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
-    func makeQueuedEvent(for job: SpeechGenerationController.Job) async -> WorkerQueuedEvent? {
-        let activeJobs = await generationController.activeJobsOrdered()
-        let queuedJobs = await generationController.queuedJobsOrdered()
-        let playbackAdmission = await playbackController.generationAdmissionSnapshot()
+    func makeQueuedEvent(for job: GenerationQueue.Job) async -> WorkerQueuedEvent? {
+        let activeJobs = await generationQueue.activeJobsOrdered()
+        let queuedJobs = await generationQueue.queuedJobsOrdered()
+        let playbackAdmission = await playbackQueue.generationAdmissionSnapshot()
         let decision = try? evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
@@ -83,7 +83,7 @@ extension SpeakSwiftly.Runtime {
             return nil
         }
 
-        let queuePosition = await generationController.waitingPosition(
+        let queuePosition = await generationQueue.waitingPosition(
             for: job.token,
             residentReady: isResidentReady,
         ) ?? 1
@@ -95,7 +95,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func syncQueuedGenerationParkReasons(
-        queuedJobs: [SpeechGenerationController.Job],
+        queuedJobs: [GenerationQueue.Job],
         parkReasons: [UUID: GenerationParkReason],
     ) async {
         var queuedRequestIDs = Set<String>()
@@ -110,7 +110,7 @@ extension SpeakSwiftly.Runtime {
                 continue
             }
 
-            let queuePosition = await generationController.waitingPosition(
+            let queuePosition = await generationQueue.waitingPosition(
                 for: job.token,
                 residentReady: isResidentReady,
             ) ?? 1
@@ -138,7 +138,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func generationActiveRequestSummaries() async -> [ActiveWorkerRequestSummary] {
-        await generationController.activeJobsOrdered()
+        await generationQueue.activeJobsOrdered()
             .map(\.request)
             .sorted { $0.id < $1.id }
             .map {
@@ -154,7 +154,7 @@ extension SpeakSwiftly.Runtime {
     func queuedRequestSummaries(for queueType: WorkerQueueType) async -> [QueuedWorkerRequestSummary] {
         switch queueType {
             case .generation:
-                let jobs = await generationController.queuedJobsOrdered()
+                let jobs = await generationQueue.queuedJobsOrdered()
                 return jobs.enumerated().map { offset, job in
                     QueuedWorkerRequestSummary(
                         id: job.request.id,
@@ -165,7 +165,7 @@ extension SpeakSwiftly.Runtime {
                     )
                 }
             case .playback:
-                return await playbackController.queuedRequestSummaries()
+                return await playbackQueue.queuedRequestSummaries()
         }
     }
 
@@ -182,7 +182,7 @@ extension SpeakSwiftly.Runtime {
             case .generation:
                 await generationActiveRequestSummaries().first
             case .playback:
-                await playbackController.activeRequestSummary()
+                await playbackQueue.activeRequestSummary()
         }
     }
 
@@ -214,7 +214,7 @@ extension SpeakSwiftly.Runtime {
             storage: runtimeStorageSnapshot(),
             generationQueue: queueSnapshot(for: .generation),
             playbackQueue: queueSnapshot(for: .playback),
-            playbackState: playbackController.workerStateSnapshot(),
+            playbackState: playbackQueue.workerStateSnapshot(),
             defaultVoiceProfile: defaultVoiceProfileName,
         )
     }
@@ -245,7 +245,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func playbackSnapshot() async -> SpeakSwiftly.PlaybackSnapshot {
-        await playbackController.stateSnapshot(
+        await playbackQueue.stateSnapshot(
             sequence: playbackObservationBroker.sequence,
             capturedAt: dependencies.now(),
         )
@@ -268,7 +268,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func generationQueueDepth() async -> Int {
-        await (generationController.queuedJobsOrdered()).count
+        await (generationQueue.queuedJobsOrdered()).count
     }
 
     private func queuedReason(for parkReason: SpeakSwiftly.Runtime.GenerationParkReason) -> WorkerQueuedReason {

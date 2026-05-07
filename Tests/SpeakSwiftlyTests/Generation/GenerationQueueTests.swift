@@ -2,7 +2,7 @@
 import Testing
 
 @Test func `preparing jobs are visible but not runnable until marked ready`() async {
-    let controller = SpeechGenerationController()
+    let controller = GenerationQueue()
     let request = makeLiveSpeechRequest(id: "req-preparing")
 
     let job = await controller.enqueue(request, readiness: .preparing)
@@ -15,7 +15,7 @@ import Testing
 }
 
 @Test func `preparing jobs remain cancellable before they are ready`() async {
-    let controller = SpeechGenerationController()
+    let controller = GenerationQueue()
     let request = makeLiveSpeechRequest(id: "req-cancellable-preparing")
 
     let job = await controller.enqueue(request, readiness: .preparing)

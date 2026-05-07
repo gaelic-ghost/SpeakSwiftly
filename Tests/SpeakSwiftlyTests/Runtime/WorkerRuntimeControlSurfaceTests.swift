@@ -293,7 +293,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { _ in makeResidentModel() },
     )
 
@@ -302,14 +302,14 @@ import TextForSpeech
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "qwen3"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
 
     let snapshot = await runtime.snapshot()
     #expect(snapshot.state == .residentModelReady)
     #expect(snapshot.residentState == .ready)
-    #expect(snapshot.speechBackend == .qwen3)
+    #expect(snapshot.speechBackend == .qwen3_smol)
 }
 
 @Test func `switch speech backend reloads resident models without restarting runtime`() async throws {
@@ -317,7 +317,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { _ in makeResidentModel() },
     )
 
@@ -326,7 +326,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "qwen3"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
 
@@ -360,7 +360,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { _ in makeResidentModel() },
     )
 
@@ -369,7 +369,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "qwen3"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
 
@@ -411,7 +411,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { backend in
             await backendLoads.record(backend)
             return makeResidentModel()
@@ -440,7 +440,7 @@ import TextForSpeech
 
             return status["stage"] as? String == "resident_models_unloaded"
                 && status["resident_state"] as? String == "unloaded"
-                && status["speech_backend"] as? String == "qwen3"
+                && status["speech_backend"] as? String == "qwen3_smol"
         }
     })
     #expect(await waitUntil {
@@ -448,7 +448,7 @@ import TextForSpeech
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_models_unloaded"
                 && $0["resident_state"] as? String == "unloaded"
-                && $0["speech_backend"] as? String == "qwen3"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
 
@@ -476,7 +476,7 @@ import TextForSpeech
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "warming_resident_model"
                 && $0["resident_state"] as? String == "warming"
-                && $0["speech_backend"] as? String == "qwen3"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
     #expect(await waitUntil {
@@ -491,7 +491,7 @@ import TextForSpeech
 
             return status["stage"] as? String == "resident_model_ready"
                 && status["resident_state"] as? String == "ready"
-                && status["speech_backend"] as? String == "qwen3"
+                && status["speech_backend"] as? String == "qwen3_smol"
         }
     })
     #expect(await waitUntil {
@@ -501,7 +501,7 @@ import TextForSpeech
                 && $0["generated_file"] != nil
         }
     })
-    #expect(await backendLoads.values() == [.qwen3, .qwen3])
+    #expect(await backendLoads.values() == [.qwen3_smol, .qwen3_smol])
 }
 
 @Test func `switch speech backend acts as an ordered barrier while playback drains`() async throws {
@@ -526,7 +526,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { backend in
             await backendLoads.record(backend)
             return makeResidentModel()
@@ -623,7 +623,7 @@ import TextForSpeech
             return generationJob["speech_backend"] as? String == "marvis"
         }
     })
-    #expect(await backendLoads.values() == [.qwen3, .marvis])
+    #expect(await backendLoads.values() == [.qwen3_smol, .marvis])
 }
 
 @Test func `clear queue fails queued requests when generation queue has waiting work`() async throws {

@@ -1,7 +1,7 @@
 import Foundation
 import TextForSpeech
 
-// MARK: - Worker Runtime Processing
+// MARK: - Runtime Generation Requests
 
 extension SpeakSwiftly.Runtime {
     func processGeneration(_ request: WorkerRequest, token: UUID) async {
@@ -287,7 +287,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     private func handleQueueSpeechLiveGeneration(id: String, op: String, text: String, profileName: String) async throws {
-        guard let playbackState = await playbackController.playbackState(for: id) else {
+        guard let playbackState = await playbackQueue.playbackState(for: id) else {
             throw WorkerError(
                 code: .internalError,
                 message: "Request '\(id)' started generation without a matching live speech job state. This indicates a SpeakSwiftly runtime bug.",
@@ -301,9 +301,9 @@ extension SpeakSwiftly.Runtime {
         )
         let residentModel = residentInputs.model
         playbackState.execution.sampleRate = Double(residentModel.sampleRate)
-        await playbackController.startNextIfPossible()
+        await playbackQueue.startNextIfPossible()
         try? await startNextGenerationIfPossible()
-        if speechBackend == .qwen3 {
+        if speechBackend.isQwenFamily {
             await logQwenLiveChunkPlan(for: playbackState.request)
         }
 

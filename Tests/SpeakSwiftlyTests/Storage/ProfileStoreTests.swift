@@ -29,7 +29,7 @@ import Testing
     #expect(stored.manifest.author == .user)
     #expect(stored.manifest.seed == nil)
     #expect(stored.manifest.transcriptProvenance == nil)
-    #expect(stored.manifest.backendMaterializations.map(\.backend) == [.qwen3])
+    #expect(stored.manifest.backendMaterializations.map(\.backend) == [.qwen3_smol])
     #expect(try stored.qwenMaterialization().manifest.referenceText == "Hello there")
 
     let listed = try store.listProfiles()
@@ -425,7 +425,7 @@ import Testing
 @Test func `runtime state root environment override supersedes deprecated profile root alias`() {
     let environment = [
         ProfileStore.runtimeStateRootOverrideEnvironmentVariable: "/tmp/speakswiftly-state-root",
-        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+        ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
     ]
 
     #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(
@@ -437,7 +437,7 @@ import Testing
 
 @Test func `deprecated profile root environment alias remains compatible`() {
     let environment = [
-        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+        ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
     ]
 
     #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(
@@ -673,7 +673,7 @@ import Testing
         {
           "backend" : "qwen3",
           "createdAt" : "2026-04-07T12:00:00Z",
-          "modelRepo" : "\(ModelFactory.residentModelRepo(for: .qwen3))",
+          "modelRepo" : "\(ModelFactory.residentModelRepo(for: .qwen3_smol))",
           "referenceAudioFile" : "reference.wav",
           "referenceText" : "Legacy clone transcript",
           "sampleRate" : 24000
@@ -733,13 +733,13 @@ import Testing
 
     let stored = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3,
-        modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+        backend: .qwen3_smol,
+        modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
         conditioning: conditioning,
         createdAt: Date(timeIntervalSince1970: 1_712_800_000),
     )
 
-    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo))
+    let artifact = try #require(stored.qwenConditioningArtifact(for: .qwen3_smol, modelRepo: ModelFactory.qwenResidentModelRepo))
     #expect(stored.manifest.qwenConditioningArtifacts.count == 1)
     #expect(fileManager.fileExists(atPath: artifact.artifactURL.path))
 
@@ -792,22 +792,22 @@ import Testing
 
     _ = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3,
+        backend: .qwen3_smol,
         modelRepo: ModelFactory.qwenResidentModelRepo,
         conditioning: defaultConditioning,
     )
     let stored = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3,
+        backend: .qwen3_BIG,
         modelRepo: ModelFactory.qwen17B8BitResidentModelRepo,
         conditioning: largerConditioning,
     )
 
-    let defaultArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo))
-    let largerArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo))
+    let defaultArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3_smol, modelRepo: ModelFactory.qwenResidentModelRepo))
+    let largerArtifact = try #require(stored.qwenConditioningArtifact(for: .qwen3_BIG, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo))
 
     #expect(stored.manifest.qwenConditioningArtifacts.count == 2)
-    #expect(defaultArtifact.manifest.artifactFile == "qwen-conditioning-qwen3.json")
+    #expect(defaultArtifact.manifest.artifactFile == "qwen-conditioning-qwen3_smol.json")
     #expect(largerArtifact.manifest.artifactFile.contains("Qwen3-TTS-12Hz-1_7B-Base-8bit"))
     #expect(fileManager.fileExists(atPath: defaultArtifact.artifactURL.path))
     #expect(fileManager.fileExists(atPath: largerArtifact.artifactURL.path))
@@ -862,12 +862,12 @@ import Testing
     try Data(legacyManifestJSON.utf8).write(to: store.manifestURL(for: profileDirectory))
 
     let loaded = try store.loadProfile(named: "legacy-custom-voice")
-    let materialization = try loaded.qwenMaterialization(for: .qwen3)
-    let artifact = try #require(loaded.qwenConditioningArtifact(for: .qwen3))
+    let materialization = try loaded.qwenMaterialization(for: .qwen3_smol)
+    let artifact = try #require(loaded.qwenConditioningArtifact(for: .qwen3_smol))
 
-    #expect(materialization.manifest.backend == .qwen3)
-    #expect(materialization.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3))
-    #expect(artifact.manifest.backend == .qwen3)
-    #expect(artifact.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3))
+    #expect(materialization.manifest.backend == .qwen3_smol)
+    #expect(materialization.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3_smol))
+    #expect(artifact.manifest.backend == .qwen3_smol)
+    #expect(artifact.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3_smol))
     #expect(artifact.artifactURL.lastPathComponent == "qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json")
 }

@@ -6,8 +6,15 @@ import TextForSpeech
 extension SpeakSwiftly.Runtime {
     func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
         switch speechBackend {
-            case .qwen3:
-                [ModelFactory.residentModelRepo(for: speechBackend, qwenResidentModel: qwenResidentModel)]
+            case .qwen3_smol,
+                 .qwen3_smol_6bit,
+                 .qwen3_smol_8bit,
+                 .qwen3_smol_bf16,
+                 .qwen3_BIG,
+                 .qwen3_BIG_6bit,
+                 .qwen3_BIG_8bit,
+                 .qwen3_BIG_bf16:
+                [ModelFactory.residentModelRepo(for: speechBackend)]
             case .chatterboxTurbo:
                 [ModelFactory.residentModelRepo(for: speechBackend)]
             case .marvis:

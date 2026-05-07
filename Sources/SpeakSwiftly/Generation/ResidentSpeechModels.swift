@@ -55,7 +55,7 @@ enum ResidentSpeechModels {
     var preloadModelRepos: [String] {
         switch self {
             case .qwen3:
-                [ModelFactory.qwenResidentModelRepo]
+                SpeakSwiftly.SpeechBackend.qwenFamilyBackends.map { ModelFactory.residentModelRepo(for: $0) }
             case .chatterboxTurbo:
                 [ModelFactory.chatterboxResidentModelRepo]
             case .marvis:

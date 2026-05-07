@@ -14,7 +14,7 @@ struct WorkerDependencies: @unchecked Sendable {
     let loadResidentModels: @Sendable (_ backend: SpeakSwiftly.SpeechBackend) async throws -> ResidentSpeechModels
     let loadProfileModel: @Sendable () async throws -> AnySpeechModel
     let loadCloneTranscriptionModel: @Sendable () async throws -> AnyCloneTranscriptionModel
-    let makePlaybackController: @MainActor @Sendable () -> AnyPlaybackController
+    let makePlaybackDriver: @MainActor @Sendable () -> AnyPlaybackDriver
     let writeWAV: @Sendable (_ samples: [Float], _ sampleRate: Int, _ url: URL) throws -> Void
     let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
     let loadAudioFloats: @Sendable (_ url: URL, _ sampleRate: Int) throws -> [Float]
@@ -24,7 +24,6 @@ struct WorkerDependencies: @unchecked Sendable {
 
     static func live(
         fileManager: FileManager = .default,
-        qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
@@ -34,18 +33,17 @@ struct WorkerDependencies: @unchecked Sendable {
             loadResidentModels: { backend in
                 try await ModelFactory.loadResidentModels(
                     for: backend,
-                    qwenResidentModel: qwenResidentModel,
                     marvisResidentPolicy: marvisResidentPolicy,
                 )
             },
             loadProfileModel: { try await ModelFactory.loadProfileModel() },
             loadCloneTranscriptionModel: { try await ModelFactory.loadCloneTranscriptionModel() },
-            makePlaybackController: {
+            makePlaybackDriver: {
                 if environment[Environment.silentPlayback] == "1" {
                     return .silent(traceEnabled: environment[Environment.playbackTrace] == "1")
                 }
 
-                return AnyPlaybackController(
+                return AnyPlaybackDriver(
                     AudioPlaybackDriver(traceEnabled: environment[Environment.playbackTrace] == "1"),
                 )
             },

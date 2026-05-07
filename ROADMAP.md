@@ -57,6 +57,8 @@ In Progress
 
 - [ ] Compare the currently pinned `mlx-audio-swift` revision with the latest available tagged release or stable candidate.
 - [ ] Review upstream changes to Qwen3 TTS defaults, generation controls, streaming behavior, and model-loading expectations for any impact on `SpeakSwiftly`.
+- [ ] Align Qwen generation policy with the current `mlx-audio-swift` and official Qwen surfaces by evaluating an explicit `topK: 50`, deciding whether `maxTokens` should stay at the Swift wrapper default or move toward official checkpoint/evaluation values, and designing one narrow request-level generation-tuning surface instead of exposing raw MLX knobs everywhere.
+- [ ] Recheck Qwen cancellation after the `mlx-audio-swift` upgrade, then simplify only local stream-adapter duplication that upstream cancellation now makes unnecessary while preserving SpeakSwiftly-owned queue completion, request-stream failure, and playback/generation state cleanup.
 - [ ] Preserve upstream `AudioGeneration` event detail through a first-class side-channel, trace stream, or equivalent logging surface instead of collapsing every resident generation path down to raw sample chunks at the first wrapper boundary.
 - [ ] Land durable Qwen generated-code investigation tooling on `main`, including capture, replay, code-stream comparison, and WAV-side prosody inspection commands that replace the invalid `compare-volume` diagnostic path.
 - [ ] Add Qwen E2E quality gates that inspect late-generation behavior, repeated or spiraling output, suspicious token/audio length, and per-chunk tail drift instead of treating playback completion as sufficient proof of speech quality.
@@ -156,6 +158,7 @@ In Progress
 ### Tickets
 
 - [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially logging migration and Marvis playback tuning.
+- [ ] Streamline runtime persistence configuration so the package has one durable storage contract: platform Application Support by default, or one explicit startup state root that moves profiles, runtime configuration, text profiles, generated files, and generation jobs together. Remove or deprecate profile-root-specific compatibility surfaces in consumers such as `SpeakSwiftlyServer` once they can pass `stateRootURL` directly.
 - [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 28 typed observation API cleanup.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
 

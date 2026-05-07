@@ -69,7 +69,7 @@ struct QwenE2ETests {
         defer { sandbox.cleanup() }
         let profileName = "prepared-conditioning-profile"
         let runtimeConfiguration = SpeakSwiftly.Configuration(
-            speechBackend: .qwen3,
+            speechBackend: .qwen3_smol,
             qwenConditioningStrategy: .preparedConditioning,
         )
 
@@ -110,7 +110,7 @@ struct QwenE2ETests {
 
         let store = ProfileStore(rootURL: sandbox.profileRootURL)
         let storedProfile = try store.loadProfile(named: profileName)
-        #expect(storedProfile.qwenConditioningArtifact(for: .qwen3) != nil)
+        #expect(storedProfile.qwenConditioningArtifact(for: .qwen3_smol) != nil)
 
         do {
             let worker = try WorkerProcess(
@@ -134,6 +134,161 @@ struct QwenE2ETests {
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
+    }
+
+    @Test(
+        .tags(.persistence),
+        .enabled(
+            if: speakSwiftlyQwenBackendE2ETestsEnabled(),
+            "This Qwen backend-variant E2E is opt-in and requires SPEAKSWIFTLY_QWEN_BACKEND_E2E=1.",
+        ),
+    )
+    func `prepared conditioning accumulates across qwen sizes and reroll rebuilds them`() async throws {
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+        let profileName = "qwen-backend-conditioning-profile"
+        let store = ProfileStore(rootURL: sandbox.profileRootURL)
+        let runtimeConfiguration = SpeakSwiftly.Configuration(
+            speechBackend: .qwen3_smol,
+            qwenConditioningStrategy: .preparedConditioning,
+        )
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: true,
+            configuration: runtimeConfiguration,
+        )
+        defer { Task { await worker.stop() } }
+
+        try await E2EHarness.awaitWorkerReady(worker)
+        try await E2EHarness.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-qwen-backend-conditioning-profile",
+            profileName: profileName,
+            text: E2EHarness.testingCloneSourceText,
+            vibe: .masc,
+            voiceDescription: E2EHarness.testingProfileVoiceDescription,
+        )
+        #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+            Self.qwenConditioningWasPersisted(
+                $0,
+                requestID: "req-create-qwen-backend-conditioning-profile",
+                backend: .qwen3_smol,
+            )
+        } != nil)
+        #expect(try store.loadProfile(named: profileName).qwenConditioningArtifact(
+            for: .qwen3_smol,
+            modelRepo: ModelFactory.qwenResidentModelRepo,
+        ) != nil)
+
+        try await E2EHarness.switchSpeechBackend(
+            on: worker,
+            id: "req-switch-qwen-big",
+            to: .qwen3_BIG,
+        )
+        try await E2EHarness.runSilentSpeech(
+            on: worker,
+            id: "req-live-qwen-big-conditioning",
+            text: E2EHarness.testingPlaybackText,
+            profileName: profileName,
+        )
+        #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+            Self.qwenConditioningWasPersisted(
+                $0,
+                requestID: "req-live-qwen-big-conditioning",
+                backend: .qwen3_BIG,
+            )
+        } != nil)
+
+        let accumulatedProfile = try store.loadProfile(named: profileName)
+        #expect(accumulatedProfile.qwenConditioningArtifact(
+            for: .qwen3_smol,
+            modelRepo: ModelFactory.qwenResidentModelRepo,
+        ) != nil)
+        #expect(accumulatedProfile.qwenConditioningArtifact(
+            for: .qwen3_BIG,
+            modelRepo: ModelFactory.qwen17B8BitResidentModelRepo,
+        ) != nil)
+        #expect(accumulatedProfile.manifest.qwenConditioningArtifacts.count == 2)
+
+        try await E2EHarness.rerollProfile(
+            on: worker,
+            id: "req-reroll-qwen-backend-conditioning-profile",
+            profileName: profileName,
+        )
+        #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+            guard
+                $0["event"] as? String == "qwen_reroll_conditioning_ready",
+                $0["request_id"] as? String == "req-reroll-qwen-backend-conditioning-profile",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["prepared_backend_count"] as? Int == 2
+                && details["qwen_conditioning_artifact_count"] as? Int == 2
+        } != nil)
+
+        let rerolledProfile = try store.loadProfile(named: profileName)
+        #expect(rerolledProfile.qwenConditioningArtifact(
+            for: .qwen3_smol,
+            modelRepo: ModelFactory.qwenResidentModelRepo,
+        ) != nil)
+        #expect(rerolledProfile.qwenConditioningArtifact(
+            for: .qwen3_BIG,
+            modelRepo: ModelFactory.qwen17B8BitResidentModelRepo,
+        ) != nil)
+        #expect(rerolledProfile.manifest.qwenConditioningArtifacts.count == 2)
+    }
+
+    @Test(
+        .tags(.persistence),
+        .enabled(
+            if: speakSwiftlyQwenBackendE2ETestsEnabled(),
+            "This Qwen backend-variant E2E is opt-in and requires SPEAKSWIFTLY_QWEN_BACKEND_E2E=1.",
+        ),
+    )
+    func `explicit qwen quant backend prepares its own conditioning artifact`() async throws {
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+        let profileName = "qwen-explicit-quant-profile"
+        let store = ProfileStore(rootURL: sandbox.profileRootURL)
+        let runtimeConfiguration = SpeakSwiftly.Configuration(
+            speechBackend: .qwen3_smol_6bit,
+            qwenConditioningStrategy: .preparedConditioning,
+        )
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: true,
+            configuration: runtimeConfiguration,
+        )
+        defer { Task { await worker.stop() } }
+
+        try await E2EHarness.awaitWorkerReady(worker)
+        try await E2EHarness.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-qwen-explicit-quant-profile",
+            profileName: profileName,
+            text: E2EHarness.testingCloneSourceText,
+            vibe: .masc,
+            voiceDescription: E2EHarness.testingProfileVoiceDescription,
+        )
+        #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+            Self.qwenConditioningWasPersisted(
+                $0,
+                requestID: "req-create-qwen-explicit-quant-profile",
+                backend: .qwen3_smol_6bit,
+            )
+        } != nil)
+
+        let storedProfile = try store.loadProfile(named: profileName)
+        let artifact = try #require(storedProfile.qwenConditioningArtifact(
+            for: .qwen3_smol_6bit,
+            modelRepo: ModelFactory.qwen06B6BitResidentModelRepo,
+        ))
+        #expect(artifact.manifest.backend == .qwen3_smol_6bit)
+        #expect(artifact.manifest.modelRepo == ModelFactory.qwen06B6BitResidentModelRepo)
     }
 
     @Test func `clone with provided and inferred transcripts`() async throws {
@@ -233,6 +388,24 @@ struct QwenE2ETests {
             try worker.closeInput()
             try await worker.waitForExit(timeout: .seconds(30))
         }
+    }
+}
+
+private extension QwenE2ETests {
+    static func qwenConditioningWasPersisted(
+        _ object: [String: Any],
+        requestID: String,
+        backend: SpeakSwiftly.SpeechBackend,
+    ) -> Bool {
+        guard
+            object["event"] as? String == "qwen_reference_conditioning_persisted",
+            object["request_id"] as? String == requestID,
+            let details = object["details"] as? [String: Any]
+        else {
+            return false
+        }
+
+        return details["speech_backend"] as? String == backend.rawValue
     }
 }
 #endif

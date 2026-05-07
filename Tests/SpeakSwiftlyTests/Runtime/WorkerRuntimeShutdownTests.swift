@@ -383,10 +383,10 @@ final class LockedFlag: @unchecked Sendable {
     let blockedRuntime = try WorkerRuntime(
         dependencies: WorkerDependencies(
             fileManager: .default,
-            loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+            loadResidentModels: { _ in makeResidentModels(for: .qwen3_smol) },
             loadProfileModel: { makeProfileModel() },
             loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
-            makePlaybackController: { AnyPlaybackController.silent() },
+            makePlaybackDriver: { AnyPlaybackDriver.silent() },
             writeWAV: { samples, _, url in
                 writeCoordinator.markEntered()
                 writeCoordinator.blockUntilReleased()
@@ -401,7 +401,7 @@ final class LockedFlag: @unchecked Sendable {
             now: Date.init,
             readRuntimeMemory: { nil },
         ),
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         qwenConditioningStrategy: .legacyRaw,
         profileStore: makeProfileStore(rootURL: storeRoot),
         generatedFileStore: makeGeneratedFileStore(rootURL: storeRoot),
@@ -409,7 +409,7 @@ final class LockedFlag: @unchecked Sendable {
         normalizer: SpeakSwiftly.Normalizer(
             persistenceURL: storeRoot.appending(path: ProfileStore.textProfilesFileName),
         ),
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
+        playbackQueue: PlaybackQueue(driver: AnyPlaybackDriver.silent()),
     )
     await blockedRuntime.installPlaybackHooks()
     await blockedRuntime.attachJSONLOutput(to: output)
@@ -491,10 +491,10 @@ final class LockedFlag: @unchecked Sendable {
 
     let dependencies = WorkerDependencies(
         fileManager: fileManager,
-        loadResidentModels: { _ in makeResidentModels(for: .qwen3) },
+        loadResidentModels: { _ in makeResidentModels(for: .qwen3_smol) },
         loadProfileModel: { makeProfileModel() },
         loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
-        makePlaybackController: { AnyPlaybackController.silent() },
+        makePlaybackDriver: { AnyPlaybackDriver.silent() },
         writeWAV: { samples, _, url in
             let bytes = samples.map(\.bitPattern).flatMap { value in
                 withUnsafeBytes(of: value.littleEndian, Array.init)
@@ -510,13 +510,13 @@ final class LockedFlag: @unchecked Sendable {
 
     let runtime = WorkerRuntime(
         dependencies: dependencies,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         qwenConditioningStrategy: .legacyRaw,
         profileStore: profileStore,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,
-        playbackController: PlaybackController(driver: AnyPlaybackController.silent()),
+        playbackQueue: PlaybackQueue(driver: AnyPlaybackDriver.silent()),
     )
     await runtime.installPlaybackHooks()
     await runtime.attachJSONLOutput(to: output)

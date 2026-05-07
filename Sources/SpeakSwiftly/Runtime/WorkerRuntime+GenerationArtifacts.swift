@@ -197,7 +197,7 @@ extension SpeakSwiftly.Runtime {
             textProfileID: textProfileID,
         )
         let normalizedLiveChunks: [LiveSpeechTextChunk]?
-        if speechBackend == .qwen3, request.qwenPreModelTextChunking == true {
+        if speechBackend.isQwenFamily, request.qwenPreModelTextChunking == true {
             let plannedChunks = LiveSpeechChunkPlanner.chunks(
                 for: text,
                 strategy: .smartParagraphGroups(),
@@ -231,7 +231,7 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
-        let existingPlaybackJobCount = await playbackController.jobCount()
+        let existingPlaybackJobCount = await playbackQueue.jobCount()
         let playbackTuningProfile: PlaybackTuningProfile =
             if speechBackend == .marvis {
                 .firstDrainedLiveMarvis
@@ -275,11 +275,11 @@ extension SpeakSwiftly.Runtime {
         guard let activeGeneration = activeGenerations[token] else { return }
 
         activeGenerations.removeValue(forKey: token)
-        await generationController.finishActive(token: token)
+        await generationQueue.finishActive(token: token)
         await publishGenerateUpdate()
         await logMarvisGenerationLaneReleasedIfNeeded(
             for: activeGeneration.request,
-            activeJobs: generationController.activeJobsOrdered(),
+            activeJobs: generationQueue.activeJobsOrdered(),
             disposition: disposition,
         )
         let cancellation = activeGenerationCancellations.removeValue(forKey: request.id)
@@ -307,7 +307,7 @@ extension SpeakSwiftly.Runtime {
         guard !isShuttingDown else { return }
 
         try? await startNextGenerationIfPossible()
-        await playbackController.startNextIfPossible()
+        await playbackQueue.startNextIfPossible()
     }
 
     func loadGeneratedBatch(

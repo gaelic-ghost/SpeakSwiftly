@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Immediate Control
+// MARK: - Runtime Control Requests
 
 extension SpeakSwiftly.Runtime {
     func processImmediateControlRequest(_ request: WorkerRequest) async {
@@ -334,12 +334,12 @@ extension SpeakSwiftly.Runtime {
                     )
 
                 case let .playback(id, action):
-                    _ = await playbackController.handle(action)
+                    _ = await playbackQueue.handle(action)
                     await publishPlaybackUpdate()
                     result = await .success(
                         WorkerSuccessPayload(
                             id: id,
-                            playbackState: playbackController.workerStateSnapshot(),
+                            playbackState: playbackQueue.workerStateSnapshot(),
                         ),
                     )
 

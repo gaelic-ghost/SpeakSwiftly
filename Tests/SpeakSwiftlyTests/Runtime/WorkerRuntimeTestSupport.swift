@@ -20,7 +20,7 @@ func makeSpeechBackendResolutionDependencies(
         loadResidentModels: { backend in makeResidentModels(for: backend) },
         loadProfileModel: { makeProfileModel() },
         loadCloneTranscriptionModel: { makeCloneTranscriptionModel() },
-        makePlaybackController: { AnyPlaybackController.silent() },
+        makePlaybackDriver: { AnyPlaybackDriver.silent() },
         writeWAV: { _, _, _ in },
         loadAudioSamples: { _, _ in nil },
         loadAudioFloats: { _, _ in [] },

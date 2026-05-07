@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Type-Erased Playback Controller
+// MARK: - Type-Erased Playback Driver
 
-final class AnyPlaybackController: @unchecked Sendable {
+final class AnyPlaybackDriver: @unchecked Sendable {
     private let prepareImpl: @Sendable (_ sampleRate: Double) async throws -> Bool
     private let playImpl: @Sendable (
         _ sampleRate: Double,
@@ -77,8 +77,8 @@ final class AnyPlaybackController: @unchecked Sendable {
         )
     }
 
-    static func silent(traceEnabled: Bool = false) -> AnyPlaybackController {
-        AnyPlaybackController(
+    static func silent(traceEnabled: Bool = false) -> AnyPlaybackDriver {
+        AnyPlaybackDriver(
             prepare: { _ in true },
             play: { sampleRate, text, tuningProfile, stream, onEvent in
                 let startedAt = Date()

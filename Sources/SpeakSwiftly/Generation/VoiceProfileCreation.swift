@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Voice Profile Generation Logic
+// MARK: - Voice Profile Creation
 
 extension SpeakSwiftly.Runtime {
     struct ResolvedCloneTranscript: Equatable {
@@ -271,7 +271,7 @@ extension SpeakSwiftly.Runtime {
         op: String,
         profile: StoredProfile,
     ) async throws -> StoredProfile {
-        guard speechBackend == .qwen3, qwenConditioningStrategy == .preparedConditioning else {
+        guard speechBackend.isQwenFamily, qwenConditioningStrategy == .preparedConditioning else {
             return profile
         }
 
@@ -284,6 +284,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: profile,
+            backend: speechBackend,
             model: model,
         )
         try Task.checkCancellation()
@@ -297,12 +298,106 @@ extension SpeakSwiftly.Runtime {
             details: [
                 "speech_backend": .string(speechBackend.rawValue),
                 "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
-                "model_repo": .string(ModelFactory.residentModelRepo(for: speechBackend, qwenResidentModel: qwenResidentModel)),
+                "model_repo": .string(ModelFactory.residentModelRepo(for: speechBackend)),
                 "qwen_conditioning_artifact_count": .int(updatedProfile.manifest.qwenConditioningArtifacts.count),
             ],
         )
 
         return updatedProfile
+    }
+
+    func prepareQwenConditioningAfterRerollIfNeeded(
+        requestID id: String,
+        op: String,
+        sourceProfile: StoredProfile,
+        rerolledProfile: StoredProfile,
+    ) async throws -> StoredProfile {
+        guard qwenConditioningStrategy == .preparedConditioning else {
+            return rerolledProfile
+        }
+
+        let backends = qwenConditioningBackendsToPrepareAfterRerolling(sourceProfile)
+        guard !backends.isEmpty else {
+            return rerolledProfile
+        }
+
+        if speechBackend.isQwenFamily, case .warming = residentState {
+            await preloadTask?.value
+        }
+
+        for backend in backends {
+            let model = try await qwenModelForConditioningPreparation(backend: backend)
+            _ = try await loadPreparedQwenConditioning(
+                requestID: id,
+                op: op,
+                profile: rerolledProfile,
+                backend: backend,
+                model: model,
+            )
+            try Task.checkCancellation()
+        }
+
+        let updatedProfile = try profileStore.loadProfile(named: rerolledProfile.manifest.profileName)
+        await logRequestEvent(
+            "qwen_reroll_conditioning_ready",
+            requestID: id,
+            op: op,
+            profileName: rerolledProfile.manifest.profileName,
+            details: [
+                "speech_backend": .string(speechBackend.rawValue),
+                "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
+                "prepared_backend_count": .int(backends.count),
+                "qwen_conditioning_artifact_count": .int(updatedProfile.manifest.qwenConditioningArtifacts.count),
+            ],
+        )
+
+        return updatedProfile
+    }
+
+    private func qwenConditioningBackendsToPrepareAfterRerolling(
+        _ sourceProfile: StoredProfile,
+    ) -> [SpeakSwiftly.SpeechBackend] {
+        var backends = [SpeakSwiftly.SpeechBackend]()
+        var seenModelRepos = Set<String>()
+
+        func append(_ backend: SpeakSwiftly.SpeechBackend) {
+            guard backend.isQwenFamily else { return }
+
+            let modelRepo = ModelFactory.residentModelRepo(for: backend)
+            guard seenModelRepos.insert(modelRepo).inserted else { return }
+
+            backends.append(backend)
+        }
+
+        append(speechBackend)
+
+        for artifact in sourceProfile.manifest.qwenConditioningArtifacts {
+            if artifact.backend.isQwenFamily {
+                append(artifact.backend)
+            } else if let backend = SpeakSwiftly.SpeechBackend.qwenBackend(forResidentModelRepo: artifact.modelRepo) {
+                append(backend)
+            }
+        }
+
+        return backends
+    }
+
+    private func qwenModelForConditioningPreparation(
+        backend: SpeakSwiftly.SpeechBackend,
+    ) async throws -> AnySpeechModel {
+        if backend == speechBackend {
+            return try residentQwenModelOrThrow()
+        }
+
+        let models = try await dependencies.loadResidentModels(backend)
+        guard case let .qwen3(model) = models else {
+            throw WorkerError(
+                code: .internalError,
+                message: "SpeakSwiftly loaded resident models for the '\(backend.rawValue)' backend while preparing rerolled Qwen conditioning, but the loaded model set did not contain a Qwen model. This indicates a backend-routing bug.",
+            )
+        }
+
+        return model
     }
 
     func handleRerollProfile(

@@ -10,7 +10,7 @@ public extension SpeakSwiftly {
 
         enum Environment {
             static let runtimeStateRootOverride = ProfileStore.runtimeStateRootOverrideEnvironmentVariable
-            static let deprecatedProfileRootOverride = ProfileStore.profileRootOverrideEnvironmentVariable
+            static let deprecatedProfileRootOverride = ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable
         }
 
         enum RequestObservationConfiguration {
@@ -56,7 +56,7 @@ public extension SpeakSwiftly {
             ) -> Double {
                 switch cadenceProfile {
                     case .standard:
-                        speechBackend == .qwen3 ? qwenResidentStreamingInterval : standardResidentStreamingInterval
+                        speechBackend.isQwenFamily ? qwenResidentStreamingInterval : standardResidentStreamingInterval
                     case .firstDrainedLiveMarvis:
                         firstDrainedLiveMarvisStreamingInterval
                 }
@@ -179,7 +179,7 @@ public extension SpeakSwiftly {
         }
 
         struct GenerationScheduleDecision {
-            let runnableJobs: [SpeechGenerationController.Job]
+            let runnableJobs: [GenerationQueue.Job]
             let parkReasons: [UUID: GenerationParkReason]
         }
 
@@ -277,15 +277,14 @@ public extension SpeakSwiftly {
         let dependencies: WorkerDependencies
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
-        let qwenResidentModel: SpeakSwiftly.QwenResidentModel
         let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let generatedFileStore: GeneratedFileStore
         let generationJobStore: GenerationJobStore
         let normalizerRef: SpeakSwiftly.Normalizer
-        let playbackController: PlaybackController
-        let generationController = SpeechGenerationController()
+        let playbackQueue: PlaybackQueue
+        let generationQueue = GenerationQueue()
         let logTimestampFormatter = ISO8601DateFormatter()
         let maxAcceptedSpeechJobs = 24
 
@@ -312,26 +311,24 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-            qwenResidentModel: SpeakSwiftly.QwenResidentModel = .base06B8Bit,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
             normalizer: SpeakSwiftly.Normalizer,
-            playbackController: PlaybackController,
+            playbackQueue: PlaybackQueue,
         ) {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
-            self.qwenResidentModel = qwenResidentModel
             self.marvisResidentPolicy = marvisResidentPolicy
             self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore
             normalizerRef = normalizer
-            self.playbackController = playbackController
+            self.playbackQueue = playbackQueue
             encoder.outputFormatting = [.sortedKeys]
         }
     }

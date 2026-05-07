@@ -3,7 +3,7 @@ import Foundation
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
-// MARK: - Qwen Speech Generation
+// MARK: - Qwen Speech Synthesis
 
 extension SpeakSwiftly.Runtime {
     func synthesisEventInfo(from info: ModelGenerationEvent.Info) -> SpeakSwiftly.SynthesisEventInfo {

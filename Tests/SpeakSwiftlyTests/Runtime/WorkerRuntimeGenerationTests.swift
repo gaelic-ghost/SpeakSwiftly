@@ -183,7 +183,7 @@ import TextForSpeech
         jobID: "job-file-lookup",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-file-lookup-artifact-1",
             text: "Hello from a persisted file job.",
@@ -270,7 +270,7 @@ import TextForSpeech
         jobID: "job-expire-file",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "job-expire-file-artifact-1",
             text: "Persisted file job",
@@ -375,7 +375,7 @@ import TextForSpeech
         jobID: "job-expire-batch",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         items: [
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-expire-batch-artifact-1",

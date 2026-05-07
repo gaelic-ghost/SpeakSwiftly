@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Voice Profile Support Logic
+// MARK: - Voice Profile Audio Support
 
 extension SpeakSwiftly.Runtime {
     func runBlockingFilesystemOperation<T: Sendable>(

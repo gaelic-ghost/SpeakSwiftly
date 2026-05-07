@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import MLX
 @preconcurrency import MLXLMCommon
 
-// MARK: - Marvis Speech Generation
+// MARK: - Marvis Speech Synthesis
 
 extension SpeakSwiftly.Runtime {
     func marvisGenerationStream(

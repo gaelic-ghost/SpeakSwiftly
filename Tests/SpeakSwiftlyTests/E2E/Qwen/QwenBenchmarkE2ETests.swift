@@ -72,7 +72,7 @@ private extension QwenBenchmarkE2ETests {
     static func provisionBenchmarkProfile(in profileRootURL: URL) async throws {
         try await BenchmarkHarness.withBenchmarkRuntime(
             profileRootURL: profileRootURL,
-            backend: .qwen3,
+            backend: .qwen3_smol,
             qwenConditioningStrategy: .preparedConditioning,
         ) { session in
             _ = try await BenchmarkHarness.awaitResidentReady(on: session.runtime)
@@ -94,7 +94,7 @@ private extension QwenBenchmarkE2ETests {
     ) async throws -> QwenBenchmarkSample {
         try await BenchmarkHarness.withBenchmarkRuntime(
             profileRootURL: profileRootURL,
-            backend: .qwen3,
+            backend: .qwen3_smol,
             qwenConditioningStrategy: strategy,
             playbackMode: BenchmarkHarness.effectivePlaybackMode(),
         ) { session in

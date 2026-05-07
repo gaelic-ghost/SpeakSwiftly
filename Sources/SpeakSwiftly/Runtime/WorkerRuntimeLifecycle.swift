@@ -7,7 +7,7 @@ extension SpeakSwiftly.Runtime {
     // MARK: - Lifecycle
 
     func installPlaybackHooks() async {
-        await playbackController.bind(
+        await playbackQueue.bind(
             PlaybackHooks(
                 handleEvent: { [weak self] event, job in
                     await self?.handlePlaybackEvent(event, for: job)
@@ -29,7 +29,7 @@ extension SpeakSwiftly.Runtime {
                     guard let self else { return }
 
                     try? await startNextGenerationIfPossible()
-                    await playbackController.startNextIfPossible()
+                    await playbackQueue.startNextIfPossible()
                 },
             ),
         )
@@ -102,7 +102,7 @@ extension SpeakSwiftly.Runtime {
                     ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
                 try await startNextGenerationIfPossible()
-                await playbackController.startNextIfPossible()
+                await playbackQueue.startNextIfPossible()
             } catch is CancellationError {
                 guard shouldApplyResidentPreloadResult(token: preloadToken, backend: targetSpeechBackend) else { return }
                 guard !isShuttingDown else { return }
@@ -208,7 +208,7 @@ extension SpeakSwiftly.Runtime {
             return
         }
 
-        if request.requiresPlayback, await playbackController.jobCount() >= maxAcceptedSpeechJobs {
+        if request.requiresPlayback, await playbackQueue.jobCount() >= maxAcceptedSpeechJobs {
             let workerError = WorkerError(
                 code: .invalidRequest,
                 message: "Request '\(request.id)' was rejected because the live speech queue is already holding \(maxAcceptedSpeechJobs) accepted jobs. Wait for playback to drain or clear queued work before adding more.",
@@ -234,7 +234,7 @@ extension SpeakSwiftly.Runtime {
             await emitFailure(id: request.id, error: workerError)
             return
         }
-        let job = await generationController.enqueue(
+        let job = await generationQueue.enqueue(
             request,
             readiness: request.requiresPlayback ? .preparing : .ready,
         )
@@ -283,7 +283,7 @@ extension SpeakSwiftly.Runtime {
             do {
                 speechJob = try await makeSpeechJobState(for: request)
             } catch let workerError as WorkerError {
-                guard await generationController.cancel(requestID: request.id) != nil else { return }
+                guard await generationQueue.cancel(requestID: request.id) != nil else { return }
 
                 await failRequestStream(for: request.id, error: workerError)
                 await emitFailure(id: request.id, error: workerError)
@@ -293,20 +293,20 @@ extension SpeakSwiftly.Runtime {
                     code: .modelGenerationFailed,
                     message: "Request '\(request.id)' could not normalize text before queueing live playback. \(error.localizedDescription)",
                 )
-                guard await generationController.cancel(requestID: request.id) != nil else { return }
+                guard await generationQueue.cancel(requestID: request.id) != nil else { return }
 
                 await failRequestStream(for: request.id, error: workerError)
                 await emitFailure(id: request.id, error: workerError)
                 return
             }
-            await playbackController.enqueue(speechJob)
+            await playbackQueue.enqueue(speechJob)
             await publishPlaybackUpdate()
-            guard await generationController.markReady(token: job.token) != nil else {
-                _ = await playbackController.discard(requestID: request.id)
+            guard await generationQueue.markReady(token: job.token) != nil else {
+                _ = await playbackQueue.discard(requestID: request.id)
                 return
             }
         }
         try? await startNextGenerationIfPossible()
-        await playbackController.startNextIfPossible()
+        await playbackQueue.startNextIfPossible()
     }
 }

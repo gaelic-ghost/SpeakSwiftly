@@ -41,8 +41,8 @@ extension ProfileStore {
             : .generated
         let materializations = [
             ProfileMaterializationManifest(
-                backend: .qwen3,
-                modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                backend: .qwen3_smol,
+                modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
                 createdAt: legacyManifest.createdAt,
                 referenceAudioFile: legacyManifest.referenceAudioFile,
                 referenceText: legacyManifest.sourceText,
@@ -72,12 +72,12 @@ extension ProfileStore {
     }
 
     func upgradeLegacyMultiBackendManifest(_ legacyManifest: LegacyMultiBackendProfileManifest) -> ProfileManifest {
-        let qwenMaterializations = legacyManifest.backendMaterializations.filter { $0.backend == .qwen3 }
+        let qwenMaterializations = legacyManifest.backendMaterializations.filter(\.backend.isQwenFamily)
         let materializations = if qwenMaterializations.isEmpty {
             [
                 ProfileMaterializationManifest(
-                    backend: .qwen3,
-                    modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+                    backend: .qwen3_smol,
+                    modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
                     createdAt: legacyManifest.createdAt,
                     referenceAudioFile: Self.audioFileName,
                     referenceText: legacyManifest.sourceText,
@@ -149,8 +149,8 @@ extension ProfileStore {
         }
 
         return ProfileMaterializationManifest(
-            backend: .qwen3,
-            modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+            backend: .qwen3_smol,
+            modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
             createdAt: materialization.createdAt,
             referenceAudioFile: materialization.referenceAudioFile,
             referenceText: materialization.referenceText,
@@ -166,7 +166,9 @@ extension ProfileStore {
         }
 
         return QwenConditioningArtifactManifest(
-            backend: .qwen3,
+            backend: SpeakSwiftly.SpeechBackend.qwenBackend(
+                forResidentModelRepo: normalizedQwenConditioningModelRepo(manifest.modelRepo),
+            ) ?? .qwen3_smol,
             modelRepo: normalizedQwenConditioningModelRepo(manifest.modelRepo),
             createdAt: manifest.createdAt,
             artifactVersion: manifest.artifactVersion,
@@ -177,7 +179,11 @@ extension ProfileStore {
     func normalizedQwenConditioningModelRepo(_ modelRepo: String) -> String {
         switch modelRepo {
             case ModelFactory.qwen06B8BitResidentModelRepo,
-                 ModelFactory.qwen17B8BitResidentModelRepo:
+                 ModelFactory.qwen06B6BitResidentModelRepo,
+                 ModelFactory.qwen06BBF16ResidentModelRepo,
+                 ModelFactory.qwen17B8BitResidentModelRepo,
+                 ModelFactory.qwen17B6BitResidentModelRepo,
+                 ModelFactory.qwen17BBF16ResidentModelRepo:
                 modelRepo
             default:
                 ModelFactory.qwenResidentModelRepo

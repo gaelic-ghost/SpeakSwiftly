@@ -302,7 +302,7 @@ import TextForSpeech
         playback: PlaybackSpy(),
         residentModelLoader: { _ in makeResidentModel() },
     )
-    let preparingLiveJob = SpeechGenerationController.Job(
+    let preparingLiveJob = GenerationQueue.Job(
         request: .queueSpeech(
             id: "req-preparing-live",
             text: "Hello while playback state is still preparing.",
@@ -314,7 +314,7 @@ import TextForSpeech
             qwenPreModelTextChunking: nil,
         ),
     )
-    let reloadJob = SpeechGenerationController.Job(
+    let reloadJob = GenerationQueue.Job(
         request: .reloadModels(id: "req-reload-models"),
     )
 
@@ -322,7 +322,7 @@ import TextForSpeech
         activeJobs: [],
         queuedJobs: [preparingLiveJob, reloadJob],
         preparingJobTokens: [preparingLiveJob.token],
-        playbackAdmission: PlaybackController.GenerationAdmissionSnapshot(
+        playbackAdmission: PlaybackQueue.GenerationAdmissionSnapshot(
             activeRequestID: nil,
             activeRequestTuningProfile: nil,
             allowsConcurrentGeneration: true,
@@ -363,7 +363,7 @@ import TextForSpeech
 
     let stateRoot = rootURL
     let dependencies = makeSpeechBackendResolutionDependencies()
-    try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
+    try SpeakSwiftly.Configuration(speechBackend: .qwen3_smol).saveDefault(
         stateRootOverride: stateRoot.path,
     )
 
@@ -382,7 +382,7 @@ import TextForSpeech
 
     let stateRoot = rootURL
     let dependencies = makeSpeechBackendResolutionDependencies()
-    try SpeakSwiftly.Configuration(speechBackend: .qwen3).saveDefault(
+    try SpeakSwiftly.Configuration(speechBackend: .qwen3_smol).saveDefault(
         stateRootOverride: stateRoot.path,
     )
 
@@ -398,26 +398,26 @@ import TextForSpeech
     #expect(resolved == .marvis)
 }
 
-@Test func `resolved qwen resident model prefers explicit configuration over environment`() {
-    let resolved = WorkerRuntime.resolvedQwenResidentModel(
+@Test func `resolved speech backend prefers explicit qwen backend over legacy qwen resident model environment`() {
+    let resolved = WorkerRuntime.resolvedSpeechBackend(
         environment: [
-            SpeakSwiftly.QwenResidentModel.environmentVariable: SpeakSwiftly.QwenResidentModel.base17B8Bit.rawValue,
+            SpeakSwiftly.SpeechBackend.legacyQwenResidentModelEnvironmentVariable: "base_1_7b_8bit",
         ],
-        configuration: SpeakSwiftly.Configuration(qwenResidentModel: .base06B8Bit),
+        configuration: SpeakSwiftly.Configuration(speechBackend: .qwen3_smol),
     )
 
-    #expect(resolved == .base06B8Bit)
+    #expect(resolved == .qwen3_smol)
 }
 
-@Test func `resolved qwen resident model falls back to environment`() {
-    let resolved = WorkerRuntime.resolvedQwenResidentModel(
+@Test func `resolved speech backend falls back to legacy qwen resident model environment`() {
+    let resolved = WorkerRuntime.resolvedSpeechBackend(
         environment: [
-            SpeakSwiftly.QwenResidentModel.environmentVariable: SpeakSwiftly.QwenResidentModel.base17B8Bit.rawValue,
+            SpeakSwiftly.SpeechBackend.legacyQwenResidentModelEnvironmentVariable: "base_1_7b_8bit",
         ],
         configuration: nil,
     )
 
-    #expect(resolved == .base17B8Bit)
+    #expect(resolved == .qwen3_BIG)
 }
 
 @Test func `resident model preload failure fails queued requests`() async throws {

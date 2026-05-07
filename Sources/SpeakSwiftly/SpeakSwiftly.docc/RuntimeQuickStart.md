@@ -31,11 +31,16 @@ let normalizer = try SpeakSwiftly.Normalizer(
 
 let runtime = await SpeakSwiftly.liftoff(
     configuration: .init(
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         textNormalizer: normalizer
     )
 )
 ```
+
+Use ``SpeakSwiftly/SpeechBackend/qwen3_BIG`` when the runtime should load the
+larger Qwen 1.7B 8-bit resident model instead of the default Qwen 0.6B 8-bit
+model. The Qwen backend family also includes explicit 6-bit, 8-bit, and bf16
+cases for both sizes.
 
 When a host needs isolated persisted state, pass the state root at startup:
 
@@ -44,6 +49,11 @@ let runtime = await SpeakSwiftly.liftoff(
     stateRootURL: URL(fileURLWithPath: "/tmp/SpeakSwiftly-Isolated")
 )
 ```
+
+`SPEAKSWIFTLY_PROFILE_ROOT` remains accepted only as a deprecated compatibility
+alias for older hosts. New hosts should pass `stateRootURL`, pass `--state-root`
+to the worker executable, or use `SPEAKSWIFTLY_STATE_ROOT` when startup
+arguments are not available.
 
 ## Generate Playback Or Files
 

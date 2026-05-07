@@ -78,11 +78,6 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
-        let configuredQwenResidentModel = resolvedQwenResidentModel(
-            environment: environment,
-            configuration: configuration
-                ?? persistedConfiguration,
-        )
         let configuredMarvisResidentPolicy = resolvedMarvisResidentPolicy(
             configuration: configuration
                 ?? persistedConfiguration,
@@ -92,7 +87,6 @@ extension SpeakSwiftly.Runtime {
                 ?? persistedConfiguration,
         )
         let dependencies = WorkerDependencies.live(
-            qwenResidentModel: configuredQwenResidentModel,
             marvisResidentPolicy: configuredMarvisResidentPolicy,
         )
         let profileStore = ProfileStore(
@@ -117,20 +111,19 @@ extension SpeakSwiftly.Runtime {
                 persistenceURL: textProfilesURL,
                 dependencies: dependencies,
             )
-        let playbackController = await PlaybackController(driver: dependencies.makePlaybackController())
+        let playbackQueue = await PlaybackQueue(driver: dependencies.makePlaybackDriver())
 
         let runtime = SpeakSwiftly.Runtime(
             dependencies: dependencies,
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
-            qwenResidentModel: configuredQwenResidentModel,
             marvisResidentPolicy: configuredMarvisResidentPolicy,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
-            playbackController: playbackController,
+            playbackQueue: playbackQueue,
         )
         await runtime.installPlaybackHooks()
         return runtime
@@ -148,7 +141,11 @@ extension SpeakSwiftly.Runtime {
             return environmentBackend
         }
 
-        return .qwen3
+        if let legacyQwenResidentModel = SpeakSwiftly.SpeechBackend.configuredFromLegacyQwenResidentModelEnvironment(in: environment) {
+            return legacyQwenResidentModel
+        }
+
+        return .qwen3_smol
     }
 
     static func resolvedSpeechBackend(
@@ -166,21 +163,6 @@ extension SpeakSwiftly.Runtime {
         configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.QwenConditioningStrategy {
         configuration?.qwenConditioningStrategy ?? .preparedConditioning
-    }
-
-    static func resolvedQwenResidentModel(
-        environment: [String: String],
-        configuration: SpeakSwiftly.Configuration?,
-    ) -> SpeakSwiftly.QwenResidentModel {
-        if let configuration {
-            return configuration.qwenResidentModel
-        }
-
-        if let environmentModel = SpeakSwiftly.QwenResidentModel.configured(in: environment) {
-            return environmentModel
-        }
-
-        return .base06B8Bit
     }
 
     static func resolvedMarvisResidentPolicy(
@@ -209,7 +191,6 @@ extension SpeakSwiftly.Runtime {
         SpeakSwiftly.Configuration(
             speechBackend: speechBackend,
             qwenConditioningStrategy: qwenConditioningStrategy,
-            qwenResidentModel: qwenResidentModel,
             marvisResidentPolicy: marvisResidentPolicy,
             defaultVoiceProfile: defaultVoiceProfileName,
             textNormalizer: normalizerRef,

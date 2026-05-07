@@ -12,13 +12,14 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 // MARK: - Adaptive Playback Thresholds
 
 @Test func `resident backend repos include chatterbox turbo 8bit`() {
-    #expect(ModelFactory.residentModelRepo(for: .qwen3) == ModelFactory.qwenResidentModelRepo)
-    #expect(
-        ModelFactory.residentModelRepo(
-            for: .qwen3,
-            qwenResidentModel: .base17B8Bit,
-        ) == ModelFactory.qwen17B8BitResidentModelRepo,
-    )
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol) == ModelFactory.qwenResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_6bit) == ModelFactory.qwen06B6BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_8bit) == ModelFactory.qwen06B8BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_bf16) == ModelFactory.qwen06BBF16ResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG) == ModelFactory.qwen17B8BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_6bit) == ModelFactory.qwen17B6BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_8bit) == ModelFactory.qwen17B8BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_bf16) == ModelFactory.qwen17BBF16ResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
 }
@@ -185,7 +186,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -283,7 +284,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 @Test func `resident cadence aligns chatterbox and marvis with the looser baseline`() {
     let qwenStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .qwen3,
+        for: .qwen3_smol,
         cadenceProfile: .standard,
     )
     let marvisStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
@@ -307,7 +308,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 @Test func `marvis live cadence role selection reserves the special role for the first request only`() {
     let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
-        speechBackend: .qwen3,
+        speechBackend: .qwen3_smol,
         existingPlaybackJobCount: 0,
     )
     let firstMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
@@ -330,12 +331,12 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `first drained live marvis requires extra reserve before overlap opens`() {
-    let standardAdmission = PlaybackController.concurrencyAdmissionThresholds(
+    let standardAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
         tuningProfile: .standard,
         startupBufferTargetMS: 2320,
         lowWaterTargetMS: 1040,
     )
-    let firstRequestAdmission = PlaybackController.concurrencyAdmissionThresholds(
+    let firstRequestAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
         tuningProfile: .firstDrainedLiveMarvis,
         startupBufferTargetMS: 2320,
         lowWaterTargetMS: 1040,
@@ -347,18 +348,18 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
-    let configuration = PlaybackController.fragileOverlapWindowConfiguration(
+    let configuration = PlaybackQueue.fragileOverlapWindowConfiguration(
         tuningProfile: .firstDrainedLiveMarvis,
         concurrentGenerationTargetMS: 3160,
         lowWaterTargetMS: 1040,
     )
 
-    #expect(configuration == PlaybackController.FragileOverlapWindowConfiguration(
+    #expect(configuration == PlaybackQueue.FragileOverlapWindowConfiguration(
         holdBufferTargetMS: 3680,
         requiredStableBufferEventCount: 4,
     ))
     #expect(
-        PlaybackController.fragileOverlapWindowConfiguration(
+        PlaybackQueue.fragileOverlapWindowConfiguration(
             tuningProfile: .standard,
             concurrentGenerationTargetMS: 3160,
             lowWaterTargetMS: 1040,
@@ -368,13 +369,13 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 @Test func `concurrent generation stays closed below the claimed reserve target`() {
     #expect(
-        PlaybackController.allowsConcurrentGeneration(
+        PlaybackQueue.allowsConcurrentGeneration(
             bufferedAudioMS: 2160,
             targetMS: 3160,
         ) == false,
     )
     #expect(
-        PlaybackController.allowsConcurrentGeneration(
+        PlaybackQueue.allowsConcurrentGeneration(
             bufferedAudioMS: 3200,
             targetMS: 3160,
         ) == true,
@@ -382,7 +383,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 }
 
 @Test func `fragile overlap window requires a brief healthy hold and re closes when reserve sags`() {
-    let progress = PlaybackController.FragileOverlapWindowProgress(
+    let progress = PlaybackQueue.FragileOverlapWindowProgress(
         configuration: .init(
             holdBufferTargetMS: 3800,
             requiredStableBufferEventCount: 4,
@@ -391,7 +392,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         hasSatisfiedHold: false,
     )
 
-    let firstHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let firstHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3900,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: progress,
@@ -401,7 +402,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 1)
     #expect(firstHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let secondHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let secondHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3920,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: firstHealthyEvent.fragileOverlapWindowProgress,
@@ -411,7 +412,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(secondHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 2)
     #expect(secondHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let thirdHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let thirdHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3940,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: secondHealthyEvent.fragileOverlapWindowProgress,
@@ -421,7 +422,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.stableBufferEventCount == 3)
     #expect(thirdHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == false)
 
-    let fourthHealthyEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let fourthHealthyEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3960,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: thirdHealthyEvent.fragileOverlapWindowProgress,
@@ -430,7 +431,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(fourthHealthyEvent.effectiveTargetMS == 3160)
     #expect(fourthHealthyEvent.fragileOverlapWindowProgress?.hasSatisfiedHold == true)
 
-    let collapsingReserveEvent = PlaybackController.resolveConcurrentGenerationAdmission(
+    let collapsingReserveEvent = PlaybackQueue.resolveConcurrentGenerationAdmission(
         bufferedAudioMS: 3600,
         concurrentGenerationTargetMS: 3160,
         fragileOverlapWindowProgress: fourthHealthyEvent.fragileOverlapWindowProgress,
@@ -445,7 +446,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -483,7 +484,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     var controller = PlaybackThresholdController(
         text: """
         Please read this code-heavy diagnostic trace.
-        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackController.swift
+        /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/PlaybackQueue.swift
         let greeting = user?.displayName ?? "friend"
         """,
     )
@@ -505,7 +506,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
 // MARK: - Runtime Playback Integration
 
-@Test func `speak live uses stored profile data waits for playback drain and reuses playback controller`() async throws {
+@Test func `speak live uses stored profile data waits for playback drain and reuses playback queue`() async throws {
     let output = OutputRecorder()
     let playbackDrain = AsyncGate()
     let playback = PlaybackSpy(behavior: .gate(playbackDrain))
@@ -1079,7 +1080,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     let storedAfterFirstRun = try store.loadProfile(named: "default-femme")
     #expect(
         storedAfterFirstRun.qwenConditioningArtifact(
-            for: .qwen3,
+            for: .qwen3_smol,
             modelRepo: ModelFactory.qwenResidentModelRepo,
         ) != nil,
     )
@@ -1143,7 +1144,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
     _ = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3,
+        backend: .qwen3_smol,
         modelRepo: ModelFactory.qwenResidentModelRepo,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
             speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
@@ -1159,8 +1160,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
-        qwenResidentModel: .base17B8Bit,
         audioLoadRecorder: recorder,
         loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
         residentModelLoader: { _ in
@@ -1189,8 +1190,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let storedAfterGeneration = try store.loadProfile(named: "default-femme")
     #expect(storedAfterGeneration.manifest.qwenConditioningArtifacts.count == 2)
-    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo) != nil)
-    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3_smol, modelRepo: ModelFactory.qwenResidentModelRepo) != nil)
+    #expect(storedAfterGeneration.qwenConditioningArtifact(for: .qwen3_BIG, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
     #expect(recorder.prepareConditioningCallCount == 1)
     #expect(recorder.audioLoadCallCount == 1)
 }
@@ -1210,8 +1211,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
-        qwenResidentModel: .base17B8Bit,
         audioLoadRecorder: recorder,
         loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
         residentModelLoader: { _ in
@@ -1242,7 +1243,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let store = try makeProfileStore(rootURL: storeRoot)
     let storedProfile = try store.loadProfile(named: "bright-guide")
-    #expect(storedProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(storedProfile.qwenConditioningArtifact(for: .qwen3_BIG, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
     #expect(recorder.prepareConditioningCallCount == 1)
     #expect(recorder.audioLoadCallCount == 1)
 }
@@ -1269,7 +1270,7 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
     _ = try store.storeQwenConditioningArtifact(
         named: "bright-guide",
-        backend: .qwen3,
+        backend: .qwen3_smol,
         modelRepo: ModelFactory.qwenResidentModelRepo,
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
             speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
@@ -1285,8 +1286,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
-        qwenResidentModel: .base17B8Bit,
         audioLoadRecorder: recorder,
         loadedAudioSamples: MLXArray([Float(0.3), 0.4]).reshaped([1, 2]),
         residentModelLoader: { _ in
@@ -1315,10 +1316,10 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
 
     let rerolledProfile = try store.loadProfile(named: "bright-guide")
     #expect(rerolledProfile.manifest.qwenConditioningArtifacts.count == 1)
-    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwenResidentModelRepo) == nil)
-    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
-    #expect(recorder.prepareConditioningCallCount == 1)
-    #expect(recorder.audioLoadCallCount == 1)
+    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3_smol, modelRepo: ModelFactory.qwenResidentModelRepo) != nil)
+    #expect(rerolledProfile.qwenConditioningArtifact(for: .qwen3_BIG, modelRepo: ModelFactory.qwen17B8BitResidentModelRepo) != nil)
+    #expect(recorder.prepareConditioningCallCount == 2)
+    #expect(recorder.audioLoadCallCount == 2)
 }
 
 @Test(
@@ -1343,8 +1344,8 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     )
     _ = try store.storeQwenConditioningArtifact(
         named: "default-femme",
-        backend: .qwen3,
-        modelRepo: ModelFactory.residentModelRepo(for: .qwen3),
+        backend: .qwen3_smol,
+        modelRepo: ModelFactory.residentModelRepo(for: .qwen3_smol),
         conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
             speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
             referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
