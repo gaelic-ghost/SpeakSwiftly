@@ -30,6 +30,7 @@ enum SpeakSwiftlyTool {
             let runtime = await SpeakSwiftly.Runtime.liftoff(
                 stateRootURL: options.stateRootURL,
                 systemProfileResourceRootURL: options.systemProfileResourceRootURL,
+                startsResidentModelsAutomatically: options.systemProfileResourceRootURL == nil,
             )
             await run(runtime: runtime)
         } catch {

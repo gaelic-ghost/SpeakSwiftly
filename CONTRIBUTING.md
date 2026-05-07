@@ -103,6 +103,8 @@ let runtime = await SpeakSwiftly.liftoff(
 
 At runtime, SpeakSwiftly loads bundled system profiles from its own package resource bundle and from configured consumer resource roots, then seeds them into the writable profile store. Do not expose system-profile creation through `runtime.voices` or any ordinary public end-user API. If `create_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
 
+When `SpeakSwiftlyTool` is launched with `--system-profile-resource-root`, it starts with resident playback models unloaded so the resource-authoring process does not warm unrelated runtime models before it can read JSONL input. The generated profile is still valid bundled profile material; prepared Qwen conditioning remains lazy and is created later by ordinary runtime use after resident models are explicitly loaded.
+
 ### Runtime Behavior
 
 For ordinary package work, use the SwiftPM build and test lane first. Real standalone worker runs should use the deterministic runtime launcher produced by the repo-maintenance scripts, not a plain SwiftPM-built worker executable.

@@ -285,11 +285,13 @@ public extension SpeakSwiftly {
         let generationJobStore: GenerationJobStore
         let normalizerRef: SpeakSwiftly.Normalizer
         let playbackQueue: PlaybackQueue
+        let startsResidentModelsAutomatically: Bool
         let generationQueue = GenerationQueue()
         let logTimestampFormatter = ISO8601DateFormatter()
         let maxAcceptedSpeechJobs = 24
 
         var residentState: ResidentState = .warming
+        var hasStarted = false
         var isShuttingDown = false
         var preloadTask: Task<Void, Never>?
         var residentPreloadToken: UUID?
@@ -320,6 +322,7 @@ public extension SpeakSwiftly {
             generationJobStore: GenerationJobStore,
             normalizer: SpeakSwiftly.Normalizer,
             playbackQueue: PlaybackQueue,
+            startsResidentModelsAutomatically: Bool = true,
         ) {
             self.dependencies = dependencies
             self.speechBackend = speechBackend
@@ -332,6 +335,7 @@ public extension SpeakSwiftly {
             self.generationJobStore = generationJobStore
             normalizerRef = normalizer
             self.playbackQueue = playbackQueue
+            self.startsResidentModelsAutomatically = startsResidentModelsAutomatically
             encoder.outputFormatting = [.sortedKeys]
         }
     }

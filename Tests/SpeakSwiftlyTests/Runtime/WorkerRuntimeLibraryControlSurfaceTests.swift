@@ -327,6 +327,7 @@ import TextForSpeech
 
 @Test func `tool system profile creation writes bundled resource store`() async throws {
     let output = OutputRecorder()
+    let residentLoadRecorder = ResidentStartupRecorder()
     let tempRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: tempRoot) }
 
@@ -339,17 +340,22 @@ import TextForSpeech
         rootURL: stateRoot,
         output: output,
         playback: PlaybackSpy(),
-        residentModelLoader: { _ in makeResidentModel() },
+        residentModelLoader: { _ in
+            residentLoadRecorder.recordLoad()
+            return makeResidentModel()
+        },
         systemProfileResourceStore: systemResourceStore,
+        startsResidentModelsAutomatically: false,
     )
 
     await runtime.start()
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
+                && $0["stage"] as? String == "resident_models_unloaded"
         }
     })
+    #expect(residentLoadRecorder.loadCount == 0)
 
     let seed = SpeakSwiftly.ProfileSeed(
         seedID: "swift.signal",
@@ -380,12 +386,13 @@ import TextForSpeech
     #expect(created.manifest.seed?.seedVersion == seed.seedVersion)
     #expect(created.manifest.seed?.intendedProfileName == seed.intendedProfileName)
     #expect(created.manifest.seed?.sourcePackage == seed.sourcePackage)
-    #expect(created.manifest.qwenConditioningArtifacts.count == 1)
+    #expect(created.manifest.qwenConditioningArtifacts.isEmpty)
 
     let writableStore = ProfileStore(rootURL: stateRoot, fileManager: .default)
     #expect(throws: WorkerError.self) {
         _ = try writableStore.loadProfile(named: "swift-signal")
     }
+    #expect(residentLoadRecorder.loadCount == 0)
 }
 
 @Test func `tool system profile creation requires resource store`() async throws {
