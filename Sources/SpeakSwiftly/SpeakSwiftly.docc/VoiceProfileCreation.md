@@ -6,10 +6,9 @@ Create, inspect, and maintain stored voice profiles through the runtime's voice-
 
 SpeakSwiftly keeps voice-profile management on ``SpeakSwiftly/Voices``. That handle owns the operator-facing lifecycle for stored profiles: create them, list them, rename them, reroll them from their saved source inputs, and delete them when they are no longer needed.
 
-The package supports three creation paths:
+The public library surface supports two end-user creation paths:
 
 - Voice design, where you provide source text plus a descriptive prompt.
-- System voice design, where trusted package-owned defaults provide source text, a prompt, and stable seed metadata.
 - Voice cloning, where you provide reference audio and an optional transcript.
 
 All creation paths return a ``SpeakSwiftly/RequestHandle`` because profile creation is queued runtime work, not a synchronous local file write.
@@ -42,30 +41,6 @@ let handle = await runtime.voices.create(
 This path is best when you want to author a reusable voice without recording reference audio first.
 If you pass `outputPath`, SpeakSwiftly uses that as an export-audio file path for the generated reference sample after the profile has been stored.
 
-## Create A Package-Owned Designed Voice
-
-Use ``SpeakSwiftly/Voices/create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)`` when a trusted downstream package installs a built-in default voice:
-
-```swift
-let seed = SpeakSwiftly.ProfileSeed(
-    seedID: "swift.signal",
-    seedVersion: "1",
-    intendedProfileName: "swift-signal",
-    sourcePackage: "SpeakSwiftlyServer",
-    sourceVersion: "4.2.0"
-)
-
-let handle = await runtime.voices.create(
-    builtInDesign: "swift-signal",
-    from: "A clear technical assistant introduction.",
-    vibe: .femme,
-    voiceDescription: "Bright, clear, responsive, and crisply articulated.",
-    seed: seed
-)
-```
-
-System-authored profiles are package-owned. Ordinary rename, delete, and in-place reroll operations reject them with explicit errors. If a user rerolls a system profile, SpeakSwiftly creates a user-owned copy instead so the built-in default remains stable.
-
 ## Create A Cloned Voice
 
 Use ``SpeakSwiftly/Voices/create(clone:from:vibe:transcript:)`` when you already have reference audio:
@@ -80,6 +55,12 @@ let handle = await runtime.voices.create(
 ```
 
 This path keeps the source audio and related metadata as part of the stored profile so the profile can be rerolled later.
+
+System-authored profiles are package-owned defaults installed through the bundled
+tool adapter, not the ordinary end-user library creation surface. Ordinary rename,
+delete, and in-place reroll operations reject them with explicit errors. If a user
+rerolls a system profile, SpeakSwiftly creates a user-owned copy instead so the
+built-in default remains stable.
 
 ## Observe Completion
 
