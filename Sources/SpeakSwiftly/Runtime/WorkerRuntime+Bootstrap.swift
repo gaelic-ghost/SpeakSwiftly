@@ -54,6 +54,7 @@ extension SpeakSwiftly.Runtime {
         configuration: SpeakSwiftly.Configuration? = nil,
         stateRootURL: URL? = nil,
         systemProfileResourceRootURL: URL? = nil,
+        startsResidentModelsAutomatically: Bool = true,
     ) async -> SpeakSwiftly.Runtime {
         let environment = ProcessInfo.processInfo.environment
         let bootstrapDependencies = WorkerDependencies.live()
@@ -138,6 +139,7 @@ extension SpeakSwiftly.Runtime {
             generationJobStore: generationJobStore,
             normalizer: normalizer,
             playbackQueue: playbackQueue,
+            startsResidentModelsAutomatically: startsResidentModelsAutomatically,
         )
         await runtime.installPlaybackHooks()
         return runtime

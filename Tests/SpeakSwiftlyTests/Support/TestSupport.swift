@@ -613,6 +613,21 @@ final class ResidentModelRecorder: @unchecked Sendable {
     }
 }
 
+final class ResidentStartupRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var loadCountStorage = 0
+
+    var loadCount: Int {
+        lock.withLock { loadCountStorage }
+    }
+
+    func recordLoad() {
+        lock.withLock {
+            loadCountStorage += 1
+        }
+    }
+}
+
 // MARK: - Test Model and Runtime Factories
 
 func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int = 1) -> AnySpeechModel {
@@ -822,6 +837,7 @@ func makeRuntime(
     },
     readRuntimeMemory: @escaping @Sendable () -> RuntimeMemorySnapshot? = { nil },
     systemProfileResourceStore: ProfileStore? = nil,
+    startsResidentModelsAutomatically: Bool = true,
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
@@ -898,6 +914,7 @@ func makeRuntime(
         generationJobStore: generationJobStore,
         normalizer: normalizer,
         playbackQueue: PlaybackQueue(driver: playbackQueue),
+        startsResidentModelsAutomatically: startsResidentModelsAutomatically,
     )
     await runtime.installPlaybackHooks()
     await runtime.attachJSONLOutput(to: output)

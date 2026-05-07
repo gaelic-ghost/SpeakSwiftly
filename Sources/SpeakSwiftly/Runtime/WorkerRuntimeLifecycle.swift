@@ -62,8 +62,17 @@ extension SpeakSwiftly.Runtime {
         return handle
     }
 
-    public func start() {
-        guard preloadTask == nil else { return }
+    public func start() async {
+        guard !hasStarted else { return }
+
+        hasStarted = true
+
+        guard startsResidentModelsAutomatically else {
+            residentState = .unloaded
+            residentPreloadToken = nil
+            await emitStatus(.residentModelsUnloaded)
+            return
+        }
 
         startResidentPreload()
     }

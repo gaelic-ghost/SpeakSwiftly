@@ -279,6 +279,21 @@ extension SpeakSwiftly.Runtime {
             return profile
         }
 
+        if case .unloaded = residentState {
+            await logRequestEvent(
+                "qwen_initial_conditioning_skipped",
+                requestID: id,
+                op: op,
+                profileName: profile.manifest.profileName,
+                details: [
+                    "speech_backend": .string(speechBackend.rawValue),
+                    "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
+                    "reason": .string("resident_models_unloaded"),
+                ],
+            )
+            return profile
+        }
+
         if case .warming = residentState {
             await preloadTask?.value
         }
