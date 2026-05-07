@@ -61,6 +61,7 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 - Public transport and result model types may stay public for inspection, but keep memberwise construction internal unless callers have a concrete reason to author those values directly.
 - Use `SpeakSwiftly.Name` as the semantic name type for stored voice-profile names and similar stable operator-facing resources.
 - For the voice-profile library surface, prefer one `Voices.create(...)` verb with explicit overloaded first labels, such as `create(design named: Name, ...)` and `create(clone named: Name, ...)`, instead of multiplying unrelated creation verbs.
+- For first-party bundled built-in voices, use the `create-system-voice-profile` SwiftPM command plugin from this checkout with `--target SpeakSwiftly`; it writes reviewed system profile resources under `Sources/SpeakSwiftly/Resources/SystemProfiles/profiles/`, which the `SpeakSwiftly` target already bundles.
 
 ### Communication and Escalation
 

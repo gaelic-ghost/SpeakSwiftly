@@ -96,6 +96,17 @@ If a host deliberately runs the helper executable directly, it owns the launch c
 
 The profile store uses `.profile-store.lock` inside the active `profiles/` directory to coordinate writers while profiles are generated or seeded. For plugin-authored system profiles, that means the lock can appear under `Resources/SystemProfiles/profiles/` after a successful run. It is an advisory coordination artifact, not a generated profile resource; leave it out of commits and reviews, and remove it only after confirming no SpeakSwiftly process is using that profile root.
 
+From this repository, use the same command plugin with `--target SpeakSwiftly` to create first-party bundled built-in profiles under `Sources/SpeakSwiftly/Resources/SystemProfiles/profiles/<profile-name>/`:
+
+```bash
+swift package plugin --allow-writing-to-package-directory upsert-system-voice-profile \
+  --target SpeakSwiftly \
+  --name package-announcer \
+  --text "A clear SpeakSwiftly package voice." \
+  --vibe neutral \
+  --voice-description "Clear, warm, steady, and concise."
+```
+
 Then the consuming target should pass its bundled system-profile root during startup:
 
 ```swift
