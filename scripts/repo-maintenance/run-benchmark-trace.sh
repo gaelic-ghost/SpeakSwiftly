@@ -8,24 +8,18 @@ export REPO_MAINTENANCE_COMMON_DIR="$SELF_DIR/lib"
 load_env_file "$SELF_DIR/config/validation.env"
 ensure_git_repo
 
-benchmark_target="qwen-quant"
+benchmark_target="qwen-quantization"
 template="Time Profiler"
 audible="false"
 playback_trace="false"
 iterations=""
-qwen_quant_backends=""
-device_label=""
 time_limit=""
 output_root="$REPO_ROOT/.local/traces"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --qwen)
-      benchmark_target="qwen"
-      shift
-      ;;
-    --qwen-quant)
-      benchmark_target="qwen-quant"
+    --qwen-quantization)
+      benchmark_target="qwen-quantization"
       shift
       ;;
     --template)
@@ -62,21 +56,6 @@ while [ "$#" -gt 0 ]; do
       [ -n "$iterations" ] || die "Pass a benchmark iteration count after --iterations."
       shift 2
       ;;
-    --backend)
-      qwen_quant_backends="${2:-}"
-      [ -n "$qwen_quant_backends" ] || die "Pass a backend name after --backend."
-      shift 2
-      ;;
-    --backends)
-      qwen_quant_backends="${2:-}"
-      [ -n "$qwen_quant_backends" ] || die "Pass comma-separated backend names after --backends."
-      shift 2
-      ;;
-    --device-label)
-      device_label="${2:-}"
-      [ -n "$device_label" ] || die "Pass a non-empty device label after --device-label."
-      shift 2
-      ;;
     --time-limit)
       time_limit="${2:-}"
       [ -n "$time_limit" ] || die "Pass an xctrace time limit such as 5m after --time-limit."
@@ -90,20 +69,19 @@ while [ "$#" -gt 0 ]; do
     -h|--help)
       cat <<'USAGE'
 Usage:
-  run-benchmark-trace.sh [--qwen|--qwen-quant] [--time-profiler|--metal-system-trace|--allocations|--vm-tracker]
-                         [--template <name>] [--iterations <count>] [--backend <backend>|--backends <names>]
-                         [--device-label <label>] [--audible] [--playback-trace]
+  run-benchmark-trace.sh [--qwen-quantization] [--time-profiler|--metal-system-trace|--allocations|--vm-tracker]
+                         [--template <name>] [--iterations <count>] [--audible] [--playback-trace]
                          [--time-limit <duration>] [--output-root <path>]
 
 Defaults:
-  --qwen-quant is the default benchmark target.
+  --qwen-quantization is the default benchmark target.
   --time-profiler is the default Instruments template.
 
 Examples:
-  sh scripts/repo-maintenance/run-benchmark-trace.sh --backend qwen3_smol_8bit --iterations 1
-  sh scripts/repo-maintenance/run-benchmark-trace.sh --metal-system-trace --backend qwen3_smol_8bit --iterations 1
-  sh scripts/repo-maintenance/run-benchmark-trace.sh --allocations --backend qwen3_smol_8bit --iterations 1
-  sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --backend qwen3_smol_8bit --iterations 1
+  sh scripts/repo-maintenance/run-benchmark-trace.sh --iterations 1
+  sh scripts/repo-maintenance/run-benchmark-trace.sh --metal-system-trace --iterations 1
+  sh scripts/repo-maintenance/run-benchmark-trace.sh --allocations --iterations 1
+  sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --iterations 1
 USAGE
       exit 0
       ;;
@@ -139,12 +117,6 @@ if [ "$playback_trace" = "true" ]; then
 fi
 if [ -n "$iterations" ]; then
   set -- "$@" --iterations "$iterations"
-fi
-if [ -n "$qwen_quant_backends" ]; then
-  set -- "$@" --backends "$qwen_quant_backends"
-fi
-if [ -n "$device_label" ]; then
-  set -- "$@" --device-label "$device_label"
 fi
 
 log "Recording SpeakSwiftly benchmark '$benchmark_target' with Instruments template '$template'."
