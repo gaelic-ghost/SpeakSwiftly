@@ -334,4 +334,91 @@ final class AnySpeechModel: @unchecked Sendable {
             streamingInterval,
         )
     }
+
+    func usingDefaultDevice(_ device: Device) -> AnySpeechModel {
+        AnySpeechModel(
+            sampleRate: sampleRate,
+            generate: { text, voice, refAudio, refText, language, generationParameters in
+                try await Device.withDefaultDevice(device) {
+                    try await self.generate(
+                        text: text,
+                        voice: voice,
+                        refAudio: refAudio,
+                        refText: refText,
+                        language: language,
+                        generationParameters: generationParameters,
+                    )
+                }
+            },
+            generateSamplesStream: { text, voice, refAudio, refText, language, generationParameters, streamingInterval in
+                streamUsingDefaultDevice(device) {
+                    self.generateSamplesStream(
+                        text: text,
+                        voice: voice,
+                        refAudio: refAudio,
+                        refText: refText,
+                        language: language,
+                        generationParameters: generationParameters,
+                        streamingInterval: streamingInterval,
+                    )
+                }
+            },
+            generateEventStream: { text, voice, refAudio, refText, language, generationParameters, streamingInterval in
+                streamUsingDefaultDevice(device) {
+                    self.generateEventStream(
+                        text: text,
+                        voice: voice,
+                        refAudio: refAudio,
+                        refText: refText,
+                        language: language,
+                        generationParameters: generationParameters,
+                        streamingInterval: streamingInterval,
+                    )
+                }
+            },
+            prepareQwenReferenceConditioning: { refAudio, refText, language in
+                try Device.withDefaultDevice(device) {
+                    try self.prepareQwenReferenceConditioning(
+                        refAudio: refAudio,
+                        refText: refText,
+                        language: language,
+                    )
+                }
+            },
+            generateConditionedEventStream: { text, conditioning, generationParameters, streamingInterval in
+                streamUsingDefaultDevice(device) {
+                    self.generateConditionedEventStream(
+                        text: text,
+                        conditioning: conditioning,
+                        generationParameters: generationParameters,
+                        streamingInterval: streamingInterval,
+                    )
+                }
+            },
+        )
+    }
+}
+
+private func streamUsingDefaultDevice<Element: Sendable>(
+    _ device: Device,
+    _ makeStream: @escaping @Sendable () -> AsyncThrowingStream<Element, Error>,
+) -> AsyncThrowingStream<Element, Error> {
+    AsyncThrowingStream { continuation in
+        let task = Task {
+            do {
+                try await Device.withDefaultDevice(device) {
+                    let stream = makeStream()
+                    for try await element in stream {
+                        continuation.yield(element)
+                    }
+                }
+                continuation.finish()
+            } catch is CancellationError {
+                continuation.finish(throwing: CancellationError())
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+        continuation.onTermination = { _ in task.cancel() }
+    }
 }
