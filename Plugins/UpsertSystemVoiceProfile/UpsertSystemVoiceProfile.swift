@@ -106,9 +106,12 @@ struct UpsertSystemVoiceProfilePlugin: CommandPlugin {
                 else {
                     continue
                 }
+                guard let ok = payload["ok"] as? Bool else {
+                    continue
+                }
 
                 return ToolResult(
-                    ok: payload["ok"] as? Bool == true,
+                    ok: ok,
                     message: payload["message"] as? String
                         ?? payload["error"] as? String
                         ?? "SpeakSwiftlyTool returned a failure response for request '\(requestID)'.",
