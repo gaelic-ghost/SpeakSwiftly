@@ -1,6 +1,5 @@
 #if os(macOS)
 import Foundation
-@testable import SpeakSwiftly
 
 func speakSwiftlyE2ETestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_E2E"] == "1"
@@ -19,11 +18,9 @@ func speakSwiftlyDeepTraceE2ETestsEnabled() -> Bool {
 }
 
 func speakSwiftlyQwenBenchmarkE2ETestsEnabled() -> Bool {
-    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
-}
-
-func speakSwiftlyQwenQuantBenchmarkE2ETestsEnabled() -> Bool {
-    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_E2E"] == "1"
+    let environment = ProcessInfo.processInfo.environment
+    return environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
+        || environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E"] == "1"
 }
 
 func speakSwiftlyQwenLongFormE2ETestsEnabled() -> Bool {
@@ -36,44 +33,34 @@ func speakSwiftlyQwenBackendE2ETestsEnabled() -> Bool {
 
 func speakSwiftlyQwenBenchmarkIterations() -> Int {
     let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS"] ?? ""
+    if let parsed = Int(rawValue) {
+        return max(1, parsed)
+    }
+
+    return speakSwiftlyBackendBenchmarkIterations()
+}
+
+func speakSwiftlyBackendBenchmarkE2ETestsEnabled() -> Bool {
+    speakSwiftlyBackendBenchmarkComparisonEnabled()
+        || speakSwiftlyQwenQuantizationBenchmarkE2ETestsEnabled()
+}
+
+func speakSwiftlyBackendBenchmarkComparisonEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E"] == "1"
+}
+
+func speakSwiftlyQwenQuantizationBenchmarkE2ETestsEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANTIZATION_BENCHMARK_E2E"] == "1"
+}
+
+func speakSwiftlyBackendBenchmarkIterations() -> Int {
+    let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS"] ?? ""
     return max(1, Int(rawValue) ?? 1)
 }
 
-func speakSwiftlyQwenQuantBenchmarkBackends() -> [SpeakSwiftly.SpeechBackend] {
-    let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_BACKENDS"] ?? ""
-    let requestedBackends = rawValue
-        .split(separator: ",")
-        .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-
-    guard !requestedBackends.isEmpty else {
-        return SpeakSwiftly.SpeechBackend.qwenFamilyBackends
-    }
-
-    var backends = [SpeakSwiftly.SpeechBackend]()
-    var invalidBackends = [String]()
-    for requestedBackend in requestedBackends {
-        if let backend = SpeakSwiftly.SpeechBackend.normalized(rawValue: requestedBackend) {
-            backends.append(backend)
-        } else {
-            invalidBackends.append(requestedBackend)
-        }
-    }
-
-    precondition(
-        invalidBackends.isEmpty,
-        """
-        SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_BACKENDS contains unsupported backend value(s): \(invalidBackends.joined(separator: ", ")). \
-        Use one or more SpeechBackend.qwenFamilyBackends raw values separated by commas.
-        """,
-    )
-    return backends
+func speakSwiftlyBackendBenchmarkAudibleEnabled() -> Bool {
+    let environment = ProcessInfo.processInfo.environment
+    return environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE"] == "1"
+        || environment["SPEAKSWIFTLY_AUDIBLE_E2E"] == "1"
 }
-
-func speakSwiftlyQwenQuantBenchmarkDeviceLabel() -> String? {
-    let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_DEVICE_LABEL"] ?? ""
-    let label = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    return label.isEmpty ? nil : label
-}
-
 #endif
