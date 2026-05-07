@@ -17,7 +17,9 @@ struct ProfileStore: @unchecked Sendable {
     static let textProfilesFileName = "text-profiles.json"
     static let configurationFileName = "configuration.json"
     static let runtimeStateRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_STATE_ROOT"
-    static let profileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
+    static let deprecatedProfileRootOverrideEnvironmentVariable = "SPEAKSWIFTLY_PROFILE_ROOT"
+    @available(*, deprecated, message: "Use SPEAKSWIFTLY_STATE_ROOT or SpeakSwiftly.liftoff(stateRootURL:) instead.")
+    static let profileRootOverrideEnvironmentVariable = deprecatedProfileRootOverrideEnvironmentVariable
     static let manifestFileName = "profile.json"
     static let audioFileName = "reference.wav"
     static let manifestVersion = 5
@@ -84,7 +86,7 @@ struct ProfileStore: @unchecked Sendable {
         }
 
         if let path = nonEmptyEnvironmentValue(
-            environment[profileRootOverrideEnvironmentVariable],
+            environment[deprecatedProfileRootOverrideEnvironmentVariable],
         ) {
             return RuntimeStateRootOverride(path: path, source: .deprecatedProfileRoot)
         }

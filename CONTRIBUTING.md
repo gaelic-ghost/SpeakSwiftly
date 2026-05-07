@@ -62,6 +62,7 @@ Runtime state normally lives under the platform Application Support directory. U
 Useful environment variables include:
 
 - `SPEAKSWIFTLY_STATE_ROOT` for an isolated worker state root when startup arguments are not available
+- `SPEAKSWIFTLY_PROFILE_ROOT` is a deprecated compatibility alias for older hosts; do not use it in new integrations
 - `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback
 - `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` for Qwen resident model selection fallback
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests

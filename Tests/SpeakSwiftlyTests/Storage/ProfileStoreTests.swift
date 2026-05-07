@@ -425,7 +425,7 @@ import Testing
 @Test func `runtime state root environment override supersedes deprecated profile root alias`() {
     let environment = [
         ProfileStore.runtimeStateRootOverrideEnvironmentVariable: "/tmp/speakswiftly-state-root",
-        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+        ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
     ]
 
     #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(
@@ -437,7 +437,7 @@ import Testing
 
 @Test func `deprecated profile root environment alias remains compatible`() {
     let environment = [
-        ProfileStore.profileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
+        ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable: "/tmp/speakswiftly-profile-root",
     ]
 
     #expect(ProfileStore.runtimeStateRootOverride(in: environment) == ProfileStore.RuntimeStateRootOverride(

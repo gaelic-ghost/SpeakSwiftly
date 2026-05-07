@@ -25,8 +25,9 @@ public enum SpeakSwiftly {
     ///   - configuration: Optional startup configuration for backend selection
     ///     and text normalization.
     ///   - stateRootURL: Optional runtime state directory. When omitted,
-    ///     SpeakSwiftly uses the platform Application Support default unless a
-    ///     process-level compatibility override is set.
+    ///     SpeakSwiftly uses the platform Application Support default. Hosts
+    ///     that need isolated persistent state should pass this explicitly
+    ///     instead of relying on process environment overrides.
     /// - Returns: A live ``Runtime`` that owns request submission, playback, and stored resources.
     public static func liftoff(
         configuration: SpeakSwiftly.Configuration? = nil,

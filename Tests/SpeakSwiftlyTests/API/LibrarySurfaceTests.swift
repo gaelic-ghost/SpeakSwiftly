@@ -188,6 +188,34 @@ import Darwin
     #expect(await (runtime.normalizer.persistence.url())?.lastPathComponent == expectedURL.lastPathComponent)
 }
 
+@Test func `liftoff state root parameter supersedes deprecated profile root environment alias`() async {
+    let explicitStateRoot = makeTempDirectoryURL()
+    let deprecatedProfileRoot = makeTempDirectoryURL()
+    defer {
+        try? FileManager.default.removeItem(at: explicitStateRoot)
+        try? FileManager.default.removeItem(at: deprecatedProfileRoot)
+    }
+
+    let environmentVariable = ProfileStore.deprecatedProfileRootOverrideEnvironmentVariable
+    let previousValue = ProcessInfo.processInfo.environment[environmentVariable]
+    setenv(environmentVariable, deprecatedProfileRoot.path, 1)
+    defer {
+        if let previousValue {
+            setenv(environmentVariable, previousValue, 1)
+        } else {
+            unsetenv(environmentVariable)
+        }
+    }
+
+    let runtime = await SpeakSwiftly.liftoff(stateRootURL: explicitStateRoot)
+    let expectedURL = ProfileStore.defaultTextProfilesURL(
+        fileManager: .default,
+        stateRootOverride: explicitStateRoot.path,
+    )
+
+    #expect(await runtime.normalizer.persistence.url()?.standardizedFileURL == expectedURL.standardizedFileURL)
+}
+
 @Test func `liftoff state root parameter preserves persisted configuration`() async throws {
     let stateRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: stateRoot) }

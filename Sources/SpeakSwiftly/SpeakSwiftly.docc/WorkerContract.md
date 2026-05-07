@@ -64,7 +64,7 @@ The worker emits both status events and request-scoped events. For example:
 Status events describe the shared runtime. Request-scoped events and terminal payloads describe one submitted operation.
 During startup warmup, queued work uses `waiting_for_resident_model`. After an explicit unload, parked work uses `waiting_for_resident_models`.
 
-`get_runtime_overview` returns a `runtime_overview.storage` object for parent processes that need to verify which persisted state they are supervising. The storage snapshot reports the resolved state root, profile-store root, persisted configuration path, text-profile archive path, generated-file root, and generation-job root. By default, those paths live under the platform Application Support directory; `stateRootURL` and `--state-root` intentionally move the whole storage family together.
+`get_runtime_overview` returns a `runtime_overview.storage` object for parent processes that need to verify which persisted state they are supervising. The storage snapshot reports the resolved state root, profile-store root, persisted configuration path, text-profile archive path, generated-file root, and generation-job root. By default, those paths live under the platform Application Support directory; `stateRootURL`, `--state-root`, and `SPEAKSWIFTLY_STATE_ROOT` intentionally move the whole storage family together. `SPEAKSWIFTLY_PROFILE_ROOT` remains accepted only as a deprecated compatibility alias for older hosts.
 
 ## Choose Between Swift And JSONL
 

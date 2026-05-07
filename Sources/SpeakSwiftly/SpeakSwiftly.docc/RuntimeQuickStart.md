@@ -45,6 +45,11 @@ let runtime = await SpeakSwiftly.liftoff(
 )
 ```
 
+`SPEAKSWIFTLY_PROFILE_ROOT` remains accepted only as a deprecated compatibility
+alias for older hosts. New hosts should pass `stateRootURL`, pass `--state-root`
+to the worker executable, or use `SPEAKSWIFTLY_STATE_ROOT` when startup
+arguments are not available.
+
 ## Generate Playback Or Files
 
 Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:sourceFormat:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
