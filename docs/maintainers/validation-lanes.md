@@ -81,7 +81,7 @@ gate light. The required check is the `validate` job in
 validation wrapper.
 
 The heavier Swift workflow in `.github/workflows/swift.yml` is release-grade CI
-for manual dispatch and tagged releases. It keeps the manifest sanity check as:
+for manual dispatch only. It keeps the manifest sanity check as:
 
 ```bash
 swift package dump-package
