@@ -59,6 +59,23 @@ let package = Package(
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
         ),
+        .plugin(
+            name: "CreateSystemVoiceProfile",
+            capability: .command(
+                intent: .custom(
+                    verb: "create-system-voice-profile",
+                    description: "Generate a SpeakSwiftly system voice profile into a target resource bundle",
+                ),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Generated system voice profiles are durable package resources owned by the consumer target.",
+                    ),
+                ],
+            ),
+            dependencies: [
+                "SpeakSwiftlyTool",
+            ],
+        ),
         .testTarget(
             name: "SpeakSwiftlyTests",
             dependencies: [

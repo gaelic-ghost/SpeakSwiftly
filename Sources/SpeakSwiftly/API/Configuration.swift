@@ -67,6 +67,8 @@ public extension SpeakSwiftly {
         public let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         /// The stored voice profile used when callers do not choose one explicitly.
         public let defaultVoiceProfile: SpeakSwiftly.Name
+        /// Extra bundled system-profile roots supplied by host packages at startup.
+        public let systemProfileResourceRoots: [URL]
         /// An optional text normalizer to reuse instead of creating the default one.
         public let textNormalizer: SpeakSwiftly.Normalizer?
 
@@ -76,12 +78,14 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
+            systemProfileResourceRoots: [URL] = [],
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.marvisResidentPolicy = marvisResidentPolicy
             self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
+            self.systemProfileResourceRoots = systemProfileResourceRoots.map(\.standardizedFileURL)
             self.textNormalizer = textNormalizer
         }
 
@@ -110,6 +114,7 @@ public extension SpeakSwiftly {
                     forKey: .defaultVoiceProfile,
                 ),
             )
+            systemProfileResourceRoots = []
             textNormalizer = nil
         }
 

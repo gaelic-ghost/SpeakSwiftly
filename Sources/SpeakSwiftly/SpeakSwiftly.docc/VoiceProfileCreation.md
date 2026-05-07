@@ -63,6 +63,30 @@ library creation surface. Ordinary rename, delete, and in-place reroll operation
 reject them with explicit errors. If a user rerolls a system profile, SpeakSwiftly
 creates a user-owned copy instead so the built-in default remains stable.
 
+Consumer packages can author system profiles with the SwiftPM command plugin:
+
+```bash
+swift package plugin --allow-writing-to-package-directory create-system-voice-profile \
+  --target SpeakSwiftlyServer \
+  --name server-announcer \
+  --text "A clear server status voice." \
+  --vibe femme \
+  --voice-description "Clear, bright, steady, and concise."
+```
+
+The target that owns those generated resources should declare
+`.copy("Resources/SystemProfiles")` and pass its bundled root into liftoff:
+
+```swift
+let systemProfileRoots = [
+    SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module),
+].compactMap(\.self)
+
+let runtime = await SpeakSwiftly.liftoff(
+    configuration: .init(systemProfileResourceRoots: systemProfileRoots)
+)
+```
+
 ## Observe Completion
 
 Both creation paths return a request handle, so completion is observed the same way as speech generation:

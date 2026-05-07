@@ -87,6 +87,7 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             marvisResidentPolicy: configuredMarvisResidentPolicy,
         )
@@ -97,7 +98,11 @@ extension SpeakSwiftly.Runtime {
             ),
             fileManager: dependencies.fileManager,
         )
-        seedBundledSystemProfilesIfAvailable(into: profileStore, dependencies: dependencies)
+        seedSystemProfilesIfAvailable(
+            from: configuredSystemProfileResourceRoots,
+            into: profileStore,
+            dependencies: dependencies,
+        )
         let systemProfileResourceStore = systemProfileResourceRootURL.map {
             ProfileStore(
                 rootURL: ProfileStore.systemProfileResourceRootURL(from: $0),
@@ -138,26 +143,51 @@ extension SpeakSwiftly.Runtime {
         return runtime
     }
 
-    private static func seedBundledSystemProfilesIfAvailable(
+    private static func seedSystemProfilesIfAvailable(
+        from configuredResourceRootURLs: [URL],
         into profileStore: ProfileStore,
         dependencies: WorkerDependencies,
     ) {
-        guard let resourceRootURL = SpeakSwiftly.SupportResources.bundledSystemProfileRootURL(
+        var seedRoots: [(source: String, url: URL)] = []
+
+        if let bundledRootURL = SpeakSwiftly.SupportResources.bundledSystemProfileRootURL(
             fileManager: dependencies.fileManager,
-        ) else {
-            return
+        ) {
+            seedRoots.append(("SpeakSwiftly bundled", bundledRootURL))
         }
 
+        seedRoots.append(
+            contentsOf: configuredResourceRootURLs.map {
+                ("configured", ProfileStore.systemProfileResourceRootURL(from: $0))
+            },
+        )
+
+        for seedRoot in seedRoots {
+            seedSystemProfilesIfAvailable(
+                from: seedRoot.url,
+                source: seedRoot.source,
+                into: profileStore,
+                dependencies: dependencies,
+            )
+        }
+    }
+
+    private static func seedSystemProfilesIfAvailable(
+        from resourceRootURL: URL,
+        source: String,
+        into profileStore: ProfileStore,
+        dependencies: WorkerDependencies,
+    ) {
         do {
             let summary = try profileStore.seedSystemProfiles(from: resourceRootURL)
             guard summary.changedCount > 0 else { return }
 
             dependencies.writeStderr(
-                "SpeakSwiftly seeded \(summary.installedCount) bundled system voice profile(s) and refreshed \(summary.replacedCount) bundled system voice profile(s) from '\(resourceRootURL.path)'.\n",
+                "SpeakSwiftly seeded \(summary.installedCount) \(source) system voice profile(s) and refreshed \(summary.replacedCount) \(source) system voice profile(s) from '\(resourceRootURL.path)'.\n",
             )
         } catch {
             dependencies.writeStderr(
-                "SpeakSwiftly could not seed bundled system voice profiles from '\(resourceRootURL.path)'. SpeakSwiftly will continue with the existing writable profile store. \(error.localizedDescription)\n",
+                "SpeakSwiftly could not seed \(source) system voice profiles from '\(resourceRootURL.path)'. SpeakSwiftly will continue with the existing writable profile store. \(error.localizedDescription)\n",
             )
         }
     }
