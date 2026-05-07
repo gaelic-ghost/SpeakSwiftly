@@ -87,6 +87,11 @@ let runtime = await SpeakSwiftly.liftoff(
 )
 ```
 
+The plugin may leave `.profile-store.lock` in `Resources/SystemProfiles/profiles/`.
+That file coordinates profile-store writers; it is not a profile resource and should
+not be committed with reviewed built-ins. It is safe to remove once the plugin or
+tool process has exited and no SpeakSwiftly process is using that resource root.
+
 ## Observe Completion
 
 Both creation paths return a request handle, so completion is observed the same way as speech generation:

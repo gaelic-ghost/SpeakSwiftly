@@ -28,4 +28,7 @@ htmlcov/
 # Local plugin cache noise
 /.codex/plugins/**/assets/repo-maintenance/release/
 
+# Profile store coordination artifacts
+**/.profile-store.lock
+
 !scripts/repo-maintenance/release/*.sh

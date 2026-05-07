@@ -68,6 +68,11 @@ During startup warmup, queued work uses `waiting_for_resident_model`. After an e
 
 `upsert_system_voice_profile_from_description` is a development-time resource authoring operation. Start `SpeakSwiftlyTool` with `--system-profile-resource-root PATH` before using it; the tool inserts or updates the generated system profile under `PATH/profiles/` so the directory can be bundled with the `SpeakSwiftly` target. In this resource-authoring mode, `SpeakSwiftlyTool` starts with resident playback models unloaded and prepared Qwen conditioning remains lazy. Runtime startup seeds bundled system profiles from the package resource bundle into the writable profile store. Without `--system-profile-resource-root`, system-profile upserts are rejected instead of installing package-owned profiles into ordinary runtime state.
 
+Resource authoring may leave `.profile-store.lock` under `PATH/profiles/`. The
+lock coordinates profile-store writers and is not part of the generated profile
+payload. Do not commit it with bundled system profiles; remove it only after the
+authoring process exits and no SpeakSwiftly process is using that profile root.
+
 ## Choose Between Swift And JSONL
 
 Use the typed Swift runtime when you want a native library surface, direct async streams, and focused concern handles like ``SpeakSwiftly/Runtime/generate`` or ``SpeakSwiftly/Runtime/playback``.
