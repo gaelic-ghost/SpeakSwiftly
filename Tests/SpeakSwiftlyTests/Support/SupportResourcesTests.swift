@@ -1,5 +1,5 @@
 import Foundation
-import SpeakSwiftly
+@testable import SpeakSwiftly
 import Testing
 
 @Test func `vendored MLX bundle is present and readable`() throws {
@@ -33,4 +33,11 @@ import Testing
         #expect(FileManager.default.fileExists(atPath: profileURL.appendingPathComponent("profile.json").path))
         #expect(FileManager.default.fileExists(atPath: profileURL.appendingPathComponent("reference.wav").path))
     }
+}
+
+@Test func `system profile resource root is bundled`() throws {
+    let rootURL = try #require(SpeakSwiftly.SupportResources.bundledSystemProfileRootURL())
+    #expect(rootURL.lastPathComponent == "profiles")
+    #expect(rootURL.deletingLastPathComponent().lastPathComponent == "SystemProfiles")
+    #expect(FileManager.default.fileExists(atPath: rootURL.path))
 }

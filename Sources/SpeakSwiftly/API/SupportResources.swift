@@ -28,6 +28,8 @@ public extension SpeakSwiftly {
         /// The package resource bundle for the SpeakSwiftly target.
         public static let bundle: Bundle = .module
 
+        package static let systemProfileResourcesDirectoryName = "SystemProfiles"
+
         /// Returns the vendored MLX bundle URL.
         public static func mlxBundleURL() throws -> URL {
             let expectedURL = bundle.resourceURL?
@@ -70,6 +72,24 @@ public extension SpeakSwiftly {
             }
 
             return metallibURL
+        }
+
+        package static func bundledSystemProfileRootURL(fileManager: FileManager = .default) -> URL? {
+            guard let resourceURL = bundle.resourceURL else { return nil }
+
+            let rootURL = resourceURL
+                .appendingPathComponent(systemProfileResourcesDirectoryName, isDirectory: true)
+                .appendingPathComponent(ProfileStore.profilesDirectoryName, isDirectory: true)
+                .standardizedFileURL
+
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue
+            else {
+                return nil
+            }
+
+            return rootURL
         }
     }
 }

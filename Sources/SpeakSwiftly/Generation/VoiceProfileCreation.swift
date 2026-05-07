@@ -18,7 +18,9 @@ extension SpeakSwiftly.Runtime {
         seed: SpeakSwiftly.ProfileSeed? = nil,
         outputPath: String?,
         cwd: String?,
+        profileStore targetProfileStore: ProfileStore? = nil,
     ) async throws -> StoredProfile {
+        let profileStore = targetProfileStore ?? profileStore
         let op = WorkerRequest.createProfile(
             id: id,
             profileName: profileName,
@@ -91,7 +93,6 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
-        let profileStore = profileStore
         var storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,
@@ -121,6 +122,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: storedProfile,
+            profileStore: profileStore,
         )
 
         if let outputPath {
@@ -261,6 +263,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: storedProfile,
+            profileStore: profileStore,
         )
 
         return storedProfile
@@ -270,6 +273,7 @@ extension SpeakSwiftly.Runtime {
         requestID id: String,
         op: String,
         profile: StoredProfile,
+        profileStore: ProfileStore,
     ) async throws -> StoredProfile {
         guard speechBackend.isQwenFamily, qwenConditioningStrategy == .preparedConditioning else {
             return profile
@@ -284,6 +288,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: profile,
+            profileStore: profileStore,
             backend: speechBackend,
             model: model,
         )

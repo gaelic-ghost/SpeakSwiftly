@@ -149,9 +149,11 @@ extension SpeakSwiftly.Runtime {
         requestID id: String,
         op: String,
         profile: StoredProfile,
+        profileStore: ProfileStore? = nil,
         backend: SpeakSwiftly.SpeechBackend,
         model: AnySpeechModel,
     ) async throws -> Qwen3TTSModel.Qwen3TTSReferenceConditioning {
+        let activeProfileStore = profileStore ?? self.profileStore
         let activeModelRepo = ModelFactory.residentModelRepo(for: backend)
 
         if let storedArtifact = profile.qwenConditioningArtifact(for: backend, modelRepo: activeModelRepo) {
@@ -175,7 +177,7 @@ extension SpeakSwiftly.Runtime {
             }
 
             let artifactLoadStartedAt = dependencies.now()
-            let loadedConditioning = try profileStore.loadQwenConditioningArtifact(storedArtifact)
+            let loadedConditioning = try activeProfileStore.loadQwenConditioningArtifact(storedArtifact)
             qwenConditioningCache[cacheKey] = loadedConditioning
             await logRequestEvent(
                 "qwen_reference_conditioning_loaded",
@@ -237,7 +239,7 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         let persistenceStartedAt = dependencies.now()
-        let updatedProfile = try profileStore.storeQwenConditioningArtifact(
+        let updatedProfile = try activeProfileStore.storeQwenConditioningArtifact(
             named: profile.manifest.profileName,
             backend: backend,
             modelRepo: activeModelRepo,

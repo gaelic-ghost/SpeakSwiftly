@@ -125,6 +125,7 @@ extension SpeakSwiftly.Runtime {
                     ))
 
                 case let .createProfile(id, profileName, text, vibe, voiceDescription, author, seed, outputPath, cwd):
+                    let targetProfileStore = try profileStore(forProfileCreationAuthor: author)
                     let storedProfile = try await handleCreateProfile(
                         id: id,
                         profileName: profileName,
@@ -135,8 +136,11 @@ extension SpeakSwiftly.Runtime {
                         seed: seed,
                         outputPath: outputPath,
                         cwd: cwd,
+                        profileStore: targetProfileStore,
                     )
-                    invalidateQwenConditioningCache()
+                    if author == .user {
+                        invalidateQwenConditioningCache()
+                    }
                     disposition = .requestCompleted(.success(
                         WorkerSuccessPayload(
                             id: id,
@@ -369,5 +373,21 @@ extension SpeakSwiftly.Runtime {
         }
 
         return generatedFiles
+    }
+
+    private func profileStore(forProfileCreationAuthor author: SpeakSwiftly.ProfileAuthor) throws -> ProfileStore {
+        switch author {
+            case .user:
+                profileStore
+            case .system:
+                if let systemProfileResourceStore {
+                    systemProfileResourceStore
+                } else {
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "System voice profiles must be authored into bundled profile resources. Start SpeakSwiftlyTool with --system-profile-resource-root PATH and point PATH at the package resource directory that should contain the generated system profile resources.",
+                    )
+                }
+        }
     }
 }

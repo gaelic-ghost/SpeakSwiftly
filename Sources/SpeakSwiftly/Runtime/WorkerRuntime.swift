@@ -280,6 +280,7 @@ public extension SpeakSwiftly {
         let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
+        let systemProfileResourceStore: ProfileStore?
         let generatedFileStore: GeneratedFileStore
         let generationJobStore: GenerationJobStore
         let normalizerRef: SpeakSwiftly.Normalizer
@@ -314,6 +315,7 @@ public extension SpeakSwiftly {
             marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
+            systemProfileResourceStore: ProfileStore? = nil,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
             normalizer: SpeakSwiftly.Normalizer,
@@ -325,6 +327,7 @@ public extension SpeakSwiftly {
             self.marvisResidentPolicy = marvisResidentPolicy
             self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
+            self.systemProfileResourceStore = systemProfileResourceStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore
             normalizerRef = normalizer

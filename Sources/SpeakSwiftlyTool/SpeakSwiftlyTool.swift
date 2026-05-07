@@ -5,6 +5,11 @@ import SpeakSwiftly
 
 @main
 enum SpeakSwiftlyTool {
+    private struct Options {
+        var stateRootURL: URL?
+        var systemProfileResourceRootURL: URL?
+    }
+
     private enum ArgumentError: LocalizedError {
         case unknown(String)
         case missingValue(String)
@@ -12,7 +17,7 @@ enum SpeakSwiftlyTool {
         var errorDescription: String? {
             switch self {
                 case let .unknown(argument):
-                    "Unknown argument '\(argument)'. Supported options: --state-root PATH."
+                    "Unknown argument '\(argument)'. Supported options: --state-root PATH and --system-profile-resource-root PATH."
                 case let .missingValue(option):
                     "Missing value for \(option)."
             }
@@ -21,8 +26,11 @@ enum SpeakSwiftlyTool {
 
     static func main() async {
         do {
-            let stateRootURL = try parseStateRootURL(arguments: Array(CommandLine.arguments.dropFirst()))
-            let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRootURL)
+            let options = try parseOptions(arguments: Array(CommandLine.arguments.dropFirst()))
+            let runtime = await SpeakSwiftly.Runtime.liftoff(
+                stateRootURL: options.stateRootURL,
+                systemProfileResourceRootURL: options.systemProfileResourceRootURL,
+            )
             await run(runtime: runtime)
         } catch {
             let message = "SpeakSwiftlyTool could not start because its launch arguments were invalid. \(error.localizedDescription)\n"
@@ -85,17 +93,21 @@ enum SpeakSwiftlyTool {
         outputTask.cancel()
     }
 
-    private static func parseStateRootURL(arguments: [String]) throws -> URL? {
-        guard !arguments.isEmpty else { return nil }
-
-        var stateRootURL: URL?
+    private static func parseOptions(arguments: [String]) throws -> Options {
+        var options = Options()
         var index = 0
         while index < arguments.count {
             let argument = arguments[index]
             switch argument {
                 case "--state-root":
                     index += 1
-                    stateRootURL = try URL(
+                    options.stateRootURL = try URL(
+                        fileURLWithPath: requireOptionValue(arguments, index: index, for: argument),
+                        isDirectory: true,
+                    )
+                case "--system-profile-resource-root":
+                    index += 1
+                    options.systemProfileResourceRootURL = try URL(
                         fileURLWithPath: requireOptionValue(arguments, index: index, for: argument),
                         isDirectory: true,
                     )
@@ -105,7 +117,7 @@ enum SpeakSwiftlyTool {
             index += 1
         }
 
-        return stateRootURL
+        return options
     }
 
     private static func requireOptionValue(

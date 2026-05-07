@@ -821,6 +821,7 @@ func makeRuntime(
         makeCloneTranscriptionModel()
     },
     readRuntimeMemory: @escaping @Sendable () -> RuntimeMemorySnapshot? = { nil },
+    systemProfileResourceStore: ProfileStore? = nil,
 ) async throws -> WorkerRuntime {
     let store = try makeProfileStore(rootURL: rootURL)
     let generatedFileStore = try makeGeneratedFileStore(rootURL: rootURL)
@@ -892,6 +893,7 @@ func makeRuntime(
         qwenConditioningStrategy: qwenConditioningStrategy,
         marvisResidentPolicy: marvisResidentPolicy,
         profileStore: store,
+        systemProfileResourceStore: systemProfileResourceStore,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
         normalizer: normalizer,

@@ -290,21 +290,19 @@ Relevant files:
 ### 7. Voice Creation Labels
 
 The `Voices.create(...)` overload family is mostly sound because the first label
-distinguishes the creation path:
+distinguishes the end-user creation path:
 
 - `create(design:from:vibe:voiceDescription:outputPath:)`
-- `create(builtInDesign:from:vibe:voiceDescription:seed:outputPath:)`
 - `create(clone:from:vibe:transcript:)`
 
 Slice 5 resolves the two roughest labels: the voice prompt now appears as
-`voiceDescription:` at the use site, and package-owned seed creation now appears
-as `builtInDesign:` instead of `systemDesign:`.
+`voiceDescription:` at the use site. Package-owned seed creation is now
+tool-only through `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`, so it no
+longer belongs to the ordinary public `runtime.voices` surface.
 
 Desired direction:
 
 - keep `voiceDescription:` unless callers prove the label is too verbose
-- keep `builtInDesign:` unless package-owned defaults start covering non-built-in
-  resources
 - keep one `create(...)` family unless the implementation proves the overloads
   are making use sites ambiguous
 
@@ -381,7 +379,7 @@ types for Milestone 27 and applied the voice-creation label changes.
 - documented remaining string aliases as a conscious cross-surface compatibility
   choice
 - changed designed voice prompts to `voiceDescription:`
-- changed trusted package-owned defaults to `builtInDesign:`
+- moved trusted package-owned default creation to the tool-only surface
 
 ## Non-Goals
 

@@ -5,15 +5,18 @@
 This note captures the `SpeakSwiftly` side of package-owned default voice support.
 
 `SpeakSwiftlyServer` wants to ship broad-appeal built-in defaults named `swift-signal` and
-`swift-anchor`. The server can own its install command and seed catalog, but this package owns the
-stored voice-profile type, profile persistence, profile mutation rules, and reroll behavior. That
-means authorship and system-profile immutability need to be modeled here first.
+`swift-anchor`. Downstream packages can use `SpeakSwiftlyTool` to author package-owned profiles into
+bundled profile resources, but this package owns the stored voice-profile type, profile persistence,
+startup resource seeding, profile mutation rules, and reroll behavior. That means authorship and
+system-profile immutability need to be modeled here first.
 
 ## Goals
 
 - keep ordinary profile creation flows user-owned by default
 - let downstream packages install package-owned default voices without mixing them with personal
   voice profiles
+- keep system-profile creation as a bundled-resource authoring workflow instead of an ordinary
+  runtime-state install path
 - preserve stable seed identity separately from the visible profile name
 - make package-owned system profiles refreshable without overwriting user intent
 - keep public API additions narrow and only expose metadata application consumers need
@@ -79,7 +82,10 @@ the system profile already owns the preferred name, the copy needs a clear confl
 
 ## Refresh Direction
 
-Refresh should be treated as seed maintenance, not ordinary profile reroll.
+Refresh should be treated as seed maintenance, not ordinary profile reroll. Runtime startup seeds
+bundled system-profile resources into the writable profile store so package-owned defaults are
+available immediately to ordinary generation calls while still giving the runtime a writable place
+for backend conditioning artifacts.
 
 A future refresh command should compare installed seed metadata against the current seed catalog and
 then report what it would change before mutating anything. Useful commands or surfaces include:
@@ -114,7 +120,9 @@ being forced into every public response payload.
 3. [x] Enforce mutation rules for `.system` profiles in rename, delete, and reroll paths.
 4. [x] Add reroll-as-user-copy behavior for system profiles.
 5. [x] Add tests for migration, list summaries, mutation rejection, and system reroll copy behavior.
-6. [ ] Coordinate a tagged `SpeakSwiftly` release before `SpeakSwiftlyServer` depends on the new
+6. [x] Add bundled system-profile resource seeding and make system-profile creation require an
+   explicit `SpeakSwiftlyTool --system-profile-resource-root` destination.
+7. [ ] Coordinate a tagged `SpeakSwiftly` release before `SpeakSwiftlyServer` depends on the new
    authorship behavior.
 
 ## Open Questions

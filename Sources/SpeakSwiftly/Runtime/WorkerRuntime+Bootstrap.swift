@@ -50,9 +50,10 @@ extension SpeakSwiftly.Runtime {
             .appendingPathExtension("invalid-\(Int(Date().timeIntervalSince1970)).json")
     }
 
-    static func liftoff(
+    package static func liftoff(
         configuration: SpeakSwiftly.Configuration? = nil,
         stateRootURL: URL? = nil,
+        systemProfileResourceRootURL: URL? = nil,
     ) async -> SpeakSwiftly.Runtime {
         let environment = ProcessInfo.processInfo.environment
         let bootstrapDependencies = WorkerDependencies.live()
@@ -96,6 +97,13 @@ extension SpeakSwiftly.Runtime {
             ),
             fileManager: dependencies.fileManager,
         )
+        seedBundledSystemProfilesIfAvailable(into: profileStore, dependencies: dependencies)
+        let systemProfileResourceStore = systemProfileResourceRootURL.map {
+            ProfileStore(
+                rootURL: ProfileStore.systemProfileResourceRootURL(from: $0),
+                fileManager: dependencies.fileManager,
+            )
+        }
         let generatedFileStore = GeneratedFileStore(
             rootURL: profileStore.rootURL.appendingPathComponent(GeneratedFileStore.directoryName, isDirectory: true),
         )
@@ -120,6 +128,7 @@ extension SpeakSwiftly.Runtime {
             marvisResidentPolicy: configuredMarvisResidentPolicy,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
+            systemProfileResourceStore: systemProfileResourceStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
             normalizer: normalizer,
@@ -127,6 +136,30 @@ extension SpeakSwiftly.Runtime {
         )
         await runtime.installPlaybackHooks()
         return runtime
+    }
+
+    private static func seedBundledSystemProfilesIfAvailable(
+        into profileStore: ProfileStore,
+        dependencies: WorkerDependencies,
+    ) {
+        guard let resourceRootURL = SpeakSwiftly.SupportResources.bundledSystemProfileRootURL(
+            fileManager: dependencies.fileManager,
+        ) else {
+            return
+        }
+
+        do {
+            let summary = try profileStore.seedSystemProfiles(from: resourceRootURL)
+            guard summary.changedCount > 0 else { return }
+
+            dependencies.writeStderr(
+                "SpeakSwiftly seeded \(summary.installedCount) bundled system voice profile(s) and refreshed \(summary.replacedCount) bundled system voice profile(s) from '\(resourceRootURL.path)'.\n",
+            )
+        } catch {
+            dependencies.writeStderr(
+                "SpeakSwiftly could not seed bundled system voice profiles from '\(resourceRootURL.path)'. SpeakSwiftly will continue with the existing writable profile store. \(error.localizedDescription)\n",
+            )
+        }
     }
 
     static func resolvedSpeechBackend(

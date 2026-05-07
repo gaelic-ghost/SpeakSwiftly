@@ -248,6 +248,53 @@ import Testing
     }
 }
 
+@Test func `seeds bundled system profile resources into writable profile store`() throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let resourceProfileRoot = tempRoot
+        .appendingPathComponent("SystemProfiles", isDirectory: true)
+        .appendingPathComponent("profiles", isDirectory: true)
+    let writableProfileRoot = tempRoot
+        .appendingPathComponent("RuntimeState", isDirectory: true)
+        .appendingPathComponent("profiles", isDirectory: true)
+    let resourceStore = ProfileStore(rootURL: resourceProfileRoot, fileManager: fileManager)
+    let writableStore = ProfileStore(rootURL: writableProfileRoot, fileManager: fileManager)
+
+    _ = try resourceStore.createProfile(
+        profileName: "swift-signal",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Bright and clear.",
+        sourceText: "Hello there",
+        author: .system,
+        seed: SpeakSwiftly.ProfileSeed(
+            seedID: "swift.signal",
+            seedVersion: "1",
+            intendedProfileName: "swift-signal",
+            sourcePackage: "SpeakSwiftlyTests",
+        ),
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+    )
+
+    let summary = try writableStore.seedSystemProfiles(from: resourceProfileRoot)
+    #expect(summary.installedCount == 1)
+    #expect(summary.replacedCount == 0)
+    #expect(summary.skippedCurrentCount == 0)
+    #expect(summary.skippedUserConflictCount == 0)
+
+    let installed = try writableStore.loadProfile(named: "swift-signal")
+    #expect(installed.manifest.author == .system)
+    #expect(installed.manifest.seed?.seedID == "swift.signal")
+
+    let currentSummary = try writableStore.seedSystemProfiles(from: resourceProfileRoot)
+    #expect(currentSummary.installedCount == 0)
+    #expect(currentSummary.replacedCount == 0)
+    #expect(currentSummary.skippedCurrentCount == 1)
+}
+
 @Test func `rejects duplicate profiles`() throws {
     let fileManager = FileManager.default
     let tempRoot = makeTempDirectoryURL()

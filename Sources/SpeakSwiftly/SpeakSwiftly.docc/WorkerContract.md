@@ -66,6 +66,8 @@ During startup warmup, queued work uses `waiting_for_resident_model`. After an e
 
 `get_runtime_overview` returns a `runtime_overview.storage` object for parent processes that need to verify which persisted state they are supervising. The storage snapshot reports the resolved state root, profile-store root, persisted configuration path, text-profile archive path, generated-file root, and generation-job root. By default, those paths live under the platform Application Support directory; `stateRootURL`, `--state-root`, and `SPEAKSWIFTLY_STATE_ROOT` intentionally move the whole storage family together. `SPEAKSWIFTLY_PROFILE_ROOT` remains accepted only as a deprecated compatibility alias for older hosts.
 
+`create_system_voice_profile_from_description` is a development-time resource authoring operation. Start `SpeakSwiftlyTool` with `--system-profile-resource-root PATH` before using it; the tool writes the generated system profile under `PATH/profiles/` so the directory can be bundled with the `SpeakSwiftly` target. Runtime startup seeds bundled system profiles from the package resource bundle into the writable profile store. Without `--system-profile-resource-root`, system-profile creation is rejected instead of installing package-owned profiles into ordinary runtime state.
+
 ## Choose Between Swift And JSONL
 
 Use the typed Swift runtime when you want a native library surface, direct async streams, and focused concern handles like ``SpeakSwiftly/Runtime/generate`` or ``SpeakSwiftly/Runtime/playback``.
