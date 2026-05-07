@@ -72,12 +72,36 @@ Useful environment variables include:
 
 System voice profiles are package-owned bundled resources, not ordinary end-user library creations. The only supported authoring workflow is:
 
-1. Build or launch `SpeakSwiftlyTool` with `--system-profile-resource-root PATH`.
+1. Run the `create-system-voice-profile` SwiftPM command plugin from the consumer package checkout, or build/launch `SpeakSwiftlyTool` with `--system-profile-resource-root PATH` for lower-level maintainer work.
 2. Submit `create_system_voice_profile_from_description` through the tool JSONL surface or `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`.
-3. Review the generated profile under `PATH/profiles/<profile-name>/`.
-4. Bundle the reviewed profile directory under `Sources/SpeakSwiftly/Resources/SystemProfiles/profiles/`.
+3. Review the generated profile under `Resources/SystemProfiles/profiles/<profile-name>/` in the consumer target, or under `PATH/profiles/<profile-name>/` when using the tool directly.
+4. Bundle the reviewed profile directory with the target that owns it by declaring `.copy("Resources/SystemProfiles")` in that target's package manifest entry.
+5. Pass that target's bundled root into SpeakSwiftly at startup with `SpeakSwiftly.Configuration(systemProfileResourceRoots:)`, usually from `SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module)`.
 
-At runtime, SpeakSwiftly loads bundled system profiles from the package resource bundle and seeds them into the writable profile store. Do not expose system-profile creation through `runtime.voices` or any ordinary public end-user API. If `create_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
+For example, a consumer package target can generate a bundled system profile with:
+
+```bash
+swift package plugin --allow-writing-to-package-directory create-system-voice-profile \
+  --target SpeakSwiftlyServer \
+  --name server-announcer \
+  --text "A clear server status voice." \
+  --vibe femme \
+  --voice-description "Clear, bright, steady, and concise."
+```
+
+Then the consuming target should pass its bundled system-profile root during startup:
+
+```swift
+let systemProfileRoots = [
+    SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module),
+].compactMap(\.self)
+
+let runtime = await SpeakSwiftly.liftoff(
+    configuration: .init(systemProfileResourceRoots: systemProfileRoots)
+)
+```
+
+At runtime, SpeakSwiftly loads bundled system profiles from its own package resource bundle and from configured consumer resource roots, then seeds them into the writable profile store. Do not expose system-profile creation through `runtime.voices` or any ordinary public end-user API. If `create_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
 
 ### Runtime Behavior
 

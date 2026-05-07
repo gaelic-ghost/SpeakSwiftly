@@ -50,6 +50,23 @@ let runtime = await SpeakSwiftly.liftoff(
 )
 ```
 
+When a host package owns generated system profiles, bundle them under that
+host target's resources and pass the bundled root at startup:
+
+```swift
+let systemProfileRoots = [
+    SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module),
+].compactMap(\.self)
+
+let runtime = await SpeakSwiftly.liftoff(
+    configuration: .init(systemProfileResourceRoots: systemProfileRoots)
+)
+```
+
+SpeakSwiftly seeds those bundled system profiles into its writable profile store
+during liftoff. After startup, callers use them by name like any other available
+voice profile.
+
 `SPEAKSWIFTLY_PROFILE_ROOT` remains accepted only as a deprecated compatibility
 alias for older hosts. New hosts should pass `stateRootURL`, pass `--state-root`
 to the worker executable, or use `SPEAKSWIFTLY_STATE_ROOT` when startup

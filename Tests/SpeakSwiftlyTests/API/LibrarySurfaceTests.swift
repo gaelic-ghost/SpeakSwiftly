@@ -63,6 +63,14 @@ import Darwin
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
+@Test func `public configuration carries startup system profile resource roots`() {
+    let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let configuration = SpeakSwiftly.Configuration(systemProfileResourceRoots: [rootURL])
+
+    #expect(configuration.systemProfileResourceRoots == [rootURL.standardizedFileURL])
+}
+
 @Test func `public configuration round trips to disk`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -83,6 +91,7 @@ import Darwin
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
+    #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
 }
 
@@ -241,6 +250,48 @@ import Darwin
     let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRoot)
 
     #expect(await runtime.speechBackend == .marvis)
+}
+
+@Test func `liftoff seeds configured system profile resource roots`() async throws {
+    let fileManager = FileManager.default
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? fileManager.removeItem(at: tempRoot) }
+
+    let stateRoot = tempRoot.appendingPathComponent("RuntimeState", isDirectory: true)
+    let resourceRoot = tempRoot.appendingPathComponent("SystemProfiles", isDirectory: true)
+    let resourceProfileRoot = resourceRoot.appendingPathComponent("profiles", isDirectory: true)
+    let resourceStore = ProfileStore(rootURL: resourceProfileRoot, fileManager: fileManager)
+
+    _ = try resourceStore.createProfile(
+        profileName: "server-system-profile",
+        vibe: .femme,
+        modelRepo: "test-model",
+        voiceDescription: "Clear and bright.",
+        sourceText: "Hello there",
+        author: .system,
+        seed: SpeakSwiftly.ProfileSeed(
+            seedID: "server.system",
+            seedVersion: "1",
+            intendedProfileName: "server-system-profile",
+            sourcePackage: "SpeakSwiftlyServerTests",
+        ),
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x52, 0x49, 0x46, 0x46]),
+    )
+
+    _ = await SpeakSwiftly.liftoff(
+        configuration: SpeakSwiftly.Configuration(systemProfileResourceRoots: [resourceRoot]),
+        stateRootURL: stateRoot,
+    )
+
+    let writableStore = ProfileStore(
+        rootURL: stateRoot.appendingPathComponent("profiles", isDirectory: true),
+        fileManager: fileManager,
+    )
+    let installedProfile = try writableStore.loadProfile(named: "server-system-profile")
+
+    #expect(installedProfile.manifest.author == .system)
+    #expect(installedProfile.manifest.seed?.seedID == "server.system")
 }
 
 // MARK: - Runtime Helpers

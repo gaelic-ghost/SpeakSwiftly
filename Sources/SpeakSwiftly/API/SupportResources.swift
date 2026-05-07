@@ -30,6 +30,31 @@ public extension SpeakSwiftly {
 
         package static let systemProfileResourcesDirectoryName = "SystemProfiles"
 
+        /// Returns the system-profile resource root inside a package or app bundle.
+        ///
+        /// Pass the host target's `Bundle.module` when a consumer package bundles
+        /// its own generated system profiles.
+        public static func systemProfileRootURL(
+            in bundle: Bundle,
+            fileManager: FileManager = .default,
+        ) -> URL? {
+            guard let resourceURL = bundle.resourceURL else { return nil }
+
+            let rootURL = resourceURL
+                .appendingPathComponent(systemProfileResourcesDirectoryName, isDirectory: true)
+                .appendingPathComponent(ProfileStore.profilesDirectoryName, isDirectory: true)
+                .standardizedFileURL
+
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue
+            else {
+                return nil
+            }
+
+            return rootURL
+        }
+
         /// Returns the vendored MLX bundle URL.
         public static func mlxBundleURL() throws -> URL {
             let expectedURL = bundle.resourceURL?
@@ -75,21 +100,7 @@ public extension SpeakSwiftly {
         }
 
         package static func bundledSystemProfileRootURL(fileManager: FileManager = .default) -> URL? {
-            guard let resourceURL = bundle.resourceURL else { return nil }
-
-            let rootURL = resourceURL
-                .appendingPathComponent(systemProfileResourcesDirectoryName, isDirectory: true)
-                .appendingPathComponent(ProfileStore.profilesDirectoryName, isDirectory: true)
-                .standardizedFileURL
-
-            var isDirectory: ObjCBool = false
-            guard fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue
-            else {
-                return nil
-            }
-
-            return rootURL
+            systemProfileRootURL(in: bundle, fileManager: fileManager)
         }
     }
 }

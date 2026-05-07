@@ -367,14 +367,11 @@ import TextForSpeech
     )
 
     #expect(await waitUntil {
-        FileManager.default.fileExists(
-            atPath: systemResourceStore.profileDirectoryURL(for: "swift-signal").path,
-        )
-    })
-    #expect(output.containsJSONObject {
-        $0["id"] as? String == "req-system"
-            && $0["ok"] as? Bool == true
-            && $0["profile_name"] as? String == "swift-signal"
+        output.containsJSONObject {
+            $0["id"] as? String == "req-system"
+                && $0["ok"] as? Bool == true
+                && $0["profile_name"] as? String == "swift-signal"
+        }
     })
 
     let created = try systemResourceStore.loadProfile(named: "swift-signal")
