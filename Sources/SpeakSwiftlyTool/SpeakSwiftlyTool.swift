@@ -8,7 +8,7 @@ enum SpeakSwiftlyTool {
     private struct Options {
         var stateRootURL: URL?
         var systemProfileResourceRootURL: URL?
-        var allowsProfileModelCPUFallback = false
+        var allowsProfileModelCPUFallback: Bool?
     }
 
     private enum ArgumentError: LocalizedError {
@@ -54,13 +54,28 @@ enum SpeakSwiftlyTool {
         await runtime.start()
 
         do {
+            var requestCompletionTasks = [Task<Void, Never>]()
+
             for try await line in FileHandle.standardInput.bytes.lines {
                 do {
                     let request = try ToolRequest.decode(from: line)
-                    await request.submit(to: runtime)
+                    let handle = await request.submit(to: runtime)
+                    requestCompletionTasks.append(
+                        Task {
+                            do {
+                                _ = try await handle.completion()
+                            } catch {
+                                // Terminal failures are already emitted through the worker output stream.
+                            }
+                        },
+                    )
                 } catch {
                     await output.writeFailure(for: line, error: error)
                 }
+            }
+
+            for task in requestCompletionTasks {
+                await task.value
             }
         } catch {
             let timestamp = ISO8601DateFormatter().string(from: Date())
