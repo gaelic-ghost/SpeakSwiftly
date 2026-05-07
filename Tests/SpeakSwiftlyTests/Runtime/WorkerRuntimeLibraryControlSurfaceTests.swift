@@ -371,6 +371,11 @@ import TextForSpeech
             atPath: systemResourceStore.profileDirectoryURL(for: "swift-signal").path,
         )
     })
+    #expect(output.containsJSONObject {
+        $0["id"] as? String == "req-system"
+            && $0["ok"] as? Bool == true
+            && $0["profile_name"] as? String == "swift-signal"
+    })
 
     let created = try systemResourceStore.loadProfile(named: "swift-signal")
     #expect(created.manifest.author == .system)
@@ -378,6 +383,7 @@ import TextForSpeech
     #expect(created.manifest.seed?.seedVersion == seed.seedVersion)
     #expect(created.manifest.seed?.intendedProfileName == seed.intendedProfileName)
     #expect(created.manifest.seed?.sourcePackage == seed.sourcePackage)
+    #expect(created.manifest.qwenConditioningArtifacts.count == 1)
 
     let writableStore = ProfileStore(rootURL: stateRoot, fileManager: .default)
     #expect(throws: WorkerError.self) {

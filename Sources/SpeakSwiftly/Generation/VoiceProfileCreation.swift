@@ -122,6 +122,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: storedProfile,
+            profileStore: profileStore,
         )
 
         if let outputPath {
@@ -262,6 +263,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: storedProfile,
+            profileStore: profileStore,
         )
 
         return storedProfile
@@ -271,6 +273,7 @@ extension SpeakSwiftly.Runtime {
         requestID id: String,
         op: String,
         profile: StoredProfile,
+        profileStore: ProfileStore,
     ) async throws -> StoredProfile {
         guard speechBackend.isQwenFamily, qwenConditioningStrategy == .preparedConditioning else {
             return profile
@@ -285,6 +288,7 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             op: op,
             profile: profile,
+            profileStore: profileStore,
             backend: speechBackend,
             model: model,
         )
