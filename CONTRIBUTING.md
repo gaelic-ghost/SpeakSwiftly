@@ -68,6 +68,17 @@ Useful environment variables include:
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests
 - `SPEAKSWIFTLY_PLAYBACK_TRACE=1` for playback trace diagnostics
 
+### System Profile Resource Authoring
+
+System voice profiles are package-owned bundled resources, not ordinary end-user library creations. The only supported authoring workflow is:
+
+1. Build or launch `SpeakSwiftlyTool` with `--system-profile-resource-root PATH`.
+2. Submit `create_system_voice_profile_from_description` through the tool JSONL surface or `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`.
+3. Review the generated profile under `PATH/profiles/<profile-name>/`.
+4. Bundle the reviewed profile directory under `Sources/SpeakSwiftly/Resources/SystemProfiles/profiles/`.
+
+At runtime, SpeakSwiftly loads bundled system profiles from the package resource bundle and seeds them into the writable profile store. Do not expose system-profile creation through `runtime.voices` or any ordinary public end-user API. If `create_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
+
 ### Runtime Behavior
 
 For ordinary package work, use the SwiftPM build and test lane first. Real standalone worker runs should use the deterministic runtime launcher produced by the repo-maintenance scripts, not a plain SwiftPM-built worker executable.
@@ -85,6 +96,8 @@ Typed observation follows the `RequestEvent`, `RequestState`, `RequestUpdate`, a
 The JSONL worker surface uses snake_case, verb-first operation names. Use `get_*` for one resource, `list_*` for collections, `create_*`, `update_*`, `replace_*`, and `delete_*` for CRUD-shaped mutations, and literal control verbs such as `queue_*`, `set_*`, `reload_*`, `unload_*`, `pause`, `resume`, `clear_*`, and `cancel_*` when those words match the real operation.
 
 When adding or renaming a JSONL operation, update the worker contract article and this guide in the same pass.
+
+Keep `create_system_voice_profile_from_description` as a development-time resource authoring operation. The flat JSONL operation name is intentional, but the operation belongs behind the `SpeakSwiftlyTool` development workflow and the `SpeakSwiftly.Tool` namespace, not the normal `SpeakSwiftly.Runtime.voices` library surface.
 
 ### Accessibility Expectations
 
