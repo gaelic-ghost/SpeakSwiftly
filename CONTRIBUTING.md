@@ -94,6 +94,8 @@ SwiftPM is the intended command-plugin entry point. Downstream packages get that
 
 If a host deliberately runs the helper executable directly, it owns the launch contract explicitly: pass `--system-profile-resource-root PATH`, send one JSONL request per stdin line, and review output under `PATH/profiles/<profile-name>/`. Direct helper launches may also pass `--allow-profile-cpu-fallback` when a nonstandard launch context cannot expose Metal and CPU authoring is an intentional one-off fallback.
 
+The profile store uses `.profile-store.lock` inside the active `profiles/` directory to coordinate writers while profiles are generated or seeded. For plugin-authored system profiles, that means the lock can appear under `Resources/SystemProfiles/profiles/` after a successful run. It is an advisory coordination artifact, not a generated profile resource; leave it out of commits and reviews, and remove it only after confirming no SpeakSwiftly process is using that profile root.
+
 Then the consuming target should pass its bundled system-profile root during startup:
 
 ```swift
