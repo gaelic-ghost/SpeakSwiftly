@@ -56,11 +56,12 @@ let handle = await runtime.voices.create(
 
 This path keeps the source audio and related metadata as part of the stored profile so the profile can be rerolled later.
 
-System-authored profiles are package-owned defaults installed through the bundled
-tool adapter, not the ordinary end-user library creation surface. Ordinary rename,
-delete, and in-place reroll operations reject them with explicit errors. If a user
-rerolls a system profile, SpeakSwiftly creates a user-owned copy instead so the
-built-in default remains stable.
+System-authored profiles are package-owned defaults generated through
+`SpeakSwiftlyTool` into bundled profile resources, then seeded into the writable
+profile store when the runtime starts. They are not part of the ordinary end-user
+library creation surface. Ordinary rename, delete, and in-place reroll operations
+reject them with explicit errors. If a user rerolls a system profile, SpeakSwiftly
+creates a user-owned copy instead so the built-in default remains stable.
 
 ## Observe Completion
 

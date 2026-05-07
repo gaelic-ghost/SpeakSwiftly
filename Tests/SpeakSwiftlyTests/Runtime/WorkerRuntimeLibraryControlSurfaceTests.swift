@@ -325,6 +325,104 @@ import TextForSpeech
     )
 }
 
+@Test func `tool system profile creation writes bundled resource store`() async throws {
+    let output = OutputRecorder()
+    let tempRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+    let stateRoot = tempRoot.appendingPathComponent("RuntimeState", isDirectory: true)
+    let systemResourceRoot = tempRoot
+        .appendingPathComponent("SystemProfiles", isDirectory: true)
+        .appendingPathComponent("profiles", isDirectory: true)
+    let systemResourceStore = try makeProfileStore(rootURL: systemResourceRoot)
+    let runtime = try await makeRuntime(
+        rootURL: stateRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+        systemProfileResourceStore: systemResourceStore,
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let seed = SpeakSwiftly.ProfileSeed(
+        seedID: "swift.signal",
+        seedVersion: "1",
+        intendedProfileName: "swift-signal",
+        sourcePackage: "SpeakSwiftlyTests",
+    )
+    _ = await runtime.tool.createBuiltInVoiceProfile(
+        requestID: "req-system",
+        design: "swift-signal",
+        from: "Hello there",
+        vibe: .femme,
+        voiceDescription: "Bright and clear.",
+        seed: seed,
+    )
+
+    #expect(await waitUntil {
+        FileManager.default.fileExists(
+            atPath: systemResourceStore.profileDirectoryURL(for: "swift-signal").path,
+        )
+    })
+
+    let created = try systemResourceStore.loadProfile(named: "swift-signal")
+    #expect(created.manifest.author == .system)
+    #expect(created.manifest.seed?.seedID == seed.seedID)
+    #expect(created.manifest.seed?.seedVersion == seed.seedVersion)
+    #expect(created.manifest.seed?.intendedProfileName == seed.intendedProfileName)
+    #expect(created.manifest.seed?.sourcePackage == seed.sourcePackage)
+
+    let writableStore = ProfileStore(rootURL: stateRoot, fileManager: .default)
+    #expect(throws: WorkerError.self) {
+        _ = try writableStore.loadProfile(named: "swift-signal")
+    }
+}
+
+@Test func `tool system profile creation requires resource store`() async throws {
+    let output = OutputRecorder()
+    let stateRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: stateRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: stateRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    await runtime.start()
+
+    let createID = await runtime.tool
+        .createBuiltInVoiceProfile(
+            requestID: "req-system-no-root",
+            design: "swift-signal",
+            from: "Hello there",
+            vibe: .femme,
+            voiceDescription: "Bright and clear.",
+            seed: SpeakSwiftly.ProfileSeed(
+                seedID: "swift.signal",
+                seedVersion: "1",
+                intendedProfileName: "swift-signal",
+                sourcePackage: "SpeakSwiftlyTests",
+            ),
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == createID
+                && $0["ok"] as? Bool == false
+                && ($0["message"] as? String)?.contains("--system-profile-resource-root") == true
+        }
+    })
+}
+
 @Test func `voice design profile creation gain normalizes reference audio`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()

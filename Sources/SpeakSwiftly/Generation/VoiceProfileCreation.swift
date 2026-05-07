@@ -18,7 +18,9 @@ extension SpeakSwiftly.Runtime {
         seed: SpeakSwiftly.ProfileSeed? = nil,
         outputPath: String?,
         cwd: String?,
+        profileStore targetProfileStore: ProfileStore? = nil,
     ) async throws -> StoredProfile {
+        let profileStore = targetProfileStore ?? profileStore
         let op = WorkerRequest.createProfile(
             id: id,
             profileName: profileName,
@@ -91,7 +93,6 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
-        let profileStore = profileStore
         var storedProfile = try await runBlockingFilesystemOperation {
             try profileStore.createProfile(
                 profileName: profileName,

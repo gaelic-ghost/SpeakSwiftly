@@ -49,6 +49,7 @@ let package = Package(
             path: "Sources/SpeakSwiftly",
             resources: [
                 .copy("Resources/mlx-swift_Cmlx.bundle"),
+                .copy("Resources/SystemProfiles"),
             ],
         ),
         .executableTarget(
