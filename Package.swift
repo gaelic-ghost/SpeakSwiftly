@@ -51,6 +51,9 @@ let package = Package(
                 .copy("Resources/mlx-swift_Cmlx.bundle"),
                 .copy("Resources/SystemProfiles"),
             ],
+            linkerSettings: [
+                .linkedFramework("CoreGraphics", .when(platforms: [.macOS])),
+            ],
         ),
         .executableTarget(
             name: "SpeakSwiftlyTool",

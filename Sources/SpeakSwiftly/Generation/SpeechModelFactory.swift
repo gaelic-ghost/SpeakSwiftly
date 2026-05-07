@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import Metal
 @preconcurrency import MLX
 import MLXAudioSTT
 import MLXAudioTTS
@@ -64,8 +65,17 @@ enum ModelFactory {
         backend.residentModelRepo
     }
 
-    static func loadProfileModel() async throws -> AnySpeechModel {
-        try await loadModel(modelRepo: profileModelRepo)
+    static func loadProfileModel(
+        hasDefaultMetalDevice: @Sendable () -> Bool = defaultMetalDeviceIsAvailable,
+    ) async throws -> AnySpeechModel {
+        guard hasDefaultMetalDevice() else {
+            throw WorkerError(
+                code: .modelLoading,
+                message: "SpeakSwiftly could not load the voice-design profile model because Metal did not provide a default GPU device for this process. On macOS, command-line hosts must link Core Graphics before requesting the default Metal device; if this is running from a service, make sure the process is launched in a user session with Metal access.",
+            )
+        }
+
+        return try await loadModel(modelRepo: profileModelRepo)
     }
 
     static func loadCloneTranscriptionModel() async throws -> AnyCloneTranscriptionModel {
@@ -76,5 +86,9 @@ enum ModelFactory {
     private static func loadModel(modelRepo: String) async throws -> AnySpeechModel {
         let model = try await TTS.loadModel(modelRepo: modelRepo)
         return AnySpeechModel(model: model)
+    }
+
+    private static func defaultMetalDeviceIsAvailable() -> Bool {
+        MTLCreateSystemDefaultDevice() != nil
     }
 }

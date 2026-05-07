@@ -24,6 +24,19 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
 }
 
+@Test func `profile model load reports missing metal device before mlx model load`() async throws {
+    do {
+        _ = try await ModelFactory.loadProfileModel(hasDefaultMetalDevice: { false })
+        Issue.record("Expected profile model loading to fail before MLX loads the voice-design model.")
+    } catch let error as WorkerError {
+        #expect(error.code == .modelLoading)
+        #expect(error.message.contains("Metal did not provide a default GPU device"))
+        #expect(error.message.contains("Core Graphics"))
+    } catch {
+        Issue.record("Expected WorkerError, got \(error).")
+    }
+}
+
 @Test func `adaptive playback thresholds seed from text complexity classes`() {
     let compact = PlaybackThresholdController(text: "Hello there.").thresholds
     let balanced = PlaybackThresholdController(
