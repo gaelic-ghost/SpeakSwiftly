@@ -66,16 +66,43 @@ enum ModelFactory {
     }
 
     static func loadProfileModel(
+        allowsCPUFallback: Bool = false,
         hasDefaultMetalDevice: @Sendable () -> Bool = defaultMetalDeviceIsAvailable,
+        modelLoader: @Sendable (String) async throws -> AnySpeechModel = loadModel,
     ) async throws -> AnySpeechModel {
         guard hasDefaultMetalDevice() else {
-            throw WorkerError(
-                code: .modelLoading,
-                message: "SpeakSwiftly could not load the voice-design profile model because Metal did not provide a default GPU device for this process. On macOS, command-line hosts must link Core Graphics before requesting the default Metal device; if this is running from a service, make sure the process is launched in a user session with Metal access.",
-            )
+            guard allowsCPUFallback else {
+                throw WorkerError(
+                    code: .modelLoading,
+                    message: "SpeakSwiftly could not load the voice-design profile model because Metal did not provide a default GPU device for this process. Fix the launch context so Metal is available, or explicitly allow CPU profile-model fallback for system-profile authoring.",
+                )
+            }
+
+            do {
+                let model = try await Device.withDefaultDevice(.cpu) {
+                    try await modelLoader(profileModelRepo)
+                }
+                return model.usingDefaultDevice(.cpu)
+            } catch let workerError as WorkerError {
+                throw workerError
+            } catch {
+                throw WorkerError(
+                    code: .modelLoading,
+                    message: "SpeakSwiftly could not load the voice-design profile model on the CPU fallback after Metal did not provide a default GPU device for this process. The profile model may be unavailable, unreadable, or unsupported in this launch context. \(error.localizedDescription)",
+                )
+            }
         }
 
-        return try await loadModel(modelRepo: profileModelRepo)
+        do {
+            return try await modelLoader(profileModelRepo)
+        } catch let workerError as WorkerError {
+            throw workerError
+        } catch {
+            throw WorkerError(
+                code: .modelLoading,
+                message: "SpeakSwiftly could not load the voice-design profile model. The profile model may be unavailable, unreadable, or unsupported in this launch context. \(error.localizedDescription)",
+            )
+        }
     }
 
     static func loadCloneTranscriptionModel() async throws -> AnyCloneTranscriptionModel {

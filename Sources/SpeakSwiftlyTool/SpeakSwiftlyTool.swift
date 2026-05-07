@@ -8,6 +8,7 @@ enum SpeakSwiftlyTool {
     private struct Options {
         var stateRootURL: URL?
         var systemProfileResourceRootURL: URL?
+        var allowsProfileModelCPUFallback = false
     }
 
     private enum ArgumentError: LocalizedError {
@@ -17,7 +18,7 @@ enum SpeakSwiftlyTool {
         var errorDescription: String? {
             switch self {
                 case let .unknown(argument):
-                    "Unknown argument '\(argument)'. Supported options: --state-root PATH and --system-profile-resource-root PATH."
+                    "Unknown argument '\(argument)'. Supported options: --state-root PATH, --system-profile-resource-root PATH, and --allow-profile-cpu-fallback."
                 case let .missingValue(option):
                     "Missing value for \(option)."
             }
@@ -30,6 +31,7 @@ enum SpeakSwiftlyTool {
             let runtime = await SpeakSwiftly.Runtime.liftoff(
                 stateRootURL: options.stateRootURL,
                 systemProfileResourceRootURL: options.systemProfileResourceRootURL,
+                allowsProfileModelCPUFallback: options.allowsProfileModelCPUFallback,
                 startsResidentModelsAutomatically: options.systemProfileResourceRootURL == nil,
             )
             await run(runtime: runtime)
@@ -112,6 +114,8 @@ enum SpeakSwiftlyTool {
                         fileURLWithPath: requireOptionValue(arguments, index: index, for: argument),
                         isDirectory: true,
                     )
+                case "--allow-profile-cpu-fallback":
+                    options.allowsProfileModelCPUFallback = true
                 default:
                     throw ArgumentError.unknown(argument)
             }

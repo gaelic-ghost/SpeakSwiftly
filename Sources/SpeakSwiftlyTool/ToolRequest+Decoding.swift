@@ -116,7 +116,7 @@ extension ToolRequest {
                     cwd: raw.cwd?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
                 )
 
-            case "create_system_voice_profile_from_description":
+            case "upsert_system_voice_profile_from_description":
                 let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
                 let text = try requireNonEmpty(raw.text, field: "text", id: id)
                 let vibe = try require(raw.vibe, field: "vibe", id: id)
@@ -127,7 +127,7 @@ extension ToolRequest {
                     raw: raw,
                     fallbackProfileName: profileName,
                 )
-                return .createBuiltInVoiceProfile(
+                return .upsertBuiltInVoiceProfile(
                     id: id,
                     profileName: profileName,
                     text: text,

@@ -65,29 +65,34 @@ Useful environment variables include:
 - `SPEAKSWIFTLY_PROFILE_ROOT` is a deprecated compatibility alias for older hosts; do not use it in new integrations
 - `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback, including `qwen3_smol`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, `qwen3_smol_bf16`, `qwen3_big`, `qwen3_big_6bit`, `qwen3_big_8bit`, and `qwen3_big_bf16`
 - `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` is a deprecated compatibility alias for older hosts; choose a Qwen backend value instead
+- `SPEAKSWIFTLY_ALLOW_PROFILE_CPU_FALLBACK=1` to explicitly allow the voice-profile model to load on CPU when the process cannot see a Metal GPU device; this is off by default because CPU-generated voice-profile conditioning is slow and should not become the normal package or host behavior
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests
 - `SPEAKSWIFTLY_PLAYBACK_TRACE=1` for playback trace diagnostics
 
 ### System Profile Resource Authoring
 
-System voice profiles are package-owned bundled resources, not ordinary end-user library creations. The only supported authoring workflow is:
+System voice profiles are package-owned bundled resources, not ordinary end-user library creations. The supported authoring workflow inserts a new profile or updates the existing profile with the same name:
 
-1. Run the `create-system-voice-profile` SwiftPM command plugin from the consumer package checkout, or build/launch `SpeakSwiftlyTool` with `--system-profile-resource-root PATH` for lower-level maintainer work.
-2. Submit `create_system_voice_profile_from_description` through the tool JSONL surface or `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`.
-3. Review the generated profile under `Resources/SystemProfiles/profiles/<profile-name>/` in the consumer target, or under `PATH/profiles/<profile-name>/` when using the tool directly.
+1. Run the `upsert-system-voice-profile` SwiftPM command plugin from the consumer package checkout.
+2. Submit `upsert_system_voice_profile_from_description` through the tool JSONL surface or `SpeakSwiftly.Tool.upsertBuiltInVoiceProfile(...)`.
+3. Review the generated profile under `Resources/SystemProfiles/profiles/<profile-name>/` in the consumer target.
 4. Bundle the reviewed profile directory with the target that owns it by declaring `.copy("Resources/SystemProfiles")` in that target's package manifest entry.
 5. Pass that target's bundled root into SpeakSwiftly at startup with `SpeakSwiftly.Configuration(systemProfileResourceRoots:)`, usually from `SpeakSwiftly.SupportResources.systemProfileRootURL(in: .module)`.
 
 For example, a consumer package target can generate a bundled system profile with:
 
 ```bash
-swift package plugin --allow-writing-to-package-directory create-system-voice-profile \
+swift package plugin --allow-writing-to-package-directory upsert-system-voice-profile \
   --target SpeakSwiftlyServer \
   --name server-announcer \
   --text "A clear server status voice." \
   --vibe femme \
   --voice-description "Clear, bright, steady, and concise."
 ```
+
+SwiftPM is the intended command-plugin entry point. Downstream packages get that entry point from the `UpsertSystemVoiceProfile` plugin product, while the user-facing command remains the verb `upsert-system-voice-profile`. The plugin itself resolves and runs `SpeakSwiftlyTool` through `context.tool(named: "SpeakSwiftlyTool")`, but host packages should not treat another checkout's `.build/.../SpeakSwiftlyTool` path as the plugin API. Launching that executable directly can be useful for lower-level maintainer diagnosis when paired with `--system-profile-resource-root PATH`, but it bypasses SwiftPM's plugin context, target lookup, write-permission gate, and artifact-path management.
+
+If a host deliberately runs the helper executable directly, it owns the launch contract explicitly: pass `--system-profile-resource-root PATH`, send one JSONL request per stdin line, and review output under `PATH/profiles/<profile-name>/`. Direct helper launches may also pass `--allow-profile-cpu-fallback` when a nonstandard launch context cannot expose Metal and CPU authoring is an intentional one-off fallback.
 
 Then the consuming target should pass its bundled system-profile root during startup:
 
@@ -101,7 +106,7 @@ let runtime = await SpeakSwiftly.liftoff(
 )
 ```
 
-At runtime, SpeakSwiftly loads bundled system profiles from its own package resource bundle and from configured consumer resource roots, then seeds them into the writable profile store. Do not expose system-profile creation through `runtime.voices` or any ordinary public end-user API. If `create_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
+At runtime, SpeakSwiftly loads bundled system profiles from its own package resource bundle and from configured consumer resource roots, then seeds them into the writable profile store. Do not expose system-profile upserts through `runtime.voices` or any ordinary public end-user API. If `upsert_system_voice_profile_from_description` is used without `--system-profile-resource-root`, the request must fail instead of writing package-owned profiles into ordinary runtime state.
 
 When `SpeakSwiftlyTool` is launched with `--system-profile-resource-root`, it starts with resident playback models unloaded so the resource-authoring process does not warm unrelated runtime models before it can read JSONL input. The generated profile is still valid bundled profile material; prepared Qwen conditioning remains lazy and is created later by ordinary runtime use after resident models are explicitly loaded.
 
@@ -123,7 +128,7 @@ The JSONL worker surface uses snake_case, verb-first operation names. Use `get_*
 
 When adding or renaming a JSONL operation, update the worker contract article and this guide in the same pass.
 
-Keep `create_system_voice_profile_from_description` as a development-time resource authoring operation. The flat JSONL operation name is intentional, but the operation belongs behind the `SpeakSwiftlyTool` development workflow and the `SpeakSwiftly.Tool` namespace, not the normal `SpeakSwiftly.Runtime.voices` library surface.
+Keep `upsert_system_voice_profile_from_description` as a development-time resource authoring operation. The flat JSONL operation name is intentional, but the operation belongs behind the `SpeakSwiftlyTool` development workflow and the `SpeakSwiftly.Tool` namespace, not the normal `SpeakSwiftly.Runtime.voices` library surface.
 
 ### Accessibility Expectations
 

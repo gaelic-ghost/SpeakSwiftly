@@ -9,6 +9,21 @@ private let longPlaybackPlannerFixtureText = """
 Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
 """
 
+private actor ProfileModelLoadObservation {
+    private(set) var repo: String?
+    private(set) var loadDeviceType: DeviceType?
+    private(set) var generateDeviceType: DeviceType?
+
+    func recordLoad(repo: String, deviceType: DeviceType?) {
+        self.repo = repo
+        loadDeviceType = deviceType
+    }
+
+    func recordGenerate(deviceType: DeviceType?) {
+        generateDeviceType = deviceType
+    }
+}
+
 // MARK: - Adaptive Playback Thresholds
 
 @Test func `resident backend repos include chatterbox turbo 8bit`() {
@@ -24,17 +39,73 @@ Hello from the real resident SpeakSwiftly playback path. This end to end test no
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
 }
 
-@Test func `profile model load reports missing metal device before mlx model load`() async throws {
+@Test func `profile model load rejects missing metal device by default`() async throws {
     do {
-        _ = try await ModelFactory.loadProfileModel(hasDefaultMetalDevice: { false })
-        Issue.record("Expected profile model loading to fail before MLX loads the voice-design model.")
+        _ = try await ModelFactory.loadProfileModel(
+            hasDefaultMetalDevice: { false },
+            modelLoader: { _ in makeProfileModel() },
+        )
+        Issue.record("Expected profile model loading to reject missing Metal without explicit CPU fallback.")
     } catch let error as WorkerError {
         #expect(error.code == .modelLoading)
         #expect(error.message.contains("Metal did not provide a default GPU device"))
-        #expect(error.message.contains("Core Graphics"))
+        #expect(error.message.contains("explicitly allow CPU profile-model fallback"))
     } catch {
         Issue.record("Expected WorkerError, got \(error).")
     }
+}
+
+@Test func `profile model load uses cpu fallback only when explicitly allowed`() async throws {
+    let observation = ProfileModelLoadObservation()
+
+    let model = try await ModelFactory.loadProfileModel(
+        allowsCPUFallback: true,
+        hasDefaultMetalDevice: { false },
+        modelLoader: { repo in
+            await observation.recordLoad(repo: repo, deviceType: Device.defaultDevice().deviceType)
+            return AnySpeechModel(
+                sampleRate: 24000,
+                generate: { _, _, _, _, _, _ in
+                    await observation.recordGenerate(deviceType: Device.defaultDevice().deviceType)
+                    return [0.1, 0.2, 0.3]
+                },
+                generateSamplesStream: { _, _, _, _, _, _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.finish()
+                    }
+                },
+            )
+        },
+    )
+    _ = try await model.generate(
+        text: "Hello",
+        voice: "Clear",
+        refAudio: nil,
+        refText: nil,
+        language: nil,
+        generationParameters: GenerationPolicy.profileModelParameters(for: "Hello"),
+    )
+
+    #expect(await observation.repo == ModelFactory.profileModelRepo)
+    #expect(await observation.loadDeviceType == .cpu)
+    #expect(await observation.generateDeviceType == .cpu)
+}
+
+@Test func `profile model load uses default device when metal device is available`() async throws {
+    let observation = ProfileModelLoadObservation()
+
+    _ = try await Device.withDefaultDevice(.gpu) {
+        try await ModelFactory.loadProfileModel(
+            hasDefaultMetalDevice: { true },
+            modelLoader: { repo in
+                await observation.recordLoad(repo: repo, deviceType: Device.defaultDevice().deviceType)
+                return makeProfileModel()
+            },
+        )
+    }
+
+    #expect(await observation.repo == ModelFactory.profileModelRepo)
+    #expect(await observation.loadDeviceType == .gpu)
 }
 
 @Test func `adaptive playback thresholds seed from text complexity classes`() {

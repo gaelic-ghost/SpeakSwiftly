@@ -22,6 +22,10 @@ let package = Package(
             name: "SpeakSwiftlyProbeTool",
             targets: ["SpeakSwiftlyProbeTool"],
         ),
+        .plugin(
+            name: "UpsertSystemVoiceProfile",
+            targets: ["UpsertSystemVoiceProfile"],
+        ),
     ],
     dependencies: [
         .package(
@@ -63,15 +67,15 @@ let package = Package(
             ],
         ),
         .plugin(
-            name: "CreateSystemVoiceProfile",
+            name: "UpsertSystemVoiceProfile",
             capability: .command(
                 intent: .custom(
-                    verb: "create-system-voice-profile",
-                    description: "Generate a SpeakSwiftly system voice profile into a target resource bundle",
+                    verb: "upsert-system-voice-profile",
+                    description: "Insert or update a SpeakSwiftly system voice profile in a target resource bundle",
                 ),
                 permissions: [
                     .writeToPackageDirectory(
-                        reason: "Generated system voice profiles are durable package resources owned by the consumer target.",
+                        reason: "Generated system voice profiles are durable package resources inserted or updated in the consumer target.",
                     ),
                 ],
             ),

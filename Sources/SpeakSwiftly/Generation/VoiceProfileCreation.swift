@@ -93,18 +93,34 @@ extension SpeakSwiftly.Runtime {
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
+        let upsertedAt = dependencies.now()
         var storedProfile = try await runBlockingFilesystemOperation {
-            try profileStore.createProfile(
-                profileName: profileName,
-                vibe: vibe,
-                modelRepo: ModelFactory.profileModelRepo,
-                voiceDescription: voiceDescription,
-                sourceText: text,
-                author: author,
-                seed: seed,
-                sampleRate: profileModel.sampleRate,
-                canonicalAudioData: canonicalAudioData,
-            )
+            switch author {
+                case .system:
+                    try profileStore.upsertSystemProfile(
+                        named: profileName,
+                        vibe: vibe,
+                        modelRepo: ModelFactory.profileModelRepo,
+                        voiceDescription: voiceDescription,
+                        sourceText: text,
+                        seed: seed,
+                        sampleRate: profileModel.sampleRate,
+                        canonicalAudioData: canonicalAudioData,
+                        createdAt: upsertedAt,
+                    )
+                case .user:
+                    try profileStore.createProfile(
+                        profileName: profileName,
+                        vibe: vibe,
+                        modelRepo: ModelFactory.profileModelRepo,
+                        voiceDescription: voiceDescription,
+                        sourceText: text,
+                        author: author,
+                        seed: seed,
+                        sampleRate: profileModel.sampleRate,
+                        canonicalAudioData: canonicalAudioData,
+                    )
+            }
         }
         await logRequestEvent(
             "profile_written",

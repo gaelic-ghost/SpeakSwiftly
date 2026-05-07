@@ -158,7 +158,7 @@ enum WorkerRequest: Equatable {
                     case .user:
                         "create_voice_profile_from_description"
                     case .system:
-                        "create_system_voice_profile_from_description"
+                        "upsert_system_voice_profile_from_description"
                 }
             case .createClone:
                 "create_voice_profile_from_audio"

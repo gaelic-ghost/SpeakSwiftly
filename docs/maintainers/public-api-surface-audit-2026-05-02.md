@@ -297,7 +297,7 @@ distinguishes the end-user creation path:
 
 Slice 5 resolves the two roughest labels: the voice prompt now appears as
 `voiceDescription:` at the use site. Package-owned seed creation is now
-tool-only through `SpeakSwiftly.Tool.createBuiltInVoiceProfile(...)`, so it no
+tool-only through `SpeakSwiftly.Tool.upsertBuiltInVoiceProfile(...)`, so it no
 longer belongs to the ordinary public `runtime.voices` surface.
 
 Desired direction:
