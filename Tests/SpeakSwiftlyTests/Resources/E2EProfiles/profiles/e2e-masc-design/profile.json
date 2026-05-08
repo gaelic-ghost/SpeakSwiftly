@@ -1,7 +1,7 @@
 {
   "backendMaterializations" : [
     {
-      "backend" : "qwen3",
+      "backend" : "qwen3_smol",
       "createdAt" : "2026-04-24T18:49:13Z",
       "modelRepo" : "mlx-community\/Qwen3-TTS-12Hz-0.6B-Base-8bit",
       "referenceAudioFile" : "reference.wav",
@@ -16,7 +16,7 @@
     {
       "artifactFile" : "qwen-conditioning-qwen3.json",
       "artifactVersion" : 1,
-      "backend" : "qwen3",
+      "backend" : "qwen3_smol",
       "createdAt" : "2026-04-24T18:49:14Z",
       "modelRepo" : "mlx-community\/Qwen3-TTS-12Hz-0.6B-Base-8bit"
     }
