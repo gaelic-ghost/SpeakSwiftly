@@ -43,6 +43,8 @@ private actor ProfileModelLoadObservation {
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .marvis_4bit) == ModelFactory.marvis4BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .marvis_6bit) == ModelFactory.marvis6BitResidentModelRepo)
+    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends == [.marvis, .marvis_4bit, .marvis_6bit])
+    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends.allSatisfy { $0.isMarvisFamily })
 }
 
 @Test func `profile model load rejects missing metal device by default`() async throws {

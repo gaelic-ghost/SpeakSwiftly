@@ -163,6 +163,7 @@ extension SpeakSwiftly.Runtime {
         if speechBackend.isMarvisFamily {
             if isLiveSpeechGenerationRequest(request),
                playbackAdmission.activeRequestID != nil,
+
                playbackAdmission.activeRequestTuningProfile == .firstDrainedLiveMarvis
                || !playbackAdmission.allowsConcurrentGeneration {
                 return .park(.waitingForPlaybackStability)
