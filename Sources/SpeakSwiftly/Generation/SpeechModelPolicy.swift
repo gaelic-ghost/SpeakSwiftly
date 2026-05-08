@@ -46,7 +46,7 @@ enum GenerationPolicy {
                     temperature: chatterboxResidentTemperature,
                     topP: chatterboxResidentTopP,
                 )
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 // Current mlx-audio-swift Marvis ignores caller-supplied generation
                 // parameters and samples with its own internal settings.
                 GenerateParameters()

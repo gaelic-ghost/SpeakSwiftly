@@ -41,6 +41,8 @@ private actor ProfileModelLoadObservation {
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_bf16) == ModelFactory.qwen17BBF16ResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .marvis_4bit) == ModelFactory.marvis4BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .marvis_6bit) == ModelFactory.marvis6BitResidentModelRepo)
 }
 
 @Test func `profile model load rejects missing metal device by default`() async throws {

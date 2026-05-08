@@ -21,8 +21,8 @@ extension SpeakSwiftly.Runtime {
                 [ModelFactory.residentModelRepo(for: speechBackend)]
             case .chatterboxTurbo:
                 [ModelFactory.residentModelRepo(for: speechBackend)]
-            case .marvis:
-                [ModelFactory.marvisResidentModelRepo]
+            case .marvis, .marvis_4bit, .marvis_6bit:
+                [ModelFactory.residentModelRepo(for: speechBackend)]
         }
     }
 
@@ -199,7 +199,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func marvisGenerationLane(for request: WorkerRequest) throws -> MarvisResidentVoice? {
-        guard speechBackend == .marvis else { return nil }
+        guard speechBackend.isMarvisFamily else { return nil }
 
         let profileName: String? = switch request {
             case .queueSpeech(

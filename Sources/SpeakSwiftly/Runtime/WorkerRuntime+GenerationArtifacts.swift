@@ -233,7 +233,7 @@ extension SpeakSwiftly.Runtime {
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
         let existingPlaybackJobCount = await playbackQueue.jobCount()
         let playbackTuningProfile: PlaybackTuningProfile =
-            if speechBackend == .marvis {
+            if speechBackend.isMarvisFamily {
                 .firstDrainedLiveMarvis
             } else {
                 .standard

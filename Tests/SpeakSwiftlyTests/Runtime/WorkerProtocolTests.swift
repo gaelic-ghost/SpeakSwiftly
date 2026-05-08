@@ -574,6 +574,18 @@ import TextForSpeech
     #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .marvis))
 }
 
+@Test func `decodes marvis quant switch speech backend requests`() throws {
+    let fourBit = try ToolRequest.decode(
+        from: #"{"id":"req-switch-marvis-4bit","op":"set_speech_backend","speech_backend":"marvis_4bit"}"#,
+    )
+    let sixBit = try ToolRequest.decode(
+        from: #"{"id":"req-switch-marvis-6bit","op":"set_speech_backend","speech_backend":"marvis_6bit"}"#,
+    )
+
+    #expect(fourBit == .switchSpeechBackend(id: "req-switch-marvis-4bit", speechBackend: .marvis_4bit))
+    #expect(sixBit == .switchSpeechBackend(id: "req-switch-marvis-6bit", speechBackend: .marvis_6bit))
+}
+
 @Test func `decodes chatterbox turbo switch speech backend request`() throws {
     let request = try ToolRequest.decode(
         from: #"{"id":"req-switch-chatterbox","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}"#,

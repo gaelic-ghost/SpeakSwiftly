@@ -18,6 +18,8 @@ public extension SpeakSwiftly {
         case qwen3_BIG_bf16 = "qwen3_big_bf16"
         case chatterboxTurbo = "chatterbox_turbo"
         case marvis
+        case marvis_4bit
+        case marvis_6bit
     }
 }
 
@@ -45,6 +47,12 @@ public extension SpeakSwiftly.SpeechBackend {
         .qwen3_BIG_6bit,
         .qwen3_BIG_8bit,
         .qwen3_BIG_bf16,
+    ]
+
+    static let marvisFamilyBackends: [Self] = [
+        .marvis,
+        .marvis_4bit,
+        .marvis_6bit,
     ]
 
     static func normalized(rawValue: String) -> Self? {
@@ -123,11 +131,19 @@ public extension SpeakSwiftly.SpeechBackend {
                 ModelFactory.chatterboxResidentModelRepo
             case .marvis:
                 ModelFactory.marvisResidentModelRepo
+            case .marvis_4bit:
+                ModelFactory.marvis4BitResidentModelRepo
+            case .marvis_6bit:
+                ModelFactory.marvis6BitResidentModelRepo
         }
     }
 
     internal var isQwenFamily: Bool {
         Self.qwenFamilyBackends.contains(self)
+    }
+
+    internal var isMarvisFamily: Bool {
+        Self.marvisFamilyBackends.contains(self)
     }
 
     internal static func qwenBackend(forResidentModelRepo modelRepo: String) -> Self? {

@@ -779,7 +779,7 @@ func makeResidentModels(
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .chatterboxTurbo:
             .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
-        case .marvis:
+        case .marvis, .marvis_4bit, .marvis_6bit:
             switch marvisResidentPolicy {
                 case .dualResidentSerialized:
                     .marvis(
@@ -898,7 +898,7 @@ func makeRuntime(
                         return .qwen3(model)
                     case .chatterboxTurbo:
                         return .chatterboxTurbo(model)
-                    case .marvis:
+                    case .marvis, .marvis_4bit, .marvis_6bit:
                         switch marvisResidentPolicy {
                             case .dualResidentSerialized:
                                 return .marvis(

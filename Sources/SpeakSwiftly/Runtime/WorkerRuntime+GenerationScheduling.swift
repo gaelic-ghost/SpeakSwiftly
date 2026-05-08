@@ -160,7 +160,7 @@ extension SpeakSwiftly.Runtime {
             return .park(.waitingForActiveRequest)
         }
 
-        if speechBackend == .marvis {
+        if speechBackend.isMarvisFamily {
             if isLiveSpeechGenerationRequest(request),
                playbackAdmission.activeRequestID != nil,
                playbackAdmission.activeRequestTuningProfile == .firstDrainedLiveMarvis
@@ -181,7 +181,7 @@ extension SpeakSwiftly.Runtime {
         for backend: SpeakSwiftly.SpeechBackend,
     ) -> Int {
         switch backend {
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 1
             case .qwen3_smol,
                  .qwen3_smol_4bit,
@@ -265,7 +265,7 @@ extension SpeakSwiftly.Runtime {
         parkReasons: [UUID: GenerationParkReason],
         playbackTelemetry: PlaybackQueue.ConcurrencySnapshot,
     ) async {
-        guard speechBackend == .marvis else { return }
+        guard speechBackend.isMarvisFamily else { return }
         guard !activeJobs.isEmpty || !queuedJobs.isEmpty || playbackTelemetry.activeRequestID != nil else {
             lastLoggedMarvisSchedulerState = nil
             return

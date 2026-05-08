@@ -19,7 +19,10 @@ enum ModelFactory {
     static let qwenResidentModelRepo = qwen06B8BitResidentModelRepo
     static let chatterboxResidentModelRepo = "mlx-community/chatterbox-turbo-8bit"
     static let legacyQwenCustomVoiceResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-bf16"
-    static let marvisResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
+    static let marvis4BitResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-4bit"
+    static let marvis6BitResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-6bit"
+    static let marvis8BitResidentModelRepo = "Marvis-AI/marvis-tts-250m-v0.2-MLX-8bit"
+    static let marvisResidentModelRepo = marvis8BitResidentModelRepo
     static let profileModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
     static let cloneTranscriptionModelRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
     static let canonicalProfileSampleRate = 24000
@@ -48,7 +51,7 @@ enum ModelFactory {
                 return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
             case .chatterboxTurbo:
                 return try await .chatterboxTurbo(loadModel(modelRepo: residentModelRepo(for: backend)))
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 switch marvisResidentPolicy {
                     case .dualResidentSerialized:
                         // Marvis keeps mutable generation caches on the model instance,

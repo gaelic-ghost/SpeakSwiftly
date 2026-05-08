@@ -132,7 +132,7 @@ extension SpeakSwiftly.Runtime {
                     refAudio: refAudio,
                 )
 
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 let (residentModel, voice) = try residentMarvisModelOrThrow(for: profile.manifest.vibe)
                 await logRequestEvent(
                     "marvis_voice_selected",
