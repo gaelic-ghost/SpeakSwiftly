@@ -8,22 +8,23 @@ extension ProfileStore {
         let manifestPath = manifestURL(for: directoryURL)
         let manifestData = try Data(contentsOf: manifestPath)
         let requiresLegacyQwenNormalization = manifestDataRequiresLegacyQwenNormalization(manifestData)
+        let decodableManifestData = normalizedLegacyQwenBackendManifestData(manifestData) ?? manifestData
 
-        if let manifest = try? decoder.decode(ProfileManifest.self, from: manifestData) {
+        if let manifest = try? decoder.decode(ProfileManifest.self, from: decodableManifestData) {
             let upgradedManifest = upgradeStoredManifest(manifest)
-            if requiresLegacyQwenNormalization || upgradedManifest != manifest {
+            if requiresLegacyQwenNormalization || decodableManifestData != manifestData || upgradedManifest != manifest {
                 try writeManifest(upgradedManifest, to: directoryURL)
             }
             return upgradedManifest
         }
 
-        if let legacyManifest = try? decoder.decode(LegacyMultiBackendProfileManifest.self, from: manifestData) {
+        if let legacyManifest = try? decoder.decode(LegacyMultiBackendProfileManifest.self, from: decodableManifestData) {
             let upgradedManifest = upgradeLegacyMultiBackendManifest(legacyManifest)
             try writeManifest(upgradedManifest, to: directoryURL)
             return upgradedManifest
         }
 
-        if let legacyManifest = try? decoder.decode(LegacyProfileManifest.self, from: manifestData) {
+        if let legacyManifest = try? decoder.decode(LegacyProfileManifest.self, from: decodableManifestData) {
             let upgradedManifest = upgradeLegacyManifest(legacyManifest)
             try writeManifest(upgradedManifest, to: directoryURL)
             return upgradedManifest
@@ -137,8 +138,53 @@ extension ProfileStore {
             return false
         }
 
-        return manifestText.contains(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue)
+        return manifestText.contains("qwen3_custom_voice")
+            || manifestText.contains(#""backend" : "qwen3""#)
+            || manifestText.contains(#""backend":"qwen3""#)
             || manifestText.contains(ModelFactory.legacyQwenCustomVoiceResidentModelRepo)
+    }
+
+    func normalizedLegacyQwenBackendManifestData(_ manifestData: Data) -> Data? {
+        guard var manifest = try? JSONSerialization.jsonObject(with: manifestData) else {
+            return nil
+        }
+
+        var changed = false
+        normalizeLegacyQwenBackendValues(in: &manifest, changed: &changed)
+        guard changed else {
+            return nil
+        }
+
+        return try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    func normalizeLegacyQwenBackendValues(in value: inout Any, changed: inout Bool) {
+        if var dictionary = value as? [String: Any] {
+            if dictionary["backend"] as? String == "qwen3"
+                || dictionary["backend"] as? String == "qwen3_custom_voice" {
+                dictionary["backend"] = SpeakSwiftly.SpeechBackend.qwen3_smol.rawValue
+                changed = true
+            }
+
+            for key in dictionary.keys {
+                var nestedValue = dictionary[key] as Any
+                normalizeLegacyQwenBackendValues(in: &nestedValue, changed: &changed)
+                dictionary[key] = nestedValue
+            }
+
+            value = dictionary
+            return
+        }
+
+        if var array = value as? [Any] {
+            for index in array.indices {
+                var nestedValue = array[index]
+                normalizeLegacyQwenBackendValues(in: &nestedValue, changed: &changed)
+                array[index] = nestedValue
+            }
+
+            value = array
+        }
     }
 
     func normalizeQwenMaterialization(

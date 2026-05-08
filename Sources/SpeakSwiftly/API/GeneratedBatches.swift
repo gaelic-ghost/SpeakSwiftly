@@ -14,7 +14,6 @@ public extension SpeakSwiftly {
             case artifactID = "artifact_id"
             case text
             case textProfile = "text_profile"
-            case sourceFormat = "source_format"
             case requestContext = "request_context"
         }
 
@@ -23,7 +22,6 @@ public extension SpeakSwiftly {
         public let artifactID: String?
         public let text: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let sourceFormat: TextForSpeech.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
 
         // MARK: Lifecycle
@@ -32,13 +30,11 @@ public extension SpeakSwiftly {
             artifactID: String? = nil,
             text: String,
             textProfile: SpeakSwiftly.TextProfileID? = nil,
-            sourceFormat: TextForSpeech.SourceFormat? = nil,
             requestContext: SpeakSwiftly.RequestContext? = nil,
         ) {
             self.artifactID = artifactID
             self.text = text
             self.textProfile = textProfile
-            self.sourceFormat = sourceFormat
             self.requestContext = requestContext
         }
     }
@@ -132,7 +128,7 @@ extension SpeakSwiftly.Runtime {
                 artifactID: item.artifactID ?? "\(batchID)-artifact-\(index + 1)",
                 text: item.text,
                 textProfile: item.textProfile,
-                sourceFormat: item.sourceFormat,
+                sourceFormat: nil,
                 requestContext: item.requestContext,
             )
         }

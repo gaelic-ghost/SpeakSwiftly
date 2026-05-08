@@ -32,7 +32,7 @@ public extension SpeakSwiftly {
             artifactID: String,
             text: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            sourceFormat: TextForSpeech.SourceFormat?,
+            sourceFormat: TextForSpeech.SourceFormat? = nil,
             requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID

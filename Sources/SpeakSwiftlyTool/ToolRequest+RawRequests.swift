@@ -23,7 +23,6 @@ struct RawBatchItem: Decodable {
     let requestContext: SpeakSwiftly.RequestContext?
     let cwd: String?
     let repoRoot: String?
-    let sourceFormat: TextForSpeech.SourceFormat?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -37,10 +36,6 @@ struct RawBatchItem: Decodable {
         requestContext = try container.decodeIfPresent(
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
-        )
-        sourceFormat = try container.decodeIfPresent(
-            TextForSpeech.SourceFormat.self,
-            forKey: .sourceFormat,
         )
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
@@ -243,7 +238,6 @@ struct RawWorkerRequest: Decodable {
     let replacementID: String?
     let cwd: String?
     let repoRoot: String?
-    let sourceFormat: TextForSpeech.SourceFormat?
     let requestID: String?
     let vibe: SpeakSwiftly.Vibe?
     let voiceDescription: String?
@@ -282,10 +276,6 @@ struct RawWorkerRequest: Decodable {
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
         )
-        sourceFormat = try container.decodeIfPresent(
-            TextForSpeech.SourceFormat.self,
-            forKey: .sourceFormat,
-        )
         textProfileStyle = try container.decodeIfPresent(
             TextForSpeech.BuiltInProfileStyle.self,
             forKey: .textProfileStyle,
@@ -316,11 +306,9 @@ struct RawWorkerRequest: Decodable {
         id: String,
         text: String?,
         textProfileID: String?,
-        sourceFormat: TextForSpeech.SourceFormat?,
     ) throws -> (
         text: String,
         textProfileID: SpeakSwiftly.TextProfileID?,
-        sourceFormat: TextForSpeech.SourceFormat?,
     ) {
         let resolvedText = try ToolRequest.requireNonEmpty(text, field: "text", id: id)
         let resolvedTextProfileID = textProfileID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
@@ -328,7 +316,6 @@ struct RawWorkerRequest: Decodable {
         return (
             text: resolvedText,
             textProfileID: resolvedTextProfileID,
-            sourceFormat: sourceFormat,
         )
     }
 
@@ -350,7 +337,6 @@ struct RawWorkerRequest: Decodable {
                 id: itemID,
                 text: rawItem.text,
                 textProfileID: rawItem.textProfile,
-                sourceFormat: rawItem.sourceFormat,
             )
             let requestContext = requestContext(
                 cwd: rawItem.cwd,
@@ -370,7 +356,6 @@ struct RawWorkerRequest: Decodable {
                 artifactID: artifactID,
                 text: resolved.text,
                 textProfile: resolved.textProfileID,
-                sourceFormat: resolved.sourceFormat,
                 requestContext: requestContext,
             )
         }
@@ -432,24 +417,6 @@ struct RawWorkerRequest: Decodable {
         )
     }
 
-    static func decodeSourceFormat(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys,
-    ) throws -> TextForSpeech.SourceFormat? {
-        guard let raw = try container.decodeIfPresent(String.self, forKey: key) else {
-            return nil
-        }
-        guard let format = TextForSpeech.SourceFormat(rawValue: raw) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: key,
-                in: container,
-                debugDescription: "Unsupported \(key.stringValue) value '\(raw)'.",
-            )
-        }
-
-        return format
-    }
-
     private static func decodeReplacementIfPresent(
         in container: KeyedDecodingContainer<CodingKeys>,
         forKey key: CodingKeys,
@@ -473,6 +440,7 @@ private extension RawBatchItem {
         try rejectRemovedGenerationContextKeysInContainer(
             in: container,
             keys: [
+                .sourceFormat,
                 .inputTextContext,
                 .textFormat,
                 .nestedSourceFormat,
@@ -497,6 +465,7 @@ private extension RawWorkerRequest {
         try rejectRemovedGenerationContextKeysInContainer(
             in: container,
             keys: [
+                .sourceFormat,
                 .inputTextContext,
                 .textFormat,
                 .nestedSourceFormat,
@@ -535,7 +504,7 @@ private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
         throw DecodingError.dataCorruptedError(
             forKey: key,
             in: container,
-            debugDescription: "Generation context key '\(key.stringValue)' was removed. Use 'source_format' only for whole-source input, move path and request metadata into 'request_context', and omit source hints for mixed prose, Markdown, HTML, logs, CLI output, and agent text.",
+            debugDescription: "Generation context key '\(key.stringValue)' was removed. Omit source-format hints and let TextForSpeech detect text and source structure from request text and path context.",
         )
     }
 }

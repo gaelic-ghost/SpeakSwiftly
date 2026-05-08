@@ -169,10 +169,10 @@ compare, rerun the same command and change only the result bundle path:
 
 ### Scenario C: Single-Resident Dynamic Marvis Baseline
 
-The package now has a real `single_resident_dynamic` policy option. If that
-mode is under investigation, keep the same test command and record the exact
-configuration override used for the run so the capture stays comparable to the
-default `dual_resident_serialized` baseline.
+The package now defaults to `single_resident_dynamic`. If
+`dual_resident_serialized` is under investigation, keep the same test command
+and record the exact `SpeakSwiftlyTool` operator override used for the run so
+the capture stays comparable to the default single-resident baseline.
 
 ## Instruments Capture Order
 
@@ -329,8 +329,8 @@ The near-term use case it unlocks is simple:
 ### Simpler Extension Path Considered First
 
 The simpler path is the one the package now already has: keep one `marvis`
-backend and expose the resident choice through `marvisResidentPolicy` instead
-of adding another backend name.
+backend and expose the resident choice through the package-only
+`marvisResidentPolicy` operator hook instead of adding another backend name.
 
 That path was considered first, but it is less clear:
 
@@ -354,10 +354,10 @@ The expected behavior split is now:
 
 - model loading can still reuse the same Marvis weights and the same built-in
   voice routing for `conversational_a` and `conversational_b`
-- `dual_resident_serialized` keeps both voices warm while still serializing
-  generation
 - `single_resident_dynamic` reuses one resident model object for whichever
   conversational voice the next request needs
+- `dual_resident_serialized` keeps both voices warm while still serializing
+  generation and is retained as a tool-only investigation override
 
 ## Apple Documentation Anchors
 

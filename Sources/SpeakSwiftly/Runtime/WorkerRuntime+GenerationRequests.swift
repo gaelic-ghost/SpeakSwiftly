@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, requestContext: _, qwenPreModelTextChunking: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -19,7 +19,6 @@ extension SpeakSwiftly.Runtime {
                 profileName: let profileName,
                 textProfileID: let textProfileID,
                 jobType: .file,
-                sourceFormat: let sourceFormat,
                 requestContext: let requestContext,
                 qwenPreModelTextChunking: _,
             ):
@@ -30,7 +29,7 @@ extension SpeakSwiftly.Runtime {
                         text: text,
                         voiceProfile: profileName,
                         textProfile: textProfileID,
-                        sourceFormat: sourceFormat,
+                        sourceFormat: nil,
                         requestContext: requestContext,
                     )
                     let completedJob = try generationJobStore.markCompleted(
@@ -366,7 +365,7 @@ extension SpeakSwiftly.Runtime {
                     text: item.text,
                     voiceProfile: profileName,
                     textProfile: item.textProfile,
-                    sourceFormat: item.sourceFormat,
+                    sourceFormat: nil,
                     requestContext: item.requestContext,
                 ),
             )

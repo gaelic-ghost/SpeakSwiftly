@@ -314,7 +314,7 @@ public extension SpeakSwiftly {
             dependencies: WorkerDependencies,
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
             defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             systemProfileResourceStore: ProfileStore? = nil,

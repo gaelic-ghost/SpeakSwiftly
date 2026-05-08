@@ -870,7 +870,7 @@ import Testing
     try fileManager.createDirectory(at: profileDirectory, withIntermediateDirectories: true)
     try Data([0x52, 0x49, 0x46, 0x46]).write(to: profileDirectory.appendingPathComponent(ProfileStore.audioFileName))
     try Data("{}".utf8).write(
-        to: profileDirectory.appendingPathComponent("qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json"),
+        to: profileDirectory.appendingPathComponent("qwen-conditioning-qwen3_custom_voice.json"),
     )
 
     let legacyManifestJSON = """
@@ -890,7 +890,7 @@ import Testing
       "profileName" : "legacy-custom-voice",
       "qwenConditioningArtifacts" : [
         {
-          "artifactFile" : "qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json",
+          "artifactFile" : "qwen-conditioning-qwen3_custom_voice.json",
           "artifactVersion" : 1,
           "backend" : "qwen3_custom_voice",
           "createdAt" : "2026-04-16T00:00:00Z",
@@ -916,5 +916,5 @@ import Testing
     #expect(materialization.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3_smol))
     #expect(artifact.manifest.backend == .qwen3_smol)
     #expect(artifact.manifest.modelRepo == ModelFactory.residentModelRepo(for: .qwen3_smol))
-    #expect(artifact.artifactURL.lastPathComponent == "qwen-conditioning-\(SpeakSwiftly.SpeechBackend.legacyQwenCustomVoiceRawValue).json")
+    #expect(artifact.artifactURL.lastPathComponent == "qwen-conditioning-qwen3_custom_voice.json")
 }

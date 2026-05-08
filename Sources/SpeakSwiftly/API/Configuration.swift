@@ -15,18 +15,6 @@ public extension SpeakSwiftly {
         case preparedConditioning = "prepared_conditioning"
     }
 
-    /// Selects how resident Marvis model instances are kept warm.
-    enum MarvisResidentPolicy: String, Codable, Sendable, Equatable, CaseIterable {
-        /// Keep both conversational resident model objects warm, but serialize
-        /// Marvis generation so only one request uses the model path at a time.
-        case dualResidentSerialized = "dual_resident_serialized"
-        /// Keep a single Marvis resident model object warm and reuse it for
-        /// whichever conversational voice a request needs next.
-        case singleResidentDynamic = "single_resident_dynamic"
-    }
-
-    // MARK: Configuration
-
     /// Startup configuration for a SpeakSwiftly runtime.
     struct Configuration: Codable, Sendable {
         // MARK: Load Error
@@ -54,8 +42,6 @@ public extension SpeakSwiftly {
         enum CodingKeys: String, CodingKey {
             case speechBackend
             case qwenConditioningStrategy
-            case qwenResidentModel
-            case marvisResidentPolicy
             case defaultVoiceProfile
         }
 
@@ -63,8 +49,6 @@ public extension SpeakSwiftly {
         public let speechBackend: SpeakSwiftly.SpeechBackend
         /// The Qwen conditioning strategy to use for Qwen-backed generation.
         public let qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
-        /// The resident Marvis loading policy to use for Marvis-backed generation.
-        public let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         /// The stored voice profile used when callers do not choose one explicitly.
         public let defaultVoiceProfile: SpeakSwiftly.Name
         /// Extra bundled system-profile roots supplied by host packages at startup.
@@ -76,14 +60,12 @@ public extension SpeakSwiftly {
         public init(
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
             defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             systemProfileResourceRoots: [URL] = [],
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
-            self.marvisResidentPolicy = marvisResidentPolicy
             self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
             self.systemProfileResourceRoots = systemProfileResourceRoots.map(\.standardizedFileURL)
             self.textNormalizer = textNormalizer
@@ -91,23 +73,11 @@ public extension SpeakSwiftly {
 
         public init(from decoder: any Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            let decodedSpeechBackend = try container.decode(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
-            let legacyQwenResidentModel = try container.decodeIfPresent(
-                LegacyQwenResidentModel.self,
-                forKey: .qwenResidentModel,
-            )
-            speechBackend = Self.normalizedSpeechBackend(
-                decodedSpeechBackend,
-                legacyQwenResidentModel: legacyQwenResidentModel,
-            )
+            speechBackend = try container.decode(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
             qwenConditioningStrategy = try container.decodeIfPresent(
                 SpeakSwiftly.QwenConditioningStrategy.self,
                 forKey: .qwenConditioningStrategy,
             ) ?? .preparedConditioning
-            marvisResidentPolicy = try container.decodeIfPresent(
-                SpeakSwiftly.MarvisResidentPolicy.self,
-                forKey: .marvisResidentPolicy,
-            ) ?? .dualResidentSerialized
             defaultVoiceProfile = try Self.normalizedDefaultVoiceProfile(
                 container.decodeIfPresent(
                     SpeakSwiftly.Name.self,
@@ -175,17 +145,6 @@ public extension SpeakSwiftly {
             return trimmed.isEmpty ? SpeakSwiftly.DefaultVoiceProfiles.signal : trimmed
         }
 
-        private static func normalizedSpeechBackend(
-            _ speechBackend: SpeakSwiftly.SpeechBackend,
-            legacyQwenResidentModel: LegacyQwenResidentModel?,
-        ) -> SpeakSwiftly.SpeechBackend {
-            guard speechBackend == .qwen3_smol else {
-                return speechBackend
-            }
-
-            return legacyQwenResidentModel?.speechBackend ?? speechBackend
-        }
-
         private static func makeEncoder() -> JSONEncoder {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -200,7 +159,6 @@ public extension SpeakSwiftly {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(speechBackend, forKey: .speechBackend)
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
-            try container.encode(marvisResidentPolicy, forKey: .marvisResidentPolicy)
             try container.encode(defaultVoiceProfile, forKey: .defaultVoiceProfile)
         }
 
@@ -222,20 +180,6 @@ public extension SpeakSwiftly {
                     stateRootOverride: stateRootOverride,
                 ),
             )
-        }
-    }
-}
-
-private enum LegacyQwenResidentModel: String, Codable {
-    case base06B8Bit = "base_0_6b_8bit"
-    case base17B8Bit = "base_1_7b_8bit"
-
-    var speechBackend: SpeakSwiftly.SpeechBackend {
-        switch self {
-            case .base06B8Bit:
-                .qwen3_smol
-            case .base17B8Bit:
-                .qwen3_BIG
         }
     }
 }

@@ -1590,7 +1590,7 @@ private actor ProfileModelLoadObservation {
     #expect(normalized.contains("settings token"))
 }
 
-@Test func `speak live uses explicit whole source lane before resident generation`() async throws {
+@Test func `speak live lets TextForSpeech detect source before resident generation`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -1623,15 +1623,16 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: #"""
-        {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}
+        {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme"}
         """#,
     )
 
     #expect(await waitUntil { residentRecorder.lastText != nil })
 
     let normalized = try #require(residentRecorder.lastText)
-    #expect(normalized.contains("colon Int"))
+    #expect(normalized.contains("struct Worker Runtime"))
     #expect(normalized.contains("sample Rate"))
+    #expect(normalized.contains("sample Rate: Int"))
 }
 
 @Test func `live speech chunk planner groups three sentences first and two sentences thereafter`() {

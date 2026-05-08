@@ -92,7 +92,7 @@ The model's own public repo and published Hugging Face surfaces:
 | Input sequence budget | No local extra cap; we rely on upstream model limit and runtime scheduling | Input must stay below `2048 - 750 = 1298` sequence positions in the current MLX Swift Marvis path | HF config for the MLX model shows `max_position_embeddings 2048` at the backbone level, with Mimi codec `max_position_embeddings 8000` and `sliding_window 250` in codec metadata |
 | Context window | We preserve full normalized text instead of pre-chunking | Full prompt context is prepended and processed in one contextual sequence | Model card explicitly says this is a core design goal |
 | Codec and sliding-window metadata | No local override | Uses the model artifact as loaded | HF config shows Mimi codec metadata including `sliding_window 250` and `_frame_rate 12.5` |
-| Resident voice policy | Configurable. Default is `dual_resident_serialized`, which keeps the `femme` and `masc` resident routes warm while serializing generation. Optional `single_resident_dynamic` reuses one resident model object for whichever route the next request needs | One model instance has mutable caches; upstream does not provide our policy surface | Model card focuses on conversational voices and cloning behavior, not our runtime policy choices |
+| Resident voice policy | Configurable on the `SpeakSwiftlyTool` operator surface. Default is `single_resident_dynamic`, which reuses one resident model object for whichever route the next request needs. `dual_resident_serialized` remains available for investigation and keeps the `femme` and `masc` resident routes warm while serializing generation | One model instance has mutable caches; upstream does not provide our policy surface | Model card focuses on conversational voices and cloning behavior, not our runtime policy choices |
 | Marvis generation concurrency | Serialized. SpeakSwiftly now allows only one Marvis generation at a time | No equivalent SpeakSwiftly-style scheduler policy | Not part of the model repo or card surface |
 | Playback stabilization | SpeakSwiftly applies one conservative Marvis live-startup profile with raised startup and resume floors across live Marvis playback | No comparable playback policy in `mlx-audio-swift` | Not part of the model repo or card surface |
 
@@ -103,7 +103,7 @@ The model's own public repo and published Hugging Face surfaces:
 - After the later 2026-04-22 simplification pass, SpeakSwiftly now serializes Marvis generation outright instead of trying to overlap two Marvis generations across resident lanes.
 - After the follow-up 2026-04-22 playback pass, all live Marvis requests now use the same conservative Marvis startup profile instead of only the first request getting the larger preroll.
 - The largest real Marvis diffs now are:
-  - resident loading policy, either `dual_resident_serialized` or `single_resident_dynamic`
+  - resident loading policy, defaulting to `single_resident_dynamic` with `dual_resident_serialized` kept as a tool-only investigation override
   - serialized Marvis generation on top of the upstream model
   - custom playback thresholds for startup and recovery, now applied as one Marvis live-startup profile
   - simple `femme` versus `masc` route selection on top of the upstream model

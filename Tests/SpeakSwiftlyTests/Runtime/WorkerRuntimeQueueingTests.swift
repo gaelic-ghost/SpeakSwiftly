@@ -309,7 +309,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -396,28 +395,6 @@ import TextForSpeech
     )
 
     #expect(resolved == .marvis)
-}
-
-@Test func `resolved speech backend prefers explicit qwen backend over legacy qwen resident model environment`() {
-    let resolved = WorkerRuntime.resolvedSpeechBackend(
-        environment: [
-            SpeakSwiftly.SpeechBackend.legacyQwenResidentModelEnvironmentVariable: "base_1_7b_8bit",
-        ],
-        configuration: SpeakSwiftly.Configuration(speechBackend: .qwen3_smol),
-    )
-
-    #expect(resolved == .qwen3_smol)
-}
-
-@Test func `resolved speech backend falls back to legacy qwen resident model environment`() {
-    let resolved = WorkerRuntime.resolvedSpeechBackend(
-        environment: [
-            SpeakSwiftly.SpeechBackend.legacyQwenResidentModelEnvironmentVariable: "base_1_7b_8bit",
-        ],
-        configuration: nil,
-    )
-
-    #expect(resolved == .qwen3_BIG)
 }
 
 @Test func `resident model preload failure fails queued requests`() async throws {

@@ -16,7 +16,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -33,7 +32,6 @@ import TextForSpeech
             profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -52,7 +50,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .file,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -71,7 +68,6 @@ import TextForSpeech
             profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .file,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -80,7 +76,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch request`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_id":"logs","source_format":"swift_source"}]}"#,
+        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_id":"logs"}]}"#,
     )
 
     #expect(
@@ -92,14 +88,12 @@ import TextForSpeech
                     artifactID: "req-batch-artifact-1",
                     text: "First file",
                     textProfile: nil,
-                    sourceFormat: nil,
                     requestContext: nil,
                 ),
                 SpeakSwiftly.GenerationJobItem(
                     artifactID: "custom-artifact",
                     text: "Second file",
                     textProfile: "logs",
-                    sourceFormat: .swift,
                     requestContext: nil,
                 ),
             ],
@@ -121,7 +115,6 @@ import TextForSpeech
                     artifactID: "req-batch-default-artifact-1",
                     text: "First file",
                     textProfile: nil,
-                    sourceFormat: nil,
                     requestContext: nil,
                 ),
             ],
@@ -143,7 +136,6 @@ import TextForSpeech
                     artifactID: "context-artifact",
                     text: "File with path context.",
                     textProfile: nil,
-                    sourceFormat: nil,
                     requestContext: .init(
                         source: "batch_export",
                         topic: "release",
@@ -168,7 +160,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: "logs",
             jobType: .live,
-            sourceFormat: nil,
             requestContext: .init(
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
                 repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
@@ -190,26 +181,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
-            requestContext: nil,
-            qwenPreModelTextChunking: false,
-        ),
-    )
-}
-
-@Test func `decodes speak live request with whole source format`() throws {
-    let request = try ToolRequest.decode(
-        from: #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#,
-    )
-
-    #expect(
-        request == .queueSpeech(
-            id: "req-source",
-            text: "struct WorkerRuntime { let sampleRate: Int }",
-            profileName: "default-femme",
-            textProfileID: nil,
-            jobType: .live,
-            sourceFormat: .swift,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -228,7 +199,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: .init(
                 source: "status_panel",
                 topic: "runtime",
@@ -250,7 +220,6 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: true,
         ),
@@ -547,7 +516,6 @@ import TextForSpeech
         profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
         textProfileID: nil,
         jobType: .live,
-        sourceFormat: nil,
         requestContext: nil,
         qwenPreModelTextChunking: false,
     )
@@ -560,7 +528,6 @@ import TextForSpeech
                 profileName: "swift-signal",
                 textProfileID: nil,
                 jobType: .live,
-                sourceFormat: nil,
                 requestContext: nil,
                 qwenPreModelTextChunking: false,
             ),
@@ -663,6 +630,8 @@ import TextForSpeech
 
 @Test func `rejects removed generation context keys`() throws {
     let removedKeyPayloads = [
+        #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#,
+        #"{"id":"req-batch-source","op":"generate_batch","items":[{"text":"Hello","source_format":"swift_source"}]}"#,
         #"{"id":"req-old-context","op":"generate_speech","text":"Hello","input_text_context":{"source_format":"swift_source"}}"#,
         #"{"id":"req-old-format","op":"generate_speech","text":"Hello","text_format":"source"}"#,
         #"{"id":"req-old-nested-source","op":"generate_batch","items":[{"text":"Hello","nested_source_format":"swift_source"}]}"#,
@@ -675,8 +644,7 @@ import TextForSpeech
         } catch let error as SpeakSwiftly.Error {
             #expect(error.code == .invalidRequest)
             #expect(error.message.contains("Generation context key"))
-            #expect(error.message.contains("request_context"))
-            #expect(error.message.contains("source_format"))
+            #expect(error.message.contains("TextForSpeech"))
         }
     }
 }
