@@ -323,6 +323,11 @@ final class PlaybackSpy: @unchecked Sendable {
                     playCount += 1
                     playbackState = .playing
                 }
+                defer {
+                    lock.withLock {
+                        playbackState = .idle
+                    }
+                }
                 let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
 
                 var emittedFirstChunk = false
@@ -507,10 +512,6 @@ final class PlaybackSpy: @unchecked Sendable {
                         fadeInChunkCount = 1
                     case let .throw(error):
                         throw error
-                }
-
-                lock.withLock {
-                    playbackState = .idle
                 }
 
                 return PlaybackSummary(

@@ -89,7 +89,7 @@ current macOS CI target set is:
 - `SpeakSwiftlyTests/LibrarySurfaceTests`
 - `SpeakSwiftlyTests/ModelClientsTests`
 
-## iOS Compile-And-Smoke Lane
+## Opt-In iOS Compile-And-Smoke Lane
 
 The iOS lane is intentionally smaller than the macOS package lane. Its job is
 to prove that:
@@ -97,6 +97,12 @@ to prove that:
 - the package resolves for iOS
 - the shared library and playback-environment code compile for iOS Simulator
 - a small library-first smoke slice still runs under Simulator
+
+This lane is opt-in in GitHub Actions. Run the `Swift` workflow manually with
+`run_ios_smoke` enabled when an implementation touches iOS portability,
+platform-conditional playback code, package resources, or shared library
+surfaces that need simulator proof. Ordinary PR and release CI does not run it
+by default.
 
 Build once:
 

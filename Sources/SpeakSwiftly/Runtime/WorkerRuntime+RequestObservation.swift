@@ -310,6 +310,26 @@ extension SpeakSwiftly.Runtime {
         playbackObservationBroker.broadcast(update)
     }
 
+    func publishPlaybackQueueChangedIfNeeded(
+        since previousSnapshot: SpeakSwiftly.PlaybackSnapshot,
+    ) async {
+        let snapshot = await playbackSnapshot()
+        guard snapshot.activeRequest != previousSnapshot.activeRequest
+            || snapshot.queuedRequests != previousSnapshot.queuedRequests
+        else {
+            return
+        }
+
+        let update = makePlaybackUpdate(
+            snapshot: snapshot,
+            event: .queueChanged(
+                activeRequest: snapshot.activeRequest,
+                queuedRequests: snapshot.queuedRequests,
+            ),
+        )
+        playbackObservationBroker.broadcast(update)
+    }
+
     func makeGenerateUpdate(
         state: SpeakSwiftly.GenerateState,
         advanceSequence: Bool = true,
