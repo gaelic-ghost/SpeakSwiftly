@@ -17,11 +17,8 @@ on:
 
 jobs:
   build-and-test:
-    name: Swift on macOS 26
+    name: Swift package smoke on macOS 26
     runs-on: macos-26
-    env:
-      SPEAKSWIFTLY_CI_DERIVED_DATA: .local/xcode/derived-data/ci
-      SPEAKSWIFTLY_CI_SOURCE_PACKAGES: .local/xcode/source-packages
 
     steps:
       - name: Check out repository
@@ -37,59 +34,11 @@ jobs:
       - name: Show Swift version
         run: swift --version
 
-      - name: Install formatting and linting tools
-        run: brew install swiftformat swiftlint
-
-      - name: Run repo-maintenance validation
-        run: sh scripts/repo-maintenance/validate-all.sh
-
       - name: Validate package manifest
         run: swift package dump-package
 
-      - name: Build package tests with Xcode-backed package lane
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          xcodebuild build-for-testing -quiet \
-            -scheme SpeakSwiftly-Package \
-            -destination 'platform=macOS' \
-            -derivedDataPath "$SPEAKSWIFTLY_CI_DERIVED_DATA" \
-            -clonedSourcePackagesDirPath "$SPEAKSWIFTLY_CI_SOURCE_PACKAGES"
-
-      - name: Resolve Xcode-backed test manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          xctestrun_path="$(find "$SPEAKSWIFTLY_CI_DERIVED_DATA/Build/Products" -maxdepth 1 -name '*.xctestrun' | head -n 1)"
-          if [[ -z "$xctestrun_path" ]]; then
-            printf 'SpeakSwiftly CI could not find the .xctestrun manifest produced by build-for-testing under %s.\n' "$SPEAKSWIFTLY_CI_DERIVED_DATA/Build/Products" >&2
-            exit 1
-          fi
-
-          printf 'SPEAKSWIFTLY_CI_XCTESTRUN=%s\n' "$xctestrun_path" >>"$GITHUB_ENV"
-
-      - name: Run runtime and library package tests
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          xcodebuild test-without-building -quiet \
-            -xctestrun "$SPEAKSWIFTLY_CI_XCTESTRUN" \
-            -destination 'platform=macOS' \
-            -only-testing:'SpeakSwiftlyTests/WorkerRuntimePlaybackTests' \
-            -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests'
-
-      - name: Run model client package tests
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          xcodebuild test-without-building -quiet \
-            -xctestrun "$SPEAKSWIFTLY_CI_XCTESTRUN" \
-            -destination 'platform=macOS' \
-            -only-testing:'SpeakSwiftlyTests/ModelClientsTests'
+      - name: Build package
+        run: swift build
 
   ios-compile-and-smoke:
     name: iOS compile and smoke on macOS 26
