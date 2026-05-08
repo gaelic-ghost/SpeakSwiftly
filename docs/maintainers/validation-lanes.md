@@ -81,13 +81,20 @@ For GitHub Actions, keep the manifest sanity check as:
 swift package dump-package
 ```
 
-GitHub Actions currently keeps build-and-test coverage on the Xcode-backed
-package lane even though local ordinary package work starts with SwiftPM. The
-current macOS CI target set is:
+GitHub Actions keeps the default Swift workflow intentionally light because
+ordinary changes run the thorough `swift build`, `swift test`, and
+repo-maintenance checks locally before commit. The remote Swift package smoke
+lane is:
 
-- `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
-- `SpeakSwiftlyTests/LibrarySurfaceTests`
-- `SpeakSwiftlyTests/ModelClientsTests`
+```bash
+swift package dump-package
+swift build
+```
+
+The separate `validate` workflow remains the remote repo-maintenance check for
+formatting, linting, toolkit shape, and resource layout. Use the Xcode-backed
+fallback lane locally, in release hardening, or in manually triggered
+investigations when SwiftPM stops being the best signal.
 
 ## Opt-In iOS Compile-And-Smoke Lane
 

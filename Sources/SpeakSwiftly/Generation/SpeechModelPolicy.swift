@@ -21,10 +21,14 @@ enum GenerationPolicy {
     ) -> GenerateParameters {
         switch backend {
             case .qwen3_smol,
+                 .qwen3_smol_4bit,
+                 .qwen3_smol_5bit,
                  .qwen3_smol_6bit,
                  .qwen3_smol_8bit,
                  .qwen3_smol_bf16,
                  .qwen3_BIG,
+                 .qwen3_BIG_4bit,
+                 .qwen3_BIG_5bit,
                  .qwen3_BIG_6bit,
                  .qwen3_BIG_8bit,
                  .qwen3_BIG_bf16:
@@ -42,7 +46,7 @@ enum GenerationPolicy {
                     temperature: chatterboxResidentTemperature,
                     topP: chatterboxResidentTopP,
                 )
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 // Current mlx-audio-swift Marvis ignores caller-supplied generation
                 // parameters and samples with its own internal settings.
                 GenerateParameters()

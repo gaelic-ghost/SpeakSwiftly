@@ -28,15 +28,23 @@ private actor ProfileModelLoadObservation {
 
 @Test func `resident backend repos include chatterbox turbo 8bit`() {
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol) == ModelFactory.qwenResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_4bit) == ModelFactory.qwen06B4BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_5bit) == ModelFactory.qwen06B5BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_6bit) == ModelFactory.qwen06B6BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_8bit) == ModelFactory.qwen06B8BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_bf16) == ModelFactory.qwen06BBF16ResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG) == ModelFactory.qwen17B8BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_4bit) == ModelFactory.qwen17B4BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_5bit) == ModelFactory.qwen17B5BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_6bit) == ModelFactory.qwen17B6BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_8bit) == ModelFactory.qwen17B8BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_bf16) == ModelFactory.qwen17BBF16ResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
     #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .marvis_4bit) == ModelFactory.marvis4BitResidentModelRepo)
+    #expect(ModelFactory.residentModelRepo(for: .marvis_6bit) == ModelFactory.marvis6BitResidentModelRepo)
+    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends == [.marvis, .marvis_4bit, .marvis_6bit])
+    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends.allSatisfy { $0.isMarvisFamily })
 }
 
 @Test func `profile model load rejects missing metal device by default`() async throws {

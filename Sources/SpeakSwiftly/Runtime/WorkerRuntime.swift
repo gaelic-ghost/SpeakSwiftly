@@ -40,7 +40,7 @@ public extension SpeakSwiftly {
                 speechBackend: SpeakSwiftly.SpeechBackend,
                 existingPlaybackJobCount: Int,
             ) -> ResidentStreamingCadenceProfile {
-                guard speechBackend == .marvis else { return .standard }
+                guard speechBackend.isMarvisFamily else { return .standard }
 
                 return switch existingPlaybackJobCount {
                     case 0:

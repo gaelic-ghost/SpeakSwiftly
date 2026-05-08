@@ -59,7 +59,7 @@ enum ResidentSpeechModels {
             case .chatterboxTurbo:
                 [ModelFactory.chatterboxResidentModelRepo]
             case .marvis:
-                [ModelFactory.marvisResidentModelRepo]
+                SpeakSwiftly.SpeechBackend.marvisFamilyBackends.map { ModelFactory.residentModelRepo(for: $0) }
         }
     }
 }

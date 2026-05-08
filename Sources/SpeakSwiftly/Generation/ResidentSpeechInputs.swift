@@ -51,10 +51,14 @@ extension SpeakSwiftly.Runtime {
 
         switch speechBackend {
             case .qwen3_smol,
+                 .qwen3_smol_4bit,
+                 .qwen3_smol_5bit,
                  .qwen3_smol_6bit,
                  .qwen3_smol_8bit,
                  .qwen3_smol_bf16,
                  .qwen3_BIG,
+                 .qwen3_BIG_4bit,
+                 .qwen3_BIG_5bit,
                  .qwen3_BIG_6bit,
                  .qwen3_BIG_8bit,
                  .qwen3_BIG_bf16:
@@ -128,7 +132,7 @@ extension SpeakSwiftly.Runtime {
                     refAudio: refAudio,
                 )
 
-            case .marvis:
+            case .marvis, .marvis_4bit, .marvis_6bit:
                 let (residentModel, voice) = try residentMarvisModelOrThrow(for: profile.manifest.vibe)
                 await logRequestEvent(
                     "marvis_voice_selected",

@@ -5,21 +5,7 @@ import TextForSpeech
 
 extension SpeakSwiftly.Runtime {
     func preloadModelRepos(for speechBackend: SpeakSwiftly.SpeechBackend) -> [String] {
-        switch speechBackend {
-            case .qwen3_smol,
-                 .qwen3_smol_6bit,
-                 .qwen3_smol_8bit,
-                 .qwen3_smol_bf16,
-                 .qwen3_BIG,
-                 .qwen3_BIG_6bit,
-                 .qwen3_BIG_8bit,
-                 .qwen3_BIG_bf16:
-                [ModelFactory.residentModelRepo(for: speechBackend)]
-            case .chatterboxTurbo:
-                [ModelFactory.residentModelRepo(for: speechBackend)]
-            case .marvis:
-                [ModelFactory.marvisResidentModelRepo]
-        }
+        [ModelFactory.residentModelRepo(for: speechBackend)]
     }
 
     func shouldApplyResidentPreloadResult(
@@ -195,7 +181,7 @@ extension SpeakSwiftly.Runtime {
     }
 
     func marvisGenerationLane(for request: WorkerRequest) throws -> MarvisResidentVoice? {
-        guard speechBackend == .marvis else { return nil }
+        guard speechBackend.isMarvisFamily else { return nil }
 
         let profileName: String? = switch request {
             case .queueSpeech(

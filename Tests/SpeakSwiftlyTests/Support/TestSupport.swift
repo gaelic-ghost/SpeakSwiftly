@@ -765,17 +765,21 @@ func makeResidentModels(
 ) -> ResidentSpeechModels {
     switch backend {
         case .qwen3_smol,
+             .qwen3_smol_4bit,
+             .qwen3_smol_5bit,
              .qwen3_smol_6bit,
              .qwen3_smol_8bit,
              .qwen3_smol_bf16,
              .qwen3_BIG,
+             .qwen3_BIG_4bit,
+             .qwen3_BIG_5bit,
              .qwen3_BIG_6bit,
              .qwen3_BIG_8bit,
              .qwen3_BIG_bf16:
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
         case .chatterboxTurbo:
             .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
-        case .marvis:
+        case .marvis, .marvis_4bit, .marvis_6bit:
             switch marvisResidentPolicy {
                 case .dualResidentSerialized:
                     .marvis(
@@ -880,17 +884,21 @@ func makeRuntime(
             if let model = loaded as? AnySpeechModel {
                 switch backend {
                     case .qwen3_smol,
+                         .qwen3_smol_4bit,
+                         .qwen3_smol_5bit,
                          .qwen3_smol_6bit,
                          .qwen3_smol_8bit,
                          .qwen3_smol_bf16,
                          .qwen3_BIG,
+                         .qwen3_BIG_4bit,
+                         .qwen3_BIG_5bit,
                          .qwen3_BIG_6bit,
                          .qwen3_BIG_8bit,
                          .qwen3_BIG_bf16:
                         return .qwen3(model)
                     case .chatterboxTurbo:
                         return .chatterboxTurbo(model)
-                    case .marvis:
+                    case .marvis, .marvis_4bit, .marvis_6bit:
                         switch marvisResidentPolicy {
                             case .dualResidentSerialized:
                                 return .marvis(
