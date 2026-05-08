@@ -353,10 +353,20 @@ extension SpeakSwiftly.Runtime {
                         case .generation:
                             await publishGenerateUpdate()
                         case .playback:
-                            await publishPlaybackUpdate()
+                            await publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                                .queueChanged(
+                                    activeRequest: snapshot.activeRequest,
+                                    queuedRequests: snapshot.queuedRequests,
+                                )
+                            })
                         case nil:
                             await publishGenerateUpdate()
-                            await publishPlaybackUpdate()
+                            await publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                                .queueChanged(
+                                    activeRequest: snapshot.activeRequest,
+                                    queuedRequests: snapshot.queuedRequests,
+                                )
+                            })
                     }
                     result = .success(WorkerSuccessPayload(id: id, clearedCount: clearedCount))
 
@@ -367,7 +377,12 @@ extension SpeakSwiftly.Runtime {
                         cancelledByRequestID: id,
                     )
                     await publishGenerateUpdate()
-                    await publishPlaybackUpdate()
+                    await publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                        .queueChanged(
+                            activeRequest: snapshot.activeRequest,
+                            queuedRequests: snapshot.queuedRequests,
+                        )
+                    })
                     result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))
 
                 case .queueSpeech,

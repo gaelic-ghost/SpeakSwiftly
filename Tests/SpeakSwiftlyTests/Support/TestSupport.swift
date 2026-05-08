@@ -302,6 +302,7 @@ final class PlaybackSpy: @unchecked Sendable {
     private let lock = NSLock()
     private let behavior: Behavior
     private let environmentEvents: [PlaybackEnvironmentEvent]
+    private var playbackState: PlaybackState = .idle
 
     init(
         behavior: Behavior = .immediate,
@@ -318,7 +319,10 @@ final class PlaybackSpy: @unchecked Sendable {
                 return prepareCount == 1
             },
             play: { [self] _, text, tuningProfile, stream, onEvent in
-                lock.withLock { playCount += 1 }
+                lock.withLock {
+                    playCount += 1
+                    playbackState = .playing
+                }
                 let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
 
                 var emittedFirstChunk = false
@@ -505,6 +509,10 @@ final class PlaybackSpy: @unchecked Sendable {
                         throw error
                 }
 
+                lock.withLock {
+                    playbackState = .idle
+                }
+
                 return PlaybackSummary(
                     thresholds: thresholds,
                     chunkCount: chunkCount,
@@ -534,11 +542,26 @@ final class PlaybackSpy: @unchecked Sendable {
                 )
             },
             stop: { [self] in
-                lock.withLock { stopCount += 1 }
+                lock.withLock {
+                    stopCount += 1
+                    playbackState = .idle
+                }
             },
-            pause: { .paused },
-            resume: { .playing },
-            state: { .idle },
+            pause: { [self] in
+                lock.withLock {
+                    playbackState = .paused
+                    return playbackState
+                }
+            },
+            resume: { [self] in
+                lock.withLock {
+                    playbackState = .playing
+                    return playbackState
+                }
+            },
+            state: { [self] in
+                lock.withLock { playbackState }
+            },
             bindEnvironmentEvents: { [environmentEvents] sink in
                 guard let sink else { return }
 

@@ -13,6 +13,16 @@ public extension SpeakSwiftly {
     /// A meaningful event in the live playback surface.
     enum PlaybackEvent: Codable, Sendable, Equatable {
         case stateChanged(PlaybackState)
+        case started(requestID: String)
+        case activeRequestChanged(ActiveRequest?)
+        case queueChanged(activeRequest: ActiveRequest?, queuedRequests: [QueuedRequest])
+        case firstChunk(requestID: String)
+        case prerollReady(requestID: String, bufferedAudioMS: Int, startupBufferTargetMS: Int)
+        case rebufferStarted(requestID: String, queuedAudioMS: Int, resumeBufferTargetMS: Int)
+        case rebufferResumed(requestID: String, bufferedAudioMS: Int, resumeBufferTargetMS: Int)
+        case completed(requestID: String)
+        case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
+        case interruptionChanged(isInterrupted: Bool, shouldResume: Bool?)
     }
 
     /// A sequenced playback-state publication.

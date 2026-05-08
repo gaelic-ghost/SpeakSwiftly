@@ -969,6 +969,7 @@ import Darwin
     let generateSnapshotQueued: KeyPath<SpeakSwiftly.GenerateSnapshot, [SpeakSwiftly.QueuedRequest]> = \.queuedRequests
     let playbackUpdateSequence: KeyPath<SpeakSwiftly.PlaybackUpdate, Int> = \.sequence
     let playbackUpdateState: KeyPath<SpeakSwiftly.PlaybackUpdate, SpeakSwiftly.PlaybackState> = \.state
+    let playbackUpdateEvent: KeyPath<SpeakSwiftly.PlaybackUpdate, SpeakSwiftly.PlaybackEvent> = \.event
     let playbackSnapshotActive: KeyPath<SpeakSwiftly.PlaybackSnapshot, SpeakSwiftly.ActiveRequest?> = \.activeRequest
     let playbackSnapshotQueued: KeyPath<SpeakSwiftly.PlaybackSnapshot, [SpeakSwiftly.QueuedRequest]> = \.queuedRequests
     let runtimeUpdateSequence: KeyPath<SpeakSwiftly.RuntimeUpdate, Int> = \.sequence
@@ -989,6 +990,7 @@ import Darwin
     _ = generateSnapshotQueued
     _ = playbackUpdateSequence
     _ = playbackUpdateState
+    _ = playbackUpdateEvent
     _ = playbackSnapshotActive
     _ = playbackSnapshotQueued
     _ = runtimeUpdateSequence
@@ -1002,6 +1004,40 @@ import Darwin
     _ = textProfilesPath
     _ = generatedFilesRootPath
     _ = generationJobsRootPath
+}
+
+@Test func `public playback events expose stable operator milestones`() {
+    let activeRequest = SpeakSwiftly.ActiveRequest(
+        id: "active-1",
+        kind: .generateSpeech,
+        voiceProfile: "testing-profile",
+        requestContext: nil,
+    )
+    let queuedRequest = SpeakSwiftly.QueuedRequest(
+        id: "queued-1",
+        kind: .generateSpeech,
+        voiceProfile: "testing-profile",
+        requestContext: nil,
+        queuePosition: 1,
+    )
+
+    let events: [SpeakSwiftly.PlaybackEvent] = [
+        .stateChanged(.playing),
+        .started(requestID: activeRequest.id),
+        .activeRequestChanged(activeRequest),
+        .activeRequestChanged(nil),
+        .queueChanged(activeRequest: activeRequest, queuedRequests: [queuedRequest]),
+        .firstChunk(requestID: activeRequest.id),
+        .prerollReady(requestID: activeRequest.id, bufferedAudioMS: 500, startupBufferTargetMS: 480),
+        .rebufferStarted(requestID: activeRequest.id, queuedAudioMS: 120, resumeBufferTargetMS: 320),
+        .rebufferResumed(requestID: activeRequest.id, bufferedAudioMS: 340, resumeBufferTargetMS: 320),
+        .completed(requestID: activeRequest.id),
+        .outputDeviceChanged(previousDevice: "Built-in Output", currentDevice: "External Headphones"),
+        .interruptionChanged(isInterrupted: true, shouldResume: nil),
+        .interruptionChanged(isInterrupted: false, shouldResume: true),
+    ]
+
+    #expect(events.count == 13)
 }
 
 @Test func `public text normalization surface exposes profile metadata`() {

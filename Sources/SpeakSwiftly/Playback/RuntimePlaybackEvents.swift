@@ -10,9 +10,17 @@ extension SpeakSwiftly.Runtime {
 
         switch event {
             case .firstChunk:
+                await publishPlaybackUpdate(event: .firstChunk(requestID: id))
                 await emitProgress(id: id, stage: .bufferingAudio)
                 await logRequestEvent("playback_first_chunk", requestID: id, op: op, profileName: profileName)
             case let .prerollReady(startupBufferedAudioMS, thresholds):
+                await publishPlaybackUpdate(
+                    event: .prerollReady(
+                        requestID: id,
+                        bufferedAudioMS: startupBufferedAudioMS,
+                        startupBufferTargetMS: thresholds.startupBufferTargetMS,
+                    ),
+                )
                 await emitProgress(id: id, stage: .prerollReady)
                 await logRequestEvent(
                     "playback_preroll_ready",
@@ -50,6 +58,13 @@ extension SpeakSwiftly.Runtime {
                     details: ["queued_audio_ms": .int(queuedAudioMS)],
                 )
             case let .rebufferStarted(queuedAudioMS, thresholds):
+                await publishPlaybackUpdate(
+                    event: .rebufferStarted(
+                        requestID: id,
+                        queuedAudioMS: queuedAudioMS,
+                        resumeBufferTargetMS: thresholds.resumeBufferTargetMS,
+                    ),
+                )
                 await logRequestEvent(
                     "playback_rebuffer_started",
                     requestID: id,
@@ -63,6 +78,13 @@ extension SpeakSwiftly.Runtime {
                     .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
                 )
             case let .rebufferResumed(bufferedAudioMS, thresholds):
+                await publishPlaybackUpdate(
+                    event: .rebufferResumed(
+                        requestID: id,
+                        bufferedAudioMS: bufferedAudioMS,
+                        resumeBufferTargetMS: thresholds.resumeBufferTargetMS,
+                    ),
+                )
                 await logRequestEvent(
                     "playback_rebuffer_resumed",
                     requestID: id,
@@ -110,6 +132,9 @@ extension SpeakSwiftly.Runtime {
                     ],
                 )
             case let .outputDeviceChanged(previousDevice, currentDevice):
+                await publishPlaybackUpdate(
+                    event: .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice),
+                )
                 await logRequestEvent(
                     "playback_output_device_changed",
                     requestID: id,
@@ -191,6 +216,9 @@ extension SpeakSwiftly.Runtime {
                     ],
                 )
             case let .outputDeviceChanged(previousDevice, currentDevice):
+                await publishPlaybackUpdate(
+                    event: .outputDeviceChanged(previousDevice: previousDevice, currentDevice: currentDevice),
+                )
                 await logEvent(
                     "playback_output_device_changed",
                     requestID: requestID,
@@ -214,6 +242,9 @@ extension SpeakSwiftly.Runtime {
                     ],
                 )
             case let .interruptionStateChanged(isInterrupted, shouldResume):
+                await publishPlaybackUpdate(
+                    event: .interruptionChanged(isInterrupted: isInterrupted, shouldResume: shouldResume),
+                )
                 var details: [String: LogValue] = [
                     "is_interrupted": .bool(isInterrupted),
                     "had_active_request": .bool(activeRequest != nil),

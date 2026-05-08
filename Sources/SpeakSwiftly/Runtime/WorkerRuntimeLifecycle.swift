@@ -15,6 +15,25 @@ extension SpeakSwiftly.Runtime {
                 handleEnvironmentEvent: { [weak self] event, activeRequest in
                     await self?.handlePlaybackEnvironmentEvent(event, activeRequest: activeRequest)
                 },
+                playbackStarted: { [weak self] requestID in
+                    await self?.publishPlaybackUpdate(event: .started(requestID: requestID))
+                },
+                playbackCompleted: { [weak self] requestID in
+                    await self?.publishPlaybackUpdate(event: .completed(requestID: requestID))
+                },
+                activeRequestChanged: { [weak self] in
+                    await self?.publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                        .activeRequestChanged(snapshot.activeRequest)
+                    })
+                },
+                queueChanged: { [weak self] in
+                    await self?.publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                        .queueChanged(
+                            activeRequest: snapshot.activeRequest,
+                            queuedRequests: snapshot.queuedRequests,
+                        )
+                    })
+                },
                 logEngineReady: { [weak self] job, sampleRate in
                     await self?.logPlaybackEngineReady(for: job, sampleRate: sampleRate)
                 },
@@ -309,7 +328,12 @@ extension SpeakSwiftly.Runtime {
                 return
             }
             await playbackQueue.enqueue(speechJob)
-            await publishPlaybackUpdate()
+            await publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+                .queueChanged(
+                    activeRequest: snapshot.activeRequest,
+                    queuedRequests: snapshot.queuedRequests,
+                )
+            })
             guard await generationQueue.markReady(token: job.token) != nil else {
                 _ = await playbackQueue.discard(requestID: request.id)
                 return

@@ -123,10 +123,12 @@ for try await update in runtime.updates(for: handle.id) {
 
 When you want the broader runtime view instead of one request, use ``SpeakSwiftly/Runtime/snapshot()`` for resident state, backend, default voice profile, and resolved storage paths. Use ``SpeakSwiftly/Generate/snapshot()`` for generation queue state and ``SpeakSwiftly/Playback/snapshot()`` for playback state and queued playback work.
 
+For live playback milestones, subscribe to ``SpeakSwiftly/Playback/updates()`` and branch on ``SpeakSwiftly/PlaybackUpdate/event``. ``SpeakSwiftly/PlaybackEvent`` reports stable operator-facing milestones such as active request changes, queue changes, first chunk, preroll readiness, rebuffer start and recovery, completion, output-device changes, and interruption changes. Detailed trace diagnostics remain internal logs.
+
 ## Where To Look Next
 
 After the runtime is up, the next question is usually whether you care about live playback or retained output:
 
-- For live queue control, continue with ``SpeakSwiftly/Playback`` and ``SpeakSwiftly/PlaybackState``.
+- For live queue control and playback milestones, continue with ``SpeakSwiftly/Playback``, ``SpeakSwiftly/PlaybackState``, and ``SpeakSwiftly/PlaybackEvent``.
 - For stored output and later inspection, continue with <doc:RetainedArtifacts>.
 - For stored voice-profile management, continue with ``SpeakSwiftly/Voices``.

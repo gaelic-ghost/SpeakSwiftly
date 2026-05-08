@@ -44,7 +44,9 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 ### Playback And Observation
 
 - ``SpeakSwiftly/Playback``
+- ``SpeakSwiftly/PlaybackEvent``
 - ``SpeakSwiftly/PlaybackState``
+- ``SpeakSwiftly/PlaybackUpdate``
 - ``SpeakSwiftly/GenerateSnapshot``
 - ``SpeakSwiftly/PlaybackSnapshot``
 - ``SpeakSwiftly/RuntimeSnapshot``

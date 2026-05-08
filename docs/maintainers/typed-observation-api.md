@@ -147,6 +147,8 @@ for the worker contract, but make the native Swift inspection path direct and
 snapshot-shaped.
 
 `PlaybackState` remains small enough for UI and agent consumers to branch on directly. Snapshot carries richer telemetry.
+`PlaybackEvent` carries the stable public milestones that host and operator
+surfaces can branch on without parsing worker log event names.
 
 Shape:
 
@@ -159,10 +161,25 @@ enum PlaybackState: Sendable, Equatable {
     case recovering
 }
 
+enum PlaybackEvent: Sendable, Equatable {
+    case stateChanged(PlaybackState)
+    case started(requestID: String)
+    case activeRequestChanged(ActiveRequest?)
+    case queueChanged(activeRequest: ActiveRequest?, queuedRequests: [QueuedRequest])
+    case firstChunk(requestID: String)
+    case prerollReady(requestID: String, bufferedAudioMS: Int, startupBufferTargetMS: Int)
+    case rebufferStarted(requestID: String, queuedAudioMS: Int, resumeBufferTargetMS: Int)
+    case rebufferResumed(requestID: String, bufferedAudioMS: Int, resumeBufferTargetMS: Int)
+    case completed(requestID: String)
+    case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
+    case interruptionChanged(isInterrupted: Bool, shouldResume: Bool?)
+}
+
 struct PlaybackUpdate: Sendable, Equatable {
     let sequence: Int
     let date: Date
     let state: PlaybackState
+    let event: PlaybackEvent
 }
 
 struct PlaybackSnapshot: Sendable, Equatable {
@@ -177,7 +194,17 @@ struct PlaybackSnapshot: Sendable, Equatable {
 }
 ```
 
-Raw playback-driver events such as trace samples, buffer-shape summaries, route-change internals, and rebuffer warnings stay internal diagnostics unless a concrete Swift consumer needs them. The public update stream publishes domain states, not driver chatter.
+Every `PlaybackUpdate` derives its `state` from the current
+`PlaybackSnapshot`, including milestone events. Consumers should branch on
+`update.event` for playback milestones, use `update.state` for the current
+coarse playback state, and call `runtime.playback.snapshot()` when they need a
+fresh aggregate read of active request, queued requests, and rebuffer telemetry.
+
+Raw playback-driver events such as trace samples, buffer-shape summaries,
+route-change internals, queue-depth warnings, rebuffer-thrash warnings,
+engine-configuration noise, recovery internals, and starvation diagnostics stay
+internal logs unless a concrete Swift consumer needs a new stable public
+milestone. The public update stream publishes domain events, not driver chatter.
 
 ### Runtime
 
