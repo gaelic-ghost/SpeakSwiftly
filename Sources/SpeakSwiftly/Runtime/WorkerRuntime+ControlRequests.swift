@@ -344,6 +344,7 @@ extension SpeakSwiftly.Runtime {
                     )
 
                 case let .clearQueue(id, queueType):
+                    let previousPlaybackSnapshot = await playbackSnapshot()
                     let clearedCount = await clearQueuedRequests(
                         queueType: queueType,
                         cancelledByRequestID: id,
@@ -353,21 +354,22 @@ extension SpeakSwiftly.Runtime {
                         case .generation:
                             await publishGenerateUpdate()
                         case .playback:
-                            await publishPlaybackUpdate()
+                            await publishPlaybackQueueChangedIfNeeded(since: previousPlaybackSnapshot)
                         case nil:
                             await publishGenerateUpdate()
-                            await publishPlaybackUpdate()
+                            await publishPlaybackQueueChangedIfNeeded(since: previousPlaybackSnapshot)
                     }
                     result = .success(WorkerSuccessPayload(id: id, clearedCount: clearedCount))
 
                 case let .cancelRequest(id, targetRequestID, queueType):
+                    let previousPlaybackSnapshot = await playbackSnapshot()
                     let cancelledRequestID = try await cancelRequestNow(
                         targetRequestID,
                         queueType: queueType,
                         cancelledByRequestID: id,
                     )
                     await publishGenerateUpdate()
-                    await publishPlaybackUpdate()
+                    await publishPlaybackQueueChangedIfNeeded(since: previousPlaybackSnapshot)
                     result = .success(WorkerSuccessPayload(id: id, cancelledRequestID: cancelledRequestID))
 
                 case .queueSpeech,

@@ -16,6 +16,9 @@ extension PlaybackQueue {
         activePlaybackFragileOverlapWindowProgress = nil
         activePlaybackIsRebuffering = false
         playbackState.execution.playbackTask = task
+        await hooks.playbackStarted(requestID)
+        await hooks.activeRequestChanged()
+        await hooks.queueChanged()
     }
 
     private func runPlayback(
@@ -86,6 +89,9 @@ extension PlaybackQueue {
         playbackState.execution.generationTask = nil
         playbackState.execution.playbackTask = nil
         await hooks.completeJob(playbackState.request, result)
+        await hooks.playbackCompleted(requestID)
+        await hooks.activeRequestChanged()
+        await hooks.queueChanged()
         await hooks.resumeQueue()
     }
 }

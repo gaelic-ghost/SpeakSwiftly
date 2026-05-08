@@ -277,7 +277,7 @@ extension SpeakSwiftly.Runtime {
         let latestUpdate = if let latestPlaybackUpdate = playbackObservationBroker.latestUpdate {
             latestPlaybackUpdate
         } else {
-            makePlaybackUpdate(state: snapshot.state, advanceSequence: false)
+            makePlaybackUpdate(snapshot: snapshot, advanceSequence: false)
         }
 
         return AsyncStream { continuation in
@@ -296,8 +296,37 @@ extension SpeakSwiftly.Runtime {
         generateObservationBroker.broadcast(update)
     }
 
-    func publishPlaybackUpdate() async {
-        let update = await makePlaybackUpdate(state: playbackSnapshot().state)
+    func publishPlaybackUpdate(event: SpeakSwiftly.PlaybackEvent? = nil) async {
+        let snapshot = await playbackSnapshot()
+        let update = makePlaybackUpdate(snapshot: snapshot, event: event)
+        playbackObservationBroker.broadcast(update)
+    }
+
+    func publishPlaybackUpdate(
+        eventFromSnapshot buildEvent: (SpeakSwiftly.PlaybackSnapshot) -> SpeakSwiftly.PlaybackEvent,
+    ) async {
+        let snapshot = await playbackSnapshot()
+        let update = makePlaybackUpdate(snapshot: snapshot, event: buildEvent(snapshot))
+        playbackObservationBroker.broadcast(update)
+    }
+
+    func publishPlaybackQueueChangedIfNeeded(
+        since previousSnapshot: SpeakSwiftly.PlaybackSnapshot,
+    ) async {
+        let snapshot = await playbackSnapshot()
+        guard snapshot.activeRequest != previousSnapshot.activeRequest
+            || snapshot.queuedRequests != previousSnapshot.queuedRequests
+        else {
+            return
+        }
+
+        let update = makePlaybackUpdate(
+            snapshot: snapshot,
+            event: .queueChanged(
+                activeRequest: snapshot.activeRequest,
+                queuedRequests: snapshot.queuedRequests,
+            ),
+        )
         playbackObservationBroker.broadcast(update)
     }
 
@@ -315,16 +344,17 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func makePlaybackUpdate(
-        state: SpeakSwiftly.PlaybackState,
+    private func makePlaybackUpdate(
+        snapshot: SpeakSwiftly.PlaybackSnapshot,
+        event: SpeakSwiftly.PlaybackEvent? = nil,
         advanceSequence: Bool = true,
     ) -> SpeakSwiftly.PlaybackUpdate {
         playbackObservationBroker.makeUpdate(advanceSequence: advanceSequence) { sequence in
             SpeakSwiftly.PlaybackUpdate(
                 sequence: sequence,
                 date: dependencies.now(),
-                state: state,
-                event: .stateChanged(state),
+                state: snapshot.state,
+                event: event ?? .stateChanged(snapshot.state),
             )
         }
     }

@@ -104,6 +104,215 @@ import TextForSpeech
     await playbackDrain.open()
 }
 
+@Test func `playback updates report public playback milestones`() async throws {
+    let output = OutputRecorder()
+    let updateRecorder = PlaybackUpdateRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(behavior: .emitLowQueueThenStarve),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    let updates = await runtime.playback.updates()
+    let collector = Task {
+        for await update in updates {
+            updateRecorder.record(update)
+        }
+    }
+    defer {
+        collector.cancel()
+    }
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let handle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
+
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .started(requestID: handle.id)
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .firstChunk(requestID: handle.id)
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            if case let .prerollReady(requestID, bufferedAudioMS, startupBufferTargetMS) = $0 {
+                return requestID == handle.id && bufferedAudioMS >= 0 && startupBufferTargetMS > 0
+            }
+            return false
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            if case let .rebufferStarted(requestID, queuedAudioMS, resumeBufferTargetMS) = $0 {
+                return requestID == handle.id && queuedAudioMS == 120 && resumeBufferTargetMS > 0
+            }
+            return false
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            if case let .rebufferResumed(requestID, bufferedAudioMS, resumeBufferTargetMS) = $0 {
+                return requestID == handle.id && bufferedAudioMS == 320 && resumeBufferTargetMS > 0
+            }
+            return false
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .completed(requestID: handle.id)
+        }
+    })
+}
+
+@Test func `playback updates report queue handoff and pause resume state changes`() async throws {
+    let output = OutputRecorder()
+    let playbackDrain = AsyncGate()
+    let updateRecorder = PlaybackUpdateRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(behavior: .gate(playbackDrain)),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    let updates = await runtime.playback.updates()
+    let collector = Task {
+        for await update in updates {
+            updateRecorder.record(update)
+        }
+    }
+    defer {
+        collector.cancel()
+    }
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeHandle = await runtime.generate.speech(text: "Hello there", voiceProfile: "default-femme")
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .started(requestID: activeHandle.id)
+        }
+    })
+
+    _ = await runtime.playback.pause()
+    #expect(await waitUntil {
+        updateRecorder.containsUpdate(state: .paused, event: .stateChanged(.paused))
+    })
+
+    _ = await runtime.playback.resume()
+    #expect(await waitUntil {
+        updateRecorder.containsUpdate(state: .playing, event: .stateChanged(.playing))
+    })
+
+    let queuedHandle = await runtime.generate.speech(text: "Hi there", voiceProfile: "default-femme")
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            if case let .queueChanged(activeRequest, queuedRequests) = $0 {
+                return activeRequest?.id == activeHandle.id
+                    && queuedRequests.map(\.id).contains(queuedHandle.id)
+            }
+            return false
+        }
+    })
+
+    await playbackDrain.open()
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            if case let .activeRequestChanged(activeRequest) = $0 {
+                return activeRequest?.id == queuedHandle.id
+            }
+            return false
+        }
+    })
+}
+
+@Test func `playback updates report stable environment events`() async throws {
+    let output = OutputRecorder()
+    let updateRecorder = PlaybackUpdateRecorder()
+    let runtime = try await makeRuntime(
+        output: output,
+        playback: PlaybackSpy(
+            environmentEvents: [
+                .outputDeviceChanged(previousDevice: "Built-in Output", currentDevice: "External Headphones"),
+                .interruptionStateChanged(isInterrupted: true, shouldResume: nil),
+                .interruptionStateChanged(isInterrupted: false, shouldResume: true),
+            ],
+        ),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+    let updates = await runtime.playback.updates()
+    let collector = Task {
+        for await update in updates {
+            updateRecorder.record(update)
+        }
+    }
+    defer {
+        collector.cancel()
+    }
+
+    await runtime.start()
+
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .outputDeviceChanged(
+                previousDevice: "Built-in Output",
+                currentDevice: "External Headphones",
+            )
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .interruptionChanged(isInterrupted: true, shouldResume: nil)
+        }
+    })
+    #expect(await waitUntil {
+        updateRecorder.containsEvent {
+            $0 == .interruptionChanged(isInterrupted: false, shouldResume: true)
+        }
+    })
+}
+
 @Test func `generation updates report running after a queued request is reserved`() async throws {
     let output = OutputRecorder()
     let generationDrain = AsyncGate()
@@ -1105,6 +1314,32 @@ private final class GenerateUpdateRecorder: @unchecked Sendable {
     func statesDescription() -> String {
         lock.withLock {
             String(describing: states)
+        }
+    }
+}
+
+private final class PlaybackUpdateRecorder: @unchecked Sendable {
+    private var updates = [SpeakSwiftly.PlaybackUpdate]()
+    private let lock = NSLock()
+
+    func record(_ update: SpeakSwiftly.PlaybackUpdate) {
+        lock.withLock {
+            updates.append(update)
+        }
+    }
+
+    func containsEvent(where predicate: (SpeakSwiftly.PlaybackEvent) -> Bool) -> Bool {
+        lock.withLock {
+            updates.contains { predicate($0.event) }
+        }
+    }
+
+    func containsUpdate(
+        state: SpeakSwiftly.PlaybackState,
+        event: SpeakSwiftly.PlaybackEvent,
+    ) -> Bool {
+        lock.withLock {
+            updates.contains { $0.state == state && $0.event == event }
         }
     }
 }

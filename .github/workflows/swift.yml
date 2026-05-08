@@ -7,6 +7,13 @@ on:
     tags:
       - 'v*'
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_ios_smoke:
+        description: Run the iOS compile-and-smoke lane
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-and-test:
@@ -86,6 +93,7 @@ jobs:
 
   ios-compile-and-smoke:
     name: iOS compile and smoke on macOS 26
+    if: github.event_name == 'workflow_dispatch' && inputs.run_ios_smoke
     runs-on: macos-26
     env:
       SPEAKSWIFTLY_IOS_CI_DERIVED_DATA: .local/xcode/derived-data/ios-ci

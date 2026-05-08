@@ -1,6 +1,10 @@
 struct PlaybackHooks {
     let handleEvent: @Sendable (PlaybackEvent, LiveSpeechRequestState) async -> Void
     let handleEnvironmentEvent: @Sendable (PlaybackEnvironmentEvent, ActiveWorkerRequestSummary?) async -> Void
+    let playbackStarted: @Sendable (String) async -> Void
+    let playbackCompleted: @Sendable (String) async -> Void
+    let activeRequestChanged: @Sendable () async -> Void
+    let queueChanged: @Sendable () async -> Void
     let logEngineReady: @Sendable (LiveSpeechRequestState, Double) async -> Void
     let logFinished: @Sendable (LiveSpeechRequestState, PlaybackSummary, Double) async -> Void
     let completeJob: @Sendable (LiveSpeechRequestState, Result<SpeakSwiftly.Runtime.WorkerSuccessPayload, WorkerError>) async -> Void
