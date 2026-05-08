@@ -179,9 +179,13 @@ extension ProfileStore {
     func normalizedQwenConditioningModelRepo(_ modelRepo: String) -> String {
         switch modelRepo {
             case ModelFactory.qwen06B8BitResidentModelRepo,
+                 ModelFactory.qwen06B4BitResidentModelRepo,
+                 ModelFactory.qwen06B5BitResidentModelRepo,
                  ModelFactory.qwen06B6BitResidentModelRepo,
                  ModelFactory.qwen06BBF16ResidentModelRepo,
                  ModelFactory.qwen17B8BitResidentModelRepo,
+                 ModelFactory.qwen17B4BitResidentModelRepo,
+                 ModelFactory.qwen17B5BitResidentModelRepo,
                  ModelFactory.qwen17B6BitResidentModelRepo,
                  ModelFactory.qwen17BBF16ResidentModelRepo:
                 modelRepo

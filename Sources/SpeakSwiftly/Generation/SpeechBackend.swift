@@ -5,10 +5,14 @@ public extension SpeakSwiftly {
 
     enum SpeechBackend: String, Codable, Sendable, Equatable, CaseIterable {
         case qwen3_smol
+        case qwen3_smol_4bit
+        case qwen3_smol_5bit
         case qwen3_smol_6bit
         case qwen3_smol_8bit
         case qwen3_smol_bf16
         case qwen3_BIG = "qwen3_big"
+        case qwen3_BIG_4bit = "qwen3_big_4bit"
+        case qwen3_BIG_5bit = "qwen3_big_5bit"
         case qwen3_BIG_6bit = "qwen3_big_6bit"
         case qwen3_BIG_8bit = "qwen3_big_8bit"
         case qwen3_BIG_bf16 = "qwen3_big_bf16"
@@ -30,10 +34,14 @@ public extension SpeakSwiftly.SpeechBackend {
 
     static let qwenFamilyBackends: [Self] = [
         .qwen3_smol,
+        .qwen3_smol_4bit,
+        .qwen3_smol_5bit,
         .qwen3_smol_6bit,
         .qwen3_smol_8bit,
         .qwen3_smol_bf16,
         .qwen3_BIG,
+        .qwen3_BIG_4bit,
+        .qwen3_BIG_5bit,
         .qwen3_BIG_6bit,
         .qwen3_BIG_8bit,
         .qwen3_BIG_bf16,
@@ -93,12 +101,20 @@ public extension SpeakSwiftly.SpeechBackend {
         switch self {
             case .qwen3_smol, .qwen3_smol_8bit:
                 ModelFactory.qwen06B8BitResidentModelRepo
+            case .qwen3_smol_4bit:
+                ModelFactory.qwen06B4BitResidentModelRepo
+            case .qwen3_smol_5bit:
+                ModelFactory.qwen06B5BitResidentModelRepo
             case .qwen3_smol_6bit:
                 ModelFactory.qwen06B6BitResidentModelRepo
             case .qwen3_smol_bf16:
                 ModelFactory.qwen06BBF16ResidentModelRepo
             case .qwen3_BIG, .qwen3_BIG_8bit:
                 ModelFactory.qwen17B8BitResidentModelRepo
+            case .qwen3_BIG_4bit:
+                ModelFactory.qwen17B4BitResidentModelRepo
+            case .qwen3_BIG_5bit:
+                ModelFactory.qwen17B5BitResidentModelRepo
             case .qwen3_BIG_6bit:
                 ModelFactory.qwen17B6BitResidentModelRepo
             case .qwen3_BIG_bf16:

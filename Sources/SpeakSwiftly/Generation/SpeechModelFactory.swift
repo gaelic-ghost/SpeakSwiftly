@@ -6,9 +6,13 @@ import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 
 enum ModelFactory {
+    static let qwen06B4BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit"
+    static let qwen06B5BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-5bit"
     static let qwen06B6BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-6bit"
     static let qwen06B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit"
     static let qwen06BBF16ResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16"
+    static let qwen17B4BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit"
+    static let qwen17B5BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-5bit"
     static let qwen17B6BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-6bit"
     static let qwen17B8BitResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
     static let qwen17BBF16ResidentModelRepo = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
@@ -30,10 +34,14 @@ enum ModelFactory {
     ) async throws -> ResidentSpeechModels {
         switch backend {
             case .qwen3_smol,
+                 .qwen3_smol_4bit,
+                 .qwen3_smol_5bit,
                  .qwen3_smol_6bit,
                  .qwen3_smol_8bit,
                  .qwen3_smol_bf16,
                  .qwen3_BIG,
+                 .qwen3_BIG_4bit,
+                 .qwen3_BIG_5bit,
                  .qwen3_BIG_6bit,
                  .qwen3_BIG_8bit,
                  .qwen3_BIG_bf16:
