@@ -14,7 +14,6 @@ extension SpeakSwiftly.Runtime {
         text: String,
         voiceProfile: String,
         textProfile: SpeakSwiftly.TextProfileID?,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
     ) async throws -> SpeakSwiftly.GeneratedFile {
         let residentInputs = try await loadResidentSpeechInputs(
@@ -26,7 +25,6 @@ extension SpeakSwiftly.Runtime {
 
         let normalizedText = try await normalizerRef.speechText(
             text,
-            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileID: textProfile,
         )
@@ -82,7 +80,7 @@ extension SpeakSwiftly.Runtime {
             artifactID: artifactID,
             voiceProfile: voiceProfile,
             textProfile: textProfile,
-            sourceFormat: sourceFormat,
+            sourceFormat: nil,
             requestContext: requestContext,
             sampleRate: residentModel.sampleRate,
             audioData: audioData,

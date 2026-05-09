@@ -37,7 +37,7 @@ let styleOptions = await normalizer.style.list()
 
 Use the active profile when you want the currently selected custom profile, the stored list when you want the saved profiles on disk or in memory, and the effective profile when you want the merged result after built-in style and custom replacements are applied together.
 
-Generation uses the same normalizer through ``SpeakSwiftly/Normalizer/speechText(_:sourceFormat:requestContext:textProfileID:)``. That shared path passes the selected text profile, active built-in style, request context, and TextForSpeech summarization provider into the current `TextForSpeech.Normalize` APIs before speech or retained-file generation starts. Generation requests no longer accept source-format hints; `TextForSpeech` detects text and source structure from the request text and path context.
+Generation uses the same normalizer through ``SpeakSwiftly/Normalizer/speechText(_:requestContext:textProfileID:)``. That shared path passes the selected text profile, active built-in style, request context, and TextForSpeech summarization provider into the current `TextForSpeech.Normalize` APIs before speech or retained-file generation starts. Generation requests no longer accept source-format hints; `TextForSpeech` detects text and source structure from the request text and path context.
 
 ## Create Or Update Profiles
 

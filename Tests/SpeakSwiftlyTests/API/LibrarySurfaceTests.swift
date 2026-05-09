@@ -20,6 +20,7 @@ import Darwin
 
 @Test func `public request context aliases the TextForSpeech model`() throws {
     let requestContext = SpeakSwiftly.RequestContext(
+        reqPurpose: .speech,
         source: "codex",
         topic: "runtime",
         attributes: ["surface": "mcp"],

@@ -29,7 +29,6 @@ extension SpeakSwiftly.Runtime {
                         text: text,
                         voiceProfile: profileName,
                         textProfile: textProfileID,
-                        sourceFormat: nil,
                         requestContext: requestContext,
                     )
                     let completedJob = try generationJobStore.markCompleted(
@@ -365,7 +364,6 @@ extension SpeakSwiftly.Runtime {
                     text: item.text,
                     voiceProfile: profileName,
                     textProfile: item.textProfile,
-                    sourceFormat: nil,
                     requestContext: item.requestContext,
                 ),
             )

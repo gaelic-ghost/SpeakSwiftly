@@ -126,7 +126,6 @@ private extension SpeakSwiftly.Normalizer {
 
     func normalizeSpeechText(
         _ text: String,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: TextForSpeech.RequestContext?,
         textProfileID: SpeakSwiftly.TextProfileID?,
     ) async throws -> String {
@@ -138,17 +137,6 @@ private extension SpeakSwiftly.Normalizer {
         }
         let style = textRuntime.builtInStyle
         let summarizationProvider = textRuntime.activeSummarizationProvider
-
-        if let sourceFormat {
-            return try await TextForSpeech.Normalize.source(
-                text,
-                as: sourceFormat,
-                requestContext: requestContext,
-                customProfile: textProfile,
-                style: style,
-                summarizationProvider: summarizationProvider,
-            )
-        }
 
         return try await TextForSpeech.Normalize.text(
             text,
@@ -301,13 +289,11 @@ public extension SpeakSwiftly.Normalizer {
     /// Normalizes generation text through the shared TextForSpeech runtime.
     func speechText(
         _ text: String,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: TextForSpeech.RequestContext? = nil,
         textProfileID: SpeakSwiftly.TextProfileID? = nil,
     ) async throws -> String {
         try await normalizeSpeechText(
             text,
-            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileID: textProfileID,
         )

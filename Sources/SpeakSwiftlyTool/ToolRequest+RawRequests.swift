@@ -341,6 +341,7 @@ struct RawWorkerRequest: Decodable {
             let requestContext = requestContext(
                 cwd: rawItem.cwd,
                 repoRoot: rawItem.repoRoot,
+                reqPurpose: .audioFile,
                 base: rawItem.requestContext,
             )
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
@@ -364,20 +365,23 @@ struct RawWorkerRequest: Decodable {
     static func requestContext(
         cwd: String?,
         repoRoot: String?,
+        reqPurpose: TextForSpeech.RequestContext.RequestPurpose,
         base: SpeakSwiftly.RequestContext? = nil,
     ) -> SpeakSwiftly.RequestContext? {
         let resolvedCWD = cwd ?? base?.cwd
         let resolvedRepoRoot = repoRoot ?? base?.repoRoot
-        if resolvedCWD == nil, resolvedRepoRoot == nil {
+        if base == nil, resolvedCWD == nil, resolvedRepoRoot == nil {
             return base
         }
 
         return SpeakSwiftly.RequestContext(
+            reqPurpose: reqPurpose,
             source: base?.source,
             topic: base?.topic,
             cwd: resolvedCWD,
             repoRoot: resolvedRepoRoot,
             attributes: base?.attributes ?? [:],
+            prefacePolicy: base?.prefacePolicy,
         )
     }
 
@@ -525,7 +529,7 @@ private func rejectRemovedRequestContextKeysInContainer<Key: CodingKey>(
         throw DecodingError.dataCorruptedError(
             forKey: key,
             in: requestContext,
-            debugDescription: "Request context key '\(key.stringValue)' was removed. Use 'source', 'topic', 'attributes', 'cwd', and 'repo_root' in 'request_context'.",
+            debugDescription: "Request context key '\(key.stringValue)' was removed. Use 'reqPurpose', 'source', 'topic', 'attributes', 'cwd', 'repo_root', and 'prefacePolicy' in 'request_context'.",
         )
     }
 }
