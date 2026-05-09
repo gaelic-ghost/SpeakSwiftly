@@ -250,7 +250,7 @@ import TextForSpeech
                 topic: "export",
                 prefacePolicy: .always,
             ),
-            qwenPreModelTextChunking: false,
+            qwenPreModelTextChunking: nil,
         ),
     )
 }
