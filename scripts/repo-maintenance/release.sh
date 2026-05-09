@@ -156,6 +156,16 @@ run_version_bump() {
   log "Committed version bump for $RELEASE_TAG."
 }
 
+run_quick_e2e_validation() {
+  if [ "$REPO_MAINTENANCE_DRY_RUN" = "true" ]; then
+    log "Would run quick SpeakSwiftly E2E validation with run-e2e.sh --suite quick."
+    return 0
+  fi
+
+  log "Running quick SpeakSwiftly E2E validation before release."
+  sh "$SELF_DIR/run-e2e.sh" --suite quick
+}
+
 create_release_tag() {
   head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
   tag_sha="$(git -C "$REPO_ROOT" rev-parse -q --verify "refs/tags/$RELEASE_TAG" 2>/dev/null || true)"
@@ -448,6 +458,7 @@ run_standard_release() {
 
   if [ "$skip_validate" != "true" ]; then
     sh "$SELF_DIR/validate-all.sh"
+    run_quick_e2e_validation
   fi
 
   run_version_bump
