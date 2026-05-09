@@ -211,6 +211,50 @@ import TextForSpeech
     )
 }
 
+@Test func `decodes speak requests preserving preface policy overrides`() throws {
+    let liveRequest = try ToolRequest.decode(
+        from: #"{"id":"req-preface-live","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"reqPurpose":"speech","source":"status_panel","topic":"runtime","prefacePolicy":"never"}}"#,
+    )
+
+    #expect(
+        liveRequest == .queueSpeech(
+            id: "req-preface-live",
+            text: "Hello",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .live,
+            requestContext: .init(
+                reqPurpose: .speech,
+                source: "status_panel",
+                topic: "runtime",
+                prefacePolicy: .never,
+            ),
+            qwenPreModelTextChunking: false,
+        ),
+    )
+
+    let fileRequest = try ToolRequest.decode(
+        from: #"{"id":"req-preface-file","op":"generate_audio_file","text":"Hello","voice_profile":"default-femme","request_context":{"reqPurpose":"audioFile","source":"status_panel","topic":"export","prefacePolicy":"always"}}"#,
+    )
+
+    #expect(
+        fileRequest == .queueSpeech(
+            id: "req-preface-file",
+            text: "Hello",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .file,
+            requestContext: .init(
+                reqPurpose: .audioFile,
+                source: "status_panel",
+                topic: "export",
+                prefacePolicy: .always,
+            ),
+            qwenPreModelTextChunking: nil,
+        ),
+    )
+}
+
 @Test func `decodes qwen pre-model text chunking opt in`() throws {
     let request = try ToolRequest.decode(
         from: #"{"id":"req-qwen-chunking","op":"generate_speech","text":"Hello","profile_name":"default-femme","qwen_pre_model_text_chunking":true}"#,
