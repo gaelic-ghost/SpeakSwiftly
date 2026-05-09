@@ -32,7 +32,53 @@ Every request includes an `id` and an `op`:
 {"id":"req-1","op":"generate_speech","text":"Hello there"}
 ```
 
-For generation requests, the current worker keys are `voice_profile`, `text_profile`, `request_context`, and `qwen_pre_model_text_chunking`. Omit `voice_profile` to use the runtime default voice profile, which falls back to `swift-signal`. `request_context` uses the shared `TextForSpeech.RequestContext` shape, including required `reqPurpose`, `source`, `topic`, `attributes`, `cwd`, `repo_root`, and optional `prefacePolicy` context. Generation requests no longer accept `source_format`; source code files already have extensions, and `TextForSpeech` detects text and source structure from the request text and path context. Removed generation-context keys such as `source_format`, `input_text_context`, `text_format`, and `nested_source_format`, plus removed request-context keys such as `app`, `agent`, and `project`, are rejected with explicit invalid-request diagnostics. Qwen live playback can opt into pre-model text chunking with `qwen_pre_model_text_chunking: true`; when omitted, Qwen live playback remains single-pass. Qwen resident model selection is part of the startup backend value: use `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, or `qwen3_smol_bf16` for the Qwen 0.6B resident model family, and `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, or `qwen3_big_bf16` for the Qwen 1.7B resident model family. Marvis resident model selection also lives in the startup backend value: use `marvis`, `marvis_4bit`, or `marvis_6bit` for the Marvis 250M v0.2 resident model family. Marvis now defaults to `single_resident_dynamic`; `dual_resident_serialized` is only exposed as a `SpeakSwiftlyTool` operator override for investigation and benchmarking. Prepared Qwen conditioning is stored per resident model repo so a profile can lazily accumulate conditioning for each selected Qwen model. Rerolling a profile regenerates every existing prepared Qwen conditioning artifact for that profile, plus the currently selected Qwen backend when applicable. Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
+### Request Keys And Structure
+
+For generation requests, the current worker keys are:
+
+- `voice_profile`: omit it to use the runtime default voice profile, which falls back to `swift-signal`.
+- `text_profile`: select a stored text-profile override for normalization.
+- `request_context`: pass caller, purpose, source/topic, and path context for `TextForSpeech`.
+- `qwen_pre_model_text_chunking`: set `true` to opt Qwen live playback into pre-model text chunking.
+
+### RequestContext Fields
+
+`request_context` uses the shared `TextForSpeech.RequestContext` shape:
+
+- `reqPurpose` is required. Valid values are `speech`, `audioFile`, and `audioStream`.
+- `source`, `topic`, `attributes`, `cwd`, and `repo_root` provide caller metadata and path context.
+- `prefacePolicy` is optional and can override the default source/topic preface behavior.
+
+### Removed And Deprecated Keys
+
+Generation requests no longer accept:
+
+- `source_format`
+- `input_text_context`
+- `text_format`
+- `nested_source_format`
+
+Removed request-context keys `app`, `agent`, and `project` are also rejected. These removed keys produce explicit invalid-request diagnostics instead of being ignored. Source code files already have extensions, and `TextForSpeech` detects text and source structure from request text and path context.
+
+### Backend And Model Selection
+
+Qwen resident model selection is part of the startup backend value:
+
+- `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, or `qwen3_smol_bf16` for the Qwen 0.6B resident model family.
+- `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, or `qwen3_big_bf16` for the Qwen 1.7B resident model family.
+
+Marvis resident model selection also lives in the startup backend value. Use `marvis`, `marvis_4bit`, or `marvis_6bit` for the Marvis 250M v0.2 resident model family. Marvis now defaults to `single_resident_dynamic`; `dual_resident_serialized` is only exposed as a `SpeakSwiftlyTool` operator override for investigation and benchmarking.
+
+### Qwen-Specific Features
+
+- `qwen_pre_model_text_chunking: true` opts Qwen live playback into pre-model text chunking.
+- When omitted, Qwen live playback remains single-pass.
+- Prepared Qwen conditioning is stored per resident model repo so a profile can lazily accumulate conditioning for each selected Qwen model.
+- Rerolling a profile regenerates every existing prepared Qwen conditioning artifact for that profile, plus the currently selected Qwen backend when applicable.
+
+### Compatibility Aliases
+
+Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
 
 Representative operations include:
 
