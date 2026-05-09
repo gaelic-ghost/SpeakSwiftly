@@ -35,6 +35,7 @@ extension ToolRequest {
                 let requestContext = RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
+                    reqPurpose: .speech,
                     base: raw.requestContext,
                 )
                 return .speech(
@@ -56,6 +57,7 @@ extension ToolRequest {
                 let requestContext = RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
+                    reqPurpose: .audioFile,
                     base: raw.requestContext,
                 )
                 return .audio(

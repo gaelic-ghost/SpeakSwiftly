@@ -124,7 +124,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch item with merged request path context`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"reqPurpose":"audioFile","source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
     )
 
     #expect(
@@ -137,6 +137,7 @@ import TextForSpeech
                     text: "File with path context.",
                     textProfile: nil,
                     requestContext: .init(
+                        reqPurpose: .audioFile,
                         source: "batch_export",
                         topic: "release",
                         cwd: "/Users/galew/Workspace/SpeakSwiftly",
@@ -161,6 +162,7 @@ import TextForSpeech
             textProfileID: "logs",
             jobType: .live,
             requestContext: .init(
+                reqPurpose: .speech,
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
                 repoRoot: "/Users/galew/Workspace/SpeakSwiftly",
             ),
@@ -189,7 +191,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with request context without attributes`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"source":"status_panel","topic":"runtime"}} "#,
+        from: #"{"id":"req-context","op":"generate_speech","text":"Hello","voice_profile":"default-femme","request_context":{"reqPurpose":"speech","source":"status_panel","topic":"runtime"}} "#,
     )
 
     #expect(
@@ -200,6 +202,7 @@ import TextForSpeech
             textProfileID: nil,
             jobType: .live,
             requestContext: .init(
+                reqPurpose: .speech,
                 source: "status_panel",
                 topic: "runtime",
             ),
