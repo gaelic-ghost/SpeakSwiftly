@@ -19,7 +19,6 @@ enum ToolRequest: Equatable {
         text: String,
         voiceProfile: SpeakSwiftly.Name?,
         textProfileID: SpeakSwiftly.TextProfileID?,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
         qwenPreModelTextChunking: Bool,
     )
@@ -28,7 +27,6 @@ enum ToolRequest: Equatable {
         text: String,
         voiceProfile: SpeakSwiftly.Name?,
         textProfileID: SpeakSwiftly.TextProfileID?,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
     )
     case batch(id: String, voiceProfile: SpeakSwiftly.Name?, items: [SpeakSwiftly.BatchItem])
@@ -105,8 +103,8 @@ enum ToolRequest: Equatable {
 
     var id: String {
         switch self {
-            case let .speech(id, _, _, _, _, _, _),
-                 let .audio(id, _, _, _, _, _),
+            case let .speech(id, _, _, _, _, _),
+                 let .audio(id, _, _, _, _),
                  let .batch(id, _, _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
@@ -160,23 +158,21 @@ enum ToolRequest: Equatable {
     func submit(to runtime: SpeakSwiftly.Runtime) async -> SpeakSwiftly.RequestHandle {
         let tool = runtime.tool
         switch self {
-            case let .speech(id, text, voiceProfile, textProfileID, sourceFormat, requestContext, qwenPreModelTextChunking):
+            case let .speech(id, text, voiceProfile, textProfileID, requestContext, qwenPreModelTextChunking):
                 return await tool.speech(
                     requestID: id,
                     text: text,
                     voiceProfile: voiceProfile,
                     textProfile: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
-            case let .audio(id, text, voiceProfile, textProfileID, sourceFormat, requestContext):
+            case let .audio(id, text, voiceProfile, textProfileID, requestContext):
                 return await tool.audio(
                     requestID: id,
                     text: text,
                     voiceProfile: voiceProfile,
                     textProfile: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                 )
             case let .batch(id, voiceProfile, items):
@@ -310,7 +306,6 @@ extension ToolRequest {
         profileName: SpeakSwiftly.Name?,
         textProfileID: SpeakSwiftly.TextProfileID?,
         jobType: ToolSpeechJobType,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
         qwenPreModelTextChunking: Bool?,
     ) -> ToolRequest {
@@ -322,7 +317,6 @@ extension ToolRequest {
                     text: text,
                     voiceProfile: voiceProfile,
                     textProfileID: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking ?? false,
                 )
@@ -332,7 +326,6 @@ extension ToolRequest {
                     text: text,
                     voiceProfile: voiceProfile,
                     textProfileID: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                 )
         }
@@ -351,7 +344,6 @@ extension ToolRequest {
                     artifactID: $0.artifactID,
                     text: $0.text,
                     textProfile: $0.textProfile,
-                    sourceFormat: $0.sourceFormat,
                     requestContext: $0.requestContext,
                 )
             },
@@ -420,23 +412,21 @@ extension ToolRequest {
 
     func resolvingRuntimeDefaultVoiceProfile(_ defaultVoiceProfileName: SpeakSwiftly.Name) -> ToolRequest {
         switch self {
-            case let .speech(id, text, nil, textProfileID, sourceFormat, requestContext, qwenPreModelTextChunking):
+            case let .speech(id, text, nil, textProfileID, requestContext, qwenPreModelTextChunking):
                 .speech(
                     id: id,
                     text: text,
                     voiceProfile: defaultVoiceProfileName,
                     textProfileID: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
-            case let .audio(id, text, nil, textProfileID, sourceFormat, requestContext):
+            case let .audio(id, text, nil, textProfileID, requestContext):
                 .audio(
                     id: id,
                     text: text,
                     voiceProfile: defaultVoiceProfileName,
                     textProfileID: textProfileID,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                 )
             case let .batch(id, nil, items):

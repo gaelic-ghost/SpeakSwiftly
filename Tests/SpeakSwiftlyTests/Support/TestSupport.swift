@@ -759,7 +759,7 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
 
 func makeResidentModels(
     for backend: SpeakSwiftly.SpeechBackend,
-    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
     recorder: ResidentModelRecorder? = nil,
     chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
@@ -852,7 +852,7 @@ func makeRuntime(
     playback: PlaybackSpy,
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
     loadedCloneAudioSamples: [Float] = [],

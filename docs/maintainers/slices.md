@@ -159,8 +159,10 @@ The generation request is selecting a stored profile by stable identifier, not b
 
 The typed generation surface also keeps text-shaping and caller metadata separate:
 
-- `sourceFormat`: the whole-source lane when the entire input is known source
 - `requestContext`: what app, agent, project, topic, or path context the request belongs to
+
+Generation callers no longer provide source-format hints. `TextForSpeech`
+detects text and source structure from request text and path context.
 
 ## Persistence
 

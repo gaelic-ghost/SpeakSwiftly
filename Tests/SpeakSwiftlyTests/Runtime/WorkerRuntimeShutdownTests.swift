@@ -239,7 +239,6 @@ final class LockedFlag: @unchecked Sendable {
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
-            sourceFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),

@@ -33,7 +33,6 @@ public extension SpeakSwiftly.Tool {
         text: String,
         voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         qwenPreModelTextChunking: Bool = false,
     ) async -> SpeakSwiftly.RequestHandle {
@@ -45,7 +44,6 @@ public extension SpeakSwiftly.Tool {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .live,
-                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
@@ -58,7 +56,6 @@ public extension SpeakSwiftly.Tool {
         text: String,
         voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
-        sourceFormat: TextForSpeech.SourceFormat? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
@@ -69,7 +66,6 @@ public extension SpeakSwiftly.Tool {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .file,
-                sourceFormat: sourceFormat,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: nil,
             ),

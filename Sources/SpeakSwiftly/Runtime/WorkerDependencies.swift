@@ -26,7 +26,7 @@ struct WorkerDependencies: @unchecked Sendable {
     static func live(
         fileManager: FileManager = .default,
         allowsProfileModelCPUFallback: Bool? = nil,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
         let allowsProfileModelCPUFallback = allowsProfileModelCPUFallback

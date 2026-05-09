@@ -31,7 +31,6 @@ extension ToolRequest {
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    sourceFormat: raw.sourceFormat,
                 )
                 let requestContext = RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
@@ -43,7 +42,6 @@ extension ToolRequest {
                     text: resolved.text,
                     voiceProfile: profileName,
                     textProfileID: resolved.textProfileID,
-                    sourceFormat: resolved.sourceFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: raw.qwenPreModelTextChunking ?? false,
                 )
@@ -54,7 +52,6 @@ extension ToolRequest {
                     id: id,
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
-                    sourceFormat: raw.sourceFormat,
                 )
                 let requestContext = RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
@@ -66,7 +63,6 @@ extension ToolRequest {
                     text: resolved.text,
                     voiceProfile: profileName,
                     textProfileID: resolved.textProfileID,
-                    sourceFormat: resolved.sourceFormat,
                     requestContext: requestContext,
                 )
 

@@ -6,13 +6,11 @@ import TextForSpeech
 extension SpeakSwiftly.Runtime {
     private func normalizeSpeechText(
         _ text: String,
-        sourceFormat: TextForSpeech.SourceFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
         textProfileID: SpeakSwiftly.TextProfileID?,
     ) async throws -> String {
         try await normalizerRef.speechText(
             text,
-            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileID: textProfileID,
         )
@@ -99,7 +97,6 @@ extension SpeakSwiftly.Runtime {
             profileName: let profileName,
             textProfileID: let textProfileID,
             jobType: .file,
-            sourceFormat: let sourceFormat,
             requestContext: let requestContext,
             qwenPreModelTextChunking: _,
         ):
@@ -112,7 +109,7 @@ extension SpeakSwiftly.Runtime {
                         artifactID: fileArtifactID(for: request),
                         text: text,
                         textProfile: textProfileID,
-                        sourceFormat: sourceFormat,
+                        sourceFormat: nil,
                         requestContext: requestContext,
                     ),
                     createdAt: dependencies.now(),
@@ -139,7 +136,6 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .file,
-            sourceFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ),
@@ -165,7 +161,6 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .file,
-            sourceFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ),
@@ -182,17 +177,15 @@ extension SpeakSwiftly.Runtime {
 
     func makeSpeechJobState(for request: WorkerRequest) async throws -> LiveSpeechRequestState {
         let text = switch request {
-            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, requestContext: _, qwenPreModelTextChunking: _):
                 text
             default:
                 ""
         }
         let textProfileID = request.textProfileID
-        let sourceFormat = request.sourceFormat
         let requestContext = request.requestContext
         let normalizedText = try await normalizeSpeechText(
             text,
-            sourceFormat: sourceFormat,
             requestContext: requestContext,
             textProfileID: textProfileID,
         )
@@ -207,7 +200,6 @@ extension SpeakSwiftly.Runtime {
             for plannedChunk in plannedChunks {
                 let normalizedChunkText = try await normalizeSpeechText(
                     plannedChunk.text,
-                    sourceFormat: sourceFormat,
                     requestContext: requestContext,
                     textProfileID: textProfileID,
                 ).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -260,7 +252,7 @@ extension SpeakSwiftly.Runtime {
 
     func fileArtifactID(for request: WorkerRequest) -> String {
         switch request {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, sourceFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, requestContext: _, qwenPreModelTextChunking: _):
                 "\(id)-artifact-1"
             default:
                 request.id
@@ -362,7 +354,6 @@ extension SpeakSwiftly.Runtime {
                     profileName: _,
                     textProfileID: _,
                     jobType: .file,
-                    sourceFormat: _,
                     requestContext: _,
                     qwenPreModelTextChunking: _,
                 ):

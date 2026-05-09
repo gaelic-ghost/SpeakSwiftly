@@ -30,8 +30,8 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 ### Generating Speech
 
 - ``SpeakSwiftly/Generate``
-- ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:sourceFormat:requestContext:qwenPreModelTextChunking:)``
-- ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)``
+- ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)``
+- ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)``
 - ``SpeakSwiftly/Generate/batch(_:voiceProfile:)``
 - ``SpeakSwiftly/RequestHandle``
 

@@ -127,7 +127,7 @@ In Progress
 - Earlier Milestone 22 work explored overlap-specific thresholds, cadence tweaks, and queue-admission changes in detail.
 - The current 2026-04-22 steady state is intentionally simpler:
   - Marvis generation is serialized
-  - the default resident policy is `dual_resident_serialized`
+  - the default resident policy is `single_resident_dynamic`
   - a benchmark now exists for `dual_resident_serialized` versus `single_resident_dynamic`
   - all live Marvis playback uses one conservative startup profile
   - the current live cadence matches the upstream Marvis `0.5s` path
@@ -184,7 +184,7 @@ In Progress
 ### 2026-05-03 TextForSpeech 0.19 simplification
 
 - Milestone 27 was condensed out of Active Milestones after the `TextForSpeech` `0.19.0` simplification landed on the `v5.0.0-rc.1` release-candidate branch. The package now uses `TextForSpeech.SourceFormat` directly only for whole-source generation, carries request metadata and path context through `SpeakSwiftly.RequestContext`, and removes the public `SpeakSwiftly.InputTextContext` typed surface.
-- The current JSONL generation wire shape uses `source_format` for whole-source input and `request_context` for request metadata and path context. Removed generation-context keys such as `input_text_context`, `text_format`, and `nested_source_format` are rejected with an explicit invalid-request diagnostic instead of being silently ignored.
+- The current JSONL generation wire shape uses `request_context` for request metadata and path context, while `TextForSpeech` detects source structure from request text and path context. Removed generation-context keys such as `source_format`, `input_text_context`, `text_format`, and `nested_source_format` are rejected with an explicit invalid-request diagnostic instead of being silently ignored.
 - The old `v5.0.0-rc.1` release-candidate notes were later consolidated into `docs/releases/release-history.md`; the stale standalone Milestone 27 migration note and superseded `v4.1.0` draft release docs were removed.
 - Downstream adoption, especially `SpeakSwiftlyServer`, remains release-hardening work under Milestone 26 so this package does not carry temporary compatibility shims while consumers move to the current surface.
 

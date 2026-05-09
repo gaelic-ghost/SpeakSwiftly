@@ -74,7 +74,7 @@ arguments are not available.
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:sourceFormat:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
 
 ```swift
 let handle = await runtime.generate.speech(
@@ -82,7 +82,7 @@ let handle = await runtime.generate.speech(
 )
 ```
 
-Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)`` when you want retained file output instead:
+Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)`` when you want retained file output instead:
 
 ```swift
 let handle = await runtime.generate.audio(

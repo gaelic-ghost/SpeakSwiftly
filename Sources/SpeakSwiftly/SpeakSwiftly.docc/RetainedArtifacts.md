@@ -21,7 +21,7 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:sourceFormat:requestContext:)``:
+The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)``:
 
 ```swift
 let handle = await runtime.generate.audio(

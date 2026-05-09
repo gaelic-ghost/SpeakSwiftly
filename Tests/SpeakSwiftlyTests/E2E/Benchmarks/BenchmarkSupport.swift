@@ -337,7 +337,7 @@ enum BenchmarkHarness {
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
         qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
+        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
         playbackMode: BenchmarkPlaybackMode = .silent,
         playbackTrace: Bool = false,
         operation: @escaping @Sendable (BenchmarkRuntimeSession) async throws -> T,

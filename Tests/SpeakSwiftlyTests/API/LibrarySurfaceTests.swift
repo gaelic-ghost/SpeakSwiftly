@@ -40,7 +40,6 @@ import Darwin
     )
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
     #expect(configuration.textNormalizer == nil)
 }
@@ -50,7 +49,6 @@ import Darwin
 
     #expect(configuration.speechBackend == .qwen3_smol)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
@@ -59,7 +57,6 @@ import Darwin
 
     #expect(configuration.speechBackend == .chatterboxTurbo)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.marvisResidentPolicy == .dualResidentSerialized)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
@@ -80,7 +77,6 @@ import Darwin
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
-        marvisResidentPolicy: .singleResidentDynamic,
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
     )
 
@@ -89,7 +85,6 @@ import Darwin
 
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
-    #expect(loaded.marvisResidentPolicy == configuration.marvisResidentPolicy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
     #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
@@ -105,7 +100,7 @@ import Darwin
     }
 }
 
-@Test func `public configuration normalizes the legacy qwen custom voice backend`() throws {
+@Test func `public configuration rejects legacy qwen resident backend names`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: rootURL) }
@@ -121,33 +116,30 @@ import Darwin
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
     try Data(legacyConfigurationJSON.utf8).write(to: persistenceURL, options: .atomic)
 
-    let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
-
-    #expect(loaded.speechBackend == .qwen3_smol)
-    #expect(loaded.qwenConditioningStrategy == .legacyRaw)
-    #expect(loaded.marvisResidentPolicy == .dualResidentSerialized)
-    #expect(loaded.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+    #expect(throws: SpeakSwiftly.Configuration.LoadError.self) {
+        try SpeakSwiftly.Configuration.load(from: persistenceURL)
+    }
 }
 
-@Test func `public configuration migrates legacy qwen resident model into speech backend`() throws {
+@Test func `public configuration ignores removed marvis resident policy key`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: rootURL) }
 
     let persistenceURL = rootURL.appendingPathComponent("configuration.json")
-    let legacyConfigurationJSON = """
+    let configurationJSON = """
     {
-      "qwenResidentModel" : "base_1_7b_8bit",
-      "speechBackend" : "qwen3"
+      "marvisResidentPolicy" : "dual_resident_serialized",
+      "speechBackend" : "marvis"
     }
     """
 
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
-    try Data(legacyConfigurationJSON.utf8).write(to: persistenceURL, options: .atomic)
+    try Data(configurationJSON.utf8).write(to: persistenceURL, options: .atomic)
 
     let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
 
-    #expect(loaded.speechBackend == .qwen3_BIG)
+    #expect(loaded.speechBackend == .marvis)
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {
@@ -155,13 +147,11 @@ import Darwin
     let configuration = SpeakSwiftly.Configuration(
         speechBackend: .marvis,
         qwenConditioningStrategy: .legacyRaw,
-        marvisResidentPolicy: .singleResidentDynamic,
         textNormalizer: normalizer,
     )
 
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .legacyRaw)
-    #expect(configuration.marvisResidentPolicy == .singleResidentDynamic)
     #expect(configuration.textNormalizer != nil)
 }
 
@@ -297,33 +287,29 @@ import Darwin
 // MARK: - Runtime Helpers
 
 @Test func `public library surface exposes queueing helpers`() {
-    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
+    let speak: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
-        textProfile,
-        sourceFormat in
+        textProfile in
         await generate.speech(
             text: text,
             voiceProfile: profileName,
             textProfile: textProfile,
-            sourceFormat: sourceFormat,
         )
     }
     let speakWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
         await generate.speech(text: text)
     }
-    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?, TextForSpeech.SourceFormat?) async -> SpeakSwiftly.RequestHandle = {
+    let generateAudio: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?) async -> SpeakSwiftly.RequestHandle = {
         generate,
         text,
         profileName,
-        textProfile,
-        sourceFormat in
+        textProfile in
         await generate.audio(
             text: text,
             voiceProfile: profileName,
             textProfile: textProfile,
-            sourceFormat: sourceFormat,
         )
     }
     let generateAudioWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
