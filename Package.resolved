@@ -1,5 +1,5 @@
 {
-  "originHash" : "a7f0dc507ba42f2b504fbca75d7103e19ad3d297733f67cb00cbac0119e9ef16",
+  "originHash" : "46fb6afaad6ae9065e8d02de5859c1e07ab91fdef2b8bcc856bd9905a235cc96",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gaelic-ghost/TextForSpeech.git",
       "state" : {
-        "revision" : "183d7ef3c5e31d533697a9f59843921a86e75838",
-        "version" : "0.22.0"
+        "revision" : "26f30afddc198f551422e1e434c0bc2398172512",
+        "version" : "0.22.1"
       }
     },
     {
