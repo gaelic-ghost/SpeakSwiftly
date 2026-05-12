@@ -29,6 +29,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
+- [Milestone 29: Security Audit Hardening](#milestone-29-security-audit-hardening)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -38,6 +39,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 21: Unified Logging With `Logger` - Planned
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
+- Milestone 29: Security Audit Hardening - Planned
 
 ## Active Milestones
 
@@ -167,6 +169,36 @@ In Progress
 - [ ] Tagged releases are operationally self-explanatory for local consumers and package consumers.
 - [ ] The package and worker surfaces are documented clearly enough that `v1.0.0` does not freeze accidental behavior.
 - [ ] Release verification proves both package correctness and published-runtime correctness.
+
+## Milestone 29: Security Audit Hardening
+
+### Status
+
+Planned
+
+### Scope
+
+- [ ] Resolve the May 2026 Codex Security repo-wide audit findings and keep the audit trail public-safe under `docs/security-audits/`.
+- [ ] Treat package-local trusted-caller APIs separately from downstream network or multi-client exposure so fixes land at the right ownership boundary.
+- [ ] Prefer narrow runtime guardrails and explicit host guidance over broad authorization machinery inside the standalone package.
+
+### Tickets
+
+- [ ] Remove raw Qwen live chunk text from structured logs. Keep chunk index, segmentation, counts, timing, and progress fields, but do not persist spoken request text in stderr diagnostics.
+- [ ] Add retained-generation admission limits for non-playback file and batch jobs, including queued job count, batch item count, queued text size, and clear `invalidRequest` diagnostics when a caller exceeds those limits.
+- [ ] Pin GitHub Actions workflow dependencies to immutable commit SHAs and add explicit least-privilege workflow `permissions`, especially for the tagged runtime-publication lane.
+- [ ] Decide whether active generation cancellation should cancel the active model task immediately, then either fix it or document the intentional delayed-cancel behavior with evidence.
+- [ ] Audit downstream `SpeakSwiftlyServer` HTTP/MCP exposure for retained file generation, batch generation, clone creation, profile export, runtime queue controls, model reload/unload, backend switching, and system-profile authoring.
+- [ ] Harden system-profile seeding by revalidating manifest-loaded profile names before destination path construction, even when the source is a bundled or configured resource root.
+- [ ] Harden manifest-loaded artifact filenames for profile reference audio and Qwen conditioning artifacts so tampered manifests cannot point reads outside the profile directory.
+- [ ] Decide whether voice clone source paths and profile export output paths need package-level root policies or whether downstream hosts should gate those trusted-caller operations explicitly.
+- [ ] Keep the security audit report, validation closure, and any follow-up fixes linked from the relevant release notes so future maintainers can see which rows were fixed, deferred, or intentionally host-owned.
+
+### Exit Criteria
+
+- [ ] All reportable audit findings are fixed or intentionally accepted with durable rationale.
+- [ ] Deferred storage hardening rows have either package-level validation or a documented reason they remain trusted-resource assumptions.
+- [ ] Downstream host exposure has been reviewed so local trusted-caller APIs are not accidentally treated as unauthenticated multi-client controls.
 
 ## Backlog Candidates
 
