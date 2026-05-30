@@ -25,6 +25,7 @@ func makeSpeechBackendResolutionDependencies(
         loadAudioSamples: { _, _ in nil },
         loadAudioFloats: { _, _ in [] },
         writeStderr: stderrMessages,
+        writeSystemLog: { _ in },
         now: Date.init,
         readRuntimeMemory: { nil },
     )

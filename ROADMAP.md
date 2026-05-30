@@ -220,7 +220,7 @@ In Progress
 - [x] Add a trace-only generated-audio quality monitor for live sample chunks before playback buffer scheduling.
 - [x] Capture per-request and per-chunk metrics such as generated duration, clipping ratio, near-silence ratio, DC offset, zero-crossing rate, repeated-window similarity, chunk cadence, and boundary jump before smoothing.
 - [ ] Correlate Qwen quality metrics with synthesis token/info/audio events, streaming interval, planned text chunks, prepared conditioning, and generation parameters.
-- [ ] Promote high-signal suspicious patterns into request-scoped warning events with concrete operator-facing messages.
+- [x] Promote high-signal suspicious patterns into request-scoped warning events with concrete operator-facing messages.
 - [ ] Add conservative cutoff behavior for high-confidence runaway patterns after trace data proves the thresholds.
 - [ ] Keep raw spoken request text out of normal quality logs while preserving enough context for debugging.
 - [ ] Use `docs/maintainers/generation-quality-guards-plan-2026-05-30.md` and `docs/maintainers/qwen-sampling-headroom-report-2026-04-24.md` as the initial planning notes for the implementation pass.

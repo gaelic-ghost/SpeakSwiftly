@@ -394,6 +394,7 @@ enum BenchmarkHarness {
                 logRecorder.appendStderr(message)
                 fputs("SpeakSwiftly benchmark runtime stderr: \(message)\n", stderr)
             },
+            writeSystemLog: liveDependencies.writeSystemLog,
             now: liveDependencies.now,
             readRuntimeMemory: liveDependencies.readRuntimeMemory,
         )

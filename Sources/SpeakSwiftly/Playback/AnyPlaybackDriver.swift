@@ -106,6 +106,7 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                 var lastChunkAt: Date?
                 var previousTrailingSample: Float?
                 var generatedAudioQualityMonitor = GeneratedAudioQualityMonitor(sampleRate: sampleRate)
+                var emittedGenerationQualityWarningReasons = Set<GeneratedAudioQualityWarningReason>()
 
                 func bufferedAudioMS() -> Int {
                     Int((Double(pendingSampleCount) / sampleRate * 1000).rounded())
@@ -138,6 +139,14 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                         }
                     }
                     lastChunkAt = now
+                    let qualityObservation = generatedAudioQualityMonitor.observe(
+                        samples: chunk,
+                        chunkIndex: chunkCount,
+                    )
+                    if let warning = generatedAudioQualityMonitor.warning(for: qualityObservation),
+                       emittedGenerationQualityWarningReasons.insert(warning.reason).inserted {
+                        await onEvent(.generationQualityWarning(warning))
+                    }
 
                     if let firstSample = chunk.first, let lastSample = chunk.last {
                         let leadingAbs = Double(abs(firstSample))
@@ -167,10 +176,6 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                     }
 
                     if traceEnabled {
-                        let qualityObservation = generatedAudioQualityMonitor.observe(
-                            samples: chunk,
-                            chunkIndex: chunkCount,
-                        )
                         await onEvent(
                             .trace(
                                 PlaybackTraceEvent(

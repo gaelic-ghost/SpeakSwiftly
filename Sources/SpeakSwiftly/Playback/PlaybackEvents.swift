@@ -9,6 +9,7 @@ enum PlaybackEvent {
     case chunkGapWarning(gapMS: Int, chunkIndex: Int)
     case scheduleGapWarning(gapMS: Int, bufferIndex: Int, queuedAudioMS: Int)
     case rebufferThrashWarning(rebufferEventCount: Int, windowMS: Int)
+    case generationQualityWarning(GeneratedAudioQualityWarning)
     case outputDeviceChanged(previousDevice: String?, currentDevice: String?)
     case engineConfigurationChanged(engineIsRunning: Bool)
     case bufferShapeSummary(

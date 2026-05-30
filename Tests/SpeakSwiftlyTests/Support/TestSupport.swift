@@ -157,6 +157,7 @@ final class OutputRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var stdoutLines = [String]()
     private var stderrLines = [String]()
+    private var systemLogEvents = [WorkerLogEvent]()
 
     func writeStdout(_ data: Data) throws {
         let string = String(decoding: data, as: UTF8.self)
@@ -172,6 +173,12 @@ final class OutputRecorder: @unchecked Sendable {
     func writeStderr(_ message: String) {
         lock.withLock {
             stderrLines.append(message)
+        }
+    }
+
+    func writeSystemLog(_ event: WorkerLogEvent) {
+        lock.withLock {
+            systemLogEvents.append(event)
         }
     }
 
@@ -231,6 +238,12 @@ final class OutputRecorder: @unchecked Sendable {
             stderrLines.compactMap { line in
                 try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
             }
+        }
+    }
+
+    func containsSystemLogEvent(_ predicate: (WorkerLogEvent) -> Bool) -> Bool {
+        lock.withLock {
+            systemLogEvents.contains(where: predicate)
         }
     }
 
@@ -463,6 +476,29 @@ final class PlaybackSpy: @unchecked Sendable {
                                 maxLeadingAbsAmplitude: 0.31,
                                 maxTrailingAbsAmplitude: 0.37,
                                 fadeInChunkCount: 1,
+                            ),
+                        )
+                        await onEvent(
+                            .generationQualityWarning(
+                                GeneratedAudioQualityWarning(
+                                    reason: .repeatedNonSilentWindow,
+                                    message: "SpeakSwiftly detected a repeated non-silent generated audio window before playback scheduling. This can indicate a looping or runaway speech generation.",
+                                    observation: GeneratedAudioQualityObservation(
+                                        chunkIndex: 2,
+                                        sampleCount: 9600,
+                                        generatedDurationMS: 400,
+                                        totalGeneratedDurationMS: 12000,
+                                        peakAmplitude: 0.31,
+                                        rmsAmplitude: 0.18,
+                                        nearSilenceRatio: 0.04,
+                                        clippingRatio: 0.002,
+                                        nonFiniteSampleCount: 0,
+                                        dcOffset: 0.01,
+                                        zeroCrossingRate: 0.22,
+                                        boundaryJump: 0.03,
+                                        repeatedWindowSimilarity: 0.998,
+                                    ),
+                                ),
                             ),
                         )
                         await onEvent(
@@ -962,6 +998,7 @@ func makeRuntime(
             loadedCloneAudioSamples
         },
         writeStderr: output.writeStderr,
+        writeSystemLog: output.writeSystemLog,
         now: Date.init,
         readRuntimeMemory: readRuntimeMemory,
     )

@@ -397,6 +397,7 @@ final class LockedFlag: @unchecked Sendable {
             loadAudioSamples: { _, _ in nil },
             loadAudioFloats: { _, _ in [] },
             writeStderr: output.writeStderr,
+            writeSystemLog: { _ in },
             now: Date.init,
             readRuntimeMemory: { nil },
         ),
@@ -503,6 +504,7 @@ final class LockedFlag: @unchecked Sendable {
         loadAudioSamples: { _, _ in nil },
         loadAudioFloats: { _, _ in [] },
         writeStderr: output.writeStderr,
+        writeSystemLog: { _ in },
         now: Date.init,
         readRuntimeMemory: { nil },
     )

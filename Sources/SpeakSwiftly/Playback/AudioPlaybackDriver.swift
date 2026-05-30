@@ -153,6 +153,7 @@ final class AudioPlaybackDriver {
         var maxScheduleGapMS: Int?
         var lastPreparedTrailingSample: Float?
         var generatedAudioQualityMonitor = GeneratedAudioQualityMonitor(sampleRate: sampleRate)
+        var emittedGenerationQualityWarningReasons = Set<GeneratedAudioQualityWarningReason>()
 
         func bufferedAudioMS() -> Int {
             state.queuedAudioMS(sampleRate: sampleRate)
@@ -417,11 +418,15 @@ final class AudioPlaybackDriver {
                     state.thresholdsController.recordChunk(durationMS: chunkDurationMS, interChunkGapMS: nil)
                 }
                 lastChunkReceivedAt = now
+                let qualityObservation = generatedAudioQualityMonitor.observe(
+                    samples: chunk,
+                    chunkIndex: chunkCount,
+                )
+                if let warning = generatedAudioQualityMonitor.warning(for: qualityObservation),
+                   emittedGenerationQualityWarningReasons.insert(warning.reason).inserted {
+                    await onEvent(.generationQualityWarning(warning))
+                }
                 if traceEnabled {
-                    let qualityObservation = generatedAudioQualityMonitor.observe(
-                        samples: chunk,
-                        chunkIndex: chunkCount,
-                    )
                     await onEvent(
                         .trace(
                             PlaybackTraceEvent(

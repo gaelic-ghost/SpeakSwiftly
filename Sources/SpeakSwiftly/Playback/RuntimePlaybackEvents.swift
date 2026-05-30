@@ -100,6 +100,7 @@ extension SpeakSwiftly.Runtime {
             case let .chunkGapWarning(gapMS, chunkIndex):
                 await logRequestEvent(
                     "playback_chunk_gap_warning",
+                    level: .warning,
                     requestID: id,
                     op: op,
                     profileName: profileName,
@@ -111,6 +112,7 @@ extension SpeakSwiftly.Runtime {
             case let .scheduleGapWarning(gapMS, bufferIndex, queuedAudioMS):
                 await logRequestEvent(
                     "playback_schedule_gap_warning",
+                    level: .warning,
                     requestID: id,
                     op: op,
                     profileName: profileName,
@@ -123,6 +125,7 @@ extension SpeakSwiftly.Runtime {
             case let .rebufferThrashWarning(rebufferEventCount, windowMS):
                 await logRequestEvent(
                     "playback_rebuffer_thrash_warning",
+                    level: .warning,
                     requestID: id,
                     op: op,
                     profileName: profileName,
@@ -130,6 +133,15 @@ extension SpeakSwiftly.Runtime {
                         "rebuffer_event_count": .int(rebufferEventCount),
                         "window_ms": .int(windowMS),
                     ],
+                )
+            case let .generationQualityWarning(warning):
+                await logRequestEvent(
+                    "playback_generation_quality_warning",
+                    level: .warning,
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: generationQualityWarningDetails(warning),
                 )
             case let .outputDeviceChanged(previousDevice, currentDevice):
                 await publishPlaybackUpdate(
@@ -184,23 +196,7 @@ extension SpeakSwiftly.Runtime {
                 if let isRebuffering = trace.isRebuffering { details["is_rebuffering"] = .bool(isRebuffering) }
                 if let fadeInApplied = trace.fadeInApplied { details["fade_in_applied"] = .bool(fadeInApplied) }
                 if let quality = trace.generatedAudioQuality {
-                    details["quality_chunk_index"] = .int(quality.chunkIndex)
-                    details["quality_sample_count"] = .int(quality.sampleCount)
-                    details["generated_duration_ms"] = .int(quality.generatedDurationMS)
-                    details["total_generated_duration_ms"] = .int(quality.totalGeneratedDurationMS)
-                    details["peak_amplitude"] = .double(quality.peakAmplitude)
-                    details["rms_amplitude"] = .double(quality.rmsAmplitude)
-                    details["near_silence_ratio"] = .double(quality.nearSilenceRatio)
-                    details["clipping_ratio"] = .double(quality.clippingRatio)
-                    details["non_finite_sample_count"] = .int(quality.nonFiniteSampleCount)
-                    details["dc_offset"] = .double(quality.dcOffset)
-                    details["zero_crossing_rate"] = .double(quality.zeroCrossingRate)
-                    if let boundaryJump = quality.boundaryJump {
-                        details["boundary_jump"] = .double(boundaryJump)
-                    }
-                    if let repeatedWindowSimilarity = quality.repeatedWindowSimilarity {
-                        details["repeated_window_similarity"] = .double(repeatedWindowSimilarity)
-                    }
+                    details.merge(generatedAudioQualityDetails(quality), uniquingKeysWith: { _, new in new })
                 }
                 await logRequestEvent(
                     "playback_trace_\(trace.name)",
@@ -212,6 +208,42 @@ extension SpeakSwiftly.Runtime {
             case .starved:
                 await logRequestEvent("playback_starved", requestID: id, op: op, profileName: profileName)
         }
+    }
+
+    private func generationQualityWarningDetails(
+        _ warning: GeneratedAudioQualityWarning,
+    ) -> [String: LogValue] {
+        var details: [String: LogValue] = [
+            "reason": .string(warning.reason.rawValue),
+            "message": .string(warning.message),
+        ]
+        details.merge(generatedAudioQualityDetails(warning.observation), uniquingKeysWith: { _, new in new })
+        return details
+    }
+
+    private func generatedAudioQualityDetails(
+        _ quality: GeneratedAudioQualityObservation,
+    ) -> [String: LogValue] {
+        var details: [String: LogValue] = [
+            "quality_chunk_index": .int(quality.chunkIndex),
+            "quality_sample_count": .int(quality.sampleCount),
+            "generated_duration_ms": .int(quality.generatedDurationMS),
+            "total_generated_duration_ms": .int(quality.totalGeneratedDurationMS),
+            "peak_amplitude": .double(quality.peakAmplitude),
+            "rms_amplitude": .double(quality.rmsAmplitude),
+            "near_silence_ratio": .double(quality.nearSilenceRatio),
+            "clipping_ratio": .double(quality.clippingRatio),
+            "non_finite_sample_count": .int(quality.nonFiniteSampleCount),
+            "dc_offset": .double(quality.dcOffset),
+            "zero_crossing_rate": .double(quality.zeroCrossingRate),
+        ]
+        if let boundaryJump = quality.boundaryJump {
+            details["boundary_jump"] = .double(boundaryJump)
+        }
+        if let repeatedWindowSimilarity = quality.repeatedWindowSimilarity {
+            details["repeated_window_similarity"] = .double(repeatedWindowSimilarity)
+        }
+        return details
     }
 
     func handlePlaybackEnvironmentEvent(

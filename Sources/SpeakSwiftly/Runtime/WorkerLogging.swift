@@ -1,7 +1,9 @@
 import Foundation
+import OSLog
 
 package enum WorkerLogLevel: String, Encodable {
     case info
+    case warning
     case error
 }
 
@@ -84,5 +86,38 @@ package enum WorkerStructuredLogSupport {
         errorDescription: String,
     ) -> String {
         #"{"event":"worker_error","level":"error","ts":"\#(timestamp)","details":{"message":"SpeakSwiftly could not encode a stderr log event.","error":"\#(errorDescription)"}}"#
+    }
+}
+
+package struct WorkerSystemLogger {
+    package static let live = WorkerSystemLogger(
+        logger: Logger(subsystem: "com.gaelic-ghost.SpeakSwiftly", category: "worker"),
+    )
+
+    private let logger: Logger
+
+    package init(logger: Logger) {
+        self.logger = logger
+    }
+
+    package func log(_ event: WorkerLogEvent) {
+        let summary = [
+            "event=\(event.event)",
+            event.requestID.map { "request_id=\($0)" },
+            event.op.map { "op=\($0)" },
+            event.profileName.map { "profile_name=\($0)" },
+            event.elapsedMS.map { "elapsed_ms=\($0)" },
+        ]
+        .compactMap(\.self)
+        .joined(separator: " ")
+
+        switch event.level {
+            case .info:
+                logger.info("\(summary, privacy: .public)")
+            case .warning:
+                logger.warning("\(summary, privacy: .public)")
+            case .error:
+                logger.error("\(summary, privacy: .public)")
+        }
     }
 }

@@ -16,7 +16,31 @@ struct GeneratedAudioQualityObservation: Equatable {
     let repeatedWindowSimilarity: Double?
 }
 
+enum GeneratedAudioQualityWarningReason: String, Hashable {
+    case nonFiniteSamples = "non_finite_samples"
+    case clipping
+    case repeatedNonSilentWindow = "repeated_non_silent_window"
+    case excessiveGeneratedDuration = "excessive_generated_duration"
+    case dcOffset = "dc_offset"
+}
+
+struct GeneratedAudioQualityWarning: Equatable {
+    let reason: GeneratedAudioQualityWarningReason
+    let message: String
+    let observation: GeneratedAudioQualityObservation
+}
+
 struct GeneratedAudioQualityMonitor {
+    private enum WarningThresholds {
+        static let clippingRatio = 0.005
+        static let repeatedWindowSimilarity = 0.995
+        static let repeatedWindowMinimumRMSAmplitude = 0.02
+        static let repeatedWindowMinimumPeakAmplitude = 0.08
+        static let repeatedWindowMinimumGeneratedDurationMS = 10000
+        static let excessiveGeneratedDurationMS = 90000
+        static let dcOffset = 0.2
+    }
+
     private let sampleRate: Double
     private let nearSilenceThreshold: Float
     private let clippingThreshold: Float
@@ -119,6 +143,54 @@ struct GeneratedAudioQualityMonitor {
             boundaryJump: boundaryJump,
             repeatedWindowSimilarity: repeatedWindowSimilarity,
         )
+    }
+
+    func warning(for observation: GeneratedAudioQualityObservation) -> GeneratedAudioQualityWarning? {
+        if observation.nonFiniteSampleCount > 0 {
+            return GeneratedAudioQualityWarning(
+                reason: .nonFiniteSamples,
+                message: "SpeakSwiftly detected non-finite generated audio samples before playback scheduling. This usually means the speech backend emitted invalid floating-point audio.",
+                observation: observation,
+            )
+        }
+
+        if observation.clippingRatio >= WarningThresholds.clippingRatio {
+            return GeneratedAudioQualityWarning(
+                reason: .clipping,
+                message: "SpeakSwiftly detected clipped generated audio before playback scheduling. This can sound distorted and may indicate an unstable generation tail.",
+                observation: observation,
+            )
+        }
+
+        if let repeatedWindowSimilarity = observation.repeatedWindowSimilarity,
+           repeatedWindowSimilarity >= WarningThresholds.repeatedWindowSimilarity,
+           observation.rmsAmplitude >= WarningThresholds.repeatedWindowMinimumRMSAmplitude,
+           observation.peakAmplitude >= WarningThresholds.repeatedWindowMinimumPeakAmplitude,
+           observation.totalGeneratedDurationMS >= WarningThresholds.repeatedWindowMinimumGeneratedDurationMS {
+            return GeneratedAudioQualityWarning(
+                reason: .repeatedNonSilentWindow,
+                message: "SpeakSwiftly detected a repeated non-silent generated audio window before playback scheduling. This can indicate a looping or runaway speech generation.",
+                observation: observation,
+            )
+        }
+
+        if observation.totalGeneratedDurationMS >= WarningThresholds.excessiveGeneratedDurationMS {
+            return GeneratedAudioQualityWarning(
+                reason: .excessiveGeneratedDuration,
+                message: "SpeakSwiftly detected unusually long generated audio before playback finished. This can indicate a runaway speech generation when the requested text is not long enough to justify the duration.",
+                observation: observation,
+            )
+        }
+
+        if abs(observation.dcOffset) >= WarningThresholds.dcOffset {
+            return GeneratedAudioQualityWarning(
+                reason: .dcOffset,
+                message: "SpeakSwiftly detected a high DC offset in generated audio before playback scheduling. This can indicate an unstable waveform that may produce audible artifacts.",
+                observation: observation,
+            )
+        }
+
+        return nil
     }
 
     private func durationMS(sampleCount: Int) -> Int {

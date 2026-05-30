@@ -14,6 +14,12 @@ surface. When `SPEAKSWIFTLY_PLAYBACK_TRACE=1` is enabled, live playback now emit
 shaped into playback buffers. This intentionally stays inside the existing
 playback trace setup instead of adding a new generation-quality flag.
 
+Stage 2 warning telemetry is also in place for high-signal suspicious chunks.
+The monitor now emits `playback_generation_quality_warning` as a request-scoped
+warning event and mirrors the structured event through `Logger` for Console and
+Unified Logging inspection. Cutoff behavior remains intentionally pending until
+warning telemetry has enough suspicious real-run evidence.
+
 This note captures the first implementation shape for detecting runaway or
 glitchy speech generations before they continue through live playback. The
 initial target is Qwen3 live generation, but the plan should stay backend-aware
@@ -111,17 +117,21 @@ Initial trace fields:
 
 ### Stage 2: Warning Events
 
-Promote strong but non-fatal signals into request-scoped warning events. These
-warnings should be operator-facing and specific, for example:
+Implemented for the initial playback path. Strong but non-fatal signals become
+request-scoped warning events. The initial warning reasons are:
 
-- generation exceeded the expected audio-duration budget for the input size
-- repeated audio windows were detected across multiple chunks
-- the generated tail stayed active after the planned text chunk should have
-  ended
-- chunk cadence became unstable while playback remained otherwise healthy
+- `non_finite_samples`
+- `clipping`
+- `repeated_non_silent_window`
+- `excessive_generated_duration`
+- `dc_offset`
 
-Warnings should be visible through the same observation and logging surfaces
-used for synthesis and playback telemetry.
+Warnings are visible through the same stderr JSONL request logging surface used
+for synthesis and playback telemetry. They use `level: "warning"` and are also
+mirrored to Apple's Unified Logging surface through `Logger` with the
+`com.gaelic-ghost.SpeakSwiftly` subsystem and `worker` category. The OSLog
+message intentionally carries event/request metadata rather than full details so
+raw requested text does not move into persistent system logs.
 
 ### Stage 3: Conservative Cutoff
 
@@ -143,16 +153,17 @@ Start with a local support type in the playback or generation feature area,
 depending on where the final call site lands. This should be a local
 implementation detail, not a new runtime subsystem.
 
-The simplest useful shape is:
+The current useful shape is:
 
-- `GenerationQualityMonitor` owns rolling sample windows and request-level
+- `GeneratedAudioQualityMonitor` owns rolling sample windows and request-level
   counters.
-- `GenerationQualityObservation` carries per-chunk metrics.
-- `GenerationQualityDisposition` returns `.healthy`, `.warning`, or `.abort`.
+- `GeneratedAudioQualityObservation` carries per-chunk metrics.
+- `GeneratedAudioQualityWarning` carries warning reason, message, and observed
+  metric values.
 - `AudioPlaybackDriver.play(...)` or the resident generation forwarding loop
   feeds chunks into the monitor before `makePCMBuffer(...)`.
-- warning and abort outcomes flow through existing request observation and
-  worker-error completion paths.
+- warning outcomes flow through existing playback events and request logging.
+- abort outcomes remain pending until thresholds have better evidence.
 
 Prefer one monitor per active live request. Avoid global shared state unless a
 later issue proves cross-request comparison is useful.
@@ -205,7 +216,7 @@ quality guards limit damage when bad tails still happen.
 3. Run known-good Qwen prompts and at least one reproduced bad or suspicious
    generation through the same metric surface.
 4. Record the observed metric ranges in this note or a follow-up report.
-5. Promote only the clearest signals into warnings.
+5. Done: promote only the clearest signals into warning events.
 6. Design cutoff thresholds after the warning telemetry has real examples.
 
 ## Initial Test Commands
@@ -256,6 +267,32 @@ The known-good trace included quiet tail chunks near the end, including a final
 chunk with peak amplitude around 0.0151 and RMS around 0.00359, so near-silence
 alone should not become an abort signal. Repeated-window similarity stayed well
 below a high-repeat threshold in this run.
+
+### Warning Telemetry Smoke Pass
+
+Command:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite trace --playback-trace
+```
+
+Result:
+
+- test passed
+- the wrapper unloaded and reloaded live-service resident models
+- 53 `playback_trace_generation_quality_chunk` events were emitted
+- 0 `playback_generation_quality_warning` events were emitted
+- maximum generated duration was 16,720 ms
+- maximum peak amplitude was 0.823839
+- maximum RMS amplitude was 0.207812
+- maximum near-silence ratio was 0.647917
+- maximum clipping ratio was 0
+- non-finite sample count was 0
+- maximum repeated-window similarity was 0.240239
+
+Early read: the initial warning thresholds do not fire on this healthy trace
+capture. That is the desired first-pass behavior; suspicious-warning evidence
+still needs a reproduced bad or borderline generation.
 
 ### Deep Trace Baseline Pass
 

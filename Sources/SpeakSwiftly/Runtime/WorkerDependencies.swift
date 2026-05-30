@@ -20,6 +20,7 @@ struct WorkerDependencies: @unchecked Sendable {
     let loadAudioSamples: @Sendable (_ url: URL, _ sampleRate: Int) throws -> MLXArray?
     let loadAudioFloats: @Sendable (_ url: URL, _ sampleRate: Int) throws -> [Float]
     let writeStderr: @Sendable (String) -> Void
+    let writeSystemLog: @Sendable (WorkerLogEvent) -> Void
     let now: @Sendable () -> Date
     let readRuntimeMemory: @Sendable () -> RuntimeMemorySnapshot?
 
@@ -74,6 +75,7 @@ struct WorkerDependencies: @unchecked Sendable {
                     fputs(message + "\n", stderr)
                 }
             },
+            writeSystemLog: WorkerSystemLogger.live.log,
             now: Date.init,
             readRuntimeMemory: currentRuntimeMemorySnapshot,
         )
