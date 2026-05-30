@@ -28,6 +28,7 @@ struct WorkerDependencies: @unchecked Sendable {
         fileManager: FileManager = .default,
         allowsProfileModelCPUFallback: Bool? = nil,
         marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
+        duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
         let allowsProfileModelCPUFallback = allowsProfileModelCPUFallback
@@ -53,7 +54,10 @@ struct WorkerDependencies: @unchecked Sendable {
                 }
 
                 return AnyPlaybackDriver(
-                    AudioPlaybackDriver(traceEnabled: environment[Environment.playbackTrace] == "1"),
+                    AudioPlaybackDriver(
+                        traceEnabled: environment[Environment.playbackTrace] == "1",
+                        duckMediaVolume: duckMediaVolume,
+                    ),
                 )
             },
             writeWAV: { samples, sampleRate, url in

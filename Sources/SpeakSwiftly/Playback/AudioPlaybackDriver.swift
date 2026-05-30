@@ -46,10 +46,13 @@ final class AudioPlaybackDriver {
 
     init(
         traceEnabled: Bool = false,
+        duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
         playbackEnvironment: PlaybackEnvironmentCoordinator? = nil,
     ) {
         self.traceEnabled = traceEnabled
-        let playbackEnvironment = playbackEnvironment ?? makeDefaultPlaybackEnvironmentCoordinator()
+        let playbackEnvironment = playbackEnvironment ?? makeDefaultPlaybackEnvironmentCoordinator(
+            duckMediaVolume: duckMediaVolume,
+        )
         self.playbackEnvironment = playbackEnvironment
         lastObservedOutputDeviceDescription = playbackEnvironment.currentOutputDeviceDescription
         installEngineConfigurationObserver()

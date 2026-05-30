@@ -42,6 +42,7 @@ import Darwin
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+    #expect(configuration.duckMediaVolume == .off)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -51,6 +52,7 @@ import Darwin
     #expect(configuration.speechBackend == .qwen3_smol)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+    #expect(configuration.duckMediaVolume == .off)
 }
 
 @Test func `public configuration supports chatterbox turbo backend`() {
@@ -79,6 +81,7 @@ import Darwin
         speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
+        duckMediaVolume: .default,
     )
 
     try configuration.save(to: persistenceURL)
@@ -87,6 +90,7 @@ import Darwin
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
+    #expect(loaded.duckMediaVolume == .default)
     #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
 }

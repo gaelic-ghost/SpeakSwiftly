@@ -20,9 +20,11 @@ protocol PlaybackEnvironmentCoordinator: AnyObject, Sendable {
 // MARK: - Playback Environment Factory
 
 @MainActor
-func makeDefaultPlaybackEnvironmentCoordinator() -> PlaybackEnvironmentCoordinator {
+func makeDefaultPlaybackEnvironmentCoordinator(
+    duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
+) -> PlaybackEnvironmentCoordinator {
 #if os(macOS)
-    MacOSPlaybackEnvironmentCoordinator()
+    MacOSPlaybackEnvironmentCoordinator(duckMediaVolume: duckMediaVolume)
 #elseif os(iOS)
     IOSPlaybackEnvironmentCoordinator()
 #else

@@ -86,10 +86,15 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredDuckMediaVolume = resolvedDuckMediaVolume(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
         let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             allowsProfileModelCPUFallback: allowsProfileModelCPUFallback,
             marvisResidentPolicy: marvisResidentPolicy,
+            duckMediaVolume: configuredDuckMediaVolume,
         )
         let profileStore = ProfileStore(
             rootURL: ProfileStore.defaultRootURL(
@@ -130,6 +135,7 @@ extension SpeakSwiftly.Runtime {
             dependencies: dependencies,
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
+            duckMediaVolume: configuredDuckMediaVolume,
             marvisResidentPolicy: marvisResidentPolicy,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
@@ -231,6 +237,12 @@ extension SpeakSwiftly.Runtime {
         SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(configuration?.defaultVoiceProfile)
     }
 
+    static func resolvedDuckMediaVolume(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> SpeakSwiftly.DuckMediaVolume {
+        configuration?.duckMediaVolume ?? .off
+    }
+
     func setDefaultVoiceProfileName(_ profileName: SpeakSwiftly.Name) throws {
         let resolvedProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(profileName)
         defaultVoiceProfileName = resolvedProfileName
@@ -246,6 +258,7 @@ extension SpeakSwiftly.Runtime {
             speechBackend: speechBackend,
             qwenConditioningStrategy: qwenConditioningStrategy,
             defaultVoiceProfile: defaultVoiceProfileName,
+            duckMediaVolume: duckMediaVolume,
             textNormalizer: normalizerRef,
         )
     }
