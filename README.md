@@ -16,7 +16,10 @@ Local speech for Swift apps, desktop tools, and agent workflows that need text r
 
 ### Status
 
-SpeakSwiftly is actively available as a macOS-first local speech package, with iOS library support in progress.
+SpeakSwiftly is actively available as a macOS-only local speech package. Future
+mobile speech work belongs in a separate `SpeakSwiftlyMobile` app that can share
+text conditioning through `TextForSpeech` without inheriting this desktop worker
+runtime.
 
 ### What This Project Is
 

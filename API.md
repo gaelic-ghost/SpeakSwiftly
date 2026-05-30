@@ -142,9 +142,9 @@ Configuration loading can throw `SpeakSwiftly.Configuration.LoadError` when pers
 
 ### Supported Versions
 
-This checkout builds as Swift language mode 6 with Swift tools version 6.3. The package declares macOS 15 and iOS 17 platform floors.
+This checkout builds as Swift language mode 6 with Swift tools version 6.3. The package declares a macOS 15 platform floor.
 
-The package depends on `TextForSpeech` from `0.21.0`, `mlx-audio-swift` exact `0.99.0`, and `mlx-swift` from `0.30.6` in the current manifest.
+The package depends on `TextForSpeech` from `0.22.1`, `mlx-audio-swift` exact `0.100.0`, and `mlx-swift` from `0.30.6` in the current manifest.
 
 ### Breaking Changes
 

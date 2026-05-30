@@ -177,7 +177,7 @@ sh scripts/repo-maintenance/verify-runtime.sh --configuration Debug
 sh scripts/repo-maintenance/verify-runtime.sh --configuration Release
 ```
 
-Use [docs/maintainers/validation-lanes.md](./docs/maintainers/validation-lanes.md) for Xcode-backed fallback validation, iOS simulator smoke checks, real-model E2E details, and benchmark lanes.
+Use [docs/maintainers/validation-lanes.md](./docs/maintainers/validation-lanes.md) for Xcode-backed fallback validation, real-model E2E details, and benchmark lanes.
 
 ## Pull Request Expectations
 

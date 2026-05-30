@@ -7,7 +7,6 @@ let package = Package(
     name: "SpeakSwiftly",
     platforms: [
         .macOS(.v15),
-        .iOS(.v17),
     ],
     products: [
         .library(
