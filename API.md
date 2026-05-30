@@ -81,6 +81,12 @@ Voice generation and playback depend on local model resources and package resour
 
 Callers need normal local filesystem permissions for the runtime state root, profile store, generated artifacts, and any explicit output paths. Live playback also needs the operating system permissions and device availability required for local audio output.
 
+On macOS, callers that enable `SpeakSwiftly.Configuration.duckMediaVolume` need
+Automation permission to control Spotify and Music volume while SpeakSwiftly
+playback is active. Host apps should include an `NSAppleEventsUsageDescription`
+that explains the volume-ducking behavior; the package exposes suggested copy
+as `SpeakSwiftly.DuckMediaVolume.automationUsageDescription`.
+
 The `UpsertSystemVoiceProfile` command plugin declares write access to the package directory because generated system voice profiles are durable package resources.
 
 ## Requests and Responses
@@ -142,9 +148,9 @@ Configuration loading can throw `SpeakSwiftly.Configuration.LoadError` when pers
 
 ### Supported Versions
 
-This checkout builds as Swift language mode 6 with Swift tools version 6.3. The package declares macOS 15 and iOS 17 platform floors.
+This checkout builds as Swift language mode 6 with Swift tools version 6.3. The package declares a macOS 15 platform floor.
 
-The package depends on `TextForSpeech` from `0.21.0`, `mlx-audio-swift` exact `0.99.0`, and `mlx-swift` from `0.30.6` in the current manifest.
+The package depends on `TextForSpeech` from `0.22.1`, `mlx-audio-swift` exact `0.100.0`, and `mlx-swift` from `0.30.6` in the current manifest.
 
 ### Breaking Changes
 
@@ -156,9 +162,15 @@ For worker JSONL changes, update `Sources/SpeakSwiftly/SpeakSwiftly.docc/WorkerC
 
 ### Runtime Configuration
 
-Runtime startup can be shaped with `SpeakSwiftly.Configuration` and an explicit `stateRootURL`. Configuration includes speech backend selection, Qwen conditioning strategy, default voice profile, system profile resource roots, and an optional `SpeakSwiftly.Normalizer`.
+Runtime startup can be shaped with `SpeakSwiftly.Configuration` and an explicit `stateRootURL`. Configuration includes speech backend selection, Qwen conditioning strategy, default voice profile, media volume ducking, system profile resource roots, and an optional `SpeakSwiftly.Normalizer`.
 
 When `stateRootURL` is omitted, the runtime uses the platform Application Support default. Hosts that need isolated persistent state should pass `stateRootURL` explicitly.
+
+`duckMediaVolume` defaults to `.off`. When set to `.aLittle`, `.default`, or
+`.aLot`, SpeakSwiftly lowers the current volume of running Spotify and Music
+instances by a fraction while local playback is active, then restores the
+original app volume afterward. The current reduction fractions are 20%, 35%, and
+75%.
 
 ### Verification
 

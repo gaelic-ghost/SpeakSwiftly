@@ -6,6 +6,7 @@ import Foundation
 
 @MainActor
 final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
+    private let mediaVolumeDucker: MacOSMediaVolumeDucker
     private var workspaceObservers = [NSObjectProtocol]()
     private var defaultOutputDeviceAddress = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -18,6 +19,13 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
 
     var currentOutputDeviceDescription: String? {
         Self.currentDefaultAudioPlaybackDeviceDescription()
+    }
+
+    init(
+        duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
+        mediaVolumeDucker: MacOSMediaVolumeDucker? = nil,
+    ) {
+        self.mediaVolumeDucker = mediaVolumeDucker ?? MacOSMediaVolumeDucker(duckMediaVolume: duckMediaVolume)
     }
 
     private static func currentDefaultAudioPlaybackDeviceDescription() -> String? {
@@ -178,9 +186,11 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
                 }
             }
         }
+        mediaVolumeDucker.duckRunningMediaApps()
     }
 
     func finishPlayback() {
+        mediaVolumeDucker.restoreDuckedMediaApps()
         routingArbitration.leave()
     }
 
@@ -201,7 +211,7 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
             self.defaultOutputDeviceListener = nil
         }
 
-        routingArbitration.leave()
+        finishPlayback()
         observersInstalled = false
     }
 }

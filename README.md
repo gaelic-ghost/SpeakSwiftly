@@ -16,7 +16,10 @@ Local speech for Swift apps, desktop tools, and agent workflows that need text r
 
 ### Status
 
-SpeakSwiftly is actively available as a macOS-first local speech package, with iOS library support in progress.
+SpeakSwiftly is actively available as a macOS-only local speech package. Future
+mobile speech work belongs in a separate `SpeakSwiftlyMobile` app that can share
+text conditioning through `TextForSpeech` without inheriting this desktop worker
+runtime.
 
 ### What This Project Is
 
@@ -71,7 +74,11 @@ Agent-facing maintainer guidance lives in [AGENTS.md](./AGENTS.md).
 
 ## Release Notes
 
-Use GitHub releases and repository tags for the authoritative release history. The active local release notes live in [docs/releases/v8-0-0-release-notes.md](./docs/releases/v8-0-0-release-notes.md), and older local release notes are consolidated in [docs/releases/release-history.md](./docs/releases/release-history.md).
+Use GitHub releases and repository tags for the authoritative release history.
+The active local release notes live in
+[docs/releases/v10-0-0-release-notes.md](./docs/releases/v10-0-0-release-notes.md),
+and older local release notes are consolidated in
+[docs/releases/release-history.md](./docs/releases/release-history.md).
 
 ## License
 

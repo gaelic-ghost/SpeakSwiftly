@@ -42,6 +42,7 @@ import Darwin
     #expect(configuration.speechBackend == .marvis)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+    #expect(configuration.duckMediaVolume == .off)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -51,6 +52,16 @@ import Darwin
     #expect(configuration.speechBackend == .qwen3_smol)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
+    #expect(configuration.duckMediaVolume == .off)
+}
+
+@Test func `public duck media volume describes automation permission needs`() {
+    #expect(!SpeakSwiftly.DuckMediaVolume.off.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.aLittle.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.default.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.aLot.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Spotify"))
+    #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Music"))
 }
 
 @Test func `public configuration supports chatterbox turbo backend`() {
@@ -79,6 +90,7 @@ import Darwin
         speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
+        duckMediaVolume: .default,
     )
 
     try configuration.save(to: persistenceURL)
@@ -87,6 +99,7 @@ import Darwin
     #expect(loaded.speechBackend == configuration.speechBackend)
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
+    #expect(loaded.duckMediaVolume == .default)
     #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
 }

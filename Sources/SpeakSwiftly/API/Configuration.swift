@@ -15,6 +15,23 @@ public extension SpeakSwiftly {
         case preparedConditioning = "prepared_conditioning"
     }
 
+    /// Selects whether SpeakSwiftly should lower supported macOS media app volumes while local playback is active.
+    enum DuckMediaVolume: String, Codable, Sendable, Equatable, CaseIterable {
+        case off
+        case aLittle = "a_little"
+        case `default`
+        case aLot = "a_lot"
+
+        /// Suggested app-tier `NSAppleEventsUsageDescription` copy for consumers that enable media-app ducking.
+        public static let automationUsageDescription =
+            "SpeakSwiftly needs permission to adjust Spotify and Music volume while local speech playback is active, then restore the original volume afterward."
+
+        /// Returns whether this setting needs macOS Automation permission to control supported media apps.
+        public var requiresMediaAutomation: Bool {
+            self != .off
+        }
+    }
+
     /// Startup configuration for a SpeakSwiftly runtime.
     struct Configuration: Codable, Sendable {
         // MARK: Load Error
@@ -43,6 +60,7 @@ public extension SpeakSwiftly {
             case speechBackend
             case qwenConditioningStrategy
             case defaultVoiceProfile
+            case duckMediaVolume
         }
 
         /// The speech backend to activate when the runtime starts.
@@ -51,6 +69,8 @@ public extension SpeakSwiftly {
         public let qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
         /// The stored voice profile used when callers do not choose one explicitly.
         public let defaultVoiceProfile: SpeakSwiftly.Name
+        /// The supported media-app ducking strength to apply while SpeakSwiftly playback is active.
+        public let duckMediaVolume: SpeakSwiftly.DuckMediaVolume
         /// Extra bundled system-profile roots supplied by host packages at startup.
         public let systemProfileResourceRoots: [URL]
         /// An optional text normalizer to reuse instead of creating the default one.
@@ -61,12 +81,14 @@ public extension SpeakSwiftly {
             speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
+            duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
             systemProfileResourceRoots: [URL] = [],
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
+            self.duckMediaVolume = duckMediaVolume
             self.systemProfileResourceRoots = systemProfileResourceRoots.map(\.standardizedFileURL)
             self.textNormalizer = textNormalizer
         }
@@ -84,6 +106,10 @@ public extension SpeakSwiftly {
                     forKey: .defaultVoiceProfile,
                 ),
             )
+            duckMediaVolume = try container.decodeIfPresent(
+                SpeakSwiftly.DuckMediaVolume.self,
+                forKey: .duckMediaVolume,
+            ) ?? .off
             systemProfileResourceRoots = []
             textNormalizer = nil
         }
@@ -160,6 +186,7 @@ public extension SpeakSwiftly {
             try container.encode(speechBackend, forKey: .speechBackend)
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
             try container.encode(defaultVoiceProfile, forKey: .defaultVoiceProfile)
+            try container.encode(duckMediaVolume, forKey: .duckMediaVolume)
         }
 
         /// Saves this configuration value to disk.

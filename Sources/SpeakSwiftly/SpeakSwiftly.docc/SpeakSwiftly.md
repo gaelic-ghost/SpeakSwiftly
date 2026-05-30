@@ -18,6 +18,7 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 - ``SpeakSwiftly/liftoff(configuration:stateRootURL:)``
 - ``SpeakSwiftly/Runtime``
 - ``SpeakSwiftly/Configuration``
+- ``SpeakSwiftly/DuckMediaVolume``
 
 ### Articles
 

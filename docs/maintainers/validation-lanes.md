@@ -96,46 +96,6 @@ formatting, linting, toolkit shape, and resource layout. Use the Xcode-backed
 fallback lane locally, in release hardening, or in manually triggered
 investigations when SwiftPM stops being the best signal.
 
-## Opt-In iOS Compile-And-Smoke Lane
-
-The iOS lane is intentionally smaller than the macOS package lane. Its job is
-to prove that:
-
-- the package resolves for iOS
-- the shared library and playback-environment code compile for iOS Simulator
-- a small library-first smoke slice still runs under Simulator
-
-This lane is opt-in in GitHub Actions. Run the `Swift` workflow manually with
-`run_ios_smoke` enabled when an implementation touches iOS portability,
-platform-conditional playback code, package resources, or shared library
-surfaces that need simulator proof. Ordinary PR and release CI does not run it
-by default.
-
-Build once:
-
-```bash
-xcodebuild build-for-testing -quiet \
-  -scheme SpeakSwiftly-Package \
-  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
-  -derivedDataPath .local/derived-data/ios-smoke \
-  -clonedSourcePackagesDirPath .local/source-packages
-```
-
-Then run the current smoke slice:
-
-```bash
-xcodebuild test-without-building -quiet \
-  -xctestrun "$(find .local/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
-  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
-  -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
-  -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
-  -only-testing:'SpeakSwiftlyTests/ProfileStoreTests'
-```
-
-Keep this lane library-first. The worker-driven e2e harness is macOS-only and
-should stay out of the iOS simulator smoke path unless we deliberately create an
-app-hosted iOS e2e story later.
-
 ## E2E and Real-Model Notes
 
 Now that the plain SwiftPM parser failure in `EnglishG2P.swift` has been fixed
