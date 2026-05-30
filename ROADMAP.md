@@ -31,6 +31,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
 - [Milestone 29: Security Audit Hardening](#milestone-29-security-audit-hardening)
 - [Milestone 30: Generation Quality Telemetry And Guards](#milestone-30-generation-quality-telemetry-and-guards)
+- [Milestone 31: macOS Retrench And Mobile Split](#milestone-31-macos-retrench-and-mobile-split)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -42,6 +43,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 - Milestone 29: Security Audit Hardening - Planned
 - Milestone 30: Generation Quality Telemetry And Guards - In Progress
+- Milestone 31: macOS Retrench And Mobile Split - Planned
 
 ## Active Milestones
 
@@ -232,6 +234,35 @@ In Progress
 - [ ] Maintainers can inspect generation-quality metrics for live Qwen requests without relying on listening alone.
 - [ ] Suspicious generation patterns produce clear warnings before any hard cutoff is enabled.
 - [ ] High-confidence runaway generations can be cancelled with a specific failure reason instead of being allowed to continue indefinitely.
+
+## Milestone 31: macOS Retrench And Mobile Split
+
+### Status
+
+Planned
+
+### Scope
+
+- [ ] Return `SpeakSwiftly` to a clearly macOS-only local speech worker package.
+- [ ] Keep `SpeakSwiftlyServer` macOS-only and aligned with the streamlined `SpeakSwiftly` surface.
+- [ ] Prepare `TextForSpeech` as the shared normalization and profile foundation for `SpeakSwiftlyMobile` after conditioning any macOS-only behavior behind explicit platform checks or injectable providers.
+- [ ] Start `SpeakSwiftlyMobile` as a separate iOS app that depends on `TextForSpeech` and owns its mobile Core ML speech engine directly.
+
+### Tickets
+
+- [ ] Remove the current iOS support promise from `SpeakSwiftly` package metadata, README wording, DocC, and maintainer docs so the package no longer advertises an unsupported mobile runtime.
+- [ ] Delete or archive `SpeakSwiftly` iOS playback-only support that is no longer part of the macOS package contract.
+- [ ] Audit `TextForSpeech` for macOS-only behavior, especially summarization-provider defaults, persistence defaults, filesystem assumptions, and any Apple-framework availability checks that could affect an iOS app consumer.
+- [ ] Condition macOS-only `TextForSpeech` behavior with explicit platform checks or injected providers while preserving the existing iOS package platform support.
+- [ ] Keep `TextForSpeech` focused on speech-safe text normalization, built-in profiles, custom profile persistence, and profile-driven pronunciation overrides rather than moving speech generation or playback into it.
+- [ ] Define the initial `SpeakSwiftlyMobile` dependency shape as `TextForSpeech` plus app-owned Core ML model catalog, model loading, iOS audio-session ownership, and a narrow speak-text flow.
+- [ ] Defer any new shared package until both the macOS package and mobile app prove real duplication that cannot belong cleanly in `TextForSpeech`.
+
+### Exit Criteria
+
+- [ ] `SpeakSwiftly` and `SpeakSwiftlyServer` are documented and packaged as macOS-only again.
+- [ ] `TextForSpeech` can be consumed by `SpeakSwiftlyMobile` without inheriting macOS-only behavior or desktop speech-worker concepts.
+- [ ] `SpeakSwiftlyMobile` has a documented first slice that uses `TextForSpeech` for text conditioning and keeps iOS Core ML generation inside the app until a shared boundary is earned.
 
 ## Backlog Candidates
 
