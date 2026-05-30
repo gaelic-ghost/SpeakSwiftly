@@ -206,6 +206,7 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                                     gapMS: maxInterChunkGapMS,
                                     isRebuffering: false,
                                     fadeInApplied: chunkCount == 1,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )

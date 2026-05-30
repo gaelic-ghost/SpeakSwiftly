@@ -423,6 +423,7 @@ final class PlaybackSpy: @unchecked Sendable {
                                 gapMS: nil,
                                 isRebuffering: false,
                                 fadeInApplied: chunkIndex == 0,
+                                generatedAudioQuality: nil,
                             ),
                         ),
                     )
@@ -545,6 +546,7 @@ final class PlaybackSpy: @unchecked Sendable {
                                     gapMS: nil,
                                     isRebuffering: false,
                                     fadeInApplied: true,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )
@@ -561,6 +563,7 @@ final class PlaybackSpy: @unchecked Sendable {
                                     gapMS: nil,
                                     isRebuffering: false,
                                     fadeInApplied: true,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )

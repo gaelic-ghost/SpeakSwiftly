@@ -107,6 +107,7 @@ package struct WorkerSystemLogger {
             event.op.map { "op=\($0)" },
             event.profileName.map { "profile_name=\($0)" },
             event.elapsedMS.map { "elapsed_ms=\($0)" },
+            warningReasonSummary(for: event),
         ]
         .compactMap(\.self)
         .joined(separator: " ")
@@ -118,6 +119,25 @@ package struct WorkerSystemLogger {
                 logger.warning("\(summary, privacy: .public)")
             case .error:
                 logger.error("\(summary, privacy: .public)")
+        }
+    }
+
+    private func warningReasonSummary(for event: WorkerLogEvent) -> String? {
+        guard event.level == .warning, let reason = event.details?["reason"] else { return nil }
+
+        return "reason=\(compactSystemLogValue(reason))"
+    }
+
+    private func compactSystemLogValue(_ value: WorkerLogValue) -> String {
+        switch value {
+            case let .string(string):
+                string
+            case let .int(int):
+                String(int)
+            case let .double(double):
+                String(double)
+            case let .bool(bool):
+                String(bool)
         }
     }
 }

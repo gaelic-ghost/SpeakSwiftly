@@ -226,6 +226,7 @@ final class AudioPlaybackDriver {
                             gapMS: scheduleGapMS,
                             isRebuffering: state.isRebuffering,
                             fadeInApplied: queuedBuffer.fadeInApplied,
+                            generatedAudioQuality: nil,
                         ),
                     ),
                 )
@@ -262,6 +263,7 @@ final class AudioPlaybackDriver {
                                     gapMS: nil,
                                     isRebuffering: state.isRebuffering,
                                     fadeInApplied: queuedBuffer.fadeInApplied,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )
@@ -374,6 +376,7 @@ final class AudioPlaybackDriver {
                                     gapMS: nil,
                                     isRebuffering: state.isRebuffering,
                                     fadeInApplied: false,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )
@@ -457,6 +460,7 @@ final class AudioPlaybackDriver {
                                 gapMS: interChunkGapMS,
                                 isRebuffering: state.isRebuffering,
                                 fadeInApplied: !emittedFirstChunk,
+                                generatedAudioQuality: nil,
                             ),
                         ),
                     )
