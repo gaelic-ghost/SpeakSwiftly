@@ -1,14 +1,23 @@
 #if os(macOS)
 import AppKit
+import CoreServices
 import Foundation
 
 @MainActor
 final class MacOSMediaVolumeDucker {
     typealias ScriptRunner = @MainActor @Sendable (_ source: String) throws -> Int
+    typealias AutomationPermissionRequester = @MainActor @Sendable (_ app: MediaApp, _ shouldPrompt: Bool) -> AutomationPermissionState
 
     struct MediaApp: Equatable {
         let name: String
         let bundleIdentifier: String
+    }
+
+    enum AutomationPermissionState: Equatable {
+        case authorized
+        case notDetermined
+        case denied
+        case unavailable
     }
 
     private struct DuckedApp: Equatable {
@@ -23,14 +32,19 @@ final class MacOSMediaVolumeDucker {
 
     private let duckMediaVolume: SpeakSwiftly.DuckMediaVolume
     private let scriptRunner: ScriptRunner
+    private let automationPermissionRequester: AutomationPermissionRequester
     private var duckedApps = [DuckedApp]()
 
     init(
         duckMediaVolume: SpeakSwiftly.DuckMediaVolume,
         scriptRunner: @escaping ScriptRunner = MacOSMediaVolumeDucker.runAppleScriptReturningInteger,
+        automationPermissionRequester: @escaping AutomationPermissionRequester =
+            MacOSMediaVolumeDucker.requestAutomationPermission,
     ) {
         self.duckMediaVolume = duckMediaVolume
         self.scriptRunner = scriptRunner
+        self.automationPermissionRequester = automationPermissionRequester
+        requestAutomationPermissionsIfNeeded(shouldPrompt: true)
     }
 
     static func getVolumeScript(for app: MediaApp) -> String {
@@ -56,8 +70,39 @@ final class MacOSMediaVolumeDucker {
         )
     }
 
+    static func permissionState(for status: OSStatus) -> AutomationPermissionState {
+        switch status {
+            case noErr:
+                .authorized
+            case OSStatus(errAEEventWouldRequireUserConsent):
+                .notDetermined
+            case OSStatus(errAEEventNotPermitted):
+                .denied
+            default:
+                .unavailable
+        }
+    }
+
     private static func isRunning(_ app: MediaApp) -> Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleIdentifier).isEmpty
+    }
+
+    private static func requestAutomationPermission(
+        for app: MediaApp,
+        shouldPrompt: Bool,
+    ) -> AutomationPermissionState {
+        guard isRunning(app) else { return .unavailable }
+
+        let descriptor = NSAppleEventDescriptor(bundleIdentifier: app.bundleIdentifier)
+        guard let target = descriptor.aeDesc else { return .unavailable }
+
+        let status = AEDeterminePermissionToAutomateTarget(
+            target,
+            typeWildCard,
+            typeWildCard,
+            shouldPrompt,
+        )
+        return permissionState(for: status)
     }
 
     private static func runAppleScriptReturningInteger(_ source: String) throws -> Int {
@@ -87,6 +132,8 @@ final class MacOSMediaVolumeDucker {
         guard duckedApps.isEmpty else { return }
 
         for app in Self.supportedMediaApps where Self.isRunning(app) {
+            guard automationPermissionRequester(app, true) == .authorized else { continue }
+
             do {
                 let originalVolume = try scriptRunner(Self.getVolumeScript(for: app))
                 let targetVolume = Self.reducedVolume(
@@ -115,6 +162,14 @@ final class MacOSMediaVolumeDucker {
             } catch {
                 continue
             }
+        }
+    }
+
+    private func requestAutomationPermissionsIfNeeded(shouldPrompt: Bool) {
+        guard duckMediaVolume.requiresMediaAutomation else { return }
+
+        for app in Self.supportedMediaApps {
+            _ = automationPermissionRequester(app, shouldPrompt)
         }
     }
 }

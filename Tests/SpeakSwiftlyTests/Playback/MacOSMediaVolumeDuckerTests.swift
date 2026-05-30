@@ -1,4 +1,5 @@
 #if os(macOS)
+import CoreServices
 @testable import SpeakSwiftly
 import Testing
 
@@ -29,5 +30,13 @@ import Testing
     #expect(MacOSMediaVolumeDucker.reducedVolume(from: 100, reductionFraction: 0.20) == 80)
     #expect(MacOSMediaVolumeDucker.reducedVolume(from: 80, reductionFraction: 0.35) == 52)
     #expect(MacOSMediaVolumeDucker.reducedVolume(from: 40, reductionFraction: 0.75) == 10)
+}
+
+@MainActor
+@Test func `macOS media volume ducker maps automation permission statuses`() {
+    #expect(MacOSMediaVolumeDucker.permissionState(for: noErr) == .authorized)
+    #expect(MacOSMediaVolumeDucker.permissionState(for: OSStatus(errAEEventWouldRequireUserConsent)) == .notDetermined)
+    #expect(MacOSMediaVolumeDucker.permissionState(for: OSStatus(errAEEventNotPermitted)) == .denied)
+    #expect(MacOSMediaVolumeDucker.permissionState(for: OSStatus(procNotFound)) == .unavailable)
 }
 #endif

@@ -21,6 +21,15 @@ public extension SpeakSwiftly {
         case aLittle = "a_little"
         case `default`
         case aLot = "a_lot"
+
+        /// Suggested app-tier `NSAppleEventsUsageDescription` copy for consumers that enable media-app ducking.
+        public static let automationUsageDescription =
+            "SpeakSwiftly needs permission to adjust Spotify and Music volume while local speech playback is active, then restore the original volume afterward."
+
+        /// Returns whether this setting needs macOS Automation permission to control supported media apps.
+        public var requiresMediaAutomation: Bool {
+            self != .off
+        }
     }
 
     /// Startup configuration for a SpeakSwiftly runtime.

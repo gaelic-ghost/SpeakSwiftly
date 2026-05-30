@@ -55,6 +55,15 @@ import Darwin
     #expect(configuration.duckMediaVolume == .off)
 }
 
+@Test func `public duck media volume describes automation permission needs`() {
+    #expect(!SpeakSwiftly.DuckMediaVolume.off.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.aLittle.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.default.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.aLot.requiresMediaAutomation)
+    #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Spotify"))
+    #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Music"))
+}
+
 @Test func `public configuration supports chatterbox turbo backend`() {
     let configuration = SpeakSwiftly.Configuration(speechBackend: .chatterboxTurbo)
 
