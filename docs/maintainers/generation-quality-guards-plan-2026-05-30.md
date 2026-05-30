@@ -6,7 +6,13 @@ Tracking issue: [#83](https://github.com/gaelic-ghost/SpeakSwiftly/issues/83)
 
 ## Status
 
-Planned.
+In progress.
+
+Stage 1 trace-only telemetry has an initial implementation in the playback trace
+surface. When `SPEAKSWIFTLY_PLAYBACK_TRACE=1` is enabled, live playback now emits
+`playback_trace_generation_quality_chunk` before raw generated sample chunks are
+shaped into playback buffers. This intentionally stays inside the existing
+playback trace setup instead of adding a new generation-quality flag.
 
 This note captures the first implementation shape for detecting runaway or
 glitchy speech generations before they continue through live playback. The
@@ -89,6 +95,20 @@ Candidate metrics:
 The trace surface should preserve enough context to compare good and bad runs
 without persisting raw spoken text in normal logs.
 
+Initial trace fields:
+
+- `generated_duration_ms`
+- `total_generated_duration_ms`
+- `peak_amplitude`
+- `rms_amplitude`
+- `near_silence_ratio`
+- `clipping_ratio`
+- `non_finite_sample_count`
+- `dc_offset`
+- `zero_crossing_rate`
+- `boundary_jump`
+- `repeated_window_similarity`
+
 ### Stage 2: Warning Events
 
 Promote strong but non-fatal signals into request-scoped warning events. These
@@ -165,8 +185,10 @@ quality guards limit damage when bad tails still happen.
 
 ## Open Questions
 
-- Should trace-only quality metrics be enabled by the existing playback trace
-  flag, a new generation-quality trace flag, or both?
+- Resolved for the initial implementation: trace-only quality metrics are
+  enabled by the existing playback trace flag. Reconsider a dedicated
+  generation-quality trace flag only if the event volume becomes too noisy or
+  generated-file jobs need the same metric surface outside playback.
 - Should abort outcomes use an existing worker error code or a new
   generation-quality-specific code?
 - Should generated-file jobs receive the same quality metrics before live
@@ -176,9 +198,93 @@ quality guards limit damage when bad tails still happen.
 
 ## First Slice
 
-1. Add trace-only metrics for live generated chunks before playback scheduling.
-2. Run known-good Qwen prompts and at least one reproduced bad or suspicious
+1. Done: add trace-only metrics for live generated chunks before playback
+   scheduling.
+2. Done: extend the trace E2E suite so `playback_trace_generation_quality_chunk`
+   must appear in real worker playback trace output.
+3. Run known-good Qwen prompts and at least one reproduced bad or suspicious
    generation through the same metric surface.
-3. Record the observed metric ranges in this note or a follow-up report.
-4. Promote only the clearest signals into warnings.
-5. Design cutoff thresholds after the warning telemetry has real examples.
+4. Record the observed metric ranges in this note or a follow-up report.
+5. Promote only the clearest signals into warnings.
+6. Design cutoff thresholds after the warning telemetry has real examples.
+
+## Initial Test Commands
+
+Use the repo-maintenance E2E wrapper so the live `SpeakSwiftlyServer` service can
+unload resident models before the package-owned worker starts and reload them
+afterward:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite trace --playback-trace
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace --playback-trace
+```
+
+The wrapper calls `unload-live-service-resident-models.sh` before `swift test`
+unless `SPEAKSWIFTLY_E2E_LIVE_SERVICE_MANAGED=1` is already set. It calls
+`reload-live-service-resident-models.sh` on exit so the live service is restored
+after the test run.
+
+## Initial Observations
+
+### Known-Good Trace Capture
+
+Command:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite trace --playback-trace
+```
+
+Result:
+
+- test passed
+- the wrapper unloaded and reloaded live-service resident models
+- 60 `playback_trace_generation_quality_chunk` events were emitted for
+  `req-live-trace`
+- total generated duration was 19,200 ms
+- maximum peak amplitude was 0.593369
+- maximum RMS amplitude was 0.141917
+- maximum near-silence ratio was 0.667839
+- maximum clipping ratio was 0
+- non-finite sample count was 0
+- maximum boundary jump was 0.035428
+- repeated-window similarity ranged from -0.316463 to 0.389933
+- maximum inter-chunk gap was 642 ms
+- 7 quality chunks arrived while playback was rebuffering
+
+Early read: the trace surface is usable for collecting healthy baseline ranges.
+The known-good trace included quiet tail chunks near the end, including a final
+chunk with peak amplitude around 0.0151 and RMS around 0.00359, so near-silence
+alone should not become an abort signal. Repeated-window similarity stayed well
+below a high-repeat threshold in this run.
+
+### Deep Trace Baseline Pass
+
+Command:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace --playback-trace
+```
+
+Result:
+
+- test suite passed
+- the wrapper unloaded and reloaded live-service resident models
+- 5 real-worker deep-trace requests completed
+- 1,049 total `playback_trace_generation_quality_chunk` events were emitted
+- longest request generated 73,920 ms of audio
+- maximum peak amplitude was 0.684818
+- maximum RMS amplitude was 0.141314
+- maximum near-silence ratio was 1.0
+- maximum clipping ratio was 0
+- non-finite sample count was 0
+- maximum boundary jump was 0.094032
+- repeated-window similarity ranged from -0.444082 to 1.0
+- maximum inter-chunk gap was 843 ms
+- 98 quality chunks arrived while playback was rebuffering
+
+Early read: healthy deep-trace runs can contain chunks that are all or nearly
+all silence, and repeated-window similarity can reach 1.0 during quiet tail
+material. Warning and cutoff rules should therefore combine repeated-window
+similarity with non-silent RMS or peak evidence, duration budget overrun, and
+late-tail context instead of treating high similarity or near-silence alone as a
+failure.

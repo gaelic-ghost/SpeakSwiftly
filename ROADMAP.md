@@ -41,7 +41,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 - Milestone 29: Security Audit Hardening - Planned
-- Milestone 30: Generation Quality Telemetry And Guards - Planned
+- Milestone 30: Generation Quality Telemetry And Guards - In Progress
 
 ## Active Milestones
 
@@ -206,7 +206,7 @@ Planned
 
 ### Status
 
-Planned
+In Progress
 
 ### Scope
 
@@ -217,8 +217,8 @@ Planned
 
 ### Tickets
 
-- [ ] Add a trace-only generated-audio quality monitor for live sample chunks before playback buffer scheduling.
-- [ ] Capture per-request and per-chunk metrics such as generated duration, clipping ratio, near-silence ratio, DC offset, zero-crossing rate, repeated-window similarity, chunk cadence, and boundary jump before smoothing.
+- [x] Add a trace-only generated-audio quality monitor for live sample chunks before playback buffer scheduling.
+- [x] Capture per-request and per-chunk metrics such as generated duration, clipping ratio, near-silence ratio, DC offset, zero-crossing rate, repeated-window similarity, chunk cadence, and boundary jump before smoothing.
 - [ ] Correlate Qwen quality metrics with synthesis token/info/audio events, streaming interval, planned text chunks, prepared conditioning, and generation parameters.
 - [ ] Promote high-signal suspicious patterns into request-scoped warning events with concrete operator-facing messages.
 - [ ] Add conservative cutoff behavior for high-confidence runaway patterns after trace data proves the thresholds.
