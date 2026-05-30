@@ -235,6 +235,27 @@ unless `SPEAKSWIFTLY_E2E_LIVE_SERVICE_MANAGED=1` is already set. It calls
 `reload-live-service-resident-models.sh` on exit so the live service is restored
 after the test run.
 
+## Live Warning Inspection
+
+After this package version is adopted by the live `SpeakSwiftlyServer` service,
+inspect warning telemetry with either the worker stderr JSONL surface or Apple's
+Unified Logging tools.
+
+Useful event name:
+
+- `playback_generation_quality_warning`
+
+Useful OSLog selector:
+
+```bash
+log show --predicate 'subsystem == "com.gaelic-ghost.SpeakSwiftly" && category == "worker"' --style compact --last 1h
+```
+
+Use the stderr JSONL records when metric details are needed. Use OSLog for a
+quick operator-facing scan of whether the warning fired during live service use.
+Cutoff behavior should wait until live logs include suspicious or borderline
+examples that justify threshold tuning.
+
 ## Initial Observations
 
 ### Known-Good Trace Capture
@@ -325,3 +346,31 @@ material. Warning and cutoff rules should therefore combine repeated-window
 similarity with non-silent RMS or peak evidence, duration budget overrun, and
 late-tail context instead of treating high similarity or near-silence alone as a
 failure.
+
+### Post-Warning Deep Trace False-Positive Check
+
+Command:
+
+```bash
+sh scripts/repo-maintenance/run-e2e.sh --suite deep-trace --deep-trace --playback-trace
+```
+
+Result:
+
+- test suite passed
+- the wrapper unloaded and reloaded live-service resident models
+- 5 real-worker deep-trace requests completed
+- 1,012 total `playback_trace_generation_quality_chunk` events were emitted
+- 0 `playback_generation_quality_warning` events were emitted
+- longest request generated 71,040 ms of audio
+- maximum peak amplitude was 0.914212
+- maximum RMS amplitude was 0.162068
+- maximum near-silence ratio was 1.0
+- maximum clipping ratio was 0
+- non-finite sample count was 0
+- maximum repeated-window similarity was 0.695987
+
+Early read: the initial warning thresholds did not false-positive on the
+post-warning healthy deep-trace suite. The remaining issue #83 work should be
+driven by live-service warning logs or reproduced suspicious generations, then
+cutoff behavior can be designed from those concrete examples.
