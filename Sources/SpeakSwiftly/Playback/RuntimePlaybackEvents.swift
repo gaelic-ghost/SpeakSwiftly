@@ -183,6 +183,25 @@ extension SpeakSwiftly.Runtime {
                 if let gapMS = trace.gapMS { details["gap_ms"] = .int(gapMS) }
                 if let isRebuffering = trace.isRebuffering { details["is_rebuffering"] = .bool(isRebuffering) }
                 if let fadeInApplied = trace.fadeInApplied { details["fade_in_applied"] = .bool(fadeInApplied) }
+                if let quality = trace.generatedAudioQuality {
+                    details["quality_chunk_index"] = .int(quality.chunkIndex)
+                    details["quality_sample_count"] = .int(quality.sampleCount)
+                    details["generated_duration_ms"] = .int(quality.generatedDurationMS)
+                    details["total_generated_duration_ms"] = .int(quality.totalGeneratedDurationMS)
+                    details["peak_amplitude"] = .double(quality.peakAmplitude)
+                    details["rms_amplitude"] = .double(quality.rmsAmplitude)
+                    details["near_silence_ratio"] = .double(quality.nearSilenceRatio)
+                    details["clipping_ratio"] = .double(quality.clippingRatio)
+                    details["non_finite_sample_count"] = .int(quality.nonFiniteSampleCount)
+                    details["dc_offset"] = .double(quality.dcOffset)
+                    details["zero_crossing_rate"] = .double(quality.zeroCrossingRate)
+                    if let boundaryJump = quality.boundaryJump {
+                        details["boundary_jump"] = .double(boundaryJump)
+                    }
+                    if let repeatedWindowSimilarity = quality.repeatedWindowSimilarity {
+                        details["repeated_window_similarity"] = .double(repeatedWindowSimilarity)
+                    }
+                }
                 await logRequestEvent(
                     "playback_trace_\(trace.name)",
                     requestID: id,

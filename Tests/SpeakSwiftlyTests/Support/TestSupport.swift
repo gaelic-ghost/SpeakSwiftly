@@ -468,6 +468,37 @@ final class PlaybackSpy: @unchecked Sendable {
                         await onEvent(
                             .trace(
                                 PlaybackTraceEvent(
+                                    name: "generation_quality_chunk",
+                                    chunkIndex: 1,
+                                    bufferIndex: nil,
+                                    sampleCount: 9600,
+                                    durationMS: 400,
+                                    queuedAudioBeforeMS: 0,
+                                    queuedAudioAfterMS: 400,
+                                    gapMS: nil,
+                                    isRebuffering: false,
+                                    fadeInApplied: true,
+                                    generatedAudioQuality: GeneratedAudioQualityObservation(
+                                        chunkIndex: 1,
+                                        sampleCount: 9600,
+                                        generatedDurationMS: 400,
+                                        totalGeneratedDurationMS: 400,
+                                        peakAmplitude: 0.31,
+                                        rmsAmplitude: 0.18,
+                                        nearSilenceRatio: 0.04,
+                                        clippingRatio: 0.002,
+                                        nonFiniteSampleCount: 0,
+                                        dcOffset: 0.01,
+                                        zeroCrossingRate: 0.22,
+                                        boundaryJump: nil,
+                                        repeatedWindowSimilarity: nil,
+                                    ),
+                                ),
+                            ),
+                        )
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
                                     name: "chunk_received",
                                     chunkIndex: 1,
                                     bufferIndex: nil,

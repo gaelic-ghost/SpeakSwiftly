@@ -29,6 +29,38 @@ private actor EnvironmentEventRecorder {
     #expect(samples.allSatisfy { $0.isFinite && abs($0) <= 0.14 })
 }
 
+@Test func `generated audio quality monitor records raw chunk shape before sample shaping`() {
+    var monitor = GeneratedAudioQualityMonitor(sampleRate: 4, repeatedWindowSampleCount: 4)
+
+    let first = monitor.observe(
+        samples: [0, 0.5, -0.5, 1.2, .nan, -1],
+        chunkIndex: 1,
+    )
+
+    #expect(first.chunkIndex == 1)
+    #expect(first.sampleCount == 6)
+    #expect(first.generatedDurationMS == 1500)
+    #expect(first.totalGeneratedDurationMS == 1500)
+    #expect(first.nonFiniteSampleCount == 1)
+    #expect(abs(first.peakAmplitude - 1.2) < 0.000_1)
+    #expect(abs(first.rmsAmplitude - 0.766_8) < 0.000_1)
+    #expect(abs(first.nearSilenceRatio - (1.0 / 6.0)) < 0.000_1)
+    #expect(abs(first.clippingRatio - (2.0 / 6.0)) < 0.000_1)
+    #expect(abs(first.dcOffset - 0.04) < 0.000_1)
+    #expect(abs(first.zeroCrossingRate - 1.0) < 0.000_1)
+    #expect(first.boundaryJump == nil)
+    #expect(first.repeatedWindowSimilarity == nil)
+
+    let second = monitor.observe(
+        samples: [0, 0.5, -0.5, 1.2, 0, -1],
+        chunkIndex: 2,
+    )
+
+    #expect(second.totalGeneratedDurationMS == 3000)
+    #expect(abs((second.boundaryJump ?? 0) - 1.0) < 0.000_1)
+    #expect(abs((second.repeatedWindowSimilarity ?? 0) - 1.0) < 0.000_1)
+}
+
 @MainActor
 @Test func `playback drain waiter clears stored continuation when cancelled`() async throws {
     let driver = AudioPlaybackDriver()

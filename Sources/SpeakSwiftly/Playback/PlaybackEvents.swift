@@ -44,4 +44,31 @@ struct PlaybackTraceEvent {
     let gapMS: Int?
     let isRebuffering: Bool?
     let fadeInApplied: Bool?
+    let generatedAudioQuality: GeneratedAudioQualityObservation?
+
+    init(
+        name: String,
+        chunkIndex: Int?,
+        bufferIndex: Int?,
+        sampleCount: Int?,
+        durationMS: Int?,
+        queuedAudioBeforeMS: Int?,
+        queuedAudioAfterMS: Int?,
+        gapMS: Int?,
+        isRebuffering: Bool?,
+        fadeInApplied: Bool?,
+        generatedAudioQuality: GeneratedAudioQualityObservation? = nil,
+    ) {
+        self.name = name
+        self.chunkIndex = chunkIndex
+        self.bufferIndex = bufferIndex
+        self.sampleCount = sampleCount
+        self.durationMS = durationMS
+        self.queuedAudioBeforeMS = queuedAudioBeforeMS
+        self.queuedAudioAfterMS = queuedAudioAfterMS
+        self.gapMS = gapMS
+        self.isRebuffering = isRebuffering
+        self.fadeInApplied = fadeInApplied
+        self.generatedAudioQuality = generatedAudioQuality
+    }
 }
