@@ -105,6 +105,8 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                 var pendingSampleCount = 0
                 var lastChunkAt: Date?
                 var previousTrailingSample: Float?
+                var generatedAudioQualityMonitor = GeneratedAudioQualityMonitor(sampleRate: sampleRate)
+                var emittedGenerationQualityWarningReasons = Set<GeneratedAudioQualityWarningReason>()
 
                 func bufferedAudioMS() -> Int {
                     Int((Double(pendingSampleCount) / sampleRate * 1000).rounded())
@@ -137,6 +139,14 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                         }
                     }
                     lastChunkAt = now
+                    let qualityObservation = generatedAudioQualityMonitor.observe(
+                        samples: chunk,
+                        chunkIndex: chunkCount,
+                    )
+                    if let warning = generatedAudioQualityMonitor.warning(for: qualityObservation),
+                       emittedGenerationQualityWarningReasons.insert(warning.reason).inserted {
+                        await onEvent(.generationQualityWarning(warning))
+                    }
 
                     if let firstSample = chunk.first, let lastSample = chunk.last {
                         let leadingAbs = Double(abs(firstSample))
@@ -169,6 +179,23 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                         await onEvent(
                             .trace(
                                 PlaybackTraceEvent(
+                                    name: "generation_quality_chunk",
+                                    chunkIndex: chunkCount,
+                                    bufferIndex: nil,
+                                    sampleCount: chunk.count,
+                                    durationMS: Int((Double(chunk.count) / sampleRate * 1000).rounded()),
+                                    queuedAudioBeforeMS: nil,
+                                    queuedAudioAfterMS: bufferedAudioMS(),
+                                    gapMS: maxInterChunkGapMS,
+                                    isRebuffering: false,
+                                    fadeInApplied: chunkCount == 1,
+                                    generatedAudioQuality: qualityObservation,
+                                ),
+                            ),
+                        )
+                        await onEvent(
+                            .trace(
+                                PlaybackTraceEvent(
                                     name: "chunk_received",
                                     chunkIndex: chunkCount,
                                     bufferIndex: nil,
@@ -179,6 +206,7 @@ final class AnyPlaybackDriver: @unchecked Sendable {
                                     gapMS: maxInterChunkGapMS,
                                     isRebuffering: false,
                                     fadeInApplied: chunkCount == 1,
+                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )

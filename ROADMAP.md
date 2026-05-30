@@ -30,6 +30,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
 - [Milestone 29: Security Audit Hardening](#milestone-29-security-audit-hardening)
+- [Milestone 30: Generation Quality Telemetry And Guards](#milestone-30-generation-quality-telemetry-and-guards)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -40,6 +41,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 - Milestone 29: Security Audit Hardening - Planned
+- Milestone 30: Generation Quality Telemetry And Guards - In Progress
 
 ## Active Milestones
 
@@ -199,6 +201,37 @@ Planned
 - [ ] All reportable audit findings are fixed or intentionally accepted with durable rationale.
 - [ ] Deferred storage hardening rows have either package-level validation or a documented reason they remain trusted-resource assumptions.
 - [ ] Downstream host exposure has been reviewed so local trusted-caller APIs are not accidentally treated as unauthenticated multi-client controls.
+
+## Milestone 30: Generation Quality Telemetry And Guards
+
+### Status
+
+In Progress
+
+### Scope
+
+- [ ] Improve generation-quality telemetry so live playback can distinguish healthy buffer delivery from suspicious or runaway generated audio. ([#83](https://github.com/gaelic-ghost/SpeakSwiftly/issues/83))
+- [ ] Start with Qwen3 live generation while keeping audio-derived metrics reusable across backends.
+- [ ] Prefer a staged rollout: trace-only metrics first, warning events second, conservative cutoff behavior only after thresholds have evidence.
+- [ ] Keep the first guard point before generated sample chunks are scheduled into `AVAudioPlayerNode`, with playback drain and rebuffer telemetry as supporting evidence.
+
+### Tickets
+
+- [x] Add a trace-only generated-audio quality monitor for live sample chunks before playback buffer scheduling.
+- [x] Capture per-request and per-chunk metrics such as generated duration, clipping ratio, near-silence ratio, DC offset, zero-crossing rate, repeated-window similarity, chunk cadence, and boundary jump before smoothing.
+- [ ] Correlate Qwen quality metrics with synthesis token/info/audio events, streaming interval, planned text chunks, prepared conditioning, and generation parameters.
+- [x] Promote high-signal suspicious patterns into request-scoped warning events with concrete operator-facing messages.
+- [ ] Collect warning telemetry from live-service use before enabling any cutoff behavior, especially `playback_generation_quality_warning` events from real Qwen usage.
+- [ ] Use collected warning logs to tune thresholds and decide whether duration-budget, repeated-window, clipping, DC-offset, or non-finite-sample signals need different severities.
+- [ ] Add conservative cutoff behavior for high-confidence runaway patterns after trace data proves the thresholds.
+- [ ] Keep raw spoken request text out of normal quality logs while preserving enough context for debugging.
+- [ ] Use `docs/maintainers/generation-quality-guards-plan-2026-05-30.md` and `docs/maintainers/qwen-sampling-headroom-report-2026-04-24.md` as the initial planning notes for the implementation pass.
+
+### Exit Criteria
+
+- [ ] Maintainers can inspect generation-quality metrics for live Qwen requests without relying on listening alone.
+- [ ] Suspicious generation patterns produce clear warnings before any hard cutoff is enabled.
+- [ ] High-confidence runaway generations can be cancelled with a specific failure reason instead of being allowed to continue indefinitely.
 
 ## Backlog Candidates
 

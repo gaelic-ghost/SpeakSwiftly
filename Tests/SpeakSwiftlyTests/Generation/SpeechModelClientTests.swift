@@ -1006,12 +1006,13 @@ private actor ProfileModelLoadObservation {
         sampleRate: 24000,
         canonicalAudioData: Data([0x01, 0x02]),
     )
+    let residentModel = makeResidentModel(chunkCount: 2)
 
     let runtime = try await makeRuntime(
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(behavior: .emitObservabilityBurst),
-        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
+        residentModelLoader: { _ in residentModel },
     )
 
     await runtime.start()
@@ -1027,19 +1028,46 @@ private actor ProfileModelLoadObservation {
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             $0["event"] as? String == "playback_chunk_gap_warning"
+                && $0["level"] as? String == "warning"
                 && $0["request_id"] as? String == "req-1"
         }
     })
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             $0["event"] as? String == "playback_schedule_gap_warning"
+                && $0["level"] as? String == "warning"
                 && $0["request_id"] as? String == "req-1"
         }
     })
     #expect(await waitUntil {
         output.containsStderrJSONObject {
             $0["event"] as? String == "playback_rebuffer_thrash_warning"
+                && $0["level"] as? String == "warning"
                 && $0["request_id"] as? String == "req-1"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_generation_quality_warning",
+                $0["level"] as? String == "warning",
+                $0["request_id"] as? String == "req-1",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["reason"] as? String == "repeated_non_silent_window"
+                && details["quality_chunk_index"] as? Int == 2
+                && details["total_generated_duration_ms"] as? Int == 12000
+                && details["repeated_window_similarity"] as? Double == 0.998
+        }
+    })
+    #expect(await waitUntil {
+        output.containsSystemLogEvent {
+            $0.event == "playback_generation_quality_warning"
+                && $0.level == .warning
+                && $0.requestID == "req-1"
         }
     })
     #expect(await waitUntil {
@@ -1060,6 +1088,23 @@ private actor ProfileModelLoadObservation {
         output.containsStderrJSONObject {
             $0["event"] as? String == "playback_trace_chunk_received"
                 && $0["request_id"] as? String == "req-1"
+        }
+    })
+    #expect(await waitUntil {
+        output.containsStderrJSONObject {
+            guard
+                $0["event"] as? String == "playback_trace_generation_quality_chunk",
+                $0["request_id"] as? String == "req-1",
+                let details = $0["details"] as? [String: Any]
+            else {
+                return false
+            }
+
+            return details["generated_duration_ms"] as? Int == 400
+                && details["total_generated_duration_ms"] as? Int == 400
+                && details["non_finite_sample_count"] as? Int == 0
+                && details["peak_amplitude"] as? Double == 0.31
+                && details["near_silence_ratio"] as? Double == 0.04
         }
     })
     #expect(await waitUntil {

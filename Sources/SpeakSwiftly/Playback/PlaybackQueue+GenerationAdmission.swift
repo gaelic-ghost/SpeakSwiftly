@@ -237,6 +237,7 @@ extension PlaybackQueue {
                  .chunkGapWarning,
                  .scheduleGapWarning,
                  .rebufferThrashWarning,
+                 .generationQualityWarning,
                  .outputDeviceChanged,
                  .engineConfigurationChanged,
                  .bufferShapeSummary:

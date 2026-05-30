@@ -40,6 +40,33 @@ struct TraceCaptureE2ETests {
             $0["event"] as? String == "playback_trace_chunk_received"
                 && $0["request_id"] as? String == "req-live-trace"
         } != nil)
+        let qualityTrace = try #require(
+            try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
+                guard
+                    $0["event"] as? String == "playback_trace_generation_quality_chunk",
+                    $0["request_id"] as? String == "req-live-trace",
+                    let details = $0["details"] as? [String: Any]
+                else {
+                    return false
+                }
+
+                return details["sample_count"] as? Int != nil
+                    && details["generated_duration_ms"] as? Int != nil
+                    && details["total_generated_duration_ms"] as? Int != nil
+                    && details["peak_amplitude"] as? Double != nil
+                    && details["rms_amplitude"] as? Double != nil
+                    && details["near_silence_ratio"] as? Double != nil
+                    && details["clipping_ratio"] as? Double != nil
+                    && details["non_finite_sample_count"] as? Int != nil
+                    && details["dc_offset"] as? Double != nil
+                    && details["zero_crossing_rate"] as? Double != nil
+            },
+        )
+        let qualityDetails = try #require(qualityTrace["details"] as? [String: Any])
+        #expect((qualityDetails["sample_count"] as? Int ?? 0) > 0)
+        #expect((qualityDetails["generated_duration_ms"] as? Int ?? 0) > 0)
+        #expect((qualityDetails["total_generated_duration_ms"] as? Int ?? 0) > 0)
+        #expect(qualityDetails["non_finite_sample_count"] as? Int == 0)
         #expect(try await worker.waitForStderrJSONObject(timeout: E2EHarness.e2eTimeout) {
             $0["event"] as? String == "playback_trace_buffer_scheduled"
                 && $0["request_id"] as? String == "req-live-trace"

@@ -235,6 +235,7 @@ extension SpeakSwiftly.Runtime {
 
     func logRequestEvent(
         _ event: String,
+        level: LogLevel = .info,
         requestID: String,
         op: String?,
         profileName: String? = nil,
@@ -243,6 +244,7 @@ extension SpeakSwiftly.Runtime {
     ) async {
         await logEvent(
             event,
+            level: level,
             requestID: requestID,
             op: op,
             profileName: profileName,
@@ -318,6 +320,7 @@ extension SpeakSwiftly.Runtime {
                 errorDescription: error.localizedDescription,
             ))
         }
+        dependencies.writeSystemLog(logEvent)
     }
 
     func elapsedMS(for requestID: String) -> Int? {
