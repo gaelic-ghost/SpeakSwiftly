@@ -51,8 +51,6 @@
 
 ## Follow-Up Before Final v11.0.0
 
-- Remove stale Marvis and Chatterbox E2E lanes and validation-lane references
-  instead of leaving skipped legacy coverage.
 - Wire real HTTP response streaming and LAN transport send/receive behavior.
 - Add `generate.audioStream(...)` after the host boundary can return a
   successful chunk stream instead of a failed request handle.

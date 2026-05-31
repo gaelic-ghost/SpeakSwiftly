@@ -119,34 +119,36 @@ Superseded by Milestone 32
 
 - [x] Stop investing in Marvis playback tuning for the vNext package line.
 - [x] Replace the Marvis investigation path with a Qwen-only output modularization pass.
-- [ ] Preserve the historical notes below as context for why Marvis is being removed instead of tuned further.
+- [x] Preserve the historical notes below as context for why Marvis is being removed instead of tuned further.
 
 ### Tickets
 
 - [x] Decide that Marvis is outside the vNext supported backend set.
-- [ ] Remove stale Marvis validation-lane and release-hardening references while preserving older release notes as history.
-- [ ] Keep removed backend values rejected clearly so persisted configs and worker requests fail with descriptive unsupported-backend errors.
+- [x] Remove stale Marvis validation-lane and release-hardening references while preserving older release notes as history.
+- [x] Keep removed backend values rejected clearly so persisted configs and worker requests fail with descriptive unsupported-backend errors.
 
 ### Stage Notes
 
 - Earlier Milestone 22 work explored overlap-specific thresholds, cadence tweaks, and queue-admission changes in detail.
-- The current 2026-04-22 steady state is intentionally simpler:
+- The 2026-04-22 steady state was intentionally simpler:
   - Marvis generation is serialized
   - the default resident policy is `single_resident_dynamic`
-  - a benchmark now exists for `dual_resident_serialized` versus `single_resident_dynamic`
+  - a benchmark existed for `dual_resident_serialized` versus `single_resident_dynamic`
   - all live Marvis playback uses one conservative startup profile
-  - the current live cadence matches the upstream Marvis `0.5s` path
-- The current read after the latest audible runs is:
+  - the live cadence matched the upstream Marvis `0.5s` path
+- The durable read after those audible runs is:
   - local overlap complexity was not the main problem
   - simplifying the runtime improved consistency, especially for later queued requests
   - even after that simplification, audible Marvis still tends to rebuffer
-  - the next useful work is upstream and reference-path investigation, not rebuilding the old overlap model
+  - the next useful work would have been upstream and reference-path investigation, not rebuilding the old overlap model
+- The vNext decision supersedes that investigation: Marvis is removed instead
+  of tuned further, and active generation work is Qwen-only.
 
 ### Exit Criteria
 
-- [ ] vNext documentation names Qwen3 as the only supported generation family.
-- [ ] Removed Marvis and Chatterbox values fail clearly in typed config and worker request tests.
-- [ ] Historical Marvis tuning notes remain separated from active prerelease work.
+- [x] vNext documentation names Qwen3 as the only supported generation family.
+- [x] Removed Marvis and Chatterbox values fail clearly in typed config and worker request tests.
+- [x] Historical Marvis tuning notes remain separated from active prerelease work.
 
 ## Milestone 26: Pre-v1 Release Hardening
 
@@ -290,7 +292,7 @@ In Progress
 - [ ] Add `generate.audioStream(...)` only after the host boundary can return a successful chunk stream instead of a failed request handle.
 - [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
 - [x] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
-- [ ] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
+- [x] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
 - [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
 - [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.
 
@@ -333,8 +335,8 @@ In Progress
 - Milestone 13 was condensed out of Active Milestones after a second audit confirmed the package already has SemVer Git tags, GitHub SwiftPM dependency documentation, `.spi.yml`, a live Swift Package Index page, and a real adjacent Swift package consumer in `SpeakSwiftlyServer` using `https://github.com/gaelic-ghost/SpeakSwiftly.git` from `4.2.0`.
 - Milestone 17 was moved out of Active Milestones because notification-linked priority playback has no current issue, implementation branch, or package-ownership decision. It remains a backlog candidate only.
 - Milestone 18 was narrowed during this audit to documentation work that depended on still-open runtime observation decisions. That remaining docs work was later closed out in the 2026-05-03 Milestone 9 closeout entry above.
-- Milestone 22 was narrowed to the Marvis work that still needs fresh target-machine evidence: resident-policy benchmark results, #13 reproduction or closure, and an evidence-backed decision about whether remaining instability belongs to upstream generation throughput, local wrapper behavior, playback policy, or machine pressure. The completed Marvis-reference comparison no longer appears as open active work.
-- Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path and has Qwen plus Chatterbox E2E coverage for provided and inferred transcripts.
+- Milestone 22 was later superseded by the vNext Qwen-only decision. Its remaining Marvis tuning questions are preserved as historical context, not active release-hardening work.
+- Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path. Earlier multi-backend E2E coverage is historical; the vNext supported generation family is Qwen-only.
 
 ### 2026-05-03 roadmap accuracy audit
 
@@ -425,7 +427,9 @@ These notes were archived and removed as standalone maintainer docs because they
 - `docs/maintainers/playback-metrics-review-2026-04-08.md`
   Result: the main lesson was to treat playback truth as controller-owned and to keep tuning grounded in trace metrics, now tracked in milestone 22 plus the completed playback-architecture cleanup history below.
 - `docs/maintainers/queued-marvis-playback-state-review-2026-04-08.md`
-  Result: the immediate controller-owned playback-state fix landed, the architecture cleanup landed, and the remaining follow-up is now first-request Marvis tuning.
+  Result: the immediate controller-owned playback-state fix landed and the
+  architecture cleanup landed. The later vNext Qwen-only decision superseded
+  the remaining first-request Marvis tuning follow-up.
 - `docs/maintainers/playback-forensics-2026-04-02.md`
   Result: early playback-threshold and adaptive-buffer tuning logs are now historical context rather than active guidance.
 
