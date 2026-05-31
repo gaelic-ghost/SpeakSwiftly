@@ -457,6 +457,7 @@ def run_w8a8_quantization(
   replace_existing: bool,
   calibration_op_group_size: int,
   activation_scope: str,
+  activation_op_types: list[str] | None,
   baseline_output: np.ndarray | None,
   candidate_label: str | None,
 ) -> dict[str, Any]:
@@ -469,13 +470,13 @@ def run_w8a8_quantization(
     activation_config = cto.coreml.OptimizationConfig(global_config=activation_quantizer_config)
     scoped_op_types: list[str] = []
   elif activation_scope == "compute_only":
+    scoped_op_types = activation_op_types or COMPUTE_ONLY_ACTIVATION_OP_TYPES
     activation_config = cto.coreml.OptimizationConfig(
       op_type_configs={
         op_type: activation_quantizer_config
-        for op_type in COMPUTE_ONLY_ACTIVATION_OP_TYPES
+        for op_type in scoped_op_types
       }
     )
-    scoped_op_types = COMPUTE_ONLY_ACTIVATION_OP_TYPES
   else:
     raise RuntimeError(f"Unsupported activation scope '{activation_scope}'.")
 
@@ -715,6 +716,7 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
             args.replace_existing,
             group_size,
             args.activation_scope,
+            args.activation_op_types,
             baseline_output,
             args.candidate_label,
           )
@@ -730,6 +732,7 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
           "error_type": type(error).__name__,
           "error_message": str(error),
           "activation_scope": args.activation_scope,
+          "activation_op_types": args.activation_op_types,
           "candidate_label": args.candidate_label,
         }
       )
@@ -775,6 +778,15 @@ def parse_args() -> argparse.Namespace:
     "--activation-scope",
     default="global",
     choices=["global", "compute_only"],
+  )
+  parser.add_argument(
+    "--activation-op-types",
+    nargs="+",
+    default=None,
+    help=(
+      "Override compute_only activation op type scope. "
+      "Defaults to conv linear matmul conv_transpose."
+    ),
   )
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output", type=Path, default=None)

@@ -1804,6 +1804,48 @@ Interpretation:
 - This strengthens the case for either narrower activation scopes or supervised
   decoder alignment before any Instruments dispatch work.
 
+### 2026-05-31 Per-Op Activation Scope Probe, Pass 1
+
+The quantization probe now accepts `--activation-op-types` for compute-only W8A8
+runs. This keeps the integer `audio_codes` path unquantized while allowing
+narrow op-family candidates inside the decoder.
+
+All candidates below used:
+
+- bucket: 72
+- sample source: Qwen talker-code fixture
+- calibration samples: `prompt-000` and `prompt-001`
+- group size: 16
+- baseline: bucket-72 fp16 Core ML package
+
+Results:
+
+| Candidate | Activation ops | Mean diff | Max diff | Package size |
+| --- | --- | ---: | ---: | ---: |
+| broad compute | `conv`, `linear`, `matmul`, `conv_transpose` | `0.01180611178278923` | `0.29174041748046875` | `114813284` |
+| transformer-ish | `linear`, `matmul` | `0.006306670140475035` | `0.2249908447265625` | `114769327` |
+| convolutional | `conv`, `conv_transpose` | `0.011072450317442417` | `0.22833251953125` | `114742359` |
+| no transposed conv | `conv`, `linear`, `matmul` | `0.011485190130770206` | `0.3626708984375` | `114813284` |
+
+Interpretation:
+
+- The best current W8A8 scope is `linear` + `matmul`, which cuts mean absolute
+  diff roughly in half versus the broad compute scope.
+- Convolutional activation quantization remains near the broader drift level.
+  This points at the decoder convolution/upsampling path as the fragile region
+  to leave in fp16 for now.
+- Excluding only `conv_transpose` did not help, so ordinary `conv` activation
+  quantization is also suspect.
+- The `linear` + `matmul` candidate still needs audio inspection and listening
+  before it can be treated as acceptable.
+
+Operational note:
+
+- Repeated Core ML package compile/predict runs grew the local e5rt cache to
+  about 20 GB and one candidate emitted a BNNS cache "No space left on device"
+  warning even though the report saved prediction metrics. Clear the e5rt cache
+  before more Core ML candidate batches.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

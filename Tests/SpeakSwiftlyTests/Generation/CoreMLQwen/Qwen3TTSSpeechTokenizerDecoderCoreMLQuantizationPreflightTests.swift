@@ -180,6 +180,40 @@ import Testing
     #expect((result.outputMatch?.meanAbsDiff ?? 0.0) > 0.011)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder bucket 72 per op scopes identify lower drift candidate`() throws {
+    let broad = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-72-fp16-talker-qwen3-group-16-12hz.json",
+    )
+    let linearMatmul = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-72-fp16-talker-qwen3-linear-matmul-group-16-12hz.json",
+    )
+    let convolutional = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-72-fp16-talker-qwen3-conv-convtranspose-group-16-12hz.json",
+    )
+    let noConvTranspose = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-72-fp16-talker-qwen3-no-convtranspose-group-16-12hz.json",
+    )
+
+    let broadResult = try #require(broad.runtime.results.first)
+    let linearMatmulResult = try #require(linearMatmul.runtime.results.first)
+    let convolutionalResult = try #require(convolutional.runtime.results.first)
+    let noConvTransposeResult = try #require(noConvTranspose.runtime.results.first)
+
+    #expect(linearMatmulResult.activationOpTypes == ["linear", "matmul"])
+    #expect(convolutionalResult.activationOpTypes == ["conv", "conv_transpose"])
+    #expect(noConvTransposeResult.activationOpTypes == ["conv", "linear", "matmul"])
+    let broadMeanDiff = try #require(broadResult.outputMatch?.meanAbsDiff)
+    let linearMatmulMeanDiff = try #require(linearMatmulResult.outputMatch?.meanAbsDiff)
+    let convolutionalMeanDiff = try #require(convolutionalResult.outputMatch?.meanAbsDiff)
+    let noConvTransposeMeanDiff = try #require(noConvTransposeResult.outputMatch?.meanAbsDiff)
+    #expect(linearMatmulMeanDiff < broadMeanDiff)
+    #expect(linearMatmulMeanDiff < convolutionalMeanDiff)
+    #expect(linearMatmulMeanDiff < noConvTransposeMeanDiff)
+    #expect(linearMatmulMeanDiff < 0.0064)
+    #expect(convolutionalMeanDiff > 0.011)
+    #expect(noConvTransposeMeanDiff > 0.011)
+}
+
 @Test func `qwen3 tts speech tokenizer decoder diverse calibration does not clear valid audio drift`() throws {
     let original = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
         "speech-tokenizer-decoder-coreml-audio-inspection-bucket-40-w8a8-12hz.json",
