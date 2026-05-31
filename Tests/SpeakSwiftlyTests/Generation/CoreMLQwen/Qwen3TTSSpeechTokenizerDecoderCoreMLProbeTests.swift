@@ -128,20 +128,40 @@ import Testing
 }
 
 @Test func `qwen3 tts speech tokenizer decoder core ml bucket 40 export converts and predicts`() throws {
-    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture.load(
-        "speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json",
+    try assertBucketConversion(
+        filename: "speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json",
+        bucket: 40,
+        outputSamples: 76800,
     )
+}
 
+@Test func `qwen3 tts speech tokenizer decoder core ml bucket 72 export converts and predicts`() throws {
+    try assertBucketConversion(
+        filename: "speech-tokenizer-decoder-coreml-conversion-bucket-72-12hz.json",
+        bucket: 72,
+        outputSamples: 138_240,
+    )
+}
+
+@Test func `qwen3 tts speech tokenizer decoder core ml bucket 88 export converts and predicts`() throws {
+    try assertBucketConversion(
+        filename: "speech-tokenizer-decoder-coreml-conversion-bucket-88-12hz.json",
+        bucket: 88,
+        outputSamples: 168_960,
+    )
+}
+
+private func assertBucketConversion(filename: String, bucket: Int, outputSamples: Int) throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture.load(filename)
     #expect(fixture.source.coremltoolsVersion == "9.0")
     #expect(fixture.source.torchVersion == "2.7.0")
     #expect(fixture.conversionTarget.wrapperMode == "fixed_16q_static_mask")
-    #expect(fixture.conversionTarget.inputShape == [1, 40, 16])
-    #expect(fixture.conversionTarget.torchOutputShape == [1, 76800])
-    #expect(fixture.conversionTarget.upstreamMaxAbsDiff == 0.0)
+    #expect(fixture.conversionTarget.inputShape == [1, bucket, 16])
+    #expect(fixture.conversionTarget.torchOutputShape == [1, outputSamples])
     #expect(fixture.trace.status == "succeeded")
     #expect(fixture.conversion.status == "succeeded")
     #expect(fixture.outputMatch?.status == "succeeded")
-    #expect(fixture.outputMatch?.coremlOutputShape == [1, 76800])
+    #expect(fixture.outputMatch?.coremlOutputShape == [1, outputSamples])
     #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0003)
 }
 

@@ -1038,11 +1038,25 @@ Validation:
 - Bucket-40 CPU-only Core ML prediction returned output shape `[1, 76800]`
   with max absolute difference `0.00019849836826324463` from the PyTorch
   wrapper output.
+- Bucket-72 runtime conversion also succeeded with CPU-only Core ML output shape
+  `[1, 138240]` and max absolute difference `0.00019851326942443848` from the
+  PyTorch wrapper output.
+- Bucket-88 runtime conversion also succeeded with CPU-only Core ML output shape
+  `[1, 168960]` and max absolute difference `0.00019818544387817383` from the
+  PyTorch wrapper output.
 - The bucket-40 local `.mlpackage` disk footprint is about 436 MB, matching the
   original 8-step package closely enough to confirm weights dominate package
-  size for these fixed decoder shapes.
+  size for these fixed decoder shapes. Bucket 72 and bucket 88 had the same
+  approximate 436 MB local disk footprint.
 - Added checked-in bucket-40 conversion report:
   `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json`.
+- Added checked-in bucket-72 and bucket-88 conversion reports:
+  `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-72-12hz.json`
+  and
+  `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-88-12hz.json`.
+- The first representative decoder shape set is now complete. The next W8A8
+  step can load bucket-specific packages and build calibration sample data from
+  the real LibriTTS-R code tensors assigned to each bucket.
 
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
