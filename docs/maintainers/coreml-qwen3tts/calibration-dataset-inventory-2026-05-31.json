@@ -1,0 +1,969 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "coreml_calibration_dataset_inventory",
+  "purpose": "Identify open speech datasets for Qwen3-TTS Core ML calibration. Decoder calibration can start from audio encoded through the Qwen3 12 Hz speech tokenizer; full-stack W8A8 calibration will need representative text, generated code histories, and reference-conditioning cases.",
+  "calibration_scope": {
+    "current_graph": "12 Hz speech-tokenizer decoder only",
+    "current_input": "audio_codes shaped batch x code_steps x 16 codebooks",
+    "not_yet_covered": [
+      "text tokenizer",
+      "main Qwen3-TTS autoregressive talker",
+      "code predictor",
+      "speaker embedding and reference conditioning",
+      "speech-tokenizer encoder"
+    ]
+  },
+  "candidate_policy": {
+    "prefer": [
+      "permissive license",
+      "24 kHz speech to match Qwen3 tokenizer sample rate",
+      "speaker ids for diversity sampling",
+      "transcripts for later full-stack calibration",
+      "small clean split for first local pass"
+    ],
+    "avoid_for_first_pass": [
+      "gated datasets",
+      "unknown license",
+      "very large downloads before the sampler is proven",
+      "datasets with no audio preview in the Dataset Viewer"
+    ]
+  },
+  "candidates": [
+    {
+      "dataset": "mythicinfinity/libritts_r",
+      "config": "clean",
+      "split": "train.clean.100",
+      "role": "primary_decoder_calibration",
+      "reason": "24 kHz English TTS-oriented speech with transcripts and speaker ids.",
+      "hub_url": "https://hf.co/datasets/mythicinfinity/libritts_r",
+      "dataset_server": {
+        "splits_status": "succeeded",
+        "first_rows_status": "succeeded"
+      },
+      "available": true,
+      "available_splits": [
+        {
+          "config": "all",
+          "split": "dev.clean"
+        },
+        {
+          "config": "all",
+          "split": "dev.other"
+        },
+        {
+          "config": "all",
+          "split": "test.clean"
+        },
+        {
+          "config": "all",
+          "split": "test.other"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "all",
+          "split": "train.other.500"
+        },
+        {
+          "config": "clean",
+          "split": "dev.clean"
+        },
+        {
+          "config": "clean",
+          "split": "test.clean"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "dev",
+          "split": "dev.clean"
+        },
+        {
+          "config": "other",
+          "split": "dev.other"
+        },
+        {
+          "config": "other",
+          "split": "test.other"
+        },
+        {
+          "config": "other",
+          "split": "train.other.500"
+        }
+      ],
+      "features": [
+        {
+          "feature_idx": 0,
+          "name": "audio",
+          "type": {
+            "sampling_rate": 24000,
+            "_type": "Audio"
+          }
+        },
+        {
+          "feature_idx": 1,
+          "name": "text_normalized",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 2,
+          "name": "text_original",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 3,
+          "name": "speaker_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 4,
+          "name": "path",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 5,
+          "name": "chapter_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 6,
+          "name": "id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        }
+      ],
+      "audio_sampling_rates": [
+        24000
+      ],
+      "string_columns": [
+        "text_normalized",
+        "text_original",
+        "speaker_id",
+        "path",
+        "chapter_id",
+        "id"
+      ],
+      "preview_rows": [
+        {
+          "row_idx": 0,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "[The moon] I gazed with a kind of wonder.",
+            "text_original": "[The moon] I gazed with a kind of wonder.",
+            "speaker_id": "730",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "358",
+            "id": "730_358_000003_000002"
+          }
+        },
+        {
+          "row_idx": 1,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+            "text_original": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+            "speaker_id": "730",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "358",
+            "id": "730_358_000004_000001"
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "parler-tts/libritts_r_filtered",
+      "config": "clean",
+      "split": "train.clean.100",
+      "role": "filtered_decoder_calibration",
+      "reason": "Filtered LibriTTS-R variant intended to remove restoration and speaker-quality problems.",
+      "hub_url": "https://hf.co/datasets/parler-tts/libritts_r_filtered",
+      "dataset_server": {
+        "splits_status": "succeeded",
+        "first_rows_status": "succeeded"
+      },
+      "available": true,
+      "available_splits": [
+        {
+          "config": "clean",
+          "split": "dev.clean"
+        },
+        {
+          "config": "clean",
+          "split": "test.clean"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "other",
+          "split": "dev.other"
+        },
+        {
+          "config": "other",
+          "split": "test.other"
+        },
+        {
+          "config": "other",
+          "split": "train.other.500"
+        }
+      ],
+      "features": [
+        {
+          "feature_idx": 0,
+          "name": "audio",
+          "type": {
+            "sampling_rate": 24000,
+            "_type": "Audio"
+          }
+        },
+        {
+          "feature_idx": 1,
+          "name": "text_normalized",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 2,
+          "name": "text_original",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 3,
+          "name": "speaker_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 4,
+          "name": "path",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 5,
+          "name": "chapter_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 6,
+          "name": "id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        }
+      ],
+      "audio_sampling_rates": [
+        24000
+      ],
+      "string_columns": [
+        "text_normalized",
+        "text_original",
+        "speaker_id",
+        "path",
+        "chapter_id",
+        "id"
+      ],
+      "preview_rows": [
+        {
+          "row_idx": 0,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "[The moon] I gazed with a kind of wonder.",
+            "text_original": "[The moon] I gazed with a kind of wonder.",
+            "speaker_id": "730",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "358",
+            "id": "730_358_000003_000002"
+          }
+        },
+        {
+          "row_idx": 1,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+            "text_original": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+            "speaker_id": "730",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "358",
+            "id": "730_358_000004_000001"
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "mythicinfinity/libritts",
+      "config": "clean",
+      "split": "train.clean.100",
+      "role": "secondary_decoder_calibration",
+      "reason": "Original 24 kHz LibriTTS baseline for comparison with restored LibriTTS-R audio.",
+      "hub_url": "https://hf.co/datasets/mythicinfinity/libritts",
+      "dataset_server": {
+        "splits_status": "succeeded",
+        "first_rows_status": "succeeded"
+      },
+      "available": true,
+      "available_splits": [
+        {
+          "config": "all",
+          "split": "dev.clean"
+        },
+        {
+          "config": "all",
+          "split": "dev.other"
+        },
+        {
+          "config": "all",
+          "split": "test.clean"
+        },
+        {
+          "config": "all",
+          "split": "test.other"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "all",
+          "split": "train.other.500"
+        },
+        {
+          "config": "clean",
+          "split": "dev.clean"
+        },
+        {
+          "config": "clean",
+          "split": "test.clean"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "clean",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "dev",
+          "split": "dev.clean"
+        },
+        {
+          "config": "other",
+          "split": "dev.other"
+        },
+        {
+          "config": "other",
+          "split": "test.other"
+        },
+        {
+          "config": "other",
+          "split": "train.other.500"
+        }
+      ],
+      "features": [
+        {
+          "feature_idx": 0,
+          "name": "audio",
+          "type": {
+            "sampling_rate": 24000,
+            "_type": "Audio"
+          }
+        },
+        {
+          "feature_idx": 1,
+          "name": "text_normalized",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 2,
+          "name": "text_original",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 3,
+          "name": "speaker_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 4,
+          "name": "path",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 5,
+          "name": "chapter_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 6,
+          "name": "id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        }
+      ],
+      "audio_sampling_rates": [
+        24000
+      ],
+      "string_columns": [
+        "text_normalized",
+        "text_original",
+        "speaker_id",
+        "path",
+        "chapter_id",
+        "id"
+      ],
+      "preview_rows": [
+        {
+          "row_idx": 0,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "His almost superhuman power of recognizing this key clew was the foundation of Christopher Quarles's success, and his solution of the mysterious burglaries which caused such speculation for a time was not the least of his achievements.",
+            "text_original": "His almost superhuman power of recognizing this key-clew was the foundation of Christopher Quarles's success, and his solution of the mysterious burglaries which caused such speculation for a time was not the least of his achievements.",
+            "speaker_id": "7190",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "90543",
+            "id": "7190_90543_000003_000000"
+          }
+        },
+        {
+          "row_idx": 1,
+          "row": {
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text_normalized": "Sir Joseph Maynard, the eminent physician of Harley Street, had given a small dinner party one evening.",
+            "text_original": "Sir Joseph Maynard, the eminent physician of Harley Street, had given a small dinner party one evening.",
+            "speaker_id": "7190",
+            "path": "<dataset-internal-path>",
+            "chapter_id": "90543",
+            "id": "7190_90543_000004_000000"
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "openslr/librispeech_asr",
+      "config": "clean",
+      "split": "train.100",
+      "role": "broad_read_speech_control",
+      "reason": "Large CC-BY English read-speech corpus, but 16 kHz and ASR-oriented.",
+      "hub_url": "https://hf.co/datasets/openslr/librispeech_asr",
+      "dataset_server": {
+        "splits_status": "succeeded",
+        "first_rows_status": "succeeded"
+      },
+      "available": true,
+      "available_splits": [
+        {
+          "config": "all",
+          "split": "test.clean"
+        },
+        {
+          "config": "all",
+          "split": "test.other"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.100"
+        },
+        {
+          "config": "all",
+          "split": "train.clean.360"
+        },
+        {
+          "config": "all",
+          "split": "train.other.500"
+        },
+        {
+          "config": "all",
+          "split": "validation.clean"
+        },
+        {
+          "config": "all",
+          "split": "validation.other"
+        },
+        {
+          "config": "clean",
+          "split": "test"
+        },
+        {
+          "config": "clean",
+          "split": "train.100"
+        },
+        {
+          "config": "clean",
+          "split": "train.360"
+        },
+        {
+          "config": "clean",
+          "split": "validation"
+        },
+        {
+          "config": "other",
+          "split": "test"
+        },
+        {
+          "config": "other",
+          "split": "train.500"
+        },
+        {
+          "config": "other",
+          "split": "validation"
+        }
+      ],
+      "features": [
+        {
+          "feature_idx": 0,
+          "name": "file",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 1,
+          "name": "audio",
+          "type": {
+            "sampling_rate": 16000,
+            "_type": "Audio"
+          }
+        },
+        {
+          "feature_idx": 2,
+          "name": "text",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 3,
+          "name": "speaker_id",
+          "type": {
+            "dtype": "int64",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 4,
+          "name": "chapter_id",
+          "type": {
+            "dtype": "int64",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 5,
+          "name": "id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        }
+      ],
+      "audio_sampling_rates": [
+        16000
+      ],
+      "string_columns": [
+        "file",
+        "text",
+        "id"
+      ],
+      "preview_rows": [
+        {
+          "row_idx": 0,
+          "row": {
+            "file": "/home/albert/.cache/huggingface/datasets/downloads/extracted/bc0d9a6ef85c2d487c9c6efbc91f8892df927c69d3f80545a668cc058d5f677e/374-180298-0000.flac",
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text": "CHAPTER SIXTEEN I MIGHT HAVE TOLD YOU OF THE BEGINNING OF THIS LIAISON IN A FEW LINES BUT I WANTED YOU TO SEE EVERY STEP BY WHICH WE CAME I TO AGREE TO WHATEVER MARGUERITE WISHED",
+            "speaker_id": 374,
+            "chapter_id": 180298,
+            "id": "374-180298-0000"
+          }
+        },
+        {
+          "row_idx": 1,
+          "row": {
+            "file": "/home/albert/.cache/huggingface/datasets/downloads/extracted/bc0d9a6ef85c2d487c9c6efbc91f8892df927c69d3f80545a668cc058d5f677e/374-180298-0001.flac",
+            "audio": [
+              {
+                "type": "audio/wav",
+                "src_available": true
+              }
+            ],
+            "text": "MARGUERITE TO BE UNABLE TO LIVE APART FROM ME IT WAS THE DAY AFTER THE EVENING WHEN SHE CAME TO SEE ME THAT I SENT HER MANON LESCAUT FROM THAT TIME SEEING THAT I COULD NOT CHANGE MY MISTRESS'S LIFE I CHANGED MY OWN",
+            "speaker_id": 374,
+            "chapter_id": 180298,
+            "id": "374-180298-0001"
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "fixie-ai/common_voice_17_0",
+      "config": "en",
+      "split": "train",
+      "role": "accent_and_speaker_diversity_control",
+      "reason": "Large English Common Voice mirror with accent, age, gender, and vote metadata.",
+      "hub_url": "https://hf.co/datasets/fixie-ai/common_voice_17_0",
+      "dataset_server": {
+        "splits_status": "succeeded",
+        "first_rows_status": "succeeded"
+      },
+      "available": true,
+      "available_splits": [
+        {
+          "config": "ar",
+          "split": "validation"
+        },
+        {
+          "config": "ar",
+          "split": "test"
+        },
+        {
+          "config": "ar",
+          "split": "train"
+        },
+        {
+          "config": "ast",
+          "split": "train"
+        },
+        {
+          "config": "ast",
+          "split": "validation"
+        },
+        {
+          "config": "ast",
+          "split": "test"
+        },
+        {
+          "config": "ast",
+          "split": "other"
+        },
+        {
+          "config": "ast",
+          "split": "invalidated"
+        },
+        {
+          "config": "ast",
+          "split": "validated"
+        },
+        {
+          "config": "be",
+          "split": "train"
+        },
+        {
+          "config": "be",
+          "split": "validation"
+        },
+        {
+          "config": "be",
+          "split": "test"
+        },
+        {
+          "config": "bg",
+          "split": "train"
+        },
+        {
+          "config": "bg",
+          "split": "validation"
+        },
+        {
+          "config": "bg",
+          "split": "test"
+        },
+        {
+          "config": "bg",
+          "split": "other"
+        },
+        {
+          "config": "bg",
+          "split": "invalidated"
+        },
+        {
+          "config": "bg",
+          "split": "validated"
+        },
+        {
+          "config": "bn",
+          "split": "train"
+        },
+        {
+          "config": "bn",
+          "split": "validation"
+        }
+      ],
+      "features": [
+        {
+          "feature_idx": 0,
+          "name": "client_id",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 1,
+          "name": "path",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 2,
+          "name": "audio",
+          "type": {
+            "sampling_rate": 48000,
+            "_type": "Audio"
+          }
+        },
+        {
+          "feature_idx": 3,
+          "name": "sentence",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 4,
+          "name": "up_votes",
+          "type": {
+            "dtype": "int64",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 5,
+          "name": "down_votes",
+          "type": {
+            "dtype": "int64",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 6,
+          "name": "age",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 7,
+          "name": "gender",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 8,
+          "name": "accent",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 9,
+          "name": "locale",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 10,
+          "name": "segment",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 11,
+          "name": "variant",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        },
+        {
+          "feature_idx": 12,
+          "name": "continuation",
+          "type": {
+            "dtype": "string",
+            "_type": "Value"
+          }
+        }
+      ],
+      "audio_sampling_rates": [
+        48000
+      ],
+      "string_columns": [
+        "client_id",
+        "path",
+        "sentence",
+        "age",
+        "gender",
+        "accent",
+        "locale",
+        "segment",
+        "variant",
+        "continuation"
+      ],
+      "preview_rows": [
+        {
+          "row_idx": 0,
+          "row": {
+            "client_id": "0b3d55acf115fdf88131d7324fa9a7e1a26542405b0671d5ec0d9ed34b40fa0158576fd51ee9cc937a41b1c529f49cfb23fec693ae1382f21ec8fed796a9dece",
+            "path": "<dataset-internal-path>",
+            "audio": [
+              {
+                "type": "audio/mpeg",
+                "src_available": true
+              }
+            ],
+            "sentence": "It was also confirmed that McClarnon is still a member of the band.",
+            "up_votes": 2,
+            "down_votes": 0,
+            "age": "twenties",
+            "gender": "female_feminine",
+            "accent": "India and South Asia (India, Pakistan, Sri Lanka)",
+            "locale": "en",
+            "segment": "",
+            "variant": "",
+            "continuation": "Despite rumors of a split, the band's social media accounts and official statement assured fans that Mcclarnon remains an integral part of the group, and they are working on new music together."
+          }
+        },
+        {
+          "row_idx": 1,
+          "row": {
+            "client_id": "c9359ac56afd8444907def4ce85b881927973c3f4a4f07a9b9d3e8d38f1b2cdae1d82047ed083e1c6351ba60fda0449e28b940300e7853cf1eae5600751efed3",
+            "path": "<dataset-internal-path>",
+            "audio": [
+              {
+                "type": "audio/mpeg",
+                "src_available": true
+              }
+            ],
+            "sentence": "He is best known for his conversion to Islam.",
+            "up_votes": 2,
+            "down_votes": 0,
+            "age": "fifties",
+            "gender": "male_masculine",
+            "accent": "United States English",
+            "locale": "en",
+            "segment": "",
+            "variant": "",
+            "continuation": "In 1977, he converted to Islam, adopting the name Malik Shabazz, and became a prominent figure in the Nation of Islam. He was a vocal advocate for African American rights and was involved in various social and political movements throughout his life."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -777,6 +777,72 @@ Validation:
   speech-tokenizer config, runtime fixtures, decoder Core ML conversion,
   decoder Core ML benchmarking, and decoder Instruments trace summaries.
 
+### 2026-05-31 Calibration Dataset Inventory, Pass 1
+
+Added a Hugging Face Dataset Viewer inventory script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/inspect-calibration-datasets.py`
+
+Added a checked-in calibration dataset inventory fixture:
+
+- `docs/maintainers/coreml-qwen3tts/calibration-dataset-inventory-2026-05-31.json`
+
+Added SwiftPM tests for the inventory fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSCalibrationDatasetInventoryTests.swift`
+
+Scope clarification:
+
+- Current converted graph: 12 Hz speech-tokenizer decoder only.
+- Current input: `audio_codes` shaped `batch x code_steps x 16 codebooks`.
+- Current graph does not include text tokenization, the main autoregressive
+  talker, the code predictor, speaker embedding, reference conditioning, or the
+  speech-tokenizer encoder.
+
+Dataset candidates:
+
+- Primary decoder-calibration candidate:
+  `mythicinfinity/libritts_r`, config `clean`, split `train.clean.100`.
+- Filtered decoder-calibration candidate:
+  `parler-tts/libritts_r_filtered`, config `clean`, split `train.clean.100`.
+- Secondary decoder-calibration comparison:
+  `mythicinfinity/libritts`, config `clean`, split `train.clean.100`.
+- Broad read-speech control:
+  `openslr/librispeech_asr`, config `clean`, split `train.100`.
+- Accent and speaker-diversity control:
+  `fixie-ai/common_voice_17_0`, config `en`, split `train`.
+
+Immediate implications:
+
+- LibriTTS-R is the best first calibration source for the current decoder graph:
+  it is open, English, TTS-oriented, 24 kHz, transcripted, and includes speaker
+  ids.
+- For decoder-only W8A8 calibration, we can encode sampled audio through the
+  Qwen3 12 Hz speech tokenizer and calibrate the Core ML decoder on the
+  resulting code tensors.
+- For full-stack W8A8 calibration, audio-only data is not enough. We will also
+  need representative prompts, generation histories, KV-cache states, code
+  predictor states, speaker/reference-conditioning examples, and generated code
+  trajectories.
+- The Qwen3-TTS paper describes very large-scale training data, but the public
+  release appears to provide model/tokenizer artifacts and examples, not the
+  full training corpus. Calibration should therefore use open substitutes and
+  locally generated Qwen3 trajectories rather than assuming training-data
+  availability.
+
+Validation:
+
+- Hugging Face Dataset Viewer inspection succeeded for all five candidates.
+- `jq empty` passed for the calibration dataset inventory fixture.
+- A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
+  checked-in Core ML Qwen fixtures, scripts, or Swift tests.
+- `uv run --with ruff ruff check` passed for all seven Core ML Qwen maintainer
+  scripts.
+- `swift test --filter qwen3` passed with 24 tests covering text tokenization,
+  speech-tokenizer config, runtime fixtures, decoder Core ML conversion,
+  decoder benchmarking, decoder Instruments trace summaries, and calibration
+  dataset inventory.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
