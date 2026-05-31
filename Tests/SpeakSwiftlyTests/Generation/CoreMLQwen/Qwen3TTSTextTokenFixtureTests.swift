@@ -84,8 +84,7 @@ private struct Qwen3TTSTextTokenFixture: Decodable {
     let prompts: [Prompt]
 
     static func load() throws -> Self {
-        let fixtureURL = try packageRootURL()
-            .appendingPathComponent("docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json")
+        let fixtureURL = try qwen3TTSFixtureURL("docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json")
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -114,34 +113,5 @@ private struct Qwen3TTSTextTokenFixture: Decodable {
         let length: Int
         let inputIds: [Int]
         let attentionMask: [Int]
-    }
-}
-
-private func packageRootURL() throws -> URL {
-    let fileManager = FileManager.default
-    var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-
-    while true {
-        let manifestURL = candidateURL.appendingPathComponent("Package.swift")
-        if fileManager.fileExists(atPath: manifestURL.path) {
-            return candidateURL
-        }
-
-        let parentURL = candidateURL.deletingLastPathComponent()
-        guard parentURL != candidateURL else {
-            throw Qwen3TTSTextTokenFixtureError(
-                "The Qwen3-TTS text token fixture tests could not find Package.swift while walking upward from '\(#filePath)'.",
-            )
-        }
-
-        candidateURL = parentURL
-    }
-}
-
-private struct Qwen3TTSTextTokenFixtureError: Error, CustomStringConvertible {
-    let description: String
-
-    init(_ description: String) {
-        self.description = description
     }
 }

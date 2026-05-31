@@ -95,40 +95,10 @@ private struct Qwen3TTSSpeechTokenizerConfigFixture: Decodable {
     let decoderConfig: DecoderConfig
 
     static func load() throws -> Self {
-        let fixtureURL = try qwen3TTSPackageRootURL()
-            .appendingPathComponent("docs/maintainers/coreml-qwen3tts/speech-tokenizer-config-12hz.json")
+        let fixtureURL = try qwen3TTSFixtureURL("docs/maintainers/coreml-qwen3tts/speech-tokenizer-config-12hz.json")
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(Self.self, from: data)
-    }
-}
-
-private func qwen3TTSPackageRootURL() throws -> URL {
-    let fileManager = FileManager.default
-    var candidateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-
-    while true {
-        let manifestURL = candidateURL.appendingPathComponent("Package.swift")
-        if fileManager.fileExists(atPath: manifestURL.path) {
-            return candidateURL
-        }
-
-        let parentURL = candidateURL.deletingLastPathComponent()
-        guard parentURL != candidateURL else {
-            throw Qwen3TTSSpeechTokenizerConfigFixtureError(
-                "The Qwen3-TTS speech tokenizer config tests could not find Package.swift while walking upward from '\(#filePath)'.",
-            )
-        }
-
-        candidateURL = parentURL
-    }
-}
-
-private struct Qwen3TTSSpeechTokenizerConfigFixtureError: Error, CustomStringConvertible {
-    let description: String
-
-    init(_ description: String) {
-        self.description = description
     }
 }

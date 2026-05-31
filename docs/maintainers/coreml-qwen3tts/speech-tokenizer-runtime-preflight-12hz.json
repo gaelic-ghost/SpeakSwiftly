@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "preflight",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229"
+  },
+  "model_file_inventory": {
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "file_count": 6,
+    "total_size_bytes": 682300739,
+    "files": [
+      {
+        "path": "model.safetensors",
+        "size_bytes": 682293092
+      },
+      {
+        "path": "README.md",
+        "size_bytes": 3482
+      },
+      {
+        "path": "config.json",
+        "size_bytes": 2336
+      },
+      {
+        "path": ".gitattributes",
+        "size_bytes": 1519
+      },
+      {
+        "path": "preprocessor_config.json",
+        "size_bytes": 234
+      },
+      {
+        "path": "configuration.json",
+        "size_bytes": 76
+      }
+    ]
+  },
+  "synthetic_audio": {
+    "sample_rate": 24000,
+    "duration_seconds": 0.64,
+    "frequency_hz": 220.0,
+    "sample_count": 15360,
+    "expected_code_steps_at_1920_samples": 8
+  },
+  "next_command": "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' scripts/repo-maintenance/coreml-qwen3tts/generate-speech-tokenizer-fixture.py --no-preflight-only --qwen-source /path/to/Qwen3-TTS --allow-model-download --output /private/tmp/qwen3tts-speech-tokenizer-fixture.json"
+}

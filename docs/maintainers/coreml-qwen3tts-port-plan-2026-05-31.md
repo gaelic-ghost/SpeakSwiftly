@@ -416,6 +416,52 @@ Validation:
 - `swift test --filter qwen3` passed with the text-token and speech-tokenizer
   config tests.
 
+### 2026-05-31 Speech Tokenizer Runtime Preflight, Pass 1
+
+Added an opt-in runtime fixture generator:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/generate-speech-tokenizer-fixture.py`
+
+Added a checked-in preflight fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-preflight-12hz.json`
+
+Added SwiftPM tests for the preflight fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerPreflightTests.swift`
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSFixtureSupport.swift`
+
+This script is shaped so preflight mode stays light and runtime mode is
+explicit. Runtime mode requires both `--no-preflight-only` and
+`--allow-model-download`; the generated preflight fixture records the exact
+heavier `uv run --with ...` command needed for the real encode/decode pass.
+
+Preflight findings:
+
+- The 12 Hz speech tokenizer repository currently has 6 files.
+- Total Hugging Face file inventory size is 682300739 bytes.
+- The dominant file is `model.safetensors` at 682293092 bytes.
+- The planned synthetic probe is 0.64 seconds at 24000 Hz, or 15360 samples.
+- At 1920 samples per code step, that should produce 8 code steps before any
+  model-specific padding or trimming behavior.
+
+Implementation note:
+
+- The first draft of the runtime fixture script put runtime packages such as
+  Torch and Transformers in the inline script dependencies. That made preflight
+  install heavy packages unnecessarily. The script now keeps inline dependencies
+  to Hugging Face metadata only and imports runtime packages lazily after the
+  explicit model-download gate.
+
+Validation:
+
+- Preflight generation succeeded without loading model weights.
+- `jq empty` passed for the runtime preflight fixture.
+- `uv run --with ruff ruff check` passed for all three Core ML Qwen maintainer
+  scripts.
+- `swift test --filter qwen3` passed with 8 tests covering the text fixture,
+  speech-tokenizer config fixture, and runtime preflight fixture.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
