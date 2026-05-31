@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T18:05:49Z",
+  "mode": "preflight",
+  "purpose": "Preview representative LibriTTS-R rows for Qwen3-TTS 12 Hz speech-tokenizer decoder calibration without downloading audio or model weights.",
+  "source": {
+    "dataset": "mythicinfinity/libritts_r",
+    "dataset_config": "clean",
+    "dataset_split": "train.clean.100",
+    "dataset_hub_url": "https://hf.co/datasets/mythicinfinity/libritts_r",
+    "row_offset": 0,
+    "requested_sample_count": 24,
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229"
+  },
+  "model_file_inventory": {
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "file_count": 6,
+    "total_size_bytes": 682300739,
+    "files": [
+      {
+        "path": "model.safetensors",
+        "size_bytes": 682293092
+      },
+      {
+        "path": "README.md",
+        "size_bytes": 3482
+      },
+      {
+        "path": "config.json",
+        "size_bytes": 2336
+      },
+      {
+        "path": ".gitattributes",
+        "size_bytes": 1519
+      },
+      {
+        "path": "preprocessor_config.json",
+        "size_bytes": 234
+      },
+      {
+        "path": "configuration.json",
+        "size_bytes": 76
+      }
+    ]
+  },
+  "sample_previews": [
+    {
+      "row_idx": 0,
+      "id": "730_358_000003_000002",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "[The moon] I gazed with a kind of wonder.",
+      "text_original": "[The moon] I gazed with a kind of wonder.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 1,
+      "id": "730_358_000004_000001",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+      "text_original": "I gradually saw plainly the clear stream that supplied me with drink and the trees that shaded me with their foliage.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 2,
+      "id": "730_358_000006_000003",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "I examined the materials of the fire, and to my joy found it to be composed of wood.",
+      "text_original": "I examined the materials of the fire, and to my joy found it to be composed of wood.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 3,
+      "id": "730_358_000006_000004",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "I quickly collected some branches, but they were wet and would not burn.",
+      "text_original": "I quickly collected some branches, but they were wet and would not burn.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 4,
+      "id": "730_358_000010_000003",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "The vegetables in the gardens, the milk and cheese that I saw placed at the windows of some of the cottages, allured my appetite.",
+      "text_original": "The vegetables in the gardens, the milk and cheese that I saw placed at the windows of some of the cottages, allured my appetite.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 5,
+      "id": "730_358_000013_000002",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "I ate my breakfast with pleasure and was about to remove a plank to procure myself a little water when I heard a step, and looking through a small chink, I beheld a young creature, with a pail on her head, passing before my hovel.",
+      "text_original": "I ate my breakfast with pleasure and was about to remove a plank to procure myself a little water when I heard a step, and looking through a small chink, I beheld a young creature, with a pail on her head, passing before my hovel.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 6,
+      "id": "730_358_000016_000003",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "One was old, with silver hairs and a countenance beaming with benevolence and love; the younger was slight and graceful in his figure, and his features were moulded with the finest symmetry, yet his eyes and attitude expressed the utmost sadness and despondency.",
+      "text_original": "One was old, with silver hairs and a countenance beaming with benevolence and love; the younger was slight and graceful in his figure, and his features were moulded with the finest symmetry, yet his eyes and attitude expressed the utmost sadness and despondency.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 7,
+      "id": "730_358_000016_000004",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "The old man returned to the cottage, and the youth, with tools different from those he had used in the morning, directed his steps across the fields.",
+      "text_original": "The old man returned to the cottage, and the youth, with tools different from those he had used in the morning, directed his steps across the fields.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 8,
+      "id": "730_358_000002_000001",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "Before I had quitted your apartment, on a sensation of cold, I had covered myself with some clothes, but these were insufficient to secure me from the dews of night.",
+      "text_original": "Before I had quitted your apartment, on a sensation of cold, I had covered myself with some clothes, but these were insufficient to secure me from the dews of night.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 9,
+      "id": "730_358_000002_000000",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "\"It was dark when I awoke; I felt cold also, and half frightened, as it were, instinctively, finding myself so desolate.",
+      "text_original": "\"It was dark when I awoke; I felt cold also, and half frightened, as it were, instinctively, finding myself so desolate.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 10,
+      "id": "730_358_000016_000001",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "The meal was quickly dispatched.",
+      "text_original": "The meal was quickly dispatched.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 11,
+      "id": "730_358_000013_000008",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "She followed, and they disappeared.",
+      "text_original": "She followed, and they disappeared.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 12,
+      "id": "730_358_000001_000002",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "Darkness then came over me and troubled me, but hardly had I felt this when, by opening my eyes, as I now suppose, the light poured in upon me again.",
+      "text_original": "Darkness then came over me and troubled me, but hardly had I felt this when, by opening my eyes, as I now suppose, the light poured in upon me again.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 13,
+      "id": "730_358_000010_000007",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "No wood, however, was placed on the earth, which formed the floor, but it was dry; and although the wind entered it by innumerable chinks, I found it an agreeable asylum from the snow and rain.",
+      "text_original": "No wood, however, was placed on the earth, which formed the floor, but it was dry; and although the wind entered it by innumerable chinks, I found it an agreeable asylum from the snow and rain.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 14,
+      "id": "730_358_000009_000001",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "This was a new sight to me, and I examined the structure with great curiosity.",
+      "text_original": "This was a new sight to me, and I examined the structure with great curiosity.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 15,
+      "id": "730_358_000004_000004",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "Sometimes I tried to imitate the pleasant songs of the birds but was unable. Sometimes I wished to express my sensations in my own mode, but the uncouth and inarticulate sounds which broke from me frightened me into silence again.",
+      "text_original": "Sometimes I tried to imitate the pleasant songs of the birds but was unable. Sometimes I wished to express my sensations in my own mode, but the uncouth and inarticulate sounds which broke from me frightened me into silence again.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 16,
+      "id": "730_358_000005_000000",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "\"The moon had disappeared from the night, and again, with a lessened form, showed itself, while I still remained in the forest.",
+      "text_original": "\"The moon had disappeared from the night, and again, with a lessened form, showed itself, while I still remained in the forest.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 17,
+      "id": "730_358_000008_000005",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "A great fall of snow had taken place the night before, and the fields were of one uniform white; the appearance was disconsolate, and I found my feet chilled by the cold damp substance that covered the ground.",
+      "text_original": "A great fall of snow had taken place the night before, and the fields were of one uniform white; the appearance was disconsolate, and I found my feet chilled by the cold damp substance that covered the ground.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 18,
+      "id": "730_358_000000_000000",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "Chapter eleven",
+      "text_original": "Chapter 11",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 19,
+      "id": "730_358_000014_000002",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "In one corner, near a small fire, sat an old man, leaning his head on his hands in a disconsolate attitude.",
+      "text_original": "In one corner, near a small fire, sat an old man, leaning his head on his hands in a disconsolate attitude.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 20,
+      "id": "730_358_000006_000001",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "In my joy I thrust my hand into the live embers, but quickly drew it out again with a cry of pain.",
+      "text_original": "In my joy I thrust my hand into the live embers, but quickly drew it out again with a cry of pain.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 21,
+      "id": "730_358_000006_000009",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "I covered it carefully with dry wood and leaves and placed wet branches upon it; and then, spreading my cloak, I lay on the ground and sank into sleep.",
+      "text_original": "I covered it carefully with dry wood and leaves and placed wet branches upon it; and then, spreading my cloak, I lay on the ground and sank into sleep.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 22,
+      "id": "730_358_000001_000005",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "This was the forest near Ingolstadt; and here I lay by the side of a brook resting from my fatigue, until I felt tormented by hunger and thirst.",
+      "text_original": "This was the forest near Ingolstadt; and here I lay by the side of a brook resting from my fatigue, until I felt tormented by hunger and thirst.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 23,
+      "id": "730_358_000009_000005",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "His appearance, different from any I had ever before seen, and his flight somewhat surprised me.",
+      "text_original": "His appearance, different from any I had ever before seen, and his flight somewhat surprised me.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    }
+  ],
+  "stratification_targets": [
+    "short_utterances",
+    "medium_utterances",
+    "long_utterances",
+    "speaker_diversity",
+    "silence_and_energy_variety",
+    "decoder_bucket_boundaries"
+  ],
+  "next_command": "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' scripts/repo-maintenance/coreml-qwen3tts/generate-calibration-code-fixture.py --no-preflight-only --allow-model-download --allow-audio-download --qwen-source /path/to/Qwen3-TTS --output .local/coreml-qwen3tts/qwen3tts-calibration-code-fixture.json"
+}

@@ -28,6 +28,7 @@ DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-s
 DEFAULT_RUNTIME_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
 DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
 DEFAULT_BUCKET_PLAN_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
+DEFAULT_TALKER_CODE_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
 DEFAULT_CONVERSION_REPORT_PATH = (
   "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
 )
@@ -312,10 +313,79 @@ def build_representative_sample_data(
   }
 
 
+def build_talker_sample_data(
+  talker_fixture: dict[str, Any],
+  model_input_shape: list[int],
+  requested_bucket: int | None,
+) -> tuple[list[dict[str | None, np.ndarray]], dict[str, Any]]:
+  bucket = requested_bucket or model_input_shape[1]
+  if bucket != model_input_shape[1]:
+    raise RuntimeError(
+      f"Talker-code bucket {bucket} does not match fixed decoder input steps {model_input_shape[1]}."
+    )
+
+  quantizer_count = model_input_shape[2]
+  matching_samples = [
+    sample for sample in talker_fixture.get("samples", [])
+    if int(sample.get("bucket_assignment", {}).get("assigned_bucket", -1)) == bucket
+  ]
+  if not matching_samples:
+    raise RuntimeError(f"Talker-code fixture does not contain samples assigned to bucket {bucket}.")
+
+  sample_data: list[dict[str | None, np.ndarray]] = []
+  sample_reports: list[dict[str, Any]] = []
+  for sample in matching_samples:
+    assignment = sample["bucket_assignment"]
+    codes = np.asarray(sample["encoded"]["audio_codes"], dtype=np.int32)
+    if codes.ndim != 2:
+      raise RuntimeError(f"Talker sample '{sample['id']}' audio_codes must be rank 2.")
+    if codes.shape[1] != quantizer_count:
+      raise RuntimeError(
+        f"Talker sample '{sample['id']}' has {codes.shape[1]} quantizers, "
+        f"but the decoder expects {quantizer_count}."
+      )
+    if codes.shape[0] > bucket:
+      raise RuntimeError(
+        f"Talker sample '{sample['id']}' has {codes.shape[0]} steps, which exceeds bucket {bucket}."
+      )
+
+    padded = np.full((bucket, quantizer_count), int(assignment.get("pad_value", -1)), dtype=np.int32)
+    padded[: codes.shape[0], :] = codes
+    sample_data.append({"audio_codes": padded[None, :, :]})
+    sample_reports.append(
+      {
+        "id": sample["id"],
+        "text": sample.get("text"),
+        "audio_codes_shape": list(codes.shape),
+        "padded_input_shape": [1, *list(padded.shape)],
+        "padded_step_count": bucket - codes.shape[0],
+        "pad_value": int(assignment.get("pad_value", -1)),
+        "valid_output_sample_count": assignment.get("valid_output_sample_count"),
+        "padded_output_sample_count": assignment.get("padded_output_sample_count"),
+      }
+    )
+
+  return sample_data, {
+    "source": "talker_code_fixture",
+    "bucket": bucket,
+    "count": len(sample_data),
+    "input_name": "audio_codes",
+    "input_shape": list(sample_data[0]["audio_codes"].shape),
+    "input_dtype": str(sample_data[0]["audio_codes"].dtype),
+    "samples": sample_reports,
+    "scope_warning": (
+      "This runtime probe uses Qwen3 talker-generated code tensors captured immediately before "
+      "speech_tokenizer.decode. It is closer to production decoder inputs than audio re-encoded "
+      "through the tokenizer, but output audio still remains evaluation data for Core ML calibration."
+    ),
+  }
+
+
 def build_runtime_sample_data(
   args: argparse.Namespace,
   runtime_fixture: dict[str, Any],
   calibration_fixture: dict[str, Any],
+  talker_code_fixture: dict[str, Any] | None,
   bucket_plan: dict[str, Any] | None,
   model_input_shape: list[int],
 ) -> tuple[list[dict[str | None, np.ndarray]], dict[str, Any]]:
@@ -325,6 +395,14 @@ def build_runtime_sample_data(
     return build_representative_sample_data(
       calibration_fixture,
       bucket_plan,
+      model_input_shape,
+      args.bucket,
+    )
+  if args.sample_source == "talker":
+    if talker_code_fixture is None:
+      raise RuntimeError("Talker sample source requires --talker-code-fixture.")
+    return build_talker_sample_data(
+      talker_code_fixture,
       model_input_shape,
       args.bucket,
     )
@@ -380,6 +458,7 @@ def run_w8a8_quantization(
   calibration_op_group_size: int,
   activation_scope: str,
   baseline_output: np.ndarray | None,
+  candidate_label: str | None,
 ) -> dict[str, Any]:
   if replace_existing:
     remove_existing_package(output_path)
@@ -416,10 +495,15 @@ def run_w8a8_quantization(
   quantized = cto.coreml.linear_quantize_weights(activation_quantized, weight_config)
   quantized.save(str(output_path))
   duration_ms = (time.perf_counter() - start) * 1000
-  sample_mode = "representative_smoke" if sample_data_report.get("source") == "representative_calibration_fixture" else "synthetic_smoke"
+  sample_source = sample_data_report.get("source")
+  sample_mode = {
+    "representative_calibration_fixture": "representative_smoke",
+    "talker_code_fixture": "talker_smoke",
+  }.get(sample_source, "synthetic_smoke")
   result: dict[str, Any] = {
     "status": "succeeded",
     "mode": f"w8a8_{sample_mode}_{activation_scope}",
+    "candidate_label": candidate_label,
     "output_package": relative_package_path(output_path),
     "duration_ms": duration_ms,
     "package_size_bytes": directory_size_bytes(output_path),
@@ -529,6 +613,16 @@ def build_preflight_report(args: argparse.Namespace) -> dict[str, Any]:
           "versus fp32 input dtype. The successful local path uses an fp16 base package."
         ),
       },
+      "w8a8_candidate_matrix": {
+        "status": "planned",
+        "candidate_label": args.candidate_label,
+        "calibration_op_group_sizes": args.candidate_matrix_op_group_sizes,
+        "sample_sources": ["representative", "talker"],
+        "note": (
+          "Candidate matrix runs are comparable by label, bucket, sample source, activation scope, "
+          "and calibration_op_group_size. Output audio remains evaluation-only."
+        ),
+      },
     },
     "next_command": (
       "uv run --python 3.12 "
@@ -556,10 +650,13 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
   calibration_fixture = load_json(resolve_package_path(args.calibration_fixture))
   bucket_plan_path = resolve_package_path(args.bucket_plan)
   bucket_plan = load_json(bucket_plan_path) if bucket_plan_path.is_file() else None
+  talker_code_fixture_path = resolve_package_path(args.talker_code_fixture)
+  talker_code_fixture = load_json(talker_code_fixture_path) if talker_code_fixture_path.is_file() else None
   sample_data, sample_data_report = build_runtime_sample_data(
     args,
     runtime_fixture,
     calibration_fixture,
+    talker_code_fixture,
     bucket_plan,
     report["source"]["conversion_target"]["input_shape"],
   )
@@ -601,30 +698,39 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
       )
 
   if args.run_w8a8:
+    group_sizes = args.candidate_matrix_op_group_sizes if args.run_w8a8_matrix else [args.calibration_op_group_size]
     try:
-      report["runtime"]["results"].append(
-        run_w8a8_quantization(
-          model,
-          sample_data,
-          sample_data_report,
-          resolve_package_path(args.w8a8_output),
-          args.replace_existing,
-          args.calibration_op_group_size,
-          args.activation_scope,
-          baseline_output,
+      for group_size in group_sizes:
+        output_path = resolve_package_path(args.w8a8_output)
+        if args.run_w8a8_matrix:
+          output_path = output_path.with_name(
+            f"{output_path.stem}-group-{group_size}{output_path.suffix}"
+          )
+        report["runtime"]["results"].append(
+          run_w8a8_quantization(
+            model,
+            sample_data,
+            sample_data_report,
+            output_path,
+            args.replace_existing,
+            group_size,
+            args.activation_scope,
+            baseline_output,
+            args.candidate_label,
+          )
         )
-      )
     except Exception as error:
       report["runtime"]["results"].append(
         {
           "status": "failed",
           "mode": (
-            f"w8a8_{'representative_smoke' if args.sample_source == 'representative' else 'synthetic_smoke'}_"
+            f"w8a8_{args.sample_source}_smoke_"
             f"{args.activation_scope}"
           ),
           "error_type": type(error).__name__,
           "error_message": str(error),
           "activation_scope": args.activation_scope,
+          "candidate_label": args.candidate_label,
         }
       )
 
@@ -641,6 +747,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--model-package", type=Path, default=Path(DEFAULT_MODEL_PACKAGE))
   parser.add_argument("--runtime-fixture", type=Path, default=Path(DEFAULT_RUNTIME_FIXTURE_PATH))
   parser.add_argument("--calibration-fixture", type=Path, default=Path(DEFAULT_CALIBRATION_FIXTURE_PATH))
+  parser.add_argument("--talker-code-fixture", type=Path, default=Path(DEFAULT_TALKER_CODE_FIXTURE_PATH))
   parser.add_argument("--bucket-plan", type=Path, default=Path(DEFAULT_BUCKET_PLAN_PATH))
   parser.add_argument("--conversion-report", type=Path, default=Path(DEFAULT_CONVERSION_REPORT_PATH))
   parser.add_argument("--weight-output", type=Path, default=Path(DEFAULT_WEIGHT_OUTPUT))
@@ -655,10 +762,13 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--replace-existing", action="store_true")
   parser.add_argument("--verify-prediction", action="store_true")
   parser.add_argument("--calibration-op-group-size", type=int, default=16)
+  parser.add_argument("--candidate-label", default=None)
+  parser.add_argument("--run-w8a8-matrix", action="store_true")
+  parser.add_argument("--candidate-matrix-op-group-sizes", type=int, nargs="+", default=[1, 8, 16, 32])
   parser.add_argument(
     "--sample-source",
     default="synthetic",
-    choices=["synthetic", "representative"],
+    choices=["synthetic", "representative", "talker"],
   )
   parser.add_argument("--bucket", type=int, default=None)
   parser.add_argument(

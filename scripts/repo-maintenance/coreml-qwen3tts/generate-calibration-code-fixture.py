@@ -31,10 +31,18 @@ DEFAULT_CONFIG = "clean"
 DEFAULT_SPLIT = "train.clean.100"
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-Tokenizer-12Hz"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
-DEFAULT_SAMPLE_COUNT = 3
+DEFAULT_SAMPLE_COUNT = 24
 DEFAULT_OFFSET = 0
 DEFAULT_EXPECTED_SAMPLE_RATE = 24_000
 CODE_STEP_SAMPLES = 1_920
+STRATIFICATION_TARGETS = [
+  "short_utterances",
+  "medium_utterances",
+  "long_utterances",
+  "speaker_diversity",
+  "silence_and_energy_variety",
+  "decoder_bucket_boundaries",
+]
 
 
 def current_utc_timestamp() -> str:
@@ -281,6 +289,7 @@ def build_preflight_report(
       }
       for row in rows
     ],
+    "stratification_targets": STRATIFICATION_TARGETS,
     "next_command": (
       "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' "
       "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' "
@@ -357,6 +366,10 @@ def build_runtime_fixture(
       "current_graph": "12 Hz speech-tokenizer decoder only",
       "current_input": "audio_codes shaped batch x code_steps x 16 codebooks",
       "code_step_samples": CODE_STEP_SAMPLES,
+      "target_sample_matrix": {
+        "libritts_r_encoded_sample_count": DEFAULT_SAMPLE_COUNT,
+        "stratification_targets": STRATIFICATION_TARGETS,
+      },
       "not_yet_covered": [
         "text tokenizer",
         "main Qwen3-TTS autoregressive talker",

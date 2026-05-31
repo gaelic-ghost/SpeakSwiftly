@@ -343,6 +343,8 @@ Research
 - [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
 - [ ] Use Instruments and Core ML performance reports to verify actual CPU, GPU, and Neural Engine dispatch instead of inferring dispatch from configuration alone.
 - [ ] Build a calibration-data lane for Core ML compression, starting with decoder-only audio-code calibration from open speech datasets and widening later to full-stack prompts, code histories, and reference-conditioning cases.
+- [x] Add a decoder-first calibration expansion plan that keeps Core ML activation calibration input-only while reserving output-aware correction for a separate supervised tuning lane.
+- [x] Add preflight fixture plans for 24 LibriTTS-R encoded samples, Qwen talker-generated code capture, and decoder-output alignment against an fp16 PyTorch teacher.
 - [x] Plan bucketed speech-tokenizer decoder packages for the first real-speech calibration shapes, starting with `[1, 40, 16]`, `[1, 72, 16]`, and `[1, 88, 16]`, so W8A8 activation calibration can use representative LibriTTS-R codes instead of the synthetic 8-step fixture.
 - [x] Convert the bucket-40 speech-tokenizer decoder package and pin its parity report.
 - [x] Convert bucket 72 and bucket 88 and pin their parity reports.
@@ -351,6 +353,7 @@ Research
 - [ ] Evaluate Swift/Metal FlashAttention as a separate custom-GPU-kernel lane for autoregressive Qwen attention if Core ML or MLX dispatch overhead becomes the limiting factor.
 - [ ] Evaluate whether autoregressive work can be batched, bucketed, prefetched, or otherwise shaped to avoid tiny per-token prediction overhead.
 - [ ] Try an offline overlapping decoder-window experiment later: decode fixed-size code windows with left/right overlap, keep only stable center regions, crossfade joins, and compare against full-sequence speech-tokenizer decode before considering any streaming-style decoder path.
+- [ ] Start the decoder-window experiment from upstream 12 Hz `chunked_decode(chunk_size=300, left_context_size=25)` behavior before trying smaller fixed buckets or custom overlap/crossfade variants.
 - [ ] Compare the first-party Core ML probe against the existing SpeakSwiftly Qwen MLX benchmark lane using matched input text, voice strategy, output duration, real-time factor, memory, startup time, and audible quality notes.
 - [ ] Decide whether the result should become a hidden experimental backend, stay probe-only, feed `SpeakSwiftlyMobile`, or be dropped with evidence.
 
@@ -366,6 +369,8 @@ Research
 - Bucket 40 now has an fp16 representative-calibration W8A8 smoke using a real LibriTTS-R code tensor padded from 37 to 40 code steps. The package still saves, reloads, and predicts, but the valid output diverges from the fp16 bucket baseline with max absolute difference above `0.28` and mean absolute difference above `0.012`, so W8A8 needs quality investigation before any backend decision.
 - Bucket 40 audio inspection writes local baseline, W8A8, valid-region, and diff WAV artifacts and confirms the drift is broad: 8 of 12 quarter-second windows in the valid region exceed mean absolute difference `0.01`, with the largest mean-diff window around 1.25-1.5 seconds.
 - Core ML activation calibration is input-only: `sample_data` feeds model inputs through the float model to measure activation ranges, then Core ML Tools inserts quantize/dequantize pairs. Our current dataset does not calibrate against output audio targets or minimize output error.
+- Decoder tuning now has a distinct preflight lane: `probe-decoder-alignment-tuning.py` treats the fp16 PyTorch decoder as the teacher, trains a selected decoder-tail student with waveform L1 plus multi-resolution STFT loss, and leaves Core ML activation calibration semantics unchanged.
+- Talker-generated calibration inputs now have their own fixture generator. It monkeypatches `speech_tokenizer.decode`, records the exact `audio_codes` passed by normal Qwen3-TTS generation, and then calls the original decode so the generated audio remains a faithful evaluation artifact.
 - The decoder bucket plan now maps the first three real LibriTTS-R calibration samples to bucket 40, bucket 72, and bucket 88, and the conversion script can pad `audio_codes` to fixed bucket sizes with upstream-compatible `-1` padding.
 - Buckets 40, 72, and 88 converted successfully through the existing static-mask export path. CPU-only Core ML prediction produced `[1, 76800]`, `[1, 138240]`, and `[1, 168960]` samples with max absolute difference below `0.0003` versus the PyTorch wrapper, and each local `.mlpackage` remained about 436 MB.
 - The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.

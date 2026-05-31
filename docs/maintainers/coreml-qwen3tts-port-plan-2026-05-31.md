@@ -1272,6 +1272,33 @@ For the current decoder W8A8 work, that means:
   quantization or distillation-style project, not the current Core ML Tools
   activation-calibration API.
 
+### Decoder-First Calibration And Tuning Slice
+
+The current implementation keeps three lanes separate:
+
+- Calibration inputs: `generate-calibration-code-fixture.py` now defaults to a
+  24-sample LibriTTS-R preflight plan and records stratification targets for
+  short, medium, long, speaker-diverse, silence/energy-varied, and bucket-edge
+  samples.
+- Talker-code inputs: `generate-talker-code-fixture.py` plans and can capture
+  Qwen3 talker-generated `audio_codes` by wrapping `speech_tokenizer.decode`,
+  recording the exact decode input, and then calling the original decode.
+- Output-aware tuning: `probe-decoder-alignment-tuning.py` is separate from Core
+  ML calibration. It uses the fp16 PyTorch decoder as a teacher and trains a
+  selected decoder-tail student with waveform L1 plus multi-resolution STFT loss
+  before any later Core ML reconversion.
+
+Checked-in preflight reports:
+
+- `docs/maintainers/coreml-qwen3tts/calibration-code-fixture-plan-libritts-r-24-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/talker-code-fixture-plan-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/decoder-alignment-plan-12hz.json`
+
+The quantization probe can now label W8A8 candidates and run the first
+`calibration_op_group_size` matrix (`1`, `8`, `16`, `32`) for comparable
+candidate reports. Output WAVs remain evaluation artifacts unless the supervised
+alignment script is explicitly running.
+
 Likely next calibration/evaluation variants:
 
 - Increase LibriTTS-R sample count and speaker/text diversity.
@@ -1282,6 +1309,14 @@ Likely next calibration/evaluation variants:
 - Compare per-tensor versus any available scoped/per-op quantization variants,
   and consider disabling activation quantization for numerically sensitive
   decoder regions if audio drift localizes to specific op families.
+
+### Upstream Chunked Decode Baseline
+
+The upstream 12 Hz speech-tokenizer decoder already exposes
+`chunked_decode(codes, chunk_size=300, left_context_size=25)`. The later decoder
+windowing experiment should reproduce that behavior first, then compare smaller
+fixed-bucket overlap and crossfade variants against both upstream chunked decode
+and full-sequence decode.
 
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
