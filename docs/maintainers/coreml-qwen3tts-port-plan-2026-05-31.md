@@ -843,6 +843,70 @@ Validation:
   decoder benchmarking, decoder Instruments trace summaries, and calibration
   dataset inventory.
 
+### 2026-05-31 Calibration Code Fixture, Pass 1
+
+Added a LibriTTS-R calibration-code fixture generator:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/generate-calibration-code-fixture.py`
+
+Added a checked-in calibration-code fixture:
+
+- `docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json`
+
+Added SwiftPM tests for the fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSCalibrationCodeFixtureTests.swift`
+
+Fixture source:
+
+- dataset: `mythicinfinity/libritts_r`
+- config: `clean`
+- split: `train.clean.100`
+- row offset: `0`
+- sample count: `3`
+- model: `Qwen/Qwen3-TTS-Tokenizer-12Hz`
+- Qwen3-TTS source commit:
+  `022e286b98fbec7e1e916cb940cdf532cd9f488e`
+
+Runtime findings:
+
+- The first three LibriTTS-R rows encoded successfully through the Qwen3 12 Hz
+  speech tokenizer.
+- All source audio decoded at 24000 Hz, matching the tokenizer's configured
+  sample rate.
+- The three sampled utterances total 14.68 seconds of audio.
+- The resulting decoder calibration fixture contains 185 total code steps across
+  16 quantizers.
+- Per-sample code shapes were `[37, 16]`, `[83, 16]`, and `[65, 16]`.
+- The first pass suggests decoder bucket sizes `[40, 72, 88]` if we bucket by
+  8-step multiples.
+- The fixture stores full integer `audio_codes` for the small sample set, plus
+  prefixes and audio/code statistics for quick review.
+
+Safety and provenance notes:
+
+- The generator uses Hugging Face Dataset Viewer rows for deterministic row
+  offsets.
+- Dataset Viewer signed audio URLs are treated as transient runtime inputs and
+  are not written to the committed fixture.
+- The committed fixture omits dataset-internal file paths and machine-local
+  Qwen source paths.
+- The fixture is useful for decoder W8A8 calibration probing, but it is not
+  enough for full-stack Qwen3-TTS calibration because it does not exercise text
+  prompts, autoregressive talker states, code-predictor states, speaker
+  embeddings, or reference conditioning.
+
+Immediate implications:
+
+- The decoder quantization lane now has representative real-speech code tensors,
+  not only the synthetic 8-frame fixture.
+- The next Core ML compression slice can try Core ML Tools activation
+  calibration against these real code tensors and compare CPU/GPU/ANE dispatch
+  after W8A8 conversion.
+- Longer and speaker-diverse calibration samples should be selected before any
+  quality-sensitive compression decision. This pass intentionally proves the
+  extraction path first.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

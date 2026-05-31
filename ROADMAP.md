@@ -353,6 +353,7 @@ Research
 - The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
 - A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
+- The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
 - Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
