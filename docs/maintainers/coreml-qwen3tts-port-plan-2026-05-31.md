@@ -1104,6 +1104,90 @@ Current decision:
   - Instruments timing and dispatch evidence
   - no dependency adoption until both compile and causal parity are proven
 
+### 2026-05-31 Metal Flash Attention Blocker Probe, Pass 2
+
+Added a bounded blocker probe:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/probe-flash-attention-blockers.py`
+
+Added a checked-in probe report:
+
+- `docs/maintainers/coreml-qwen3tts/flash-attention-blocker-probe-2026-05-31.json`
+
+Probe scope:
+
+- The script does not add package dependencies to SpeakSwiftly.
+- It invokes third-party probes through `uv` child processes and records
+  structured JSON, return codes, and stderr.
+- The report redacts the local `metal-flash-sdpa` checkout path and stores no
+  downloaded repositories, model artifacts, wheel caches, or machine-local
+  absolute paths.
+- Qwen-like parity uses expanded KV heads for the current probe shape:
+  16 query heads, 16 effective KV heads after expansion, sequence length 256,
+  and head dimension 128. Native grouped-query support remains unproven.
+
+`mpsops/mps-flash-attention` minimization result:
+
+- The published `mps-flash-attn` package still aborts in AGX pipeline creation
+  before the probe can reach larger Qwen-like cases.
+- The crash reproduces on the first tiny non-causal shape:
+  `[batch: 1, heads: 1, sequence: 16, head_dim: 32]`.
+- Exit code was `133`.
+- The recorded failure remains:
+  `AGXMetalG16X Code=2`, `XPC_ERROR_CONNECTION_INTERRUPTED`.
+
+Practical interpretation:
+
+- This is smaller than the earlier Qwen-like wheel probe. The failure is not
+  caused by Qwen-sized tensors, causal masking, or grouped-query shape pressure.
+- MetalASM still avoids the runtime Metal source parser blocker, but the
+  assembled library is not locally accepted by the AGX pipeline compiler even
+  for a tiny forward kernel.
+- Continuing this lane usefully would mean reducing the assembled AIR/metallib
+  itself and taking that minimized compiler crash upstream. It is not ready to
+  be forked into SpeakSwiftly.
+
+`alliprice/metal-flash-sdpa` causal correctness result:
+
+- The direct ccv-backed kernel is causal-correct for `float32`.
+- `float32` causal shape `[1, 8, 256, 64]` matched the CPU causal reference with
+  max absolute difference about `0.00000066`.
+- `float16` causal shape `[1, 8, 256, 64]` failed causal parity with max
+  absolute difference about `3.7609` and mean absolute difference about
+  `0.1104`.
+- The same `float16` causal output matched the non-causal reference with max
+  absolute difference about `0.000232`.
+- `bfloat16` showed the same pattern: poor causal-reference parity and close
+  non-causal-reference parity.
+- The Qwen-like expanded-KV `float16` causal shape `[1, 16, 256, 128]` also
+  matched the non-causal reference, not the causal reference.
+- The patched `scaled_dot_product_attention` wrapper dispatched exactly once
+  and matched the direct kernel output, so the mismatch is not introduced by
+  the Python dispatch wrapper.
+
+Practical interpretation:
+
+- The failure is not a simple mask-orientation mismatch. The `float32` causal
+  path uses the expected upper-triangular causal reference correctly.
+- The failure is not scale handling. The same scale and reference path pass in
+  `float32`, while lower-precision causal outputs track the non-causal result.
+- The current evidence points to the lower-precision causal path ignoring or
+  losing causal masking inside the kernel.
+- This blocks Qwen3-TTS talker and code-predictor use because the useful
+  autoregressive path would need causal attention at `float16` or `bfloat16`,
+  16 query heads, 8 KV heads, and head dimension 128.
+
+Current recommendation:
+
+- Pause FlashAttention dependency adoption for SpeakSwiftly.
+- Continue the first-party Core ML decoder and quantization work independently;
+  FlashAttention cannot accelerate the current Core ML ML Program.
+- Reopen this lane only if:
+  - `mpsops/mps-flash-attention` can produce a minimized AGX compiler report and
+    an upstream fix or supported macOS/Xcode matrix, or
+  - `metal-flash-sdpa` fixes lower-precision causal masking and demonstrates
+    Qwen-like grouped-query parity.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
