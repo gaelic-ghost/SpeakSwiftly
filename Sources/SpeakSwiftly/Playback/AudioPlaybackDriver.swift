@@ -81,7 +81,7 @@ final class AudioPlaybackDriver {
     deinit {
         let playbackEnvironment = playbackEnvironment
         Task { @MainActor in
-            playbackEnvironment.invalidate()
+            await playbackEnvironment.invalidate()
         }
     }
 
@@ -645,10 +645,10 @@ final class AudioPlaybackDriver {
         }
     }
 
-    func stop() {
+    func stop() async {
         recoveryTask?.cancel()
         recoveryTask = nil
-        tearDownPlaybackHardware(leavingPlaybackEnvironment: true)
+        await tearDownPlaybackHardware(leavingPlaybackEnvironment: true)
         playbackRecoveryReason = nil
         playbackRecoveryAttempt = 0
         lastEnvironmentInstabilityAt = nil

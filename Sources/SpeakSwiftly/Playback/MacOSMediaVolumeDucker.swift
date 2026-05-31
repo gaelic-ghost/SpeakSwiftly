@@ -7,6 +7,7 @@ import Foundation
 final class MacOSMediaVolumeDucker {
     typealias ScriptRunner = @MainActor @Sendable (_ source: String) throws -> Int
     typealias AutomationPermissionRequester = @MainActor @Sendable (_ app: MediaApp, _ shouldPrompt: Bool) -> AutomationPermissionState
+    typealias RunningAppChecker = @MainActor @Sendable (_ app: MediaApp) -> Bool
 
     struct MediaApp: Equatable {
         let name: String
@@ -29,10 +30,17 @@ final class MacOSMediaVolumeDucker {
         MediaApp(name: "Spotify", bundleIdentifier: "com.spotify.client"),
         MediaApp(name: "Music", bundleIdentifier: "com.apple.Music"),
     ]
+    static let duckRampWeights = [1, 2, 3, 2, 1]
+    static let restoreRampWeights = [1, 2, 3, 4, 3, 2, 1]
+    static let duckRampStepDelay: Duration = .milliseconds(35)
+    static let restoreRampStepDelay: Duration = .milliseconds(70)
+    static let restoreVerificationRetryDelay: Duration = .milliseconds(80)
+    static let restoreVerificationRetryLimit = 2
 
     private let duckMediaVolume: SpeakSwiftly.DuckMediaVolume
     private let scriptRunner: ScriptRunner
     private let automationPermissionRequester: AutomationPermissionRequester
+    private let runningAppChecker: RunningAppChecker
     private var duckedApps = [DuckedApp]()
 
     init(
@@ -40,10 +48,12 @@ final class MacOSMediaVolumeDucker {
         scriptRunner: @escaping ScriptRunner = MacOSMediaVolumeDucker.runAppleScriptReturningInteger,
         automationPermissionRequester: @escaping AutomationPermissionRequester =
             MacOSMediaVolumeDucker.requestAutomationPermission,
+        runningAppChecker: @escaping RunningAppChecker = MacOSMediaVolumeDucker.isRunning,
     ) {
         self.duckMediaVolume = duckMediaVolume
         self.scriptRunner = scriptRunner
         self.automationPermissionRequester = automationPermissionRequester
+        self.runningAppChecker = runningAppChecker
         requestAutomationPermissionsIfNeeded(shouldPrompt: true)
     }
 
@@ -68,6 +78,43 @@ final class MacOSMediaVolumeDucker {
         return clampedVolume(
             Int((Double(clampedOriginalVolume) * (1 - clampedReductionFraction)).rounded()),
         )
+    }
+
+    static func steppedVolumes(
+        from startVolume: Int,
+        to targetVolume: Int,
+        weights: [Int],
+    ) -> [Int] {
+        let startVolume = clampedVolume(startVolume)
+        let targetVolume = clampedVolume(targetVolume)
+        guard startVolume != targetVolume else { return [] }
+
+        let weights = weights.filter { $0 > 0 }
+        guard !weights.isEmpty else { return [targetVolume] }
+
+        let totalWeight = weights.reduce(0, +)
+        let gap = targetVolume - startVolume
+        var cumulativeWeight = 0
+        var previousVolume = startVolume
+        var volumes = [Int]()
+
+        for weight in weights {
+            cumulativeWeight += weight
+            let progress = Double(cumulativeWeight) / Double(totalWeight)
+            let volume = clampedVolume(
+                startVolume + Int((Double(gap) * progress).rounded()),
+            )
+            guard volume != previousVolume else { continue }
+
+            volumes.append(volume)
+            previousVolume = volume
+        }
+
+        if volumes.last != targetVolume {
+            volumes.append(targetVolume)
+        }
+
+        return volumes
     }
 
     static func permissionState(for status: OSStatus) -> AutomationPermissionState {
@@ -127,11 +174,11 @@ final class MacOSMediaVolumeDucker {
         return Int(descriptor.int32Value)
     }
 
-    func duckRunningMediaApps() {
+    func duckRunningMediaApps() async {
         guard let reductionFraction = duckMediaVolume.reductionFraction else { return }
         guard duckedApps.isEmpty else { return }
 
-        for app in Self.supportedMediaApps where Self.isRunning(app) {
+        for app in Self.supportedMediaApps where runningAppChecker(app) {
             guard automationPermissionRequester(app, true) == .authorized else { continue }
 
             do {
@@ -142,7 +189,13 @@ final class MacOSMediaVolumeDucker {
                 )
                 guard targetVolume < originalVolume else { continue }
 
-                _ = try scriptRunner(Self.setVolumeScript(for: app, volume: targetVolume))
+                try await applyVolumeRamp(
+                    for: app,
+                    from: originalVolume,
+                    to: targetVolume,
+                    weights: Self.duckRampWeights,
+                    stepDelay: Self.duckRampStepDelay,
+                )
                 duckedApps.append(DuckedApp(app: app, originalVolume: originalVolume))
             } catch {
                 continue
@@ -150,17 +203,54 @@ final class MacOSMediaVolumeDucker {
         }
     }
 
-    func restoreDuckedMediaApps() {
+    func restoreDuckedMediaApps() async {
         guard !duckedApps.isEmpty else { return }
 
         let appsToRestore = duckedApps
         duckedApps.removeAll()
 
-        for duckedApp in appsToRestore where Self.isRunning(duckedApp.app) {
+        for duckedApp in appsToRestore where runningAppChecker(duckedApp.app) {
+            await restoreDuckedMediaApp(duckedApp)
+        }
+    }
+
+    private func applyVolumeRamp(
+        for app: MediaApp,
+        from startVolume: Int,
+        to targetVolume: Int,
+        weights: [Int],
+        stepDelay: Duration,
+    ) async throws {
+        for volume in Self.steppedVolumes(from: startVolume, to: targetVolume, weights: weights) {
+            _ = try scriptRunner(Self.setVolumeScript(for: app, volume: volume))
+            try? await playbackDelay(for: stepDelay)
+        }
+    }
+
+    private func restoreDuckedMediaApp(_ duckedApp: DuckedApp) async {
+        let targetVolume = Self.clampedVolume(duckedApp.originalVolume)
+
+        for attempt in 0...Self.restoreVerificationRetryLimit {
             do {
-                _ = try scriptRunner(Self.setVolumeScript(for: duckedApp.app, volume: duckedApp.originalVolume))
+                let currentVolume = try scriptRunner(Self.getVolumeScript(for: duckedApp.app))
+                try await applyVolumeRamp(
+                    for: duckedApp.app,
+                    from: currentVolume,
+                    to: targetVolume,
+                    weights: Self.restoreRampWeights,
+                    stepDelay: Self.restoreRampStepDelay,
+                )
+
+                let restoredVolume = try scriptRunner(Self.getVolumeScript(for: duckedApp.app))
+                if Self.clampedVolume(restoredVolume) == targetVolume {
+                    return
+                }
             } catch {
-                continue
+                // Keep restore best-effort so playback teardown does not hide the request result.
+            }
+
+            if attempt < Self.restoreVerificationRetryLimit {
+                try? await playbackDelay(for: Self.restoreVerificationRetryDelay)
             }
         }
     }
