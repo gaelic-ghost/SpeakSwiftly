@@ -329,6 +329,34 @@ Immediate implications:
   direct Swift port, a generated tokenizer asset, or a vendored tokenizer
   library.
 
+### 2026-05-31 Swift Text Fixture Tests, Pass 1
+
+Added SwiftPM tests for the checked-in text-token fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSTextTokenFixtureTests.swift`
+
+The tests intentionally stay test-only. They do not add a production Core ML
+backend, source module, runtime enum case, or tokenizer implementation yet.
+
+Covered behavior:
+
+- fixture provenance is pinned to the upstream Qwen3-TTS repository, inspected
+  source commit, and public 0.6B Base model id
+- the Swift prompt-wrapper helpers reproduce the upstream target, reference, and
+  instruction wrapped strings stored in the fixture
+- the first checked-in token IDs and attention masks remain stable
+
+Validation:
+
+- `swift test --filter qwen3` passed after the first fresh-worktree dependency
+  build completed.
+
+Implementation note:
+
+- Swift's `.convertFromSnakeCase` decodes `created_at_utc` as `createdAtUtc` and
+  `model_id` as `modelId`, so the fixture model avoids all-caps acronym
+  properties in test-only `Decodable` structs.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
