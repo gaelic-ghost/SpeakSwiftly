@@ -279,15 +279,58 @@ Immediate implications:
 - A custom port should likely convert the talker and speech-tokenizer decode
   separately rather than treating Qwen3-TTS as one monolithic model.
 
+### 2026-05-31 Text Token Fixture Script, Pass 1
+
+Added a maintained tokenizer fixture script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/generate-text-token-fixture.py`
+
+The script deliberately does not load model weights. It uses the Hugging Face
+tokenizer files from `Qwen/Qwen3-TTS-12Hz-0.6B-Base`, applies the upstream prompt
+wrappers recorded above, and emits a small JSON fixture with:
+
+- source model id, upstream source commit, tokenizer class, vocab size, and
+  model max length
+- wrapped target, reference, and instruction prompts
+- input IDs, attention masks, token strings, and prompt lengths
+- upstream generation defaults that matter for later parity work
+
+Validation notes:
+
+- The public 0.6B Base tokenizer loads as `Qwen2Tokenizer`.
+- Hugging Face `transformers` warns that PyTorch is absent, which is acceptable
+  for this script because it only needs tokenizer and file utilities.
+- Hugging Face also warns that a `qwen3_tts` model type is being used through the
+  generic tokenizer path. The script still resolves the tokenizer files and
+  produces deterministic text token IDs, but this warning should remain visible
+  in future validation notes until native Swift tokenizer parity replaces the
+  Python fixture.
+- With the default target text plus one reference transcript and one instruction,
+  the generated prompt lengths were:
+  - target: 23 tokens
+  - reference: 12 tokens
+  - instruction: 14 tokens
+
+Immediate implications:
+
+- This gives Swift-side work a stable first target: reproduce the exact wrapped
+  prompt strings and token IDs before converting the talker graph.
+- The script is a temporary probe tool, not a runtime dependency. A production
+  Core ML backend still needs native tokenizer ownership or a clearly vendored
+  tokenizer artifact with reproducible provenance.
+- The next useful slice is to add a tiny checked-in JSON fixture or Swift test
+  expectation only after deciding the exact golden sentence and whether token
+  strings should be treated as stable test data.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
   a smaller tokenizer-only path first?
-- Should the first probe live as a package executable target, a local-only script
-  under `.local`, or a maintained script under `scripts/repo-maintenance/`?
-- Should the tokenizer be ported directly to Swift, shared through a generated
-  vocabulary artifact, or initially tested with a temporary Python-produced
-  token fixture?
+- Should the first full model probe graduate from the maintained script path
+  into a package executable target, or stay outside the package until conversion
+  evidence exists?
+- Should the tokenizer ultimately be ported directly to Swift, shared through a
+  generated vocabulary artifact, or vendored from a proven tokenizer library?
 - What is the minimum evidence needed before adding a public
   `SpeechBackend` case?
 
