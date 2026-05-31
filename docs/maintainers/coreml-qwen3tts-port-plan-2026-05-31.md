@@ -1,0 +1,309 @@
+# First-Party Core ML Qwen3-TTS Port Plan
+
+Date: 2026-05-31
+
+## Purpose
+
+This note tracks the first-party Core ML Qwen3-TTS investigation. The goal is
+not to adopt the existing FluidInference Core ML artifact blindly. The goal is
+to decide whether SpeakSwiftly can produce a better Apple-silicon port by
+owning the tokenizer boundary, graph split points, cache layout, precision, and
+per-stage compute-unit policy.
+
+This is a backend-extension investigation. It only becomes a package runtime
+backend if the probe proves it can meet a real SpeakSwiftly use case better than
+the existing MLX Qwen path or with a valuable Apple-platform deployment tradeoff.
+
+## Starting Hypothesis
+
+A first-party port might outperform the current external Core ML artifact if it
+avoids the two problems visible in the FluidAudio prototype:
+
+- large numbers of tiny Core ML prediction calls around autoregressive decode
+- stage placement that falls back to CPU or CPU+GPU instead of using the Neural
+  Engine for the stages where ANE actually helps
+
+The investigation should try to prove or disprove that hypothesis with measured
+evidence. Do not claim Neural Engine benefit from `MLModelConfiguration` alone.
+
+## Practical Classification
+
+This is a durable building-block investigation.
+
+Near-term use cases it unlocks:
+
+- direct A/B measurement of Core ML Qwen3-TTS against the current MLX Qwen path
+- an Apple-silicon-specific answer for whether Qwen3-TTS can be shaped for ANE,
+  GPU, or mixed execution better than the public conversion
+- a possible future engine for mobile work if a Core ML path is materially more
+  deployable than the MLX worker path
+
+Existing pain or uncertainty it removes:
+
+- the current external Core ML artifact is too opaque for SpeakSwiftly's runtime
+  decisions
+- FluidAudio's Swift path was closed before merge and lacks tokenizer ownership
+- the repository does not yet have a repeatable way to compare MLX and Core ML
+  Qwen on the same text, voice strategy, and hardware
+
+Simpler extension path considered first:
+
+- adding another `SpeechBackend` case that points at a different MLX model repo
+
+Why that is insufficient:
+
+- the port changes inference engine, model artifact layout, tokenizer handling,
+  cache ownership, and profiling tools
+- Core ML dispatch must be verified with Apple tooling, not through the existing
+  MLX model wrapper
+
+## Investigation Rules
+
+- Keep the base `SpeakSwiftly` runtime untouched until a standalone probe has
+  useful evidence.
+- Keep external conversion scripts, downloaded models, compiled artifacts, and
+  large intermediate tensors out of Git unless a tiny fixture is explicitly
+  useful and safe.
+- Prefer small, reproducible probes over broad dependency adoption.
+- Record exact model source, commit, Core ML Tools version, deployment target,
+  input shapes, output shapes, precision, and compute-unit setting for every
+  converted stage.
+- Treat tokenizer parity as a first-class requirement. A Core ML backend that
+  needs hidden Python tokenization is not ready for runtime integration.
+- Treat audible quality as evidence, but pair it with timing, token, codec-frame,
+  memory, and device-dispatch data.
+
+## Upstream Inventory Targets
+
+Inventory these surfaces from upstream Qwen3-TTS before converting anything:
+
+- text tokenizer source and vocabulary files
+- speech tokenizer or codec model source
+- prompt assembly for Base, CustomVoice, and VoiceDesign paths
+- language and control token IDs
+- reference-audio conditioning path
+- reference transcript handling
+- LM prefill inputs and outputs
+- LM decode inputs, outputs, KV cache shape, cache update rule, and stop tokens
+- code predictor inputs, outputs, cache shape, sampling rule, and codebook order
+- audio decoder inputs, outputs, sample rate, frame size, padding behavior, and
+  maximum audio duration
+
+## Golden Path
+
+The first golden path should be deliberately small:
+
+- one English sentence
+- one fixed language setting
+- one fixed voice or speaker embedding strategy
+- one deterministic sampling configuration when upstream allows it
+- saved token IDs
+- saved prefill tensor shapes
+- saved first few decode token IDs
+- saved codec-frame count
+- saved final audio sample count and sample rate
+
+Only after that path is stable should the investigation add a clone/reference
+audio path.
+
+## Candidate Graph Boundaries
+
+The first conversion pass should evaluate these boundaries separately:
+
+- Swift-side tokenizer and prompt assembly
+- optional Swift-side sampling and logit processing
+- Core ML text/code embedding stage
+- Core ML LM prefill stage
+- Core ML LM decode step with explicit KV cache input/output
+- Core ML code predictor stage
+- Core ML audio decoder stage
+
+Avoid a monolithic all-in-one graph at the start. Separate graphs make stage
+parity, precision failures, and device-placement decisions easier to isolate.
+
+If a stage is dominated by small scalar work, cache mutation, or sampling, keep
+it Swift-side until measurement proves Core ML helps.
+
+## Compute-Unit Questions
+
+For each converted stage, measure at least these configurations where the model
+is numerically stable:
+
+- `.cpuAndGPU`
+- `.cpuAndNeuralEngine`
+- `.all`
+- `.cpuOnly`
+
+Record:
+
+- cold compile or first-load time
+- warm load time
+- per-call latency
+- total synthesis latency
+- real-time factor
+- peak process footprint
+- whether the stage produces finite output
+- whether output parity remains acceptable
+- actual dispatch evidence from Instruments or Core ML performance reports
+
+## Parallelism Questions
+
+The useful performance questions are not only "does ANE run it?"
+
+Also answer:
+
+- Can prefill run as a larger stable graph instead of token-by-token calls?
+- Can decode use fixed buckets that reduce cache reshaping and model recompiles?
+- Can multiple text lines or batch items share warm loaded stages?
+- Can audio decoding overlap with later codec generation?
+- Can reference-conditioning preparation be cached per profile in a Core ML-safe
+  shape?
+- Is generation limited by Core ML dispatch overhead, memory bandwidth, cache
+  copies, sampling, or actual matrix work?
+
+## SpeakSwiftly Integration Boundary
+
+If the probe earns runtime integration, the first backend should be explicitly
+experimental:
+
+- raw backend value: `qwen3_coreml_experimental` or a similarly clear name
+- feature directory: `Sources/SpeakSwiftly/Generation/CoreMLQwen`
+- no default-backend promotion
+- no profile-creation integration until reference conditioning is understood
+- no live playback integration until the probe can produce chunkable audio or a
+  clear file-only limitation is accepted
+
+The adapter should expose the same practical output shape SpeakSwiftly already
+needs:
+
+- sample rate
+- generated samples
+- timing metadata
+- model/source identifier
+- stage timing and compute-unit settings for diagnostics
+
+## Investigation Log
+
+### 2026-05-31 Initial Planning
+
+- Created `research/coreml-qwen3tts` as an isolated worktree.
+- Reviewed the existing FluidInference Qwen3-TTS Core ML artifact and the closed
+  FluidAudio Swift backend PR.
+- Recorded that the external artifact is useful evidence but not a production
+  target for SpeakSwiftly.
+- Added Milestone 32 to `ROADMAP.md` so this work is visible alongside the other
+  backend and release-hardening tracks.
+- Next working slice: inventory upstream Qwen3-TTS source and identify the
+  smallest reproducible Python golden path.
+
+### 2026-05-31 Upstream Source Inventory, Pass 1
+
+Upstream source snapshot:
+
+- repository: `https://github.com/QwenLM/Qwen3-TTS.git`
+- commit inspected: `022e286b98fbec7e1e916cb940cdf532cd9f488e`
+- local inspection path: `/private/tmp/Qwen3-TTS-upstream`
+
+Important upstream files:
+
+- `qwen_tts/inference/qwen3_tts_model.py`
+- `qwen_tts/inference/qwen3_tts_tokenizer.py`
+- `qwen_tts/core/models/modeling_qwen3_tts.py`
+- `qwen_tts/core/models/processing_qwen3_tts.py`
+- `qwen_tts/core/models/configuration_qwen3_tts.py`
+- `qwen_tts/core/tokenizer_12hz/modeling_qwen3_tts_tokenizer_v2.py`
+- `examples/test_model_12hz_base.py`
+- `examples/test_tokenizer_12hz.py`
+
+Initial architecture findings:
+
+- Text tokenization is handled by `Qwen3TTSProcessor`, which wraps
+  `Qwen2Tokenizer` / `Qwen2TokenizerFast` through Hugging Face `ProcessorMixin`.
+- Speech tokenization is separate from text tokenization. The 12 Hz speech
+  tokenizer is loaded through `Qwen3TTSTokenizer.from_pretrained(...)`, registers
+  `qwen3_tts_tokenizer_12hz`, and exposes `encode(...)` plus `decode(...)`.
+- For 12 Hz, `Qwen3TTSTokenizer.encode(...)` returns `audio_codes` shaped per
+  item as `(codes_len, num_quantizers)`.
+- For Base voice cloning, `Qwen3TTSModel.create_voice_clone_prompt(...)` uses the
+  speech tokenizer to encode reference audio and separately extracts a speaker
+  embedding. If `x_vector_only_mode` is false, `ref_text` is required because the
+  generation path uses ICL reference text plus reference speech codes.
+- Text prompts are chat wrapped by small helper methods:
+  - target text: `<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n`
+  - reference text: `<|im_start|>assistant\n{text}<|im_end|>\n`
+  - instruction text: `<|im_start|>user\n{instruct}<|im_end|>\n`
+- Default generation settings in the wrapper match the earlier external-port
+  findings: `top_k=50`, `top_p=1.0`, `temperature=0.9`,
+  `repetition_penalty=1.05`, subtalker sampling enabled with matching top-k,
+  top-p, and temperature, and `min_new_tokens=2` inside the model generate call.
+- The main generation call suppresses the upper 1024 codec-vocabulary tokens
+  except the codec EOS token.
+
+Initial graph-boundary findings:
+
+- The main talker has two embedding sources: text embeddings projected through
+  `text_projection`, and codec embeddings from talker input embeddings.
+- The prompt-building path constructs prefill embeddings by summing text-side
+  and codec-side embeddings in specific positions. This is a strong candidate
+  for Swift-side prompt assembly plus small Core ML embedding/projector stages,
+  but it may be cheaper to keep some embedding lookup work outside Core ML
+  during the first parity probe.
+- The main talker `forward(...)` has a prefill mode when `inputs_embeds` has
+  sequence length greater than one, and a generate mode where the previous CB0
+  token drives code-predictor generation for the other codebooks.
+- The code predictor is a smaller transformer that predicts codebooks 1 through
+  15 from the current hidden state and previous codebook IDs. Its config defaults
+  show 5 hidden layers, hidden size 1024, 16 attention heads, 8 KV heads, and
+  32 code groups in config, while runtime generation uses the model's
+  `num_code_groups - 1` continuation.
+- The main talker returns logits, updated cache, hidden states, `past_hidden`,
+  generation step, trailing text hidden state, and the TTS pad embedding.
+- The final waveform is produced by `model.speech_tokenizer.decode(...)`, not by
+  the talker directly. For Base ICL mode, reference codes are prepended before
+  decode and then the reference-audio portion is cut from the decoded waveform.
+
+Immediate implications:
+
+- The first golden path should target the Base model with `x_vector_only_mode`
+  enabled or use a fixed upstream test fixture before attempting full ICL clone
+  parity. Full ICL clone parity requires text tokenization, speech-tokenizer
+  reference encoding, speaker embedding extraction, generation, speech-tokenizer
+  decode, and reference-audio trimming.
+- Tokenizer work splits into two tracks:
+  - Qwen2 text tokenizer parity for prompt token IDs.
+  - 12 Hz speech tokenizer encode/decode parity for reference codes and final
+    waveform decode.
+- A first Core ML probe can reduce scope by accepting saved text token IDs and a
+  saved speaker embedding or reference-code fixture, but that should be marked
+  probe-only. Runtime integration requires native tokenizer ownership.
+- A custom port should likely convert the talker and speech-tokenizer decode
+  separately rather than treating Qwen3-TTS as one monolithic model.
+
+## Open Decisions
+
+- Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
+  a smaller tokenizer-only path first?
+- Should the first probe live as a package executable target, a local-only script
+  under `.local`, or a maintained script under `scripts/repo-maintenance/`?
+- Should the tokenizer be ported directly to Swift, shared through a generated
+  vocabulary artifact, or initially tested with a temporary Python-produced
+  token fixture?
+- What is the minimum evidence needed before adding a public
+  `SpeechBackend` case?
+
+## Sources
+
+- Qwen3-TTS upstream repository:
+  https://github.com/QwenLM/Qwen3-TTS
+- Qwen3-TTS upstream model card:
+  https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
+- FluidInference Qwen3-TTS Core ML model card:
+  https://huggingface.co/FluidInference/qwen3-tts-coreml
+- Core ML Tools conversion guide:
+  https://apple.github.io/coremltools/docs-guides/source/convert-to-ml-program.html
+- Core ML Tools typed execution guide:
+  https://apple.github.io/coremltools/docs-guides/source/typed-execution.html
+- Apple MLComputeUnits documentation:
+  https://developer.apple.com/documentation/coreml/mlcomputeunits
+- Apple Neural Engine transformer guidance:
+  https://machinelearning.apple.com/research/neural-engine-transformers
