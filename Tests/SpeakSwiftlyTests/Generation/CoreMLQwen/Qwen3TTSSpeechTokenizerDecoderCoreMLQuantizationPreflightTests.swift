@@ -133,6 +133,32 @@ import Testing
     #expect((result.outputMatch?.meanAbsDiff ?? 1.0) < 0.0124)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder bucket 72 w8a8 accepts talker generated codes`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-72-fp16-talker-qwen3-group-16-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_quantization_runtime")
+    #expect(fixture.source.conversionTarget.computePrecision == "float16")
+    #expect(fixture.source.conversionTarget.inputShape == [1, 72, 16])
+    #expect(fixture.runtime.sampleData.source == "talker_code_fixture")
+    #expect(fixture.runtime.sampleData.bucket == 72)
+    #expect(fixture.runtime.sampleData.count == 2)
+    #expect(fixture.runtime.sampleData.samples?.map(\.id) == ["prompt-000", "prompt-001"])
+    #expect(fixture.runtime.sampleData.samples?.map(\.audioCodesShape) == [[72, 16], [67, 16]])
+
+    let result = try #require(fixture.runtime.results.first)
+    #expect(result.status == "succeeded")
+    #expect(result.candidateLabel == "talker-qwen3-bucket-72-group-16")
+    #expect(result.mode == "w8a8_talker_smoke_compute_only")
+    #expect(result.calibrationOpGroupSize == 16)
+    #expect(result.sampleDataCount == 2)
+    #expect(result.packageSizeBytes == 114_813_284)
+    #expect(result.outputMatch?.quantizedOutputShape == [1, 138_240])
+    #expect((result.outputMatch?.maxAbsDiff ?? 0.0) > 0.29)
+    #expect((result.outputMatch?.meanAbsDiff ?? 0.0) > 0.011)
+}
+
 @Test func `qwen3 tts speech tokenizer decoder diverse calibration does not clear valid audio drift`() throws {
     let original = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
         "speech-tokenizer-decoder-coreml-audio-inspection-bucket-40-w8a8-12hz.json",

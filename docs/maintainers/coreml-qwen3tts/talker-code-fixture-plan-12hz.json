@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-05-31T18:05:35Z",
+  "created_at_utc": "2026-05-31T18:05:50Z",
   "mode": "preflight",
   "purpose": "Plan Qwen3-TTS talker-code capture for decoder calibration and evaluation. Runtime mode monkeypatches speech_tokenizer.decode, records exact audio_codes, then calls the original decode so generated audio remains the normal output.",
   "source": {
@@ -108,5 +108,5 @@
     "code_step_samples": 1920,
     "output_audio_role": "evaluation_only_for_coreml_activation_calibration"
   },
-  "next_command": "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh uv run --python 3.12 --with 'torch==2.7.0' --with 'transformers==4.57.3' --with 'numpy>=2.0.0' --with 'soundfile>=0.13.0' --with 'librosa>=0.11.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio==2.7.0' scripts/repo-maintenance/coreml-qwen3tts/generate-talker-code-fixture.py --no-preflight-only --allow-model-download --replace-existing --qwen-source .local/coreml-qwen3tts/Qwen3-TTS-source --output docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
+  "next_command": "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh -- uv run --python 3.12 --with 'torch==2.7.0' --with 'transformers==4.57.3' --with 'accelerate==1.12.0' --with 'numpy>=2.0.0' --with 'soundfile>=0.13.0' --with 'librosa>=0.11.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio==2.7.0' scripts/repo-maintenance/coreml-qwen3tts/generate-talker-code-fixture.py --no-preflight-only --allow-model-download --replace-existing --qwen-source .local/coreml-qwen3tts/Qwen3-TTS-source --output .local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json --summary-output docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json"
 }

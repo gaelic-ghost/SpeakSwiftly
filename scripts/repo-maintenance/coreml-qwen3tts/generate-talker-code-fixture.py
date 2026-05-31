@@ -172,6 +172,39 @@ def aggregate_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
   }
 
 
+def compact_sample(sample: dict[str, Any]) -> dict[str, Any]:
+  encoded = sample["encoded"]
+  return {
+    "id": sample["id"],
+    "text": sample["text"],
+    "generation_parameters": sample["generation_parameters"],
+    "encoded": {
+      "audio_codes_shape": encoded["audio_codes_shape"],
+      "audio_codes_dtype": encoded["audio_codes_dtype"],
+      "audio_codes_min": encoded["audio_codes_min"],
+      "audio_codes_max": encoded["audio_codes_max"],
+      "audio_codes_unique_count": encoded["audio_codes_unique_count"],
+      "audio_codes_prefix": encoded["audio_codes_prefix"],
+      "audio_codes_first_quantizer_prefix": encoded["audio_codes_first_quantizer_prefix"],
+    },
+    "bucket_assignment": sample["bucket_assignment"],
+    "generated_audio": sample["generated_audio"],
+  }
+
+
+def compact_report(report: dict[str, Any]) -> dict[str, Any]:
+  return {
+    **report,
+    "mode": f"{report['mode']}_summary",
+    "purpose": (
+      "Compact summary of Qwen3-TTS talker-generated audio-code fixtures. "
+      "Full audio_codes arrays remain in the local artifact named by full_fixture_path."
+    ),
+    "full_fixture_path": report.get("artifact_paths", {}).get("full_fixture_path"),
+    "samples": [compact_sample(sample) for sample in report.get("samples", [])],
+  }
+
+
 def reset_output_dir(output_dir: Path, replace_existing: bool) -> None:
   if output_dir.exists():
     if not replace_existing:
@@ -221,15 +254,18 @@ def build_preflight_report(
     "calibration_scope": calibration_scope(),
     "next_command": (
       "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh "
+      "-- "
       "uv run --python 3.12 "
       "--with 'torch==2.7.0' --with 'transformers==4.57.3' "
+      "--with 'accelerate==1.12.0' "
       "--with 'numpy>=2.0.0' --with 'soundfile>=0.13.0' "
       "--with 'librosa>=0.11.0' --with 'sox>=1.5.0' "
       "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio==2.7.0' "
       "scripts/repo-maintenance/coreml-qwen3tts/generate-talker-code-fixture.py "
       "--no-preflight-only --allow-model-download --replace-existing "
       "--qwen-source .local/coreml-qwen3tts/Qwen3-TTS-source "
-      "--output docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
+      "--output .local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json "
+      "--summary-output docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json"
     ),
   }
 
@@ -386,6 +422,10 @@ def build_runtime_report(
     "model_file_inventory": inventory,
     "calibration_scope": calibration_scope(),
     "aggregate": aggregate_samples(samples),
+    "artifact_paths": {
+      "full_fixture_path": relative_package_path(resolve_package_path(args.output)) if args.output else None,
+      "output_dir": relative_package_path(output_dir),
+    },
     "samples": samples,
   }
 
@@ -434,6 +474,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output-dir", type=Path, default=Path(DEFAULT_OUTPUT_DIR))
   parser.add_argument("--output", type=Path, default=None)
+  parser.add_argument("--summary-output", type=Path, default=None)
   return parser.parse_args()
 
 
@@ -449,7 +490,10 @@ def write_report(report: dict[str, Any], output: Path | None) -> None:
 def main() -> int:
   args = parse_args()
   try:
-    write_report(build_report(args), args.output)
+    report = build_report(args)
+    write_report(report, args.output)
+    if args.summary_output:
+      write_report(compact_report(report), args.summary_output)
   except Exception as error:
     print(f"ERROR: {error}", file=sys.stderr)
     return 1

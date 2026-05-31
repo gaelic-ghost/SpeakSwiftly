@@ -38,6 +38,20 @@ import Testing
     #expect(fixture.nextCommand.contains("generate-talker-code-fixture.py"))
 }
 
+@Test func `qwen3 tts talker code fixture summary records captured buckets`() throws {
+    let fixture = try Qwen3TTSTalkerCodeSummaryFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "runtime_summary")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice")
+    #expect(fixture.fullFixturePath == ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json")
+    #expect(fixture.aggregate.sampleCount == 3)
+    #expect(fixture.aggregate.suggestedDecoderBuckets == [72, 88])
+    #expect(fixture.samples.map(\.bucketAssignment.assignedBucket) == [72, 72, 88])
+    #expect(fixture.samples.map(\.encoded.audioCodesShape) == [[72, 16], [67, 16], [84, 16]])
+    #expect(fixture.samples.allSatisfy { !$0.encoded.audioCodesPrefix.isEmpty })
+}
+
 @Test func `qwen3 tts decoder alignment plan keeps tuning separate from activation calibration`() throws {
     let fixture = try Qwen3TTSDecoderAlignmentPlanFixture.load()
 
@@ -112,6 +126,45 @@ private struct Qwen3TTSTalkerCodePlanFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/talker-code-fixture-plan-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSTalkerCodeSummaryFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct Aggregate: Decodable {
+        let sampleCount: Int
+        let suggestedDecoderBuckets: [Int]
+    }
+
+    struct Sample: Decodable {
+        struct Encoded: Decodable {
+            let audioCodesShape: [Int]
+            let audioCodesPrefix: [[Int]]
+        }
+
+        struct BucketAssignment: Decodable {
+            let assignedBucket: Int
+        }
+
+        let encoded: Encoded
+        let bucketAssignment: BucketAssignment
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let source: Source
+    let fullFixturePath: String
+    let aggregate: Aggregate
+    let samples: [Sample]
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
             as: Self.self,
         )
     }

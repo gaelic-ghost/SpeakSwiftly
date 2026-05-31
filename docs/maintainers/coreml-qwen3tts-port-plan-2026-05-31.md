@@ -1702,6 +1702,73 @@ Next decision pressure:
   broader LibriTTS-R inputs still leave valid-region drift around the same
   magnitude.
 
+### 2026-05-31 Talker-Code Capture, Pass 1
+
+The talker-code fixture generator now writes the full code tensor fixture to
+`.local` and can also write a compact summary report for Git. The compact report
+keeps text, generation settings, code shapes, code prefixes, bucket assignment,
+and generated WAV metadata while leaving full `audio_codes` arrays and WAVs in
+local artifacts.
+
+The first runtime capture used:
+
+- model id: `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice`
+- resolved revision: `85e237c12c027371202489a0ec509ded67b5e4b5`
+- voice: `Ryan`
+- language: `English`
+- seed: `20260531`
+- prompts: three short English calibration prompts
+- live-service protection: `run-with-live-service-headroom.sh`
+
+The script monkeypatched `model.model.speech_tokenizer.decode` at runtime,
+recorded the exact `audio_codes` argument, and then called the original decode
+so the generated WAVs still came from the normal Qwen path.
+
+Captured code lengths:
+
+- `prompt-000`: 72 steps, bucket 72, no padding
+- `prompt-001`: 67 steps, bucket 72, 5 padded steps
+- `prompt-002`: 84 steps, bucket 88, 4 padded steps
+
+Practical interpretation:
+
+- Even short Qwen talker outputs landed in buckets 72 and 88, not bucket 40.
+- This supports keeping bucketed decoder packages around the production talker
+  distribution instead of judging W8A8 only from short LibriTTS-R encoded clips.
+- The generated audio sample counts matched `code_steps * 1920`, so the captured
+  codes and output WAV metadata agree with the 12 Hz decoder contract.
+
+Bucket 72 fp16 conversion was rebuilt after earlier artifact cleanup:
+
+- package size: about 218 MB
+- input shape: `[1, 72, 16]`
+- output shape: `[1, 138240]`
+- mean absolute diff versus PyTorch wrapper: `0.000435686728451401`
+- max absolute diff versus PyTorch wrapper: `0.048760250210762024`
+
+That fp16 max diff is looser than the earlier bucket-40 fp16 package, but the
+mean diff remains much smaller than the W8A8 drift being investigated.
+
+Bucket 72 group-size-16 W8A8 using the two talker-generated bucket-72 samples:
+
+- package size: `114813284` bytes
+- whole-output max absolute diff versus bucket-72 fp16 Core ML:
+  `0.29174041748046875`
+- whole-output mean absolute diff versus bucket-72 fp16 Core ML:
+  `0.01180611178278923`
+- sample source: `talker_code_fixture`
+- calibration sample count: 2
+
+Interpretation:
+
+- Talker-generated codes are a better production-shaped calibration source than
+  LibriTTS-R re-encodes, but they did not clear the W8A8 decoder drift.
+- The mean diff is slightly below the bucket-40 LibriTTS-R valid-region number,
+  but it remains in the same audible-risk range.
+- The next useful evidence is not timing or Instruments yet. It should be either
+  an audio inspection report for bucket 72 talker samples, narrower per-op
+  activation scopes, or the supervised decoder-alignment probe.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
