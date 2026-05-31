@@ -541,6 +541,7 @@ Added checked-in conversion fixtures:
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-fixed16q-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-export-fixed16q-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-export-strict-fixed16q-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json`
 
 Added SwiftPM tests for the conversion fixtures:
 
@@ -585,8 +586,19 @@ Runtime findings:
 - A strict `torch.export` capture attempt failed in the decoder transformer
   masking path. The actionable part of the error is that PyTorch export hit a
   vmap path that calls `.item()` on a Tensor inside the causal mask helper.
-- The script now records this as a structured trace failure with conversion
-  status `not_started`.
+- A fixed-shape static-mask wrapper then bypassed the Transformers causal-mask
+  helper while preserving the same upstream weights and output. This wrapper
+  matched upstream PyTorch output exactly with `upstream_max_abs_diff: 0.0`.
+- TorchScript tracing with the static-mask wrapper succeeded, but Core ML Tools
+  conversion failed on an `int` op around the causal convolution path.
+- Non-strict `torch.export` with the static-mask wrapper succeeded. Core ML
+  Tools first rejected the raw exported program because it was still in the
+  PyTorch training dialect and requested `run_decompositions({})`.
+- After `run_decompositions({})`, Core ML Tools converted the fixed-shape
+  decoder to an ML Program and saved an `.mlpackage`.
+- CPU-only Core ML prediction against the converted decoder returned shape
+  `[1, 15360]` and matched the PyTorch wrapper with max absolute difference
+  `0.00003900937736034393`.
 
 Trace warnings before the failure:
 
@@ -599,27 +611,30 @@ Trace warnings before the failure:
 
 Immediate implications:
 
-- The blocker is now the PyTorch trace/export boundary, not Core ML execution
-  quality and not Neural Engine dispatch.
+- The first decoder-only Core ML package now exists for the tiny synthetic
+  `[1, 8, 16]` fixture.
 - The Core ML Tools-tested Torch line did not fix the trace failure.
 - Removing the quantizer iteration was useful because it eliminated several
   trace warnings without changing output, but it was not sufficient.
-- The next conversion slice should isolate or rewrite the decoder transformer's
-  causal-mask path for this fixed `[1, 8, 16]` probe before spending time on
-  Core ML compute-unit or Neural Engine measurement.
-- No `.mlpackage` was produced in this pass.
+- Replacing the transformer causal-mask helper with a fixed-shape static mask
+  was the step that moved the probe from PyTorch-capture failure to Core ML
+  conversion success.
+- This is still a fixed-shape proof, not a runtime backend. The next slice
+  should inspect the generated `.mlpackage`, measure CPU/GPU/ANE compute-unit
+  behavior, and decide whether the static-mask strategy can become a small set
+  of bucketed decoder graphs rather than one hardcoded test shape.
 
 Validation:
 
 - Conversion preflight generation succeeded.
-- Runtime conversion probe produced a structured failure report.
+- Runtime conversion probes produced structured failure and success reports.
 - `jq empty` passed for the Core ML preflight, conversion, and runtime
   speech-tokenizer fixtures.
 - A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
   checked-in Core ML conversion fixtures or script.
 - `uv run --with ruff ruff check` passed for all four Core ML Qwen maintainer
   scripts.
-- `swift test --filter qwen3` passed with 12 tests covering text tokenization,
+- `swift test --filter qwen3` passed with 16 tests covering text tokenization,
   speech-tokenizer config, runtime fixtures, and the decoder Core ML conversion
   probe.
 

@@ -168,7 +168,8 @@ def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], in
       "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' "
       "--with 'coremltools>=8.3.0,<10' "
       "scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py "
-      "--no-preflight-only --capture-mode export --wrapper-mode fixed_16q "
+      "--no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask "
+      "--verify-coreml-prediction --coreml-compute-units cpuOnly "
       "--qwen-source /path/to/Qwen3-TTS --allow-model-download "
       "--output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion.json "
       "--mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
@@ -243,6 +244,51 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
         wav = block(wav)
       return wav.clamp(min=-1, max=1).squeeze(1)
 
+  class Fixed16StaticMaskDecoderWrapper(Fixed16QuantizerDecoderWrapper):
+    def run_pre_transformer(self, hidden):
+      transformer = self.pre_transformer
+      hidden = transformer.input_proj(hidden)
+      batch_size = hidden.shape[0]
+      sequence_length = hidden.shape[1]
+      cache_position = torch.arange(sequence_length, device=hidden.device)
+      position_ids = cache_position.unsqueeze(0).expand(batch_size, sequence_length)
+      mask = torch.full(
+        (1, 1, sequence_length, sequence_length),
+        torch.finfo(hidden.dtype).min,
+        dtype=hidden.dtype,
+        device=hidden.device,
+      )
+      mask = torch.triu(mask, diagonal=1)
+      position_embeddings = transformer.rotary_emb(hidden, position_ids)
+      for decoder_layer in transformer.layers:
+        hidden = decoder_layer(
+          hidden,
+          attention_mask=mask,
+          position_ids=position_ids,
+          past_key_values=None,
+          use_cache=False,
+          cache_position=cache_position,
+          position_embeddings=position_embeddings,
+        )
+      hidden = transformer.norm(hidden)
+      return transformer.output_proj(hidden)
+
+    def forward(self, audio_codes):
+      codes = torch.clamp(audio_codes, min=0).transpose(1, 2)
+      semantic = self.decode_rvq(self.quantizer.rvq_first, codes[:, :1, :])
+      acoustic = self.decode_rvq(self.quantizer.rvq_rest, codes[:, 1:, :])
+      hidden = semantic + acoustic
+      hidden = self.pre_conv(hidden).transpose(1, 2)
+      hidden = self.run_pre_transformer(hidden)
+      hidden = hidden.permute(0, 2, 1)
+      for blocks in self.upsample:
+        for block in blocks:
+          hidden = block(hidden)
+      wav = hidden
+      for block in self.decoder:
+        wav = block(wav)
+      return wav.clamp(min=-1, max=1).squeeze(1)
+
   audio_codes = np.asarray(fixture["encoded"]["audio_codes"], dtype=np.int64)[None, :, :]
   torch_codes = torch.from_numpy(audio_codes)
 
@@ -250,6 +296,8 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
   upstream_decoder = UpstreamDecoderWrapper(tokenizer.model.decoder).eval()
   if args.wrapper_mode == "fixed_16q":
     decoder = Fixed16QuantizerDecoderWrapper(tokenizer.model.decoder).eval()
+  elif args.wrapper_mode == "fixed_16q_static_mask":
+    decoder = Fixed16StaticMaskDecoderWrapper(tokenizer.model.decoder).eval()
   else:
     decoder = upstream_decoder
 
@@ -277,6 +325,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "convert_to": "mlprogram",
       "compute_precision": args.compute_precision,
       "capture_mode": args.capture_mode,
+      "export_decomposed": args.export_decomposed if args.capture_mode == "export" else False,
     },
     "trace": {
       "status": "not_started",
@@ -288,6 +337,10 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "status": "not_started",
       "mlpackage_output": str(args.mlpackage_output) if args.mlpackage_output else None,
     },
+    "output_match": {
+      "status": "not_started",
+      "compute_units": args.coreml_compute_units,
+    } if args.verify_coreml_prediction else None,
   }
 
   with torch.inference_mode():
@@ -309,12 +362,15 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
     with torch.inference_mode():
       if args.capture_mode == "export":
         captured_model = torch.export.export(decoder, (torch_codes,), strict=args.export_strict)
+        if args.export_decomposed:
+          captured_model = captured_model.run_decompositions({})
       else:
         captured_model = torch.jit.trace(decoder, torch_codes, strict=False, check_trace=False)
     report["trace"] = {
       "status": "succeeded",
       "capture_mode": args.capture_mode,
       "strict": args.export_strict if args.capture_mode == "export" else False,
+      "export_decomposed": args.export_decomposed if args.capture_mode == "export" else False,
       "check_trace": False,
     }
   except Exception as error:
@@ -322,6 +378,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "status": "failed",
       "capture_mode": args.capture_mode,
       "strict": args.export_strict if args.capture_mode == "export" else False,
+      "export_decomposed": args.export_decomposed if args.capture_mode == "export" else False,
       "check_trace": False,
       "error_type": type(error).__name__,
       "error_message": str(error),
@@ -352,6 +409,41 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "status": "succeeded",
       "mlpackage_output": str(args.mlpackage_output) if args.mlpackage_output else None,
     }
+    if args.verify_coreml_prediction:
+      try:
+        compute_units = {
+          "all": ct.ComputeUnit.ALL,
+          "cpuOnly": ct.ComputeUnit.CPU_ONLY,
+          "cpuAndGPU": ct.ComputeUnit.CPU_AND_GPU,
+          "cpuAndNeuralEngine": ct.ComputeUnit.CPU_AND_NE,
+        }[args.coreml_compute_units]
+        prediction_model = (
+          ct.models.MLModel(str(args.mlpackage_output), compute_units=compute_units)
+          if args.mlpackage_output
+          else mlmodel
+        )
+        prediction = prediction_model.predict({"audio_codes": audio_codes.astype(np.int32)})
+        coreml_output = np.asarray(prediction["audio_values"])
+        delta = coreml_output - torch_output
+        report["output_match"] = {
+          "status": "succeeded",
+          "compute_units": args.coreml_compute_units,
+          "coreml_output_shape": list(coreml_output.shape),
+          "coreml_output_dtype": str(coreml_output.dtype),
+          "coreml_output_min": float(coreml_output.min()),
+          "coreml_output_max": float(coreml_output.max()),
+          "coreml_output_mean": float(coreml_output.mean()),
+          "coreml_output_rms": float(np.sqrt(np.mean(np.square(coreml_output)))),
+          "max_abs_diff": float(np.max(np.abs(delta))),
+          "mean_abs_diff": float(np.mean(np.abs(delta))),
+        }
+      except Exception as error:
+        report["output_match"] = {
+          "status": "failed",
+          "compute_units": args.coreml_compute_units,
+          "error_type": type(error).__name__,
+          "error_message": str(error),
+        }
   except Exception as error:
     report["conversion"] = {
       "status": "failed",
@@ -409,7 +501,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument(
     "--wrapper-mode",
     default="upstream",
-    choices=["upstream", "fixed_16q"],
+    choices=["upstream", "fixed_16q", "fixed_16q_static_mask"],
   )
   parser.add_argument(
     "--capture-mode",
@@ -420,6 +512,17 @@ def parse_args() -> argparse.Namespace:
     "--export-strict",
     action=argparse.BooleanOptionalAction,
     default=False,
+  )
+  parser.add_argument(
+    "--export-decomposed",
+    action=argparse.BooleanOptionalAction,
+    default=False,
+  )
+  parser.add_argument("--verify-coreml-prediction", action="store_true")
+  parser.add_argument(
+    "--coreml-compute-units",
+    default="cpuOnly",
+    choices=["all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"],
   )
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output", type=Path, default=None)

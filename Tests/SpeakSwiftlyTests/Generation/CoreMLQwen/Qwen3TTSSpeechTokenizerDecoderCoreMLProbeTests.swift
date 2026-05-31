@@ -16,6 +16,10 @@ import Testing
     #expect(fixture.nextCommand.contains("--python 3.12"))
     #expect(fixture.nextCommand.contains("--with 'coremltools>=8.3.0,<10'"))
     #expect(fixture.nextCommand.contains("--with 'torch==2.7.0'"))
+    #expect(fixture.nextCommand.contains("--capture-mode export"))
+    #expect(fixture.nextCommand.contains("--export-decomposed"))
+    #expect(fixture.nextCommand.contains("--wrapper-mode fixed_16q_static_mask"))
+    #expect(fixture.nextCommand.contains("--verify-coreml-prediction"))
 }
 
 @Test func `qwen3 tts speech tokenizer decoder core ml conversion records trace blocker`() throws {
@@ -85,7 +89,7 @@ import Testing
     #expect(nonStrictFixture.trace.status == "failed")
     #expect(nonStrictFixture.trace.strict == false)
     #expect(nonStrictFixture.trace.errorType == "RuntimeError")
-    #expect(nonStrictFixture.trace.errorMessage.contains("is_contiguous inside of vmap"))
+    #expect(nonStrictFixture.trace.errorMessage?.contains("is_contiguous inside of vmap") == true)
 
     #expect(strictFixture.conversionTarget.wrapperMode == "fixed_16q")
     #expect(strictFixture.conversionTarget.captureMode == "export")
@@ -93,9 +97,30 @@ import Testing
     #expect(strictFixture.trace.status == "failed")
     #expect(strictFixture.trace.strict == true)
     #expect(strictFixture.trace.errorType == "TorchRuntimeError")
-    #expect(strictFixture.trace.errorMessage.contains("calling .item() on a Tensor"))
-    #expect(strictFixture.trace.errorMessage.contains("<local-home-path>"))
+    #expect(strictFixture.trace.errorMessage?.contains("calling .item() on a Tensor") == true)
+    #expect(strictFixture.trace.errorMessage?.contains("<local-home-path>") == true)
     #expect(strictFixture.conversion.status == "not_started")
+}
+
+@Test func `qwen3 tts speech tokenizer decoder core ml static mask export converts and predicts`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture.load(
+        "speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json",
+    )
+
+    #expect(fixture.source.coremltoolsVersion == "9.0")
+    #expect(fixture.source.torchVersion == "2.7.0")
+    #expect(fixture.conversionTarget.wrapperMode == "fixed_16q_static_mask")
+    #expect(fixture.conversionTarget.captureMode == "export")
+    #expect(fixture.conversionTarget.exportDecomposed == true)
+    #expect(fixture.conversionTarget.upstreamMaxAbsDiff == 0.0)
+    #expect(fixture.trace.status == "succeeded")
+    #expect(fixture.trace.captureMode == "export")
+    #expect(fixture.trace.exportDecomposed == true)
+    #expect(fixture.conversion.status == "succeeded")
+    #expect(fixture.outputMatch?.status == "succeeded")
+    #expect(fixture.outputMatch?.computeUnits == "cpuOnly")
+    #expect(fixture.outputMatch?.coremlOutputShape == [1, 15360])
+    #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0001)
 }
 
 private struct Qwen3TTSSpeechTokenizerDecoderCoreMLPreflightFixture: Decodable {
@@ -136,6 +161,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture: Decodable 
         let inputShape: [Int]
         let torchOutputShape: [Int]
         let captureMode: String?
+        let exportDecomposed: Bool?
         let upstreamMaxAbsDiff: Double?
     }
 
@@ -143,12 +169,20 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture: Decodable 
         let status: String
         let captureMode: String?
         let strict: Bool
-        let errorType: String
-        let errorMessage: String
+        let exportDecomposed: Bool?
+        let errorType: String?
+        let errorMessage: String?
     }
 
     struct Conversion: Decodable {
         let status: String
+    }
+
+    struct OutputMatch: Decodable {
+        let status: String
+        let computeUnits: String
+        let coremlOutputShape: [Int]?
+        let maxAbsDiff: Double?
     }
 
     let schemaVersion: Int
@@ -157,6 +191,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture: Decodable 
     let conversionTarget: ConversionTarget
     let trace: Trace
     let conversion: Conversion
+    let outputMatch: OutputMatch?
 
     static func load(_ filename: String) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
