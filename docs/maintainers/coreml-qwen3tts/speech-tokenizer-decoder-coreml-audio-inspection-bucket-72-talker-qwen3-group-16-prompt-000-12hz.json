@@ -1,0 +1,330 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T20:36:28Z",
+  "mode": "coreml_decoder_audio_inspection",
+  "source": {
+    "baseline_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72-fp16.mlpackage",
+    "baseline_model_package_size_bytes": 228718254,
+    "candidate_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-72-fp16-w8a8-talker-qwen3-group-16.mlpackage",
+    "candidate_model_package_size_bytes": 114813284,
+    "calibration_fixture_path": ".local/coreml-qwen3tts/calibration-code-fixture-libritts-r-24-diverse-12hz.json",
+    "talker_code_fixture_path": ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json",
+    "bucket_plan_path": ".local/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-libritts-r-24-diverse-12hz.json",
+    "sample_source": "talker",
+    "compute_units": "cpuOnly",
+    "sample_rate": 24000
+  },
+  "sample": {
+    "id": "prompt-000",
+    "text_normalized": "A calm calibration sentence with steady volume and clear articulation.",
+    "audio_codes_shape": [
+      72,
+      16
+    ],
+    "padded_input_shape": [
+      1,
+      72,
+      16
+    ],
+    "padded_step_count": 0,
+    "pad_value": -1,
+    "source_audio_seconds": 5.76,
+    "valid_output_sample_count": 138240,
+    "padded_output_sample_count": 138240,
+    "generated_audio_path": ".local/coreml-qwen3tts/talker-code-fixtures/000-prompt-000.wav"
+  },
+  "artifacts": {
+    "baseline_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-group-16-prompt-000/baseline-fp16.wav",
+    "candidate_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-group-16-prompt-000/candidate-w8a8.wav",
+    "diff_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-group-16-prompt-000/candidate-minus-baseline.wav",
+    "baseline_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-group-16-prompt-000/baseline-fp16-valid.wav",
+    "candidate_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-group-16-prompt-000/candidate-w8a8-valid.wav"
+  },
+  "audio": {
+    "baseline": {
+      "sample_count": 138240,
+      "min": -0.62890625,
+      "max": 0.52734375,
+      "mean": -0.00037206886918284,
+      "rms": 0.08517513424158096,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "candidate": {
+      "sample_count": 138240,
+      "min": -0.427490234375,
+      "max": 0.424072265625,
+      "mean": 0.00037458064616657794,
+      "rms": 0.08323308825492859,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "full_output_diff": {
+      "sample_count": 138240,
+      "max_abs_diff": 0.3759765625,
+      "mean_abs_diff": 0.012348570860922337,
+      "rms_diff": 0.02168286219239235
+    },
+    "valid_output_diff": {
+      "sample_count": 138240,
+      "max_abs_diff": 0.3759765625,
+      "mean_abs_diff": 0.012348570860922337,
+      "rms_diff": 0.02168286219239235
+    },
+    "padded_tail_diff": null,
+    "windows": {
+      "window_seconds": 0.25,
+      "window_samples": 6000,
+      "count": 24,
+      "alert_mean_abs_diff": 0.01,
+      "alert_count": 15,
+      "alert_ratio": 0.625,
+      "top_by_mean_abs_diff": [
+        {
+          "index": 4,
+          "start_sample": 24000,
+          "end_sample": 30000,
+          "start_seconds": 1.0,
+          "end_seconds": 1.25,
+          "baseline_rms": 0.08361246436834335,
+          "candidate_rms": 0.08142942190170288,
+          "max_abs_diff": 0.2073974609375,
+          "mean_abs_diff": 0.028064705431461334,
+          "rms_diff": 0.04742826521396637
+        },
+        {
+          "index": 3,
+          "start_sample": 18000,
+          "end_sample": 24000,
+          "start_seconds": 0.75,
+          "end_seconds": 1.0,
+          "baseline_rms": 0.19786731898784637,
+          "candidate_rms": 0.1832023710012436,
+          "max_abs_diff": 0.201416015625,
+          "mean_abs_diff": 0.025066835805773735,
+          "rms_diff": 0.03600754961371422
+        },
+        {
+          "index": 16,
+          "start_sample": 96000,
+          "end_sample": 102000,
+          "start_seconds": 4.0,
+          "end_seconds": 4.25,
+          "baseline_rms": 0.12401019781827927,
+          "candidate_rms": 0.12580522894859314,
+          "max_abs_diff": 0.3759765625,
+          "mean_abs_diff": 0.02050769329071045,
+          "rms_diff": 0.03952082246541977
+        },
+        {
+          "index": 2,
+          "start_sample": 12000,
+          "end_sample": 18000,
+          "start_seconds": 0.5,
+          "end_seconds": 0.75,
+          "baseline_rms": 0.06428787112236023,
+          "candidate_rms": 0.06524428725242615,
+          "max_abs_diff": 0.1805419921875,
+          "mean_abs_diff": 0.01891310140490532,
+          "rms_diff": 0.030262833461165428
+        },
+        {
+          "index": 6,
+          "start_sample": 36000,
+          "end_sample": 42000,
+          "start_seconds": 1.5,
+          "end_seconds": 1.75,
+          "baseline_rms": 0.11128081381320953,
+          "candidate_rms": 0.1112622320652008,
+          "max_abs_diff": 0.108154296875,
+          "mean_abs_diff": 0.017588665708899498,
+          "rms_diff": 0.023616435006260872
+        },
+        {
+          "index": 12,
+          "start_sample": 72000,
+          "end_sample": 78000,
+          "start_seconds": 3.0,
+          "end_seconds": 3.25,
+          "baseline_rms": 0.11399176716804504,
+          "candidate_rms": 0.10967522859573364,
+          "max_abs_diff": 0.09246826171875,
+          "mean_abs_diff": 0.015617881901562214,
+          "rms_diff": 0.02202952839434147
+        },
+        {
+          "index": 7,
+          "start_sample": 42000,
+          "end_sample": 48000,
+          "start_seconds": 1.75,
+          "end_seconds": 2.0,
+          "baseline_rms": 0.07595621049404144,
+          "candidate_rms": 0.07149443030357361,
+          "max_abs_diff": 0.0970458984375,
+          "mean_abs_diff": 0.0151371406391263,
+          "rms_diff": 0.01978128030896187
+        },
+        {
+          "index": 10,
+          "start_sample": 60000,
+          "end_sample": 66000,
+          "start_seconds": 2.5,
+          "end_seconds": 2.75,
+          "baseline_rms": 0.05324891582131386,
+          "candidate_rms": 0.051104843616485596,
+          "max_abs_diff": 0.12287139892578125,
+          "mean_abs_diff": 0.013463209383189678,
+          "rms_diff": 0.020120427012443542
+        },
+        {
+          "index": 5,
+          "start_sample": 30000,
+          "end_sample": 36000,
+          "start_seconds": 1.25,
+          "end_seconds": 1.5,
+          "baseline_rms": 0.09544988721609116,
+          "candidate_rms": 0.09437157213687897,
+          "max_abs_diff": 0.1148681640625,
+          "mean_abs_diff": 0.013051213696599007,
+          "rms_diff": 0.01854221150279045
+        },
+        {
+          "index": 11,
+          "start_sample": 66000,
+          "end_sample": 72000,
+          "start_seconds": 2.75,
+          "end_seconds": 3.0,
+          "baseline_rms": 0.08544609695672989,
+          "candidate_rms": 0.0842679888010025,
+          "max_abs_diff": 0.1142578125,
+          "mean_abs_diff": 0.012647364288568497,
+          "rms_diff": 0.018207555636763573
+        }
+      ],
+      "top_by_max_abs_diff": [
+        {
+          "index": 16,
+          "start_sample": 96000,
+          "end_sample": 102000,
+          "start_seconds": 4.0,
+          "end_seconds": 4.25,
+          "baseline_rms": 0.12401019781827927,
+          "candidate_rms": 0.12580522894859314,
+          "max_abs_diff": 0.3759765625,
+          "mean_abs_diff": 0.02050769329071045,
+          "rms_diff": 0.03952082246541977
+        },
+        {
+          "index": 17,
+          "start_sample": 102000,
+          "end_sample": 108000,
+          "start_seconds": 4.25,
+          "end_seconds": 4.5,
+          "baseline_rms": 0.06354408711194992,
+          "candidate_rms": 0.0635867789387703,
+          "max_abs_diff": 0.23358154296875,
+          "mean_abs_diff": 0.01167814526706934,
+          "rms_diff": 0.020645957440137863
+        },
+        {
+          "index": 4,
+          "start_sample": 24000,
+          "end_sample": 30000,
+          "start_seconds": 1.0,
+          "end_seconds": 1.25,
+          "baseline_rms": 0.08361246436834335,
+          "candidate_rms": 0.08142942190170288,
+          "max_abs_diff": 0.2073974609375,
+          "mean_abs_diff": 0.028064705431461334,
+          "rms_diff": 0.04742826521396637
+        },
+        {
+          "index": 3,
+          "start_sample": 18000,
+          "end_sample": 24000,
+          "start_seconds": 0.75,
+          "end_seconds": 1.0,
+          "baseline_rms": 0.19786731898784637,
+          "candidate_rms": 0.1832023710012436,
+          "max_abs_diff": 0.201416015625,
+          "mean_abs_diff": 0.025066835805773735,
+          "rms_diff": 0.03600754961371422
+        },
+        {
+          "index": 2,
+          "start_sample": 12000,
+          "end_sample": 18000,
+          "start_seconds": 0.5,
+          "end_seconds": 0.75,
+          "baseline_rms": 0.06428787112236023,
+          "candidate_rms": 0.06524428725242615,
+          "max_abs_diff": 0.1805419921875,
+          "mean_abs_diff": 0.01891310140490532,
+          "rms_diff": 0.030262833461165428
+        },
+        {
+          "index": 14,
+          "start_sample": 84000,
+          "end_sample": 90000,
+          "start_seconds": 3.5,
+          "end_seconds": 3.75,
+          "baseline_rms": 0.06566370278596878,
+          "candidate_rms": 0.06554906070232391,
+          "max_abs_diff": 0.154144287109375,
+          "mean_abs_diff": 0.009070687927305698,
+          "rms_diff": 0.013650955632328987
+        },
+        {
+          "index": 10,
+          "start_sample": 60000,
+          "end_sample": 66000,
+          "start_seconds": 2.5,
+          "end_seconds": 2.75,
+          "baseline_rms": 0.05324891582131386,
+          "candidate_rms": 0.051104843616485596,
+          "max_abs_diff": 0.12287139892578125,
+          "mean_abs_diff": 0.013463209383189678,
+          "rms_diff": 0.020120427012443542
+        },
+        {
+          "index": 9,
+          "start_sample": 54000,
+          "end_sample": 60000,
+          "start_seconds": 2.25,
+          "end_seconds": 2.5,
+          "baseline_rms": 0.05149243026971817,
+          "candidate_rms": 0.05263508856296539,
+          "max_abs_diff": 0.121246337890625,
+          "mean_abs_diff": 0.012642092071473598,
+          "rms_diff": 0.017649156972765923
+        },
+        {
+          "index": 5,
+          "start_sample": 30000,
+          "end_sample": 36000,
+          "start_seconds": 1.25,
+          "end_seconds": 1.5,
+          "baseline_rms": 0.09544988721609116,
+          "candidate_rms": 0.09437157213687897,
+          "max_abs_diff": 0.1148681640625,
+          "mean_abs_diff": 0.013051213696599007,
+          "rms_diff": 0.01854221150279045
+        },
+        {
+          "index": 11,
+          "start_sample": 66000,
+          "end_sample": 72000,
+          "start_seconds": 2.75,
+          "end_seconds": 3.0,
+          "baseline_rms": 0.08544609695672989,
+          "candidate_rms": 0.0842679888010025,
+          "max_abs_diff": 0.1142578125,
+          "mean_abs_diff": 0.012647364288568497,
+          "rms_diff": 0.018207555636763573
+        }
+      ]
+    }
+  },
+  "interpretation": {
+    "status": "needs_audio_review",
+    "note": "This report compares Core ML decoder outputs from the fp16 bucket package and the representative W8A8 bucket package. It localizes numeric drift in the valid decoded region, but human listening is still required before making a quality decision."
+  }
+}

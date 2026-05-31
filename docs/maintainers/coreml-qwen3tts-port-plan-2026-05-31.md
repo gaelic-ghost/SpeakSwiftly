@@ -1769,6 +1769,41 @@ Interpretation:
   an audio inspection report for bucket 72 talker samples, narrower per-op
   activation scopes, or the supervised decoder-alignment probe.
 
+### 2026-05-31 Talker-Code Audio Inspection, Pass 1
+
+The decoder audio inspection script now supports `--sample-source talker`, which
+loads captured talker-code fixtures directly instead of going through the
+LibriTTS-R calibration fixture and bucket plan. It still writes only local WAV
+artifacts and a compact JSON report for Git.
+
+The first talker audio inspection compared:
+
+- baseline: bucket-72 fp16 Core ML decoder package
+- candidate: bucket-72 group-size-16 W8A8 package calibrated with talker codes
+- sample: `prompt-000`
+- input code shape: `[72, 16]`
+- valid output samples: `138240`
+- padding: none
+
+Numeric result:
+
+- valid-region max absolute diff: `0.3759765625`
+- valid-region mean absolute diff: `0.012348570860922337`
+- valid-region RMS diff: `0.02168286219239235`
+- alert windows: 15 of 24 quarter-second windows
+- worst mean-diff window: 1.0-1.25 seconds, mean diff
+  `0.028064705431461334`
+- largest spike window: 4.0-4.25 seconds, max diff `0.3759765625`
+
+Interpretation:
+
+- The drift is broad for production-shaped generated codes, not only for
+  LibriTTS-R re-encoded speech codes.
+- The mean-diff scale is almost identical to the earlier bucket-40 LibriTTS-R
+  audio inspection, even though the prompt and bucket differ.
+- This strengthens the case for either narrower activation scopes or supervised
+  decoder alignment before any Instruments dispatch work.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

@@ -32,6 +32,7 @@ DEFAULT_CANDIDATE_MODEL_PACKAGE = (
   "Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40-fp16-w8a8-representative.mlpackage"
 )
 DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
+DEFAULT_TALKER_CODE_FIXTURE_PATH = ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
 DEFAULT_BUCKET_PLAN_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
 DEFAULT_OUTPUT_DIR = ".local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8"
 DEFAULT_SAMPLE_RATE = 24_000
@@ -142,6 +143,50 @@ def representative_audio_codes(
   return padded[None, :, :], sample_report
 
 
+def talker_audio_codes(
+  talker_fixture: dict[str, Any],
+  bucket: int,
+  sample_id: str | None,
+) -> tuple[np.ndarray, dict[str, Any]]:
+  matches = [
+    sample for sample in talker_fixture.get("samples", [])
+    if int(sample.get("bucket_assignment", {}).get("assigned_bucket", -1)) == bucket
+    and (sample_id is None or sample.get("id") == sample_id)
+  ]
+  if not matches:
+    raise RuntimeError(f"Talker-code fixture has no sample assignment for bucket {bucket} and sample id '{sample_id}'.")
+  if len(matches) > 1:
+    raise RuntimeError(f"Talker-code fixture has {len(matches)} assignments for bucket {bucket}; pass --sample-id.")
+
+  sample = matches[0]
+  assignment = sample["bucket_assignment"]
+  codes = np.asarray(sample["encoded"]["audio_codes"], dtype=np.int32)
+  if codes.ndim != 2:
+    raise RuntimeError(f"Talker sample '{sample['id']}' audio_codes must be rank 2.")
+  if codes.shape[0] > bucket:
+    raise RuntimeError(f"Talker sample '{sample['id']}' has {codes.shape[0]} code steps, exceeding bucket {bucket}.")
+
+  quantizer_count = codes.shape[1]
+  padded = np.full((bucket, quantizer_count), int(assignment.get("pad_value", -1)), dtype=np.int32)
+  padded[: codes.shape[0], :] = codes
+  audio = sample.get("generated_audio", {})
+  sample_rate = int(audio.get("sample_rate", DEFAULT_SAMPLE_RATE))
+  sample_count = audio.get("sample_count")
+  sample_report = {
+    "id": sample["id"],
+    "text_normalized": sample.get("text"),
+    "audio_codes_shape": list(codes.shape),
+    "padded_input_shape": [1, *list(padded.shape)],
+    "padded_step_count": bucket - codes.shape[0],
+    "pad_value": int(assignment.get("pad_value", -1)),
+    "source_audio_seconds": sample_count / sample_rate if sample_count is not None else None,
+    "valid_output_sample_count": assignment.get("valid_output_sample_count"),
+    "padded_output_sample_count": assignment.get("padded_output_sample_count"),
+    "generated_audio_path": audio.get("wav_path"),
+  }
+  return padded[None, :, :], sample_report
+
+
 def predict_audio(model_package: Path, audio_codes: np.ndarray) -> np.ndarray:
   model = ct.models.MLModel(str(model_package), compute_units=ct.ComputeUnit.CPU_ONLY)
   prediction = model.predict({"audio_codes": audio_codes})
@@ -225,12 +270,25 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
   calibration_fixture = load_json(resolve_package_path(args.calibration_fixture))
   bucket_plan = load_json(resolve_package_path(args.bucket_plan))
-  audio_codes, sample_report = representative_audio_codes(
-    calibration_fixture,
-    bucket_plan,
-    args.bucket,
-    args.sample_id,
-  )
+  talker_fixture_path = resolve_package_path(args.talker_code_fixture)
+  talker_fixture = load_json(talker_fixture_path) if talker_fixture_path.is_file() else None
+  if args.sample_source == "representative":
+    audio_codes, sample_report = representative_audio_codes(
+      calibration_fixture,
+      bucket_plan,
+      args.bucket,
+      args.sample_id,
+    )
+  elif args.sample_source == "talker":
+    if talker_fixture is None:
+      raise RuntimeError("Talker sample source requires --talker-code-fixture.")
+    audio_codes, sample_report = talker_audio_codes(
+      talker_fixture,
+      args.bucket,
+      args.sample_id,
+    )
+  else:
+    raise RuntimeError(f"Unsupported sample source '{args.sample_source}'.")
 
   baseline_audio = predict_audio(baseline_model_package, audio_codes)
   candidate_audio = predict_audio(candidate_model_package, audio_codes)
@@ -264,7 +322,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
       "candidate_model_package": relative_package_path(candidate_model_package),
       "candidate_model_package_size_bytes": directory_size_bytes(candidate_model_package),
       "calibration_fixture_path": str(args.calibration_fixture),
+      "talker_code_fixture_path": str(args.talker_code_fixture),
       "bucket_plan_path": str(args.bucket_plan),
+      "sample_source": args.sample_source,
       "compute_units": "cpuOnly",
       "sample_rate": args.sample_rate,
     },
@@ -305,7 +365,9 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--baseline-model-package", type=Path, default=Path(DEFAULT_BASELINE_MODEL_PACKAGE))
   parser.add_argument("--candidate-model-package", type=Path, default=Path(DEFAULT_CANDIDATE_MODEL_PACKAGE))
   parser.add_argument("--calibration-fixture", type=Path, default=Path(DEFAULT_CALIBRATION_FIXTURE_PATH))
+  parser.add_argument("--talker-code-fixture", type=Path, default=Path(DEFAULT_TALKER_CODE_FIXTURE_PATH))
   parser.add_argument("--bucket-plan", type=Path, default=Path(DEFAULT_BUCKET_PLAN_PATH))
+  parser.add_argument("--sample-source", default="representative", choices=["representative", "talker"])
   parser.add_argument("--bucket", type=int, default=40)
   parser.add_argument("--sample-id", default=None)
   parser.add_argument("--sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)

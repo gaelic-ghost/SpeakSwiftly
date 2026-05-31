@@ -104,6 +104,27 @@ import Testing
     #expect(fixture.artifacts.candidateValidWav.hasSuffix("candidate-w8a8-valid.wav"))
 }
 
+@Test func `qwen3 tts speech tokenizer decoder audio inspection localizes talker w8a8 drift`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-group-16-prompt-000-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_decoder_audio_inspection")
+    #expect(fixture.sample.id == "prompt-000")
+    #expect(fixture.sample.audioCodesShape == [72, 16])
+    #expect(fixture.sample.paddedInputShape == [1, 72, 16])
+    #expect(fixture.sample.validOutputSampleCount == 138_240)
+    #expect(fixture.audio.validOutputDiff.sampleCount == 138_240)
+    #expect((fixture.audio.validOutputDiff.maxAbsDiff) > 0.37)
+    #expect((fixture.audio.validOutputDiff.meanAbsDiff) > 0.012)
+    #expect(fixture.audio.paddedTailDiff?.sampleCount == nil)
+    #expect(fixture.audio.windows.count == 24)
+    #expect(fixture.audio.windows.alertCount == 15)
+    #expect(fixture.audio.windows.topByMeanAbsDiff.first?.startSeconds == 1.0)
+    #expect(fixture.artifacts.baselineValidWav.contains("bucket-72-talker-qwen3"))
+    #expect(fixture.artifacts.candidateValidWav.contains("bucket-72-talker-qwen3"))
+}
+
 @Test func `qwen3 tts speech tokenizer decoder diverse bucket 40 w8a8 records four calibration samples`() throws {
     let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
         "speech-tokenizer-decoder-coreml-quantization-bucket-40-fp16-libritts-r-24-diverse-group-16-12hz.json",
