@@ -299,7 +299,9 @@ In Progress
 - [x] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
 - [x] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
 - [ ] Add detailed latency and benchmarking coverage for Qwen3 local playback and generated-output paths, including first-audio latency, chunk cadence, total generation time, memory pressure, prepared-conditioning cache behavior, and audible-quality notes for each size and quant variant.
+- [ ] Use `docs/maintainers/qwen-quant-benchmark-and-default-selection-plan.md` as the starting plan for the fresh Qwen3 quant benchmark branch across Gale's MacBook Pro and Mac mini.
 - [ ] Use the Qwen3 benchmark results to decide which quant variants should remain in the supported public matrix and slim any variants that do not justify their maintenance, download, memory, latency, or quality tradeoff.
+- [ ] Design a hardware-sensitive default backend selection system that records detected device facts, explains its selected Qwen backend, and still allows explicit operator configuration.
 - [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
 - [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.
 
