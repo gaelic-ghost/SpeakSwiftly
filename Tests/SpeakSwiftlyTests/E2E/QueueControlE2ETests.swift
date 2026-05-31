@@ -136,6 +136,10 @@ struct QueueControlE2ETests {
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "request_cancelled"
         })
+        _ = try #require(try await worker.waitForStderrJSONObject(timeout: Self.queueControlTimeout) {
+            $0["event"] as? String == "qwen_live_chunk_finished"
+                && $0["request_id"] as? String == "req-playback-active-e2e"
+        })
 
         try worker.closeInput()
         try await worker.waitForExit(timeout: .seconds(30))

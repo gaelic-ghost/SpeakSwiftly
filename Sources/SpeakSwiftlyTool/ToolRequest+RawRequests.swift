@@ -370,13 +370,6 @@ struct RawWorkerRequest: Decodable {
         base: SpeakSwiftly.RequestContext? = nil,
         requestID id: String,
     ) throws -> SpeakSwiftly.RequestContext? {
-        if base?.reqPurpose == .audioStream {
-            throw SpeakSwiftly.Error(
-                code: .invalidRequest,
-                message: "Request '\(id)' uses request_context.reqPurpose 'audioStream', which is not part of the SpeakSwiftly worker contract. Use request_context.reqPurpose 'speech' for spoken output and choose local playback, HTTP streaming, or LAN streaming with the output destination API.",
-            )
-        }
-
         let resolvedCWD = cwd ?? base?.cwd
         let resolvedRepoRoot = repoRoot ?? base?.repoRoot
         if base == nil, resolvedCWD == nil, resolvedRepoRoot == nil {

@@ -708,7 +708,7 @@ import TextForSpeech
     }
 }
 
-@Test func `rejects audio stream request purpose`() throws {
+@Test func `rejects removed audio stream request purpose`() throws {
     let audioStreamPurposePayloads = [
         #"{"id":"req-stream-purpose","op":"generate_speech","text":"Hello","request_context":{"reqPurpose":"audioStream"}}"#,
         #"{"id":"req-batch-stream-purpose","op":"generate_batch","items":[{"text":"Hello","request_context":{"reqPurpose":"audioStream"}}]}"#,
@@ -721,8 +721,7 @@ import TextForSpeech
         } catch let error as SpeakSwiftly.Error {
             #expect(error.code == .invalidRequest)
             #expect(error.message.contains("audioStream"))
-            #expect(error.message.contains("speech"))
-            #expect(error.message.contains("output destination"))
+            #expect(error.message.contains("RequestPurpose"))
         }
     }
 }

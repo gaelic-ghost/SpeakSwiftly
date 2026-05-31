@@ -14,6 +14,7 @@
   response streaming.
 - Added Network.framework audio frame encoding plus Bonjour audio-receiver
   discovery primitives for LAN receiver selection.
+- Raised the `TextForSpeech` dependency floor to `0.23.0`.
 
 ## Breaking Changes
 
@@ -22,6 +23,8 @@
   invalid input instead of falling back to another backend.
 - Live speech output is now modeled as generation plus an output destination.
   Local playback is still the default destination.
+- `TextForSpeech.RequestContext.RequestPurpose.audioStream` is no longer
+  available. Use `speech` for spoken output regardless of destination.
 - The new output-module shape is intentionally not a compatibility shim for the
   previous backend-switching model.
 
@@ -38,6 +41,9 @@
   audio receivers and convert the selected endpoint into an output destination.
 - Real `SpeakSwiftlyServer` adoption and two-Mac LAN validation are follow-up
   integration work after this package prerelease.
+- Replace stale `request_context.reqPurpose: "audioStream"` payloads with
+  `request_context.reqPurpose: "speech"` and choose transport through the output
+  destination API.
 
 ## Verification
 
@@ -45,7 +51,9 @@
 - `swift test --filter GeneratedAudioOutputTests`
 - `swift test --filter NetworkAudioOutputTests`
 - `swift test --filter LibrarySurfaceTests`
+- `swift test --filter WorkerProtocolTests`
 - `swift test`
+- `sh scripts/repo-maintenance/run-e2e-full.sh`
 - commit-hook repo-maintenance validation, including SwiftFormat, MLX resource
   checks, and SwiftLint
 
@@ -54,9 +62,6 @@
 - Wire real HTTP response streaming and LAN transport send/receive behavior.
 - Add `generate.audioStream(...)` after the host boundary can return a
   successful chunk stream instead of a failed request handle.
-- Remove SpeakSwiftly's local `request_context.reqPurpose: "audioStream"`
-  rejection guard after TextForSpeech removes `RequestPurpose.audioStream` in
-  [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
 - Validate `SpeakSwiftlyServer` adoption against the prerelease package.
 - Run opt-in live worker E2E and real LAN receiver tests when the transport
   integration is ready.

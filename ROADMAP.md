@@ -290,7 +290,7 @@ In Progress
 - [x] Add Network.framework audio frame encoding and Bonjour audio-receiver discovery primitives to `SpeakSwiftlyNetworkAudioOutput`.
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.
 - [ ] Add `generate.audioStream(...)` only after the host boundary can return a successful chunk stream instead of a failed request handle.
-- [ ] Remove the local `request_context.reqPurpose: "audioStream"` rejection guard after TextForSpeech removes `RequestPurpose.audioStream` in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+- [x] Remove the local `request_context.reqPurpose: "audioStream"` rejection guard after TextForSpeech removed `RequestPurpose.audioStream` in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
 - [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
 - [x] Add organized unit and integration matrix coverage for every Qwen3 size and quant variant so routing, decoding, configuration, resident repo mapping, generation policy, and runtime scheduling stay covered without real-model downloads in the default suite.
 - [x] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
