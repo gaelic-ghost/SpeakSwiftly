@@ -7,8 +7,6 @@ extension Tag {
     @Tag static var artifacts: Self
     @Tag static var qwen: Self
     @Tag static var longForm: Self
-    @Tag static var chatterbox: Self
-    @Tag static var marvis: Self
     @Tag static var trace: Self
     @Tag static var deepTrace: Self
     @Tag static var benchmark: Self

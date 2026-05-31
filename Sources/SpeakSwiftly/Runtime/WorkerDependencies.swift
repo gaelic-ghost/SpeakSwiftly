@@ -27,7 +27,6 @@ struct WorkerDependencies: @unchecked Sendable {
     static func live(
         fileManager: FileManager = .default,
         allowsProfileModelCPUFallback: Bool? = nil,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
         duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
     ) -> WorkerDependencies {
         let environment = ProcessInfo.processInfo.environment
@@ -39,7 +38,6 @@ struct WorkerDependencies: @unchecked Sendable {
             loadResidentModels: { backend in
                 try await ModelFactory.loadResidentModels(
                     for: backend,
-                    marvisResidentPolicy: marvisResidentPolicy,
                 )
             },
             loadProfileModel: {

@@ -583,28 +583,19 @@ import TextForSpeech
 
 @Test func `decodes switch speech backend request`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"marvis"}"#,
+        from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"qwen3_big"}"#,
     )
-    #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .marvis))
+    #expect(request == .switchSpeechBackend(id: "req-switch", speechBackend: .qwen3_BIG))
 }
 
-@Test func `decodes marvis quant switch speech backend requests`() throws {
-    let fourBit = try ToolRequest.decode(
-        from: #"{"id":"req-switch-marvis-4bit","op":"set_speech_backend","speech_backend":"marvis_4bit"}"#,
-    )
-    let sixBit = try ToolRequest.decode(
-        from: #"{"id":"req-switch-marvis-6bit","op":"set_speech_backend","speech_backend":"marvis_6bit"}"#,
-    )
-
-    #expect(fourBit == .switchSpeechBackend(id: "req-switch-marvis-4bit", speechBackend: .marvis_4bit))
-    #expect(sixBit == .switchSpeechBackend(id: "req-switch-marvis-6bit", speechBackend: .marvis_6bit))
-}
-
-@Test func `decodes chatterbox turbo switch speech backend request`() throws {
-    let request = try ToolRequest.decode(
-        from: #"{"id":"req-switch-chatterbox","op":"set_speech_backend","speech_backend":"chatterbox_turbo"}"#,
-    )
-    #expect(request == .switchSpeechBackend(id: "req-switch-chatterbox", speechBackend: .chatterboxTurbo))
+@Test func `rejects removed switch speech backend values`() throws {
+    for removedBackend in ["marvis", "marvis_4bit", "marvis_6bit", "chatterbox_turbo"] {
+        #expect(throws: SpeakSwiftly.Error.self) {
+            try ToolRequest.decode(
+                from: #"{"id":"req-switch","op":"set_speech_backend","speech_backend":"\#(removedBackend)"}"#,
+            )
+        }
+    }
 }
 
 @Test func `decodes reload models request`() throws {
@@ -717,6 +708,24 @@ import TextForSpeech
     }
 }
 
+@Test func `rejects removed audio stream request purpose`() throws {
+    let audioStreamPurposePayloads = [
+        #"{"id":"req-stream-purpose","op":"generate_speech","text":"Hello","request_context":{"reqPurpose":"audioStream"}}"#,
+        #"{"id":"req-batch-stream-purpose","op":"generate_batch","items":[{"text":"Hello","request_context":{"reqPurpose":"audioStream"}}]}"#,
+    ]
+
+    for payload in audioStreamPurposePayloads {
+        do {
+            _ = try ToolRequest.decode(from: payload)
+            Issue.record("Expected audioStream request purpose to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("audioStream"))
+            #expect(error.message.contains("RequestPurpose"))
+        }
+    }
+}
+
 @Test func `rejects invalid profile name`() throws {
     let tempRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: tempRoot) }
@@ -758,13 +767,13 @@ import TextForSpeech
         SpeakSwiftly.WorkerStatusEvent(
             stage: .residentModelReady,
             residentState: .ready,
-            speechBackend: .marvis,
+            speechBackend: .qwen3_BIG,
         ),
     )
     #expect(status["event"] as? String == "worker_status")
     #expect(status["stage"] as? String == "resident_model_ready")
     #expect(status["resident_state"] as? String == "ready")
-    #expect(status["speech_backend"] as? String == "marvis")
+    #expect(status["speech_backend"] as? String == "qwen3_big")
 
     let success = try jsonObject(
         SpeakSwiftly.Success(

@@ -55,7 +55,6 @@ extension SpeakSwiftly.Runtime {
         stateRootURL: URL? = nil,
         systemProfileResourceRootURL: URL? = nil,
         allowsProfileModelCPUFallback: Bool? = nil,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
         startsResidentModelsAutomatically: Bool = true,
     ) async -> SpeakSwiftly.Runtime {
         let environment = ProcessInfo.processInfo.environment
@@ -90,10 +89,13 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredAudioOutputDestination = resolvedAudioOutputDestination(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
         let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             allowsProfileModelCPUFallback: allowsProfileModelCPUFallback,
-            marvisResidentPolicy: marvisResidentPolicy,
             duckMediaVolume: configuredDuckMediaVolume,
         )
         let profileStore = ProfileStore(
@@ -136,7 +138,7 @@ extension SpeakSwiftly.Runtime {
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
             duckMediaVolume: configuredDuckMediaVolume,
-            marvisResidentPolicy: marvisResidentPolicy,
+            audioOutputDestination: configuredAudioOutputDestination,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
             systemProfileResourceStore: systemProfileResourceStore,
@@ -243,6 +245,12 @@ extension SpeakSwiftly.Runtime {
         configuration?.duckMediaVolume ?? .off
     }
 
+    static func resolvedAudioOutputDestination(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> SpeakSwiftly.AudioOutputDestination {
+        configuration?.audioOutputDestination ?? .localPlayback
+    }
+
     func setDefaultVoiceProfileName(_ profileName: SpeakSwiftly.Name) throws {
         let resolvedProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(profileName)
         defaultVoiceProfileName = resolvedProfileName
@@ -259,6 +267,7 @@ extension SpeakSwiftly.Runtime {
             qwenConditioningStrategy: qwenConditioningStrategy,
             defaultVoiceProfile: defaultVoiceProfileName,
             duckMediaVolume: duckMediaVolume,
+            audioOutputDestination: audioOutputDestination,
             textNormalizer: normalizerRef,
         )
     }

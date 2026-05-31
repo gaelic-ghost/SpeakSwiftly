@@ -68,10 +68,6 @@ extension SpeakSwiftly.Runtime {
         switch models {
             case let .qwen3(model):
                 model.sampleRate
-            case let .chatterboxTurbo(model):
-                model.sampleRate
-            case let .marvis(models):
-                models.primaryModel.sampleRate
         }
     }
 
@@ -86,16 +82,6 @@ extension SpeakSwiftly.Runtime {
         switch residentState {
             case let .ready(.qwen3(model)):
                 return model
-            case .ready(.chatterboxTurbo):
-                throw WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly attempted to use the resident Qwen model while the runtime is configured for the 'chatterbox_turbo' backend. This indicates a backend-routing bug.",
-                )
-            case .ready(.marvis):
-                throw WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly attempted to use the resident Qwen model while the runtime is configured for the 'marvis' backend. This indicates a backend-routing bug.",
-                )
             case .warming:
                 throw WorkerError(
                     code: .modelLoading,
@@ -109,100 +95,5 @@ extension SpeakSwiftly.Runtime {
             case let .failed(error):
                 throw error
         }
-    }
-
-    func residentChatterboxModelOrThrow() throws -> AnySpeechModel {
-        if isShuttingDown {
-            throw WorkerError(
-                code: .workerShuttingDown,
-                message: "The resident model cannot be used because the SpeakSwiftly worker is shutting down.",
-            )
-        }
-
-        switch residentState {
-            case let .ready(.chatterboxTurbo(model)):
-                return model
-            case .ready(.qwen3):
-                throw WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly attempted to use the resident Chatterbox Turbo model while the runtime is configured for the '\(speechBackend.rawValue)' backend. This indicates a backend-routing bug.",
-                )
-            case .ready(.marvis):
-                throw WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly attempted to use the resident Chatterbox Turbo model while the runtime is configured for the 'marvis' backend. This indicates a backend-routing bug.",
-                )
-            case .warming:
-                throw WorkerError(
-                    code: .modelLoading,
-                    message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.",
-                )
-            case .unloaded:
-                throw WorkerError(
-                    code: .modelLoading,
-                    message: "The resident models for the '\(speechBackend.rawValue)' backend are currently unloaded. Queue `reload_models` and retry this generation request after the runtime reports resident_model_ready.",
-                )
-            case let .failed(error):
-                throw error
-        }
-    }
-
-    func residentMarvisModelOrThrow(
-        for vibe: SpeakSwiftly.Vibe,
-    ) throws -> (model: AnySpeechModel, voice: MarvisResidentVoice) {
-        if isShuttingDown {
-            throw WorkerError(
-                code: .workerShuttingDown,
-                message: "The resident model cannot be used because the SpeakSwiftly worker is shutting down.",
-            )
-        }
-
-        switch residentState {
-            case let .ready(.marvis(models)):
-                return models.model(for: vibe)
-            case .ready(.qwen3), .ready(.chatterboxTurbo):
-                throw WorkerError(
-                    code: .internalError,
-                    message: "SpeakSwiftly attempted to use the resident Marvis model bundle while the runtime is configured for the '\(speechBackend.rawValue)' backend. This indicates a backend-routing bug.",
-                )
-            case .warming:
-                throw WorkerError(
-                    code: .modelLoading,
-                    message: "The resident \(preloadModelRepos(for: speechBackend).joined(separator: ", ")) model set for the '\(speechBackend.rawValue)' backend is still loading.",
-                )
-            case .unloaded:
-                throw WorkerError(
-                    code: .modelLoading,
-                    message: "The resident models for the '\(speechBackend.rawValue)' backend are currently unloaded. Queue `reload_models` and retry this generation request after the runtime reports resident_model_ready.",
-                )
-            case let .failed(error):
-                throw error
-        }
-    }
-
-    func marvisGenerationLane(for request: WorkerRequest) throws -> MarvisResidentVoice? {
-        guard speechBackend.isMarvisFamily else { return nil }
-
-        let profileName: String? = switch request {
-            case .queueSpeech(
-            id: _,
-            text: _,
-            profileName: let profileName,
-            textProfileID: _,
-            jobType: _,
-            requestContext: _,
-            qwenPreModelTextChunking: _,
-        ):
-                profileName
-            case .queueBatch(id: _, profileName: let profileName, items: _):
-                profileName
-            default:
-                nil
-        }
-
-        guard let profileName else { return nil }
-
-        let profile = try profileStore.loadProfile(named: profileName)
-        return MarvisResidentVoice.forVibe(profile.manifest.vibe)
     }
 }

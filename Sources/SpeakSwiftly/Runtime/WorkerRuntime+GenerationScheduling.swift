@@ -10,7 +10,6 @@ extension SpeakSwiftly.Runtime {
         let queuedJobs = await generationQueue.queuedJobsOrdered()
         let preparingJobTokens = await generationQueue.preparingJobTokens()
         let playbackAdmission = await playbackQueue.generationAdmissionSnapshot()
-        let playbackTelemetry = await playbackQueue.coordinationTelemetrySnapshot()
         let decision = try evaluateGenerationSchedule(
             activeJobs: activeJobs,
             queuedJobs: queuedJobs,
@@ -18,13 +17,6 @@ extension SpeakSwiftly.Runtime {
             playbackAdmission: playbackAdmission,
         )
 
-        await logMarvisSchedulerSnapshotIfNeeded(
-            activeJobs: activeJobs,
-            queuedJobs: queuedJobs,
-            runnableJobs: decision.runnableJobs,
-            parkReasons: decision.parkReasons,
-            playbackTelemetry: playbackTelemetry,
-        )
         await syncQueuedGenerationParkReasons(
             queuedJobs: queuedJobs,
             parkReasons: decision.parkReasons,
@@ -44,17 +36,12 @@ extension SpeakSwiftly.Runtime {
                 for: job.request.id,
             )
 
-            var details = [String: LogValue]()
-            if let marvisLane = try marvisGenerationLane(for: job.request) {
-                details["marvis_lane"] = .string(marvisLane.rawValue)
-            }
             await logRequestEvent(
                 "request_started",
                 requestID: job.request.id,
                 op: job.request.opName,
                 profileName: job.request.voiceProfile,
                 queueDepth: generationQueueDepth(),
-                details: details,
             )
 
             let task = Task {
@@ -64,11 +51,6 @@ extension SpeakSwiftly.Runtime {
             if case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .live, requestContext: _, qwenPreModelTextChunking: _) = job.request {
                 await playbackQueue.setGenerationTask(task, for: id)
             }
-            await logMarvisGenerationLaneReservedIfNeeded(
-                for: job.request,
-                activeJobs: generationQueue.activeJobsOrdered(),
-                playbackAdmission: playbackAdmission,
-            )
         }
 
         await publishGenerateUpdate()
@@ -160,16 +142,6 @@ extension SpeakSwiftly.Runtime {
             return .park(.waitingForActiveRequest)
         }
 
-        if speechBackend.isMarvisFamily {
-            if isLiveSpeechGenerationRequest(request),
-               playbackAdmission.activeRequestID != nil,
-
-               playbackAdmission.activeRequestTuningProfile == .firstDrainedLiveMarvis
-               || !playbackAdmission.allowsConcurrentGeneration {
-                return .park(.waitingForPlaybackStability)
-            }
-        }
-
         let maximumConcurrentGenerationJobs = maximumConcurrentGenerationJobs(for: speechBackend)
         if activeJobs.count >= maximumConcurrentGenerationJobs {
             return .park(.waitingForActiveRequest)
@@ -182,8 +154,6 @@ extension SpeakSwiftly.Runtime {
         for backend: SpeakSwiftly.SpeechBackend,
     ) -> Int {
         switch backend {
-            case .marvis, .marvis_4bit, .marvis_6bit:
-                1
             case .qwen3_smol,
                  .qwen3_smol_4bit,
                  .qwen3_smol_5bit,
@@ -196,8 +166,6 @@ extension SpeakSwiftly.Runtime {
                  .qwen3_BIG_6bit,
                  .qwen3_BIG_8bit,
                  .qwen3_BIG_bf16:
-                1
-            case .chatterboxTurbo:
                 1
         }
     }
@@ -256,128 +224,6 @@ extension SpeakSwiftly.Runtime {
             default:
                 false
         }
-    }
-
-    func logMarvisSchedulerSnapshotIfNeeded(
-        activeJobs: [GenerationQueue.Job],
-        queuedJobs: [GenerationQueue.Job],
-        runnableJobs: [GenerationQueue.Job],
-        parkReasons: [UUID: GenerationParkReason],
-        playbackTelemetry: PlaybackQueue.ConcurrencySnapshot,
-    ) async {
-        guard speechBackend.isMarvisFamily else { return }
-        guard !activeJobs.isEmpty || !queuedJobs.isEmpty || playbackTelemetry.activeRequestID != nil else {
-            lastLoggedMarvisSchedulerState = nil
-            return
-        }
-
-        let stateDescription = [
-            "active=\(activeJobs.map(\.request.id).joined(separator: ","))",
-            "queued=\(queuedJobs.map(\.request.id).joined(separator: ","))",
-            "runnable=\(runnableJobs.map(\.request.id).joined(separator: ","))",
-            "playback=\(playbackTelemetry.activeRequestID ?? "none")",
-            "stable=\(playbackTelemetry.isStableForConcurrentGeneration)",
-            "rebuffering=\(playbackTelemetry.isRebuffering)",
-        ]
-        .joined(separator: "|")
-
-        guard stateDescription != lastLoggedMarvisSchedulerState else { return }
-
-        lastLoggedMarvisSchedulerState = stateDescription
-
-        var parkedByRequest = [String: String]()
-        for job in queuedJobs {
-            if let reason = parkReasons[job.token] {
-                parkedByRequest[job.request.id] = reason.rawValue
-            }
-        }
-
-        var activeLaneAssignments = [String: String]()
-        for job in activeJobs {
-            if let lane = try? marvisGenerationLane(for: job.request) {
-                activeLaneAssignments[job.request.id] = lane.rawValue
-            }
-        }
-
-        await logEvent(
-            "marvis_generation_scheduler_snapshot",
-            details: [
-                "active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
-                "queued_generation_request_ids": .string(queuedJobs.map(\.request.id).joined(separator: ",")),
-                "runnable_generation_request_ids": .string(runnableJobs.map(\.request.id).joined(separator: ",")),
-                "active_playback_request_id": .string(playbackTelemetry.activeRequestID ?? "none"),
-                "playback_is_stable_for_concurrency": .bool(playbackTelemetry.isStableForConcurrentGeneration),
-                "playback_is_rebuffering": .bool(playbackTelemetry.isRebuffering),
-                "playback_stable_buffered_audio_ms": .int(playbackTelemetry.stableBufferedAudioMS ?? 0),
-                "playback_stable_buffer_target_ms": .int(playbackTelemetry.stableBufferTargetMS ?? 0),
-                "active_marvis_generation_lanes": .string(
-                    activeLaneAssignments
-                        .map { "\($0.key):\($0.value)" }
-                        .sorted()
-                        .joined(separator: ","),
-                ),
-                "parked_generation_reasons": .string(
-                    parkedByRequest
-                        .map { "\($0.key):\($0.value)" }
-                        .sorted()
-                        .joined(separator: ","),
-                ),
-            ]
-            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
-        )
-    }
-
-    func logMarvisGenerationLaneReservedIfNeeded(
-        for request: WorkerRequest,
-        activeJobs: [GenerationQueue.Job],
-        playbackAdmission: PlaybackQueue.GenerationAdmissionSnapshot,
-    ) async {
-        guard let lane = try? marvisGenerationLane(for: request) else { return }
-
-        await logRequestEvent(
-            "marvis_generation_lane_reserved",
-            requestID: request.id,
-            op: request.opName,
-            profileName: request.voiceProfile,
-            details: [
-                "marvis_lane": .string(lane.rawValue),
-                "active_generation_count": .int(activeJobs.count),
-                "active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
-                "playback_allows_concurrent_generation": .bool(playbackAdmission.allowsConcurrentGeneration),
-                "active_playback_request_id": .string(playbackAdmission.activeRequestID ?? "none"),
-            ]
-            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
-        )
-    }
-
-    func logMarvisGenerationLaneReleasedIfNeeded(
-        for request: WorkerRequest,
-        activeJobs: [GenerationQueue.Job],
-        disposition: GenerationCompletionDisposition,
-    ) async {
-        guard let lane = try? marvisGenerationLane(for: request) else { return }
-
-        let dispositionSummary = switch disposition {
-            case .requestCompleted(.success):
-                "completed"
-            case let .requestCompleted(.failure(error)):
-                "failed:\(error.code.rawValue)"
-            case .requestStillPendingPlayback:
-                "pending_playback"
-        }
-        await logRequestEvent(
-            "marvis_generation_lane_released",
-            requestID: request.id,
-            op: request.opName,
-            profileName: request.voiceProfile,
-            details: [
-                "marvis_lane": .string(lane.rawValue),
-                "generation_disposition": .string(dispositionSummary),
-                "remaining_active_generation_count": .int(activeJobs.count),
-                "remaining_active_generation_request_ids": .string(activeJobs.map(\.request.id).joined(separator: ",")),
-            ]
-            .merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
-        )
     }
 
     func failQueuedRequests(with error: WorkerError) async {

@@ -90,13 +90,24 @@ arguments are not available.
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:output:)`` when you want audio to enter the live playback queue:
 
 ```swift
 let handle = await runtime.generate.speech(
     text: "Hello from SpeakSwiftly."
 )
 ```
+
+Pass an explicit nonlocal `output:` when a host is ready to route generated
+audio to an HTTP response or LAN transport. The output modules expose framing
+and discovery primitives, while the host-owned server boundary is responsible
+for attaching those bytes to a response or network connection.
+
+Hosts that want selectable LAN audio receivers can use
+``SpeakSwiftly/NetworkAudioDestinationBrowser`` to keep an in-memory list of
+Bonjour-advertised audio receivers. A receiver host can attach
+``SpeakSwiftly/NetworkAudioServiceAdvertisement/listenerService`` to its
+Network.framework listener so other SpeakSwiftly instances can discover it.
 
 Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)`` when you want retained file output instead:
 

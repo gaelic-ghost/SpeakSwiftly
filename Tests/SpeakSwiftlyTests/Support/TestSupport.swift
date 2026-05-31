@@ -829,7 +829,6 @@ func makeResidentModel(recorder: ResidentModelRecorder? = nil, chunkCount: Int =
 
 func makeResidentModels(
     for backend: SpeakSwiftly.SpeechBackend,
-    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
     recorder: ResidentModelRecorder? = nil,
     chunkCount: Int = 1,
 ) -> ResidentSpeechModels {
@@ -847,22 +846,6 @@ func makeResidentModels(
              .qwen3_BIG_8bit,
              .qwen3_BIG_bf16:
             .qwen3(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
-        case .chatterboxTurbo:
-            .chatterboxTurbo(makeResidentModel(recorder: recorder, chunkCount: chunkCount))
-        case .marvis, .marvis_4bit, .marvis_6bit:
-            switch marvisResidentPolicy {
-                case .dualResidentSerialized:
-                    .marvis(
-                        .dual(
-                            conversationalA: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
-                            conversationalB: makeResidentModel(recorder: recorder, chunkCount: chunkCount),
-                        ),
-                    )
-                case .singleResidentDynamic:
-                    .marvis(
-                        .single(makeResidentModel(recorder: recorder, chunkCount: chunkCount)),
-                    )
-            }
     }
 }
 
@@ -916,15 +899,25 @@ func makeGenerationJobStore(rootURL: URL) throws -> GenerationJobStore {
     return store
 }
 
+func makeDefaultLoadedAudioSamples() -> MLXArray? {
+    do {
+        try ensureMLXSwiftTestMetallibInstalled()
+    } catch {
+        Issue.record("Failed to stage default.metallib for the Swift test process: \(error)")
+    }
+
+    return MLXArray([Float(0.1), 0.2]).reshaped([1, 2])
+}
+
 func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
     playback: PlaybackSpy,
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
-    marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
+    audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
     audioLoadRecorder: ResidentModelRecorder? = nil,
-    loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
+    loadedAudioSamples: MLXArray? = makeDefaultLoadedAudioSamples(),
     loadedCloneAudioSamples: [Float] = [],
     residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> some Any,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
@@ -966,20 +959,6 @@ func makeRuntime(
                          .qwen3_BIG_8bit,
                          .qwen3_BIG_bf16:
                         return .qwen3(model)
-                    case .chatterboxTurbo:
-                        return .chatterboxTurbo(model)
-                    case .marvis, .marvis_4bit, .marvis_6bit:
-                        switch marvisResidentPolicy {
-                            case .dualResidentSerialized:
-                                return .marvis(
-                                    .dual(
-                                        conversationalA: model,
-                                        conversationalB: model,
-                                    ),
-                                )
-                            case .singleResidentDynamic:
-                                return .marvis(.single(model))
-                        }
                 }
             }
             fatalError("Test support received an unexpected resident model loader result type: \(type(of: loaded))")
@@ -1010,7 +989,7 @@ func makeRuntime(
         dependencies: dependencies,
         speechBackend: speechBackend,
         qwenConditioningStrategy: qwenConditioningStrategy,
-        marvisResidentPolicy: marvisResidentPolicy,
+        audioOutputDestination: audioOutputDestination,
         profileStore: store,
         systemProfileResourceStore: systemProfileResourceStore,
         generatedFileStore: generatedFileStore,

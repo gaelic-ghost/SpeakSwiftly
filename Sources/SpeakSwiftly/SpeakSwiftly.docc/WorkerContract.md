@@ -43,9 +43,13 @@ For generation requests, the current worker keys are:
 
 ### RequestContext Fields
 
-`request_context` uses the shared `TextForSpeech.RequestContext` shape:
+`request_context` uses the shared `TextForSpeech.RequestContext` shape with a
+narrower SpeakSwiftly worker contract:
 
-- `reqPurpose` is required. Valid values are `speech`, `audioFile`, and `audioStream`.
+- `reqPurpose` is required. Valid values are `speech` and `audioFile`.
+- Use `speech` for spoken output whether the generated audio is played locally,
+  served by HTTP, or sent over LAN. Output destinations select transport; request
+  purpose only describes how the text should be normalized.
 - `source`, `topic`, `attributes`, `cwd`, and `repo_root` provide caller metadata and path context.
 - `prefacePolicy` is optional and can override the default source/topic preface behavior.
 
@@ -66,8 +70,6 @@ Qwen resident model selection is part of the startup backend value:
 
 - `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, or `qwen3_smol_bf16` for the Qwen 0.6B resident model family.
 - `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, or `qwen3_big_bf16` for the Qwen 1.7B resident model family.
-
-Marvis resident model selection also lives in the startup backend value. Use `marvis`, `marvis_4bit`, or `marvis_6bit` for the Marvis 250M v0.2 resident model family. Marvis now defaults to `single_resident_dynamic`; `dual_resident_serialized` is only exposed as a `SpeakSwiftlyTool` operator override for investigation and benchmarking.
 
 ### Qwen-Specific Features
 

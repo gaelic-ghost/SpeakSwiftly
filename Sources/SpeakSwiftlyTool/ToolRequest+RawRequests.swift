@@ -338,11 +338,12 @@ struct RawWorkerRequest: Decodable {
                 text: rawItem.text,
                 textProfileID: rawItem.textProfile,
             )
-            let requestContext = requestContext(
+            let requestContext = try requestContext(
                 cwd: rawItem.cwd,
                 repoRoot: rawItem.repoRoot,
                 reqPurpose: .audioFile,
                 base: rawItem.requestContext,
+                requestID: itemID,
             )
             let artifactID = rawItem.artifactID?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil
                 ?? "\(id)-artifact-\(index + 1)"
@@ -367,7 +368,8 @@ struct RawWorkerRequest: Decodable {
         repoRoot: String?,
         reqPurpose: TextForSpeech.RequestContext.RequestPurpose,
         base: SpeakSwiftly.RequestContext? = nil,
-    ) -> SpeakSwiftly.RequestContext? {
+        requestID id: String,
+    ) throws -> SpeakSwiftly.RequestContext? {
         let resolvedCWD = cwd ?? base?.cwd
         let resolvedRepoRoot = repoRoot ?? base?.repoRoot
         if base == nil, resolvedCWD == nil, resolvedRepoRoot == nil {

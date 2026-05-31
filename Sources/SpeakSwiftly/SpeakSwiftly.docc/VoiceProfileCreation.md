@@ -120,4 +120,4 @@ That split keeps creation and later maintenance on one focused handle instead of
 
 ## Where To Look Next
 
-After a profile exists, the most common next step is to use it with ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)`` or ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)``.
+After a profile exists, the most common next step is to use it with ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:output:)`` or ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)``.

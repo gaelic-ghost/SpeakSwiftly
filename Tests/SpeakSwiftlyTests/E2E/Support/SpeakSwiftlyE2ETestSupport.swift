@@ -577,25 +577,6 @@ enum E2EHarness {
         return String(decoding: compactData, as: UTF8.self)
     }
 
-    static func expectMarvisVoiceSelection(
-        on worker: WorkerProcess,
-        requestID: String,
-        expectedVoice: String,
-    ) async throws {
-        #expect(try await worker.waitForStderrJSONObject(timeout: e2eTimeout) {
-            guard
-                $0["event"] as? String == "marvis_voice_selected",
-                $0["request_id"] as? String == requestID,
-                let details = $0["details"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return details["speech_backend"] as? String == "marvis"
-                && details["marvis_voice"] as? String == expectedVoice
-        } != nil)
-    }
-
     static func transcriptLooksCloseToCloneSource(_ transcript: String) -> Bool {
         let expectedTokens = normalizedTranscriptTokens(from: testingCloneSourceText)
         let actualTokens = normalizedTranscriptTokens(from: transcript)

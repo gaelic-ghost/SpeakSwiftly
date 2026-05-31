@@ -111,7 +111,7 @@ struct GenerateSnapshot: Sendable, Equatable {
 }
 ```
 
-`GenerateBlockReason` is the Swift-facing equivalent of generation park reasons such as resident-model warmup, resident-model unload, active generation, playback stability, and Marvis lane serialization.
+`GenerateBlockReason` is the Swift-facing equivalent of generation park reasons such as resident-model warmup, resident-model unload, active generation, and playback stability.
 
 ### Playback
 

@@ -6,8 +6,6 @@ enum GenerationPolicy {
     private static let qwenResidentTemperature: Float = 0.9
     private static let qwenResidentTopP: Float = 1.0
     private static let qwenResidentRepetitionPenalty: Float = 1.05
-    private static let chatterboxResidentTemperature: Float = 0.8
-    private static let chatterboxResidentTopP: Float = 0.8
     private static let profileTemperature: Float = 0.9
     private static let profileTopP: Float = 1.0
     private static let profileRepetitionPenalty: Float = 1.05
@@ -38,18 +36,6 @@ enum GenerationPolicy {
                     topP: qwenResidentTopP,
                     repetitionPenalty: qwenResidentRepetitionPenalty,
                 )
-            case .chatterboxTurbo:
-                // Current mlx-audio-swift Chatterbox Turbo computes its own max-token
-                // cap and hardcodes repetition penalty internally, so only pass the
-                // knobs that upstream actually reads from the caller surface.
-                GenerateParameters(
-                    temperature: chatterboxResidentTemperature,
-                    topP: chatterboxResidentTopP,
-                )
-            case .marvis, .marvis_4bit, .marvis_6bit:
-                // Current mlx-audio-swift Marvis ignores caller-supplied generation
-                // parameters and samples with its own internal settings.
-                GenerateParameters()
         }
     }
 

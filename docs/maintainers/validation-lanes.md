@@ -51,7 +51,6 @@ Use this fallback for:
 
 - release hardening
 - standalone-worker validation
-- Marvis overlap investigation
 - any validation pass blocked by the SwiftPM parser failure
 
 Build once:
@@ -180,26 +179,19 @@ xcodebuild test-without-building -quiet \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
-  -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QueueControlE2ETests' \
-  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QwenE2ETests'
 ```
 
 That lane excludes the opt-in `DeepTraceE2ETests` and `QwenBenchmarkE2ETests`
 families unless you deliberately inject their extra environment flags too.
 
-For the broader backend-comparison benchmark design that should eventually
-replace the Qwen-only benchmark as the main package benchmark lane, see:
-
-- [backend-benchmarking-plan-2026-04-20.md](backend-benchmarking-plan-2026-04-20.md)
-
-The package now also has an opt-in backend-wide benchmark suite behind:
+The package also has an opt-in Qwen benchmark suite behind:
 
 - `SPEAKSWIFTLY_E2E=1`
-- `SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1`
-- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=<n>`
-- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1`
+- `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`
+- optional `SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=<n>`
+- optional `SPEAKSWIFTLY_AUDIBLE_E2E=1`
 
 Prefer the repo-maintenance wrapper instead of exporting those by hand:
 
@@ -208,21 +200,6 @@ sh scripts/repo-maintenance/run-benchmark.sh
 sh scripts/repo-maintenance/run-benchmark.sh --audible --iterations 3
 sh scripts/repo-maintenance/run-benchmark.sh --qwen --iterations 5
 ```
-
-For the Marvis-specific resident-policy comparison lane, run the benchmark test
-directly so the filter stays narrow:
-
-```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=1 swift test --filter 'BackendBenchmarkE2ETests/compare marvis resident policies with three queued voice switches'
-```
-
-That lane compares `dual_resident_serialized` against
-`single_resident_dynamic` with a three-request voice order that goes
-`femme` -> `masc` -> `femme` again.
-
-For Marvis profiling, throughput investigation, and trace work, prefer the dedicated runbook:
-
-- [marvis-overlap-profiling-runbook-2026-04-16.md](marvis-overlap-profiling-runbook-2026-04-16.md)
 
 ## Practical Rules
 

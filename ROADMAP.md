@@ -27,11 +27,11 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Active Milestones](#active-milestones)
 - [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
-- [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
 - [Milestone 29: Security Audit Hardening](#milestone-29-security-audit-hardening)
 - [Milestone 30: Generation Quality Telemetry And Guards](#milestone-30-generation-quality-telemetry-and-guards)
 - [Milestone 31: macOS Retrench And Mobile Split](#milestone-31-macos-retrench-and-mobile-split)
+- [Milestone 32: Qwen-Only Output Modularization](#milestone-32-qwen-only-output-modularization)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -39,11 +39,11 @@ This roadmap now keeps active milestones and the current release-hardening queue
 
 - Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
 - Milestone 21: Unified Logging With `Logger` - Planned
-- Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 - Milestone 29: Security Audit Hardening - Planned
 - Milestone 30: Generation Quality Telemetry And Guards - In Progress
 - Milestone 31: macOS Retrench And Mobile Split - In Progress
+- Milestone 32: Qwen-Only Output Modularization - In Progress
 
 ## Active Milestones
 
@@ -113,41 +113,42 @@ Planned
 
 ### Status
 
-In Progress
+Superseded by Milestone 32
 
 ### Scope
 
-- [ ] Keep Marvis behavior simple enough that the runtime policy is easy to reason about and the remaining instability is attributable.
-- [ ] Document whether the remaining Marvis rebuffers are mainly a local playback-policy issue or a throughput limitation in the current `mlx-audio-swift` generation path.
-- [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning or investigation pass.
+- [x] Stop investing in Marvis playback tuning for the vNext package line.
+- [x] Replace the Marvis investigation path with a Qwen-only output modularization pass.
+- [x] Preserve the historical notes below as context for why Marvis is being removed instead of tuned further.
 
 ### Tickets
 
-- [ ] Run and record Marvis resident-policy benchmark results for `dual_resident_serialized` versus `single_resident_dynamic` on target Apple-silicon machines.
-- [ ] Verify whether the queued-Marvis playback drain abort remains reproducible after the later playback-drain and cancellation hardening. ([#13](https://github.com/gaelic-ghost/SpeakSwiftly/issues/13))
-- [ ] If Marvis audible instability remains, identify whether it is upstream `mlx-audio-swift` throughput, wrapper behavior, local playback policy, or machine-specific pressure, and record the evidence.
-- [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful Marvis runtime or upstream investigation pass.
+- [x] Decide that Marvis is outside the vNext supported backend set.
+- [x] Remove stale Marvis validation-lane and release-hardening references while preserving older release notes as history.
+- [x] Keep removed backend values rejected clearly so persisted configs and worker requests fail with descriptive unsupported-backend errors.
 
 ### Stage Notes
 
 - Earlier Milestone 22 work explored overlap-specific thresholds, cadence tweaks, and queue-admission changes in detail.
-- The current 2026-04-22 steady state is intentionally simpler:
+- The 2026-04-22 steady state was intentionally simpler:
   - Marvis generation is serialized
   - the default resident policy is `single_resident_dynamic`
-  - a benchmark now exists for `dual_resident_serialized` versus `single_resident_dynamic`
+  - a benchmark existed for `dual_resident_serialized` versus `single_resident_dynamic`
   - all live Marvis playback uses one conservative startup profile
-  - the current live cadence matches the upstream Marvis `0.5s` path
-- The current read after the latest audible runs is:
+  - the live cadence matched the upstream Marvis `0.5s` path
+- The durable read after those audible runs is:
   - local overlap complexity was not the main problem
   - simplifying the runtime improved consistency, especially for later queued requests
   - even after that simplification, audible Marvis still tends to rebuffer
-  - the next useful work is upstream and reference-path investigation, not rebuilding the old overlap model
+  - the next useful work would have been upstream and reference-path investigation, not rebuilding the old overlap model
+- The vNext decision supersedes that investigation: Marvis is removed instead
+  of tuned further, and active generation work is Qwen-only.
 
 ### Exit Criteria
 
-- [ ] The repository records target-machine benchmark evidence for the resident policy choice instead of only noting that a harness exists.
-- [ ] Marvis audible playback is either measurably steadier after upstream-aware changes or explicitly documented as limited by the current MLX path.
-- [ ] The repository has a documented before-and-after record for the simplified serialized policy and the follow-on upstream investigation.
+- [x] vNext documentation names Qwen3 as the only supported generation family.
+- [x] Removed Marvis and Chatterbox values fail clearly in typed config and worker request tests.
+- [x] Historical Marvis tuning notes remain separated from active prerelease work.
 
 ## Milestone 26: Pre-v1 Release Hardening
 
@@ -163,7 +164,7 @@ In Progress
 
 ### Tickets
 
-- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially logging migration and Marvis playback tuning.
+- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially logging migration and Qwen-only output modularization.
 - [ ] Streamline runtime persistence configuration so the package has one durable storage contract: platform Application Support by default, or one explicit startup state root that moves profiles, runtime configuration, text profiles, generated files, and generation jobs together. Remove or deprecate profile-root-specific compatibility surfaces in consumers such as `SpeakSwiftlyServer` once they can pass `stateRootURL` directly.
 - [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 28 typed observation API cleanup.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
@@ -264,6 +265,48 @@ In Progress
 - [ ] `TextForSpeech` can be consumed by `SpeakSwiftlyMobile` without inheriting macOS-only behavior or desktop speech-worker concepts.
 - [ ] `SpeakSwiftlyMobile` has a documented first slice that uses `TextForSpeech` for text conditioning and keeps iOS Core ML generation inside the app until a shared boundary is earned.
 
+## Milestone 32: Qwen-Only Output Modularization
+
+### Status
+
+In Progress
+
+### Scope
+
+- [x] Record the major-version plan for removing Marvis and Chatterbox without compatibility shims.
+- [x] Keep Qwen3 as the only supported generation family in the public backend configuration surface.
+- [x] Split generated-audio output primitives into Core, Playback, HTTP, and Network module targets.
+- [x] Model live speech as generation plus an output destination rather than assuming generation always means local playback.
+- [ ] Finish transport adoption so HTTP response streams and LAN streaming can consume canonical generated-audio chunks outside the local playback path.
+- [ ] Keep the current Qwen implementation working while the CoreML and Metal Flash Attention port remains a future generation-module swap.
+
+### Tickets
+
+- [x] Add a maintainer plan note under `docs/maintainers/` for the Qwen-only vNext cleanup.
+- [x] Remove Marvis and Chatterbox backend values from normal configuration and request switching paths.
+- [x] Add the canonical generated-audio chunk type, sample format, output errors, and stream adapter to `SpeakSwiftlyCore`.
+- [x] Add local playback chunk consumption to `SpeakSwiftlyPlayback`.
+- [x] Add HTTP-friendly raw PCM payload framing with metadata headers to `SpeakSwiftlyHTTPAudioOutput`.
+- [x] Add Network.framework audio frame encoding and Bonjour audio-receiver discovery primitives to `SpeakSwiftlyNetworkAudioOutput`.
+- [x] Add `generate.speech(... output:)` to the typed runtime surface.
+- [ ] Add `generate.audioStream(...)` only after the host boundary can return a successful chunk stream instead of a failed request handle.
+- [x] Remove the local `request_context.reqPurpose: "audioStream"` rejection guard after TextForSpeech removed `RequestPurpose.audioStream` in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+- [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
+- [x] Add organized unit and integration matrix coverage for every Qwen3 size and quant variant so routing, decoding, configuration, resident repo mapping, generation policy, and runtime scheduling stay covered without real-model downloads in the default suite.
+- [x] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
+- [x] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
+- [ ] Add detailed latency and benchmarking coverage for Qwen3 local playback and generated-output paths, including first-audio latency, chunk cadence, total generation time, memory pressure, prepared-conditioning cache behavior, and audible-quality notes for each size and quant variant.
+- [ ] Use the Qwen3 benchmark results to decide which quant variants should remain in the supported public matrix and slim any variants that do not justify their maintenance, download, memory, latency, or quality tradeoff.
+- [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
+- [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.
+
+### Exit Criteria
+
+- [ ] The package exposes Qwen-only generation plus selectable local playback, HTTP response stream, and LAN audio output destinations.
+- [ ] Removed backend names fail clearly from persisted config and worker requests.
+- [ ] Unit and integration tests cover module boundaries without requiring two real Macs for default validation.
+- [ ] The prerelease notes clearly call out breaking changes, migration notes, verification performed, and follow-up server adoption work.
+
 ## Backlog Candidates
 
 - Notification-linked priority playback is a backlog candidate, not an active milestone. It should only return to Active Milestones after a current issue or implementation plan proves the package should own notification-triggered priority playback instead of leaving that concern to a parent app.
@@ -296,8 +339,8 @@ In Progress
 - Milestone 13 was condensed out of Active Milestones after a second audit confirmed the package already has SemVer Git tags, GitHub SwiftPM dependency documentation, `.spi.yml`, a live Swift Package Index page, and a real adjacent Swift package consumer in `SpeakSwiftlyServer` using `https://github.com/gaelic-ghost/SpeakSwiftly.git` from `4.2.0`.
 - Milestone 17 was moved out of Active Milestones because notification-linked priority playback has no current issue, implementation branch, or package-ownership decision. It remains a backlog candidate only.
 - Milestone 18 was narrowed during this audit to documentation work that depended on still-open runtime observation decisions. That remaining docs work was later closed out in the 2026-05-03 Milestone 9 closeout entry above.
-- Milestone 22 was narrowed to the Marvis work that still needs fresh target-machine evidence: resident-policy benchmark results, #13 reproduction or closure, and an evidence-backed decision about whether remaining instability belongs to upstream generation throughput, local wrapper behavior, playback policy, or machine pressure. The completed Marvis-reference comparison no longer appears as open active work.
-- Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path and has Qwen plus Chatterbox E2E coverage for provided and inferred transcripts.
+- Milestone 22 was later superseded by the vNext Qwen-only decision. Its remaining Marvis tuning questions are preserved as historical context, not active release-hardening work.
+- Milestone 16 no longer tracks clone auto-transcription as active because clone transcript inference now lives in the shared clone-profile creation path. Earlier multi-backend E2E coverage is historical; the vNext supported generation family is Qwen-only.
 
 ### 2026-05-03 roadmap accuracy audit
 
@@ -388,7 +431,9 @@ These notes were archived and removed as standalone maintainer docs because they
 - `docs/maintainers/playback-metrics-review-2026-04-08.md`
   Result: the main lesson was to treat playback truth as controller-owned and to keep tuning grounded in trace metrics, now tracked in milestone 22 plus the completed playback-architecture cleanup history below.
 - `docs/maintainers/queued-marvis-playback-state-review-2026-04-08.md`
-  Result: the immediate controller-owned playback-state fix landed, the architecture cleanup landed, and the remaining follow-up is now first-request Marvis tuning.
+  Result: the immediate controller-owned playback-state fix landed and the
+  architecture cleanup landed. The later vNext Qwen-only decision superseded
+  the remaining first-request Marvis tuning follow-up.
 - `docs/maintainers/playback-forensics-2026-04-02.md`
   Result: early playback-threshold and adaptive-buffer tuning logs are now historical context rather than active guidance.
 

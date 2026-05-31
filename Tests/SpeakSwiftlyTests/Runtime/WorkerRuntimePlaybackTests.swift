@@ -17,6 +17,21 @@ private actor EnvironmentEventRecorder {
 
 // MARK: - Playback Utilities
 
+private func makeStreamOnlyResidentModel() -> AnySpeechModel {
+    AnySpeechModel(
+        sampleRate: 24000,
+        generate: { _, _, _, _, _, _ in
+            [0.1, 0.2]
+        },
+        generateSamplesStream: { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield([0.1, 0.2])
+                continuation.finish()
+            }
+        },
+    )
+}
+
 @Test func `inter job boop samples are short faded and audible`() {
     let sampleRate = 24000.0
     let samples = makeInterJobBoopSamples(sampleRate: sampleRate)
@@ -265,6 +280,150 @@ private actor EnvironmentEventRecorder {
         $0["id"] as? String == failedID
             && $0["ok"] as? Bool == true
     } == 1)
+}
+
+@Test func `speech uses configured nonlocal output when call does not override destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
+        audioOutputDestination: .httpResponseStream,
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let failedID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            voiceProfile: "default-femme",
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == failedID
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "invalid_request"
+                && (($0["message"] as? String)?.contains("HTTP audio streaming") ?? false)
+        }
+    })
+
+    let rejectedOutputSnapshot = await runtime.playback.snapshot()
+    #expect(rejectedOutputSnapshot.activeRequest == nil)
+    #expect(rejectedOutputSnapshot.queuedRequests.isEmpty)
+
+    let playedID = await runtime.generate
+        .speech(
+            text: "Hello locally",
+            voiceProfile: "default-femme",
+            output: .localPlayback,
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == playedID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+}
+
+@Test func `explicit local playback output overrides configured nonlocal destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
+        audioOutputDestination: .httpResponseStream,
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let playedID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            voiceProfile: "default-femme",
+            output: .localPlayback,
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == playedID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+}
+
+@Test func `saving runtime configuration preserves configured audio output destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        audioOutputDestination: .networkService(name: "Mac mini"),
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
+        startsResidentModelsAutomatically: false,
+    )
+
+    try await runtime.setDefaultVoiceProfile("testing-profile")
+
+    let configuration = try SpeakSwiftly.Configuration.load(
+        from: storeRoot.appendingPathComponent(ProfileStore.configurationFileName),
+    )
+
+    #expect(configuration.audioOutputDestination == .networkService(name: "Mac mini"))
 }
 
 @Test func `resident preload stays playback cold until the first audible request`() async throws {

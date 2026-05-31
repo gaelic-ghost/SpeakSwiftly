@@ -63,7 +63,7 @@ Useful environment variables include:
 
 - `SPEAKSWIFTLY_STATE_ROOT` for an isolated worker state root when startup arguments are not available
 - `SPEAKSWIFTLY_PROFILE_ROOT` is a deprecated compatibility alias for older hosts; do not use it in new integrations
-- `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback, including `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, `qwen3_smol_bf16`, `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, `qwen3_big_bf16`, `marvis`, `marvis_4bit`, and `marvis_6bit`
+- `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback, including `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, `qwen3_smol_bf16`, `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, and `qwen3_big_bf16`
 - `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` is a deprecated compatibility alias for older hosts; choose a Qwen backend value instead
 - `SPEAKSWIFTLY_ALLOW_PROFILE_CPU_FALLBACK=1` to explicitly allow the voice-profile model to load on CPU when the process cannot see a Metal GPU device; this is off by default because CPU-generated voice-profile conditioning is slow and should not become the normal package or host behavior
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests

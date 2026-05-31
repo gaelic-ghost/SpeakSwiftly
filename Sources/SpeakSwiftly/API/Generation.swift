@@ -32,7 +32,7 @@ public extension SpeakSwiftly.Generate {
         await runtime.generateSnapshot()
     }
 
-    /// Queues text for live speech playback.
+    /// Queues text for live speech output.
     ///
     /// - Parameters:
     ///   - text: The text to synthesize.
@@ -40,6 +40,8 @@ public extension SpeakSwiftly.Generate {
     ///   - textProfile: An optional text-normalization profile override.
     ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
     ///   - qwenPreModelTextChunking: Whether Qwen live playback should split text before model generation.
+    ///   - output: Optional request-level destination override for this live generated-audio stream.
+    ///     When omitted, SpeakSwiftly uses the runtime's configured audio output destination.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
@@ -47,11 +49,16 @@ public extension SpeakSwiftly.Generate {
         textProfile: SpeakSwiftly.TextProfileID? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         qwenPreModelTextChunking: Bool = false,
+        output: SpeakSwiftly.AudioOutputDestination? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
+        let requestID = UUID().uuidString
         let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
+        if let output {
+            await runtime.setAudioOutputDestination(output, for: requestID)
+        }
         return await runtime.submit(
             .queueSpeech(
-                id: UUID().uuidString,
+                id: requestID,
                 text: text,
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,

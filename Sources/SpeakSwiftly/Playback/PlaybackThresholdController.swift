@@ -8,7 +8,6 @@ enum PlaybackComplexityClass: String {
 
 enum PlaybackTuningProfile: Equatable {
     case standard
-    case firstDrainedLiveMarvis
 }
 
 struct PlaybackAdaptiveThresholds: Equatable {
@@ -44,8 +43,6 @@ struct PlaybackThresholdController {
     private(set) var thresholds: PlaybackAdaptiveThresholds
     private(set) var phase: PlaybackPhase = .warmup
 
-    private let tuningProfile: PlaybackTuningProfile
-
     private var chunkDurationsMS = [Int]()
     private var interChunkGapsMS = [Int]()
     private var rebufferCount = 0
@@ -58,9 +55,8 @@ struct PlaybackThresholdController {
     private var chunkGapWarningFloorMS: Int
     private var scheduleGapWarningFloorMS: Int
 
-    init(text: String, tuningProfile: PlaybackTuningProfile = .standard) {
-        self.tuningProfile = tuningProfile
-        thresholds = Self.seedThresholds(for: text, phase: .warmup, tuningProfile: tuningProfile)
+    init(text: String, tuningProfile _: PlaybackTuningProfile = .standard) {
+        thresholds = Self.seedThresholds(for: text, phase: .warmup)
         startupBufferFloorMS = thresholds.startupBufferTargetMS
         lowWaterFloorMS = thresholds.lowWaterTargetMS
         resumeBufferFloorMS = thresholds.resumeBufferTargetMS
@@ -71,15 +67,13 @@ struct PlaybackThresholdController {
     private static func seedThresholds(
         for text: String,
         phase: PlaybackPhase,
-        tuningProfile: PlaybackTuningProfile,
     ) -> PlaybackAdaptiveThresholds {
-        seededThresholds(for: classify(text: text), phase: phase, tuningProfile: tuningProfile)
+        seededThresholds(for: classify(text: text), phase: phase)
     }
 
     private static func seededThresholds(
         for complexityClass: PlaybackComplexityClass,
         phase: PlaybackPhase,
-        tuningProfile: PlaybackTuningProfile,
     ) -> PlaybackAdaptiveThresholds {
         let base = switch complexityClass {
             case .compact:
@@ -112,28 +106,27 @@ struct PlaybackThresholdController {
         }
 
         let phaseBias = phaseThresholdBias(for: complexityClass, phase: phase)
-        let tuningBias = tuningThresholdBias(for: complexityClass, phase: phase, tuningProfile: tuningProfile)
         return PlaybackAdaptiveThresholds(
             complexityClass: base.complexityClass,
             startupBufferTargetMS: min(
                 Self.maxStartupBufferTargetMS,
-                base.startupBufferTargetMS + phaseBias.startupBufferMS + tuningBias.startupBufferMS,
+                base.startupBufferTargetMS + phaseBias.startupBufferMS,
             ),
             lowWaterTargetMS: min(
                 Self.maxLowWaterTargetMS,
-                base.lowWaterTargetMS + phaseBias.lowWaterMS + tuningBias.lowWaterMS,
+                base.lowWaterTargetMS + phaseBias.lowWaterMS,
             ),
             resumeBufferTargetMS: min(
                 Self.maxResumeBufferTargetMS,
-                base.resumeBufferTargetMS + phaseBias.resumeBufferMS + tuningBias.resumeBufferMS,
+                base.resumeBufferTargetMS + phaseBias.resumeBufferMS,
             ),
             chunkGapWarningMS: min(
                 Self.maxChunkGapWarningMS,
-                base.chunkGapWarningMS + phaseBias.chunkGapWarningMS + tuningBias.chunkGapWarningMS,
+                base.chunkGapWarningMS + phaseBias.chunkGapWarningMS,
             ),
             scheduleGapWarningMS: min(
                 Self.maxScheduleGapWarningMS,
-                base.scheduleGapWarningMS + phaseBias.scheduleGapWarningMS + tuningBias.scheduleGapWarningMS,
+                base.scheduleGapWarningMS + phaseBias.scheduleGapWarningMS,
             ),
         )
     }
@@ -160,35 +153,6 @@ struct PlaybackThresholdController {
                 (140, 100, 220, 40, 30)
             case (.extended, .recovery):
                 (220, 160, 360, 50, 40)
-        }
-    }
-
-    private static func tuningThresholdBias(
-        for complexityClass: PlaybackComplexityClass,
-        phase: PlaybackPhase,
-        tuningProfile: PlaybackTuningProfile,
-    ) -> (
-        startupBufferMS: Int,
-        lowWaterMS: Int,
-        resumeBufferMS: Int,
-        chunkGapWarningMS: Int,
-        scheduleGapWarningMS: Int,
-    ) {
-        guard tuningProfile == .firstDrainedLiveMarvis else {
-            return (0, 0, 0, 0, 0)
-        }
-
-        return switch (complexityClass, phase) {
-            case (.compact, .warmup):
-                (2400, 980, 2820, 0, 0)
-            case (.balanced, .warmup):
-                (4560, 1900, 5340, 0, 0)
-            case (.compact, .recovery):
-                (1120, 500, 1460, 0, 0)
-            case (.balanced, .recovery):
-                (2060, 880, 2580, 0, 0)
-            case (_, .steady), (.extended, _):
-                (0, 0, 0, 0, 0)
         }
     }
 
@@ -238,7 +202,6 @@ struct PlaybackThresholdController {
         let seeded = Self.seededThresholds(
             for: thresholds.complexityClass,
             phase: phase,
-            tuningProfile: tuningProfile,
         )
         let phaseMargins = phaseAdaptiveMargins(
             for: phase,
@@ -357,8 +320,7 @@ struct PlaybackThresholdController {
         let maxInterChunkGapMS = interChunkGapsMS.max() ?? avgInterChunkGapMS
         let jitterMS = max(maxInterChunkGapMS - avgInterChunkGapMS, 0)
         let cadenceDeficitMS = max(avgInterChunkGapMS - avgChunkDurationMS, 0)
-        let immediateRecoveryPenalty = tuningProfile == .firstDrainedLiveMarvis ? 1 : 0
-        let effectiveRebufferCount = max(rebufferCount - 1, immediateRecoveryPenalty)
+        let effectiveRebufferCount = rebufferCount - 1
         guard effectiveRebufferCount > 0 else { return }
 
         let rebufferPenaltyMS = max(avgChunkDurationMS / 2, 40) * effectiveRebufferCount
@@ -447,14 +409,14 @@ struct PlaybackThresholdController {
         guard gapMS >= severeGapFloorMS else { return }
 
         preRebufferScheduleGapWarnings += 1
-        let requiredWarningCount = tuningProfile == .firstDrainedLiveMarvis ? 2 : 3
+        let requiredWarningCount = 3
         guard preRebufferScheduleGapWarnings >= requiredWarningCount else { return }
 
         preRebufferScheduleGapWarnings = 0
         phase = .recovery
         stableChunkStreak = 0
 
-        let distressPenaltyMS = max(avgChunkDurationMS / 2, 40) * (tuningProfile == .firstDrainedLiveMarvis ? 2 : 1)
+        let distressPenaltyMS = max(avgChunkDurationMS / 2, 40)
         let lowWaterTargetMS = min(
             Self.maxLowWaterTargetMS,
             max(

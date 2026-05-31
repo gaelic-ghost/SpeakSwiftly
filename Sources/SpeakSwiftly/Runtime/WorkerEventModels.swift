@@ -38,7 +38,6 @@ public extension SpeakSwiftly {
         case waitingForResidentModels = "waiting_for_resident_models"
         case waitingForActiveRequest = "waiting_for_active_request"
         case waitingForPlaybackStability = "waiting_for_playback_stability"
-        case waitingForMarvisGenerationLane = "waiting_for_marvis_generation_lane"
     }
 
     struct QueuedEvent: Encodable, Sendable, Equatable {

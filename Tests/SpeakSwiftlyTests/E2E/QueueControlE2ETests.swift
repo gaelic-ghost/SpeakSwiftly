@@ -5,7 +5,7 @@ import Testing
 
 @Suite(
     .serialized,
-    .tags(.e2e, .chatterbox),
+    .tags(.e2e, .qwen),
     .enabled(
         if: speakSwiftlyE2ETestsEnabled(),
         "These end-to-end worker tests are opt-in and require SPEAKSWIFTLY_E2E=1.",
@@ -21,7 +21,7 @@ struct QueueControlE2ETests {
         let worker = try WorkerProcess(
             profileRootURL: sandbox.profileRootURL,
             silentPlayback: true,
-            speechBackend: .chatterboxTurbo,
+            speechBackend: .qwen3_smol,
         )
         defer { Task { await worker.stop() } }
 
@@ -103,7 +103,7 @@ struct QueueControlE2ETests {
         let worker = try WorkerProcess(
             profileRootURL: sandbox.profileRootURL,
             silentPlayback: true,
-            speechBackend: .chatterboxTurbo,
+            speechBackend: .qwen3_smol,
         )
         defer { Task { await worker.stop() } }
 
@@ -135,6 +135,10 @@ struct QueueControlE2ETests {
             $0["id"] as? String == "req-playback-active-e2e"
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "request_cancelled"
+        })
+        _ = try #require(try await worker.waitForStderrJSONObject(timeout: Self.queueControlTimeout) {
+            $0["event"] as? String == "qwen_live_chunk_finished"
+                && $0["request_id"] as? String == "req-playback-active-e2e"
         })
 
         try worker.closeInput()

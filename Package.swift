@@ -13,6 +13,22 @@ let package = Package(
             name: "SpeakSwiftly",
             targets: ["SpeakSwiftly"],
         ),
+        .library(
+            name: "SpeakSwiftlyCore",
+            targets: ["SpeakSwiftlyCore"],
+        ),
+        .library(
+            name: "SpeakSwiftlyPlayback",
+            targets: ["SpeakSwiftlyPlayback"],
+        ),
+        .library(
+            name: "SpeakSwiftlyHTTPAudioOutput",
+            targets: ["SpeakSwiftlyHTTPAudioOutput"],
+        ),
+        .library(
+            name: "SpeakSwiftlyNetworkAudioOutput",
+            targets: ["SpeakSwiftlyNetworkAudioOutput"],
+        ),
         .executable(
             name: "SpeakSwiftlyTool",
             targets: ["SpeakSwiftlyTool"],
@@ -29,7 +45,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.22.1"),
+            .upToNextMajor(from: "0.23.0"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
@@ -44,6 +60,11 @@ let package = Package(
         .target(
             name: "SpeakSwiftly",
             dependencies: [
+                "SpeakSwiftlyCore",
+                "SpeakSwiftlyQwenGeneration",
+                "SpeakSwiftlyPlayback",
+                "SpeakSwiftlyHTTPAudioOutput",
+                "SpeakSwiftlyNetworkAudioOutput",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -56,6 +77,33 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("CoreGraphics", .when(platforms: [.macOS])),
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyCore",
+        ),
+        .target(
+            name: "SpeakSwiftlyQwenGeneration",
+            dependencies: [
+                "SpeakSwiftlyCore",
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyPlayback",
+            dependencies: [
+                "SpeakSwiftlyCore",
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyHTTPAudioOutput",
+            dependencies: [
+                "SpeakSwiftlyCore",
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyNetworkAudioOutput",
+            dependencies: [
+                "SpeakSwiftlyCore",
             ],
         ),
         .executableTarget(
@@ -86,6 +134,10 @@ let package = Package(
             name: "SpeakSwiftlyTests",
             dependencies: [
                 "SpeakSwiftly",
+                "SpeakSwiftlyCore",
+                "SpeakSwiftlyPlayback",
+                "SpeakSwiftlyHTTPAudioOutput",
+                "SpeakSwiftlyNetworkAudioOutput",
                 "SpeakSwiftlyTool",
                 "SpeakSwiftlyTestSupport",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),

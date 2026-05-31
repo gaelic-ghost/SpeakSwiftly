@@ -330,14 +330,13 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
 
 enum BenchmarkHarness {
     static func effectivePlaybackMode() -> BenchmarkPlaybackMode {
-        speakSwiftlyBackendBenchmarkAudibleEnabled() ? .audible : .silent
+        speakSwiftlyAudibleE2ETestsEnabled() ? .audible : .silent
     }
 
     static func withBenchmarkRuntime<T>(
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
         qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
         playbackMode: BenchmarkPlaybackMode = .silent,
         playbackTrace: Bool = false,
         operation: @escaping @Sendable (BenchmarkRuntimeSession) async throws -> T,
@@ -346,7 +345,6 @@ enum BenchmarkHarness {
             profileRootURL: profileRootURL,
             backend: backend,
             qwenConditioningStrategy: qwenConditioningStrategy,
-            marvisResidentPolicy: marvisResidentPolicy,
             playbackMode: playbackMode,
             playbackTrace: playbackTrace,
         )
@@ -365,7 +363,6 @@ enum BenchmarkHarness {
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
         qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy,
         playbackMode: BenchmarkPlaybackMode,
         playbackTrace: Bool,
     ) async throws -> BenchmarkRuntimeSession {
@@ -423,7 +420,6 @@ enum BenchmarkHarness {
             dependencies: dependencies,
             speechBackend: backend,
             qwenConditioningStrategy: qwenConditioningStrategy,
-            marvisResidentPolicy: marvisResidentPolicy,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,

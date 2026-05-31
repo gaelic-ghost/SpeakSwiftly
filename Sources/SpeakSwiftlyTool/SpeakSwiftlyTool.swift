@@ -9,7 +9,6 @@ enum SpeakSwiftlyTool {
         var stateRootURL: URL?
         var systemProfileResourceRootURL: URL?
         var allowsProfileModelCPUFallback: Bool?
-        var marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic
     }
 
     private enum ArgumentError: LocalizedError {
@@ -19,7 +18,7 @@ enum SpeakSwiftlyTool {
         var errorDescription: String? {
             switch self {
                 case let .unknown(argument):
-                    "Unknown argument '\(argument)'. Supported options: --state-root PATH, --system-profile-resource-root PATH, --allow-profile-cpu-fallback, and --marvis-resident-policy dual_resident_serialized|single_resident_dynamic."
+                    "Unknown argument '\(argument)'. Supported options: --state-root PATH, --system-profile-resource-root PATH, and --allow-profile-cpu-fallback."
                 case let .missingValue(option):
                     "Missing value for \(option)."
             }
@@ -33,7 +32,6 @@ enum SpeakSwiftlyTool {
                 stateRootURL: options.stateRootURL,
                 systemProfileResourceRootURL: options.systemProfileResourceRootURL,
                 allowsProfileModelCPUFallback: options.allowsProfileModelCPUFallback,
-                marvisResidentPolicy: options.marvisResidentPolicy,
                 startsResidentModelsAutomatically: options.systemProfileResourceRootURL == nil,
             )
             await run(runtime: runtime)
@@ -133,14 +131,6 @@ enum SpeakSwiftlyTool {
                     )
                 case "--allow-profile-cpu-fallback":
                     options.allowsProfileModelCPUFallback = true
-                case "--marvis-resident-policy":
-                    index += 1
-                    let value = try requireOptionValue(arguments, index: index, for: argument)
-                    guard let policy = SpeakSwiftly.MarvisResidentPolicy(rawValue: value) else {
-                        throw ArgumentError.unknown("\(argument) \(value)")
-                    }
-
-                    options.marvisResidentPolicy = policy
                 default:
                     throw ArgumentError.unknown(argument)
             }

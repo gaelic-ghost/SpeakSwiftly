@@ -1,0 +1,46 @@
+# Qwen-Only Output Modularization for SpeakSwiftly vNext
+
+This branch is a major-version cleanup. SpeakSwiftly will keep Qwen3 as the only
+speech generation family, remove Marvis and Chatterbox, and split generated audio
+output into small self-contained package modules.
+
+## Decisions
+
+- Do not keep compatibility shims, backend aliases, transitional wrappers, or
+  duplicate codepaths for removed backends.
+- Treat persisted configuration or worker requests that name removed backends as
+  invalid input and report a clear unsupported-backend error.
+- Keep the initial modularization in this package rather than creating another
+  repository.
+- Leave the CoreML and Metal Flash Attention Qwen port as a future generation
+  implementation swap unless that work is explicitly brought into this branch.
+- Treat `SpeakSwiftlyServer` adoption and real two-Mac LAN testing as follow-up
+  integration work after this package exposes stable output modules.
+- TextForSpeech 0.23.0 removed
+  `TextForSpeech.RequestContext.RequestPurpose.audioStream` in
+  [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+  SpeakSwiftly now relies on TextForSpeech decoding to reject stale JSONL
+  `request_context.reqPurpose: "audioStream"` payloads.
+
+## Target Shape
+
+- `SpeakSwiftlyCore` owns shared request identifiers, names, generated-audio
+  chunk metadata, output errors, and observation primitives.
+- `SpeakSwiftlyQwenGeneration` is the future Qwen generation module target. It
+  is intentionally not published as a package product until it owns a real
+  public generation entry point that emits typed async generated-audio chunks.
+- `SpeakSwiftlyPlayback` owns local AVAudioEngine playback and consumes generated
+  audio chunks.
+- `SpeakSwiftlyHTTPAudioOutput` owns HTTP-friendly generated-audio chunk framing.
+- `SpeakSwiftlyNetworkAudioOutput` owns Network.framework LAN audio stream
+  encoding, Bonjour audio-receiver discovery, advertisement metadata, and
+  transport primitives.
+- `SpeakSwiftly` remains the composition and runtime facade that wires
+  generation, queues, storage, and selected output destinations together.
+
+## Validation Shape
+
+- Prefer targeted Swift tests after each coherent slice.
+- Run `swift package dump-package`, `swift build`, and `swift test` before
+  checkpoints that change public API or the package graph.
+- Do not run live worker E2E by default during the structural pass.
