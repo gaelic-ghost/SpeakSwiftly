@@ -84,6 +84,24 @@ import Testing
     #expect(result.outputMatch?.paddedTail?.sampleCount == 5760)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder audio inspection localizes representative w8a8 drift`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load()
+
+    #expect(fixture.mode == "coreml_decoder_audio_inspection")
+    #expect(fixture.sample.id == "730_358_000003_000002")
+    #expect(fixture.sample.audioCodesShape == [37, 16])
+    #expect(fixture.sample.paddedInputShape == [1, 40, 16])
+    #expect(fixture.sample.validOutputSampleCount == 71040)
+    #expect(fixture.audio.validOutputDiff.sampleCount == 71040)
+    #expect((fixture.audio.validOutputDiff.maxAbsDiff) > 0.17)
+    #expect((fixture.audio.validOutputDiff.meanAbsDiff) > 0.012)
+    #expect(fixture.audio.windows.count == 12)
+    #expect(fixture.audio.windows.alertCount == 8)
+    #expect(fixture.audio.windows.topByMeanAbsDiff.first?.startSeconds == 1.25)
+    #expect(fixture.artifacts.baselineValidWav.hasSuffix("baseline-fp16-valid.wav"))
+    #expect(fixture.artifacts.candidateValidWav.hasSuffix("candidate-w8a8-valid.wav"))
+}
+
 private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightFixture: Decodable {
     struct Source: Decodable {
         struct ConversionTarget: Decodable {
@@ -151,6 +169,56 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightFixture:
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
             "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-preflight-12hz.json",
+        )
+        let data = try Data(contentsOf: fixtureURL)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(Self.self, from: data)
+    }
+}
+
+private struct Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture: Decodable {
+    struct Sample: Decodable {
+        let id: String
+        let audioCodesShape: [Int]
+        let paddedInputShape: [Int]
+        let validOutputSampleCount: Int
+    }
+
+    struct Artifacts: Decodable {
+        let baselineValidWav: String
+        let candidateValidWav: String
+    }
+
+    struct Audio: Decodable {
+        struct Diff: Decodable {
+            let sampleCount: Int
+            let maxAbsDiff: Double
+            let meanAbsDiff: Double
+        }
+
+        struct Windows: Decodable {
+            struct Window: Decodable {
+                let startSeconds: Double
+            }
+
+            let count: Int
+            let alertCount: Int
+            let topByMeanAbsDiff: [Window]
+        }
+
+        let validOutputDiff: Diff
+        let windows: Windows
+    }
+
+    let mode: String
+    let sample: Sample
+    let artifacts: Artifacts
+    let audio: Audio
+
+    static func load() throws -> Self {
+        let fixtureURL = try qwen3TTSFixtureURL(
+            "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-40-w8a8-12hz.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

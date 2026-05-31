@@ -1176,6 +1176,66 @@ Immediate implications:
   understood, unless the next goal is only to characterize whether drift scales
   with output length.
 
+### 2026-05-31 Decoder Audio Inspection, Bucket 40 W8A8, Pass 1
+
+Added a guarded Core ML maintenance wrapper:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh`
+
+The wrapper does three jobs for local Core ML/Qwen maintenance commands:
+
+- unload live `SpeakSwiftlyServer` resident models before the command starts;
+- optionally clear stale artifacts under `.local/coreml-qwen3tts`;
+- reload live resident models on exit, including after a failed inner command.
+
+Added a decoder audio inspection probe:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/inspect-speech-tokenizer-decoder-audio.py`
+
+Added a checked-in audio inspection report:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-40-w8a8-12hz.json`
+
+The local WAV artifacts are intentionally not checked in:
+
+- `.local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8/baseline-fp16.wav`
+- `.local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8/candidate-w8a8.wav`
+- `.local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8/candidate-minus-baseline.wav`
+- `.local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8/baseline-fp16-valid.wav`
+- `.local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8/candidate-w8a8-valid.wav`
+
+Validation:
+
+- The first guarded run successfully unloaded live resident models, but the
+  inner `uv` command hit a sandbox permission error while opening the existing
+  `uv` cache. The wrapper still reloaded live resident models afterward.
+- The guarded command was rerun with elevated filesystem access for the `uv`
+  cache. It unloaded live resident models, ran the audio inspection, and
+  reloaded live resident models after completion.
+- The audio inspection used CPU-only Core ML predictions for both the fp16
+  bucket-40 decoder and the representative W8A8 bucket-40 decoder.
+- The valid decoded region has max absolute difference `0.1773681640625`, mean
+  absolute difference `0.012432368472218513`, and RMS difference
+  `0.018015170469880104`.
+- The padded tail has max absolute difference `0.26751708984375`, mean absolute
+  difference `0.008735979907214642`, and RMS difference
+  `0.020247511565685272`.
+- In the valid decoded region, 8 of 12 quarter-second windows exceed mean
+  absolute difference `0.01`. The top mean-diff windows start at 1.25 seconds,
+  2.5 seconds, 2.0 seconds, 0.0 seconds, and 1.5 seconds.
+
+Immediate implications:
+
+- The representative W8A8 drift is not isolated to padding. The valid audio
+  region has broad drift across most of the utterance.
+- A wider calibration set is still worth testing, but this result raises the
+  bar: we need audible review and alternative quantization settings before
+  spending much more time on Neural Engine dispatch for this decoder.
+- Talker-generated Qwen3 code histories should be added as a separate
+  calibration/evaluation source. Current LibriTTS-R codes are real human speech
+  encoded through Qwen3-TTS's tokenizer, not codes from another TTS model, but
+  they may still differ from the code distribution produced by the Qwen3 talker.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:
