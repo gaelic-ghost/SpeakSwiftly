@@ -357,6 +357,65 @@ Implementation note:
   `model_id` as `modelId`, so the fixture model avoids all-caps acronym
   properties in test-only `Decodable` structs.
 
+### 2026-05-31 Speech Tokenizer Config Probe, Pass 1
+
+Added a config-only speech-tokenizer inspection script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/inspect-speech-tokenizer-config.py`
+
+Added a checked-in metadata fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-config-12hz.json`
+
+Added SwiftPM tests for the fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerConfigTests.swift`
+
+This probe downloads only small Hugging Face metadata files from
+`Qwen/Qwen3-TTS-Tokenizer-12Hz`. It does not download model weights and does not
+run encode/decode yet.
+
+Captured metadata:
+
+- Hugging Face resolved revision:
+  `7dd38ad4e9bad454aae9cd937d0cd577604fe229`
+- model type: `qwen3_tts_tokenizer_12hz`
+- input sample rate: 24000 Hz
+- output sample rate: 24000 Hz
+- encode downsample rate: 1920 samples per code step
+- decode upsample rate: 1920 samples per code step
+- valid quantizers used by the encoder output: 16
+- encoder codebook size: 2048
+- decoder transformer hidden size: 512
+- decoder transformer layers: 8
+- decoder attention heads: 16
+- decoder key-value heads: 16
+- decoder latent dimension: 1024
+- decoder dimension: 1536
+- decoder upsample rates: `[8, 5, 4, 3]`
+- decoder pre-upsampling ratios: `[2, 2]`
+
+Core ML implications:
+
+- The 12 Hz speech tokenizer should be treated as at least two graph candidates:
+  encoder and decoder. It should not be hidden inside the first talker graph.
+- The first decode graph can accept padded integer codes shaped
+  `batch x codes_length x num_quantizers`.
+- Upstream pads missing code steps as `-1`, computes valid length from CB0,
+  clamps codes to zero before decode, and trims decoded audio by
+  `valid_code_steps * 1920`.
+- The decoder has enough transformer and convolutional/upsampling work that it
+  deserves its own compute-unit measurement instead of inheriting the talker
+  compute policy.
+
+Validation:
+
+- `uv run --with ruff ruff check` passed for both Core ML Qwen maintainer
+  scripts.
+- `jq empty` passed for the speech-tokenizer config fixture.
+- `swift test --filter qwen3` passed with the text-token and speech-tokenizer
+  config tests.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
