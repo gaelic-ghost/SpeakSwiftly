@@ -899,6 +899,16 @@ func makeGenerationJobStore(rootURL: URL) throws -> GenerationJobStore {
     return store
 }
 
+func makeDefaultLoadedAudioSamples() -> MLXArray? {
+    do {
+        try ensureMLXSwiftTestMetallibInstalled()
+    } catch {
+        Issue.record("Failed to stage default.metallib for the Swift test process: \(error)")
+    }
+
+    return MLXArray([Float(0.1), 0.2]).reshaped([1, 2])
+}
+
 func makeRuntime(
     rootURL: URL = makeTempDirectoryURL(),
     output: OutputRecorder,
@@ -907,7 +917,7 @@ func makeRuntime(
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
     audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
     audioLoadRecorder: ResidentModelRecorder? = nil,
-    loadedAudioSamples: MLXArray? = MLXArray([Float(0.1), 0.2]).reshaped([1, 2]),
+    loadedAudioSamples: MLXArray? = makeDefaultLoadedAudioSamples(),
     loadedCloneAudioSamples: [Float] = [],
     residentModelLoader: @escaping @Sendable (SpeakSwiftly.SpeechBackend) async throws -> some Any,
     profileModelLoader: @escaping @Sendable () async throws -> AnySpeechModel = {
