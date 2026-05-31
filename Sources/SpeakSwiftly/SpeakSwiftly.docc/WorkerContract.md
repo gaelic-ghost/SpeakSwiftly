@@ -43,9 +43,13 @@ For generation requests, the current worker keys are:
 
 ### RequestContext Fields
 
-`request_context` uses the shared `TextForSpeech.RequestContext` shape:
+`request_context` uses the shared `TextForSpeech.RequestContext` shape with a
+narrower SpeakSwiftly worker contract:
 
-- `reqPurpose` is required. Valid values are `speech`, `audioFile`, and `audioStream`.
+- `reqPurpose` is required. Valid values are `speech` and `audioFile`.
+- Use `speech` for spoken output whether the generated audio is played locally,
+  served by HTTP, or sent over LAN. Output destinations select transport; request
+  purpose only describes how the text should be normalized.
 - `source`, `topic`, `attributes`, `cwd`, and `repo_root` provide caller metadata and path context.
 - `prefacePolicy` is optional and can override the default source/topic preface behavior.
 

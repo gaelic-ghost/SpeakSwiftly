@@ -708,6 +708,25 @@ import TextForSpeech
     }
 }
 
+@Test func `rejects audio stream request purpose`() throws {
+    let audioStreamPurposePayloads = [
+        #"{"id":"req-stream-purpose","op":"generate_speech","text":"Hello","request_context":{"reqPurpose":"audioStream"}}"#,
+        #"{"id":"req-batch-stream-purpose","op":"generate_batch","items":[{"text":"Hello","request_context":{"reqPurpose":"audioStream"}}]}"#,
+    ]
+
+    for payload in audioStreamPurposePayloads {
+        do {
+            _ = try ToolRequest.decode(from: payload)
+            Issue.record("Expected audioStream request purpose to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains("audioStream"))
+            #expect(error.message.contains("speech"))
+            #expect(error.message.contains("output destination"))
+        }
+    }
+}
+
 @Test func `rejects invalid profile name`() throws {
     let tempRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: tempRoot) }

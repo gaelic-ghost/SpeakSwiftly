@@ -32,11 +32,12 @@ extension ToolRequest {
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
                 )
-                let requestContext = RawWorkerRequest.requestContext(
+                let requestContext = try RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
                     reqPurpose: .speech,
                     base: raw.requestContext,
+                    requestID: id,
                 )
                 return .speech(
                     id: id,
@@ -54,11 +55,12 @@ extension ToolRequest {
                     text: raw.text,
                     textProfileID: raw.textProfile ?? raw.textProfileID,
                 )
-                let requestContext = RawWorkerRequest.requestContext(
+                let requestContext = try RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
                     repoRoot: raw.repoRoot,
                     reqPurpose: .audioFile,
                     base: raw.requestContext,
+                    requestID: id,
                 )
                 return .audio(
                     id: id,
