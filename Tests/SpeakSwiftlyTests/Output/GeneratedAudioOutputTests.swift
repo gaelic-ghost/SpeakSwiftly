@@ -4,7 +4,6 @@ import SpeakSwiftlyCore
 import SpeakSwiftlyHTTPAudioOutput
 import SpeakSwiftlyNetworkAudioOutput
 import SpeakSwiftlyPlayback
-import SpeakSwiftlyQwenGeneration
 import Testing
 
 @Test func `canonical generated audio chunk carries metadata and final marker`() {
@@ -26,7 +25,7 @@ import Testing
     #expect(chunk.isFinal)
 }
 
-@Test func `qwen stream wraps float samples as canonical chunks`() async throws {
+@Test func `chunk stream wraps float samples as canonical chunks`() async throws {
     let source = AsyncThrowingStream<[Float], any Error> { continuation in
         continuation.yield([0.1, 0.2])
         continuation.yield([0.3])
@@ -34,7 +33,7 @@ import Testing
     }
     var chunks = [GeneratedAudioChunk]()
 
-    for try await chunk in QwenGeneratedAudioStream.chunks(
+    for try await chunk in GeneratedAudioChunkStream.chunks(
         requestID: "req-qwen",
         sampleRate: 24000,
         samples: source,
@@ -91,12 +90,14 @@ import Testing
 
     let frame = HTTPGeneratedAudioFrame(chunk: chunk)
 
-    #expect(frame.requestID == "req-http")
-    #expect(frame.sequenceNumber == 7)
-    #expect(frame.sampleRate == 48000)
-    #expect(frame.channelCount == 2)
-    #expect(frame.sampleFormat == .float32PCM)
-    #expect(frame.isFinal)
+    #expect(frame.header.requestID == "req-http")
+    #expect(frame.header.sequenceNumber == 7)
+    #expect(frame.header.sampleRate == 48000)
+    #expect(frame.header.channelCount == 2)
+    #expect(frame.header.sampleFormat == .float32PCM)
+    #expect(frame.header.isFinal)
+    #expect(frame.contentType == "application/octet-stream")
+    #expect(frame.metadataHeaders.contains { $0.name == "X-SpeakSwiftly-Final" && $0.value == "true" })
     #expect(frame.decodedSamples() == [0.25, -0.5])
 }
 

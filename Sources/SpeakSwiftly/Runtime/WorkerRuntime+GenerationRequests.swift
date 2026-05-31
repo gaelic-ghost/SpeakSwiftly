@@ -324,14 +324,14 @@ extension SpeakSwiftly.Runtime {
             streamingInterval: playbackState.request.residentStreamingInterval,
         )
         do {
-            switch audioOutputDestination {
+            switch audioOutputDestination(for: id) {
                 case .localPlayback:
                     for try await samples in sampleStream {
                         try Task.checkCancellation()
                         playbackState.execution.continuation.yield(samples)
                     }
                     playbackState.execution.continuation.finish()
-                case .httpStream:
+                case .httpResponseStream:
                     playbackState.execution.continuation.finish()
                     throw WorkerError(
                         code: .invalidRequest,
@@ -357,6 +357,14 @@ extension SpeakSwiftly.Runtime {
                 message: "Live speech generation failed while streaming audio for request '\(id)'. \(error.localizedDescription)",
             )
         }
+    }
+
+    func setAudioOutputDestination(_ destination: SpeakSwiftly.AudioOutputDestination, for requestID: String) {
+        requestAudioOutputDestinations[requestID] = destination
+    }
+
+    private func audioOutputDestination(for requestID: String) -> SpeakSwiftly.AudioOutputDestination {
+        requestAudioOutputDestinations[requestID] ?? audioOutputDestination
     }
 
     private func handleQueueSpeechBatchGeneration(

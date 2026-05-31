@@ -259,6 +259,7 @@ extension SpeakSwiftly.Runtime {
         guard activeGenerations[token] != nil else { return }
 
         activeGenerations.removeValue(forKey: token)
+        requestAudioOutputDestinations.removeValue(forKey: request.id)
         await generationQueue.finishActive(token: token)
         await publishGenerateUpdate()
         let cancellation = activeGenerationCancellations.removeValue(forKey: request.id)

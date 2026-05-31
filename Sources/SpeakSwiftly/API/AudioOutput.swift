@@ -3,22 +3,22 @@ import SpeakSwiftlyCore
 import SpeakSwiftlyHTTPAudioOutput
 import SpeakSwiftlyNetworkAudioOutput
 import SpeakSwiftlyPlayback
-import SpeakSwiftlyQwenGeneration
 
 public extension SpeakSwiftly {
     typealias GeneratedAudioChunk = SpeakSwiftlyCore.GeneratedAudioChunk
+    typealias GeneratedAudioChunkStream = SpeakSwiftlyCore.GeneratedAudioChunkStream
     typealias GeneratedAudioSampleFormat = SpeakSwiftlyCore.GeneratedAudioSampleFormat
     typealias GeneratedAudioOutputError = SpeakSwiftlyCore.GeneratedAudioOutputError
-    typealias QwenGeneratedAudioStream = SpeakSwiftlyQwenGeneration.QwenGeneratedAudioStream
     typealias LocalPlaybackAudioOutput = SpeakSwiftlyPlayback.LocalPlaybackAudioOutput
     typealias HTTPGeneratedAudioFrame = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrame
+    typealias HTTPGeneratedAudioFrameHeader = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrameHeader
     typealias NetworkAudioEndpoint = SpeakSwiftlyNetworkAudioOutput.NetworkAudioEndpoint
     typealias NetworkGeneratedAudioFrame = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrame
     typealias NetworkGeneratedAudioFrameCodec = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrameCodec
 
     enum AudioOutputDestination: Codable, Sendable, Equatable {
         case localPlayback
-        case httpStream
+        case httpResponseStream
         case networkStream(host: String, port: UInt16)
 
         enum CodingKeys: String, CodingKey {
@@ -29,7 +29,7 @@ public extension SpeakSwiftly {
 
         enum Kind: String, Codable {
             case localPlayback = "local_playback"
-            case httpStream = "http_stream"
+            case httpResponseStream = "http_response_stream"
             case networkStream = "network_stream"
         }
 
@@ -38,8 +38,8 @@ public extension SpeakSwiftly {
             switch try container.decode(Kind.self, forKey: .kind) {
                 case .localPlayback:
                     self = .localPlayback
-                case .httpStream:
-                    self = .httpStream
+                case .httpResponseStream:
+                    self = .httpResponseStream
                 case .networkStream:
                     let host = try container.decode(String.self, forKey: .host)
                     let port = try container.decode(UInt16.self, forKey: .port)
@@ -52,8 +52,8 @@ public extension SpeakSwiftly {
             switch self {
                 case .localPlayback:
                     try container.encode(Kind.localPlayback, forKey: .kind)
-                case .httpStream:
-                    try container.encode(Kind.httpStream, forKey: .kind)
+                case .httpResponseStream:
+                    try container.encode(Kind.httpResponseStream, forKey: .kind)
                 case let .networkStream(host, port):
                     try container.encode(Kind.networkStream, forKey: .kind)
                     try container.encode(host, forKey: .host)

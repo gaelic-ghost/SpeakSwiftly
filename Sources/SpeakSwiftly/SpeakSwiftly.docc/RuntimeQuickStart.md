@@ -90,13 +90,15 @@ arguments are not available.
 
 ## Generate Playback Or Files
 
-Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)`` when you want audio to enter the live playback queue:
+Use ``SpeakSwiftly/Generate/speech(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:output:)`` when you want audio to enter the live playback queue:
 
 ```swift
 let handle = await runtime.generate.speech(
     text: "Hello from SpeakSwiftly."
 )
 ```
+
+Use ``SpeakSwiftly/Generate/audioStream(text:voiceProfile:textProfile:requestContext:output:)`` when the generated audio should stream to a host-managed response or LAN transport instead of local playback.
 
 Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)`` when you want retained file output instead:
 

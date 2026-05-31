@@ -2,21 +2,19 @@ import Foundation
 import SpeakSwiftlyCore
 
 public struct HTTPGeneratedAudioFrame: Codable, Sendable, Equatable {
-    public let requestID: String
-    public let sequenceNumber: Int
-    public let sampleRate: Int
-    public let channelCount: Int
-    public let sampleFormat: GeneratedAudioSampleFormat
-    public let isFinal: Bool
+    public let header: HTTPGeneratedAudioFrameHeader
     public let payload: Data
 
+    public var contentType: String {
+        "application/octet-stream"
+    }
+
+    public var metadataHeaders: [(name: String, value: String)] {
+        header.httpHeaders
+    }
+
     public init(chunk: GeneratedAudioChunk) {
-        requestID = chunk.requestID
-        sequenceNumber = chunk.sequenceNumber
-        sampleRate = chunk.sampleRate
-        channelCount = chunk.channelCount
-        sampleFormat = chunk.sampleFormat
-        isFinal = chunk.isFinal
+        header = HTTPGeneratedAudioFrameHeader(chunk: chunk)
         payload = Self.encodeFloat32Samples(chunk.samples)
     }
 
@@ -44,5 +42,37 @@ public struct HTTPGeneratedAudioFrame: Codable, Sendable, Equatable {
 
     public func decodedSamples() -> [Float] {
         Self.decodeFloat32Samples(payload)
+    }
+}
+
+public struct HTTPGeneratedAudioFrameHeader: Codable, Sendable, Equatable {
+    public let requestID: String
+    public let sequenceNumber: Int
+    public let sampleRate: Int
+    public let channelCount: Int
+    public let sampleFormat: GeneratedAudioSampleFormat
+    public let isFinal: Bool
+    public let payloadByteCount: Int
+
+    public init(chunk: GeneratedAudioChunk) {
+        requestID = chunk.requestID
+        sequenceNumber = chunk.sequenceNumber
+        sampleRate = chunk.sampleRate
+        channelCount = chunk.channelCount
+        sampleFormat = chunk.sampleFormat
+        isFinal = chunk.isFinal
+        payloadByteCount = chunk.samples.count * MemoryLayout<Float>.size
+    }
+
+    public var httpHeaders: [(name: String, value: String)] {
+        [
+            ("X-SpeakSwiftly-Request-ID", requestID),
+            ("X-SpeakSwiftly-Sequence", String(sequenceNumber)),
+            ("X-SpeakSwiftly-Sample-Rate", String(sampleRate)),
+            ("X-SpeakSwiftly-Channel-Count", String(channelCount)),
+            ("X-SpeakSwiftly-Sample-Format", sampleFormat.rawValue),
+            ("X-SpeakSwiftly-Final", isFinal ? "true" : "false"),
+            ("Content-Length", String(payloadByteCount)),
+        ]
     }
 }

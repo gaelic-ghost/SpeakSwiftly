@@ -84,7 +84,7 @@ import Darwin
         qwenConditioningStrategy: .preparedConditioning,
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
         duckMediaVolume: .default,
-        audioOutputDestination: .httpStream,
+        audioOutputDestination: .httpResponseStream,
     )
 
     try configuration.save(to: persistenceURL)
@@ -94,7 +94,7 @@ import Darwin
     #expect(loaded.qwenConditioningStrategy == configuration.qwenConditioningStrategy)
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
     #expect(loaded.duckMediaVolume == .default)
-    #expect(loaded.audioOutputDestination == .httpStream)
+    #expect(loaded.audioOutputDestination == .httpResponseStream)
     #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
 }

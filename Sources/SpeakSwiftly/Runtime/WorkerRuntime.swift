@@ -280,6 +280,7 @@ public extension SpeakSwiftly {
         var generateObservationBroker = SingletonObservationBroker<SpeakSwiftly.GenerateUpdate>()
         var playbackObservationBroker = SingletonObservationBroker<SpeakSwiftly.PlaybackUpdate>()
         var requestBrokers = [String: RequestBroker]()
+        var requestAudioOutputDestinations = [String: SpeakSwiftly.AudioOutputDestination]()
         var terminalRequestBrokerOrder = [String]()
         var workerOutputContinuations = [UUID: AsyncStream<SpeakSwiftly.WorkerOutputEvent>.Continuation]()
         var activeGenerations = [UUID: ActiveRequest]()
