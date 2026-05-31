@@ -8,7 +8,11 @@ import Testing
     #expect(fixture.mode == "preflight")
     #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-Tokenizer-12Hz")
     #expect(fixture.source.requestedSampleCount == 24)
+    #expect(fixture.source.rowOffsets?.count == 24)
+    #expect(fixture.source.rowOffsets?.first == 0)
+    #expect(fixture.source.rowOffsets?.last == 26000)
     #expect(fixture.samplePreviews.count == 24)
+    #expect(Set(fixture.samplePreviews.map(\.speakerId)).count == 24)
     #expect(fixture.stratificationTargets.contains("short_utterances"))
     #expect(fixture.stratificationTargets.contains("medium_utterances"))
     #expect(fixture.stratificationTargets.contains("long_utterances"))
@@ -53,10 +57,12 @@ private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
     struct Source: Decodable {
         let modelId: String
         let requestedSampleCount: Int
+        let rowOffsets: [Int]?
     }
 
     struct SamplePreview: Decodable {
         let rowIdx: Int?
+        let speakerId: String
     }
 
     let schemaVersion: Int

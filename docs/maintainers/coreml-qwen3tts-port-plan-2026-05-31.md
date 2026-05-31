@@ -1599,6 +1599,109 @@ Current recommendation:
   - `metal-flash-sdpa` fixes lower-precision causal masking and demonstrates
     Qwen-like grouped-query parity.
 
+### 2026-05-31 LibriTTS-R Calibration Expansion, Pass 2
+
+The first 24-sample LibriTTS-R runtime fixture was mechanically valid but
+calibration-poor: it selected a contiguous row block that all belonged to
+speaker `730`. That proved the expanded fixture machinery worked, but it did
+not satisfy the speaker-diversity goal.
+
+The calibration-code fixture generator now supports explicit Dataset Viewer row
+offsets through `--row-offsets`. The checked-in 24-row preflight now uses these
+offsets:
+
+- `0`
+- `100`
+- `250`
+- `500`
+- `750`
+- `1000`
+- `1500`
+- `2000`
+- `3000`
+- `4000`
+- `5000`
+- `6000`
+- `7000`
+- `8000`
+- `9000`
+- `10000`
+- `12000`
+- `14000`
+- `16000`
+- `18000`
+- `20000`
+- `22000`
+- `24000`
+- `26000`
+
+The real local runtime fixture generated from those offsets covered 24 unique
+speakers. It produced 1777 total code steps, a minimum of 16 code steps, a
+maximum of 296 code steps, and a median of 58 code steps. The bucket plan
+assigned samples across buckets:
+
+- `16`
+- `24`
+- `32`
+- `40`
+- `48`
+- `56`
+- `64`
+- `80`
+- `88`
+- `96`
+- `104`
+- `112`
+- `120`
+- `176`
+- `296`
+
+Only bucket 40 was rerun in this pass because it already had a checked fp16
+Core ML package available after artifact cleanup. Bucket 40 had four calibration
+samples: 37, 39, 33, and 35 code steps, padded to 40 with `-1` metadata.
+
+The full group-size matrix was attempted first, but the group-size-1 candidate
+hit a Core ML/BNNS cache copy failure with no disk space available in the local
+Core ML cache path. Old generated `.mlpackage` artifacts and the local e5rt
+bundle cache were cleared, preserving the bucket-40 fp16 package. The narrowed
+group-size-16 run then succeeded through the live-service headroom wrapper.
+
+Bucket 40 group-size-16 W8A8 results with the diverse four-sample calibration:
+
+- package size: `114801996` bytes
+- whole-output max absolute diff versus fp16 Core ML: `0.263427734375`
+- whole-output mean absolute diff versus fp16 Core ML:
+  `0.012348680756986141`
+- valid-region max absolute diff on `730_358_000003_000002`:
+  `0.263427734375`
+- valid-region mean absolute diff on `730_358_000003_000002`:
+  `0.012741940096020699`
+- padded-tail mean absolute diff on the same sample:
+  `0.007498471066355705`
+- valid-region alert windows: 8 of 12
+- top mean-diff window: 1.5-1.75 seconds
+
+Interpretation:
+
+- The broader calibration input set helped the whole padded output slightly and
+  reduced the padded-tail mean diff on the original sample.
+- It did not improve the valid audible region on the original sample. The
+  valid-region mean diff is slightly worse than the earlier one-sample
+  representative run, and the number of alert windows stayed the same.
+- This is evidence that broader input-only Core ML activation calibration is not
+  enough by itself to clear decoder W8A8 drift.
+
+Next decision pressure:
+
+- Capture Qwen talker-generated code fixtures, because those codes may exercise
+  a different decoder input distribution from LibriTTS-R speech-tokenizer
+  encodes.
+- Try per-op or narrower activation scopes only if the drift pattern suggests a
+  specific sensitive op family.
+- Start the supervised decoder-alignment lane if talker-generated codes and
+  broader LibriTTS-R inputs still leave valid-region drift around the same
+  magnitude.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
