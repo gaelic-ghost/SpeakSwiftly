@@ -343,6 +343,12 @@ extension SpeakSwiftly.Runtime {
                         code: .invalidRequest,
                         message: "Request '\(id)' selected LAN audio streaming to '\(host):\(port)', but the worker runtime does not yet own a Network.framework connection for JSONL live-speech requests. Use the SpeakSwiftlyNetworkAudioOutput module to encode chunks at a LAN transport boundary.",
                     )
+                case let .networkService(name, type, domain):
+                    playbackState.execution.continuation.finish()
+                    throw WorkerError(
+                        code: .invalidRequest,
+                        message: "Request '\(id)' selected LAN audio streaming to Bonjour service '\(name)' of type '\(type)' in domain '\(domain)', but the worker runtime does not yet own a Network.framework connection for JSONL live-speech requests. Use the SpeakSwiftlyNetworkAudioOutput module to discover receivers and encode chunks at a LAN transport boundary.",
+                    )
             }
         } catch {
             playbackState.execution.continuation.finish(throwing: error)

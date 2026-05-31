@@ -2,17 +2,25 @@ import Foundation
 import Network
 import SpeakSwiftlyCore
 
-public struct NetworkAudioEndpoint: Sendable, Equatable {
-    public let host: String
-    public let port: UInt16
+public enum NetworkAudioEndpoint: Codable, Sendable, Equatable {
+    case hostPort(host: String, port: UInt16)
+    case bonjourService(name: String, type: String = NetworkAudioBonjour.serviceType, domain: String = NetworkAudioBonjour.domain)
 
     public init(host: String, port: UInt16) {
-        self.host = host
-        self.port = port
+        self = .hostPort(host: host, port: port)
+    }
+
+    public init(serviceName: String, type: String = NetworkAudioBonjour.serviceType, domain: String = NetworkAudioBonjour.domain) {
+        self = .bonjourService(name: serviceName, type: type, domain: domain)
     }
 
     public var nwEndpoint: NWEndpoint {
-        .hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port) ?? 0)
+        switch self {
+            case let .hostPort(host, port):
+                .hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: port))
+            case let .bonjourService(name, type, domain):
+                .service(name: name, type: type, domain: domain, interface: nil)
+        }
     }
 }
 

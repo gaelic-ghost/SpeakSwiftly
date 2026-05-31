@@ -12,7 +12,13 @@ public extension SpeakSwiftly {
     typealias LocalPlaybackAudioOutput = SpeakSwiftlyPlayback.LocalPlaybackAudioOutput
     typealias HTTPGeneratedAudioFrame = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrame
     typealias HTTPGeneratedAudioFrameHeader = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrameHeader
+    typealias NetworkAudioBonjour = SpeakSwiftlyNetworkAudioOutput.NetworkAudioBonjour
+    typealias NetworkAudioCapabilities = SpeakSwiftlyNetworkAudioOutput.NetworkAudioCapabilities
+    typealias NetworkAudioDestination = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestination
+    typealias NetworkAudioDestinationBrowser = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestinationBrowser
+    typealias NetworkAudioDestinationBrowserState = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestinationBrowserState
     typealias NetworkAudioEndpoint = SpeakSwiftlyNetworkAudioOutput.NetworkAudioEndpoint
+    typealias NetworkAudioServiceAdvertisement = SpeakSwiftlyNetworkAudioOutput.NetworkAudioServiceAdvertisement
     typealias NetworkGeneratedAudioFrame = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrame
     typealias NetworkGeneratedAudioFrameCodec = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrameCodec
 
@@ -20,17 +26,22 @@ public extension SpeakSwiftly {
         case localPlayback
         case httpResponseStream
         case networkStream(host: String, port: UInt16)
+        case networkService(name: String, type: String = NetworkAudioBonjour.serviceType, domain: String = NetworkAudioBonjour.domain)
 
         enum CodingKeys: String, CodingKey {
             case kind
             case host
             case port
+            case name
+            case type
+            case domain
         }
 
         enum Kind: String, Codable {
             case localPlayback = "local_playback"
             case httpResponseStream = "http_response_stream"
             case networkStream = "network_stream"
+            case networkService = "network_service"
         }
 
         public init(from decoder: any Decoder) throws {
@@ -44,6 +55,20 @@ public extension SpeakSwiftly {
                     let host = try container.decode(String.self, forKey: .host)
                     let port = try container.decode(UInt16.self, forKey: .port)
                     self = .networkStream(host: host, port: port)
+                case .networkService:
+                    let name = try container.decode(String.self, forKey: .name)
+                    let type = try container.decode(String.self, forKey: .type)
+                    let domain = try container.decode(String.self, forKey: .domain)
+                    self = .networkService(name: name, type: type, domain: domain)
+            }
+        }
+
+        public init(networkEndpoint endpoint: NetworkAudioEndpoint) {
+            switch endpoint {
+                case let .hostPort(host, port):
+                    self = .networkStream(host: host, port: port)
+                case let .bonjourService(name, type, domain):
+                    self = .networkService(name: name, type: type, domain: domain)
             }
         }
 
@@ -58,6 +83,11 @@ public extension SpeakSwiftly {
                     try container.encode(Kind.networkStream, forKey: .kind)
                     try container.encode(host, forKey: .host)
                     try container.encode(port, forKey: .port)
+                case let .networkService(name, type, domain):
+                    try container.encode(Kind.networkService, forKey: .kind)
+                    try container.encode(name, forKey: .name)
+                    try container.encode(type, forKey: .type)
+                    try container.encode(domain, forKey: .domain)
             }
         }
     }

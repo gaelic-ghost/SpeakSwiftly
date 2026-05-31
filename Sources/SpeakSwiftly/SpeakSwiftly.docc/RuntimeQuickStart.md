@@ -100,6 +100,12 @@ let handle = await runtime.generate.speech(
 
 Use ``SpeakSwiftly/Generate/audioStream(text:voiceProfile:textProfile:requestContext:output:)`` when the generated audio should stream to a host-managed response or LAN transport instead of local playback.
 
+Hosts that want selectable LAN audio receivers can use
+``SpeakSwiftly/NetworkAudioDestinationBrowser`` to keep an in-memory list of
+Bonjour-advertised audio receivers. A receiver host can attach
+``SpeakSwiftly/NetworkAudioServiceAdvertisement/listenerService`` to its
+Network.framework listener so other SpeakSwiftly instances can discover it.
+
 Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)`` when you want retained file output instead:
 
 ```swift

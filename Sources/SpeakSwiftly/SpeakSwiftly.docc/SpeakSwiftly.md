@@ -63,6 +63,14 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 - ``SpeakSwiftly/GenerationArtifact``
 - ``SpeakSwiftly/Artifacts``
 
+### Network Audio Output
+
+- ``SpeakSwiftly/NetworkAudioDestinationBrowser``
+- ``SpeakSwiftly/NetworkAudioDestination``
+- ``SpeakSwiftly/NetworkAudioEndpoint``
+- ``SpeakSwiftly/NetworkAudioServiceAdvertisement``
+- ``SpeakSwiftly/NetworkAudioCapabilities``
+
 ### Support
 
 - ``SpeakSwiftly/Normalizer``

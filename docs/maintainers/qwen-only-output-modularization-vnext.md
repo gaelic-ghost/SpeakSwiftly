@@ -27,7 +27,8 @@ output into small self-contained package modules.
   audio chunks.
 - `SpeakSwiftlyHTTPAudioOutput` owns HTTP-friendly generated-audio chunk framing.
 - `SpeakSwiftlyNetworkAudioOutput` owns Network.framework LAN audio stream
-  encoding and transport primitives.
+  encoding, Bonjour audio-receiver discovery, advertisement metadata, and
+  transport primitives.
 - `SpeakSwiftly` remains the composition and runtime facade that wires
   generation, queues, storage, and selected output destinations together.
 
