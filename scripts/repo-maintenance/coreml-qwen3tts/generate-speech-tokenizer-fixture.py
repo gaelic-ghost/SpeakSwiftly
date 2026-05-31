@@ -142,10 +142,11 @@ def build_preflight_report(args: argparse.Namespace, inventory: dict[str, Any]) 
     },
     "next_command": (
       "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' "
-      "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' "
+      "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' "
+      "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' "
       "scripts/repo-maintenance/coreml-qwen3tts/generate-speech-tokenizer-fixture.py "
       "--no-preflight-only --qwen-source /path/to/Qwen3-TTS --allow-model-download "
-      "--output /private/tmp/qwen3tts-speech-tokenizer-fixture.json"
+      "--output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-fixture.json"
     ),
   }
 
@@ -157,7 +158,8 @@ def build_runtime_fixture(args: argparse.Namespace, inventory: dict[str, Any]) -
     raise RuntimeError(
       "Runtime speech-tokenizer fixture generation needs numpy. Rerun through uv with "
       "`--with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' "
-      "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0'`."
+      "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' "
+      "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0'`."
     ) from error
 
   qwen_source = qwen_source_from_args(args)
@@ -169,7 +171,8 @@ def build_runtime_fixture(args: argparse.Namespace, inventory: dict[str, Any]) -
   except Exception as error:
     raise RuntimeError(
       f"Unable to import Qwen3TTSTokenizer from '{qwen_source}'. "
-      "Confirm the upstream checkout is intact and this script's Python dependencies installed."
+      "Confirm the upstream checkout is intact and this script's Python dependencies installed. "
+      f"Underlying import error: {error!r}"
     ) from error
 
   waveform = synthetic_waveform(args.sample_rate, args.duration_seconds, args.frequency_hz)
@@ -191,7 +194,7 @@ def build_runtime_fixture(args: argparse.Namespace, inventory: dict[str, Any]) -
       "model_id": args.model_id,
       "requested_revision": args.revision,
       "resolved_revision": inventory["resolved_revision"],
-      "qwen_source": str(qwen_source),
+      "qwen_source_commit": args.upstream_commit,
     },
     "model_file_inventory": inventory,
     "synthetic_audio": {

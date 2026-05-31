@@ -28,6 +28,7 @@ import Testing
     #expect(fixture.nextCommand.contains("--allow-model-download"))
     #expect(fixture.nextCommand.contains("--no-preflight-only"))
     #expect(fixture.nextCommand.contains("--with 'torch>=2.6.0'"))
+    #expect(fixture.nextCommand.contains("--output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-fixture.json"))
 }
 
 private struct Qwen3TTSSpeechTokenizerPreflightFixture: Decodable {

@@ -462,6 +462,71 @@ Validation:
 - `swift test --filter qwen3` passed with 8 tests covering the text fixture,
   speech-tokenizer config fixture, and runtime preflight fixture.
 
+### 2026-05-31 Speech Tokenizer Runtime Fixture, Pass 1
+
+Ran the real 12 Hz speech-tokenizer encode/decode probe against a deterministic
+synthetic waveform.
+
+Added a checked-in runtime fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json`
+
+Added SwiftPM tests for the runtime fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerRuntimeFixtureTests.swift`
+
+Runtime command shape:
+
+- The script requires `--no-preflight-only` and `--allow-model-download`.
+- Runtime dependencies needed by the upstream package were:
+  `numpy`, `torch`, `transformers`, `librosa`, `soundfile`, `sox`,
+  `onnxruntime`, `einops`, and `torchaudio`.
+- The local upstream source checkout used for the run was the previously
+  inspected Qwen3-TTS commit
+  `022e286b98fbec7e1e916cb940cdf532cd9f488e`.
+- The committed fixture records that source commit, not the machine-local source
+  path.
+
+Runtime findings:
+
+- Upstream package import pulls the 25 Hz tokenizer path during package
+  initialization, so the runtime environment needs 25 Hz support dependencies
+  even for a 12 Hz-only fixture.
+- Missing dependencies encountered and fixed in the runtime command:
+  `sox`, then `onnxruntime`, then `torchaudio`.
+- `flash-attn` was not installed. Upstream warned that it would use the manual
+  PyTorch implementation. This is acceptable for the CPU fixture, but should be
+  recorded separately from any future performance result.
+- The 0.64 second synthetic waveform encoded to audio codes shaped `[8, 16]`
+  with `int64` dtype.
+- The decoded waveform returned 15360 samples at 24000 Hz, matching the input
+  duration and the preflight code-step expectation.
+- The first CB0 code prefix was:
+  `[1221, 215, 1521, 1095, 1985, 1985, 1985, 687]`.
+
+Core ML implications:
+
+- We now have a tiny, deterministic decoder input shape for the first
+  decoder-only Core ML conversion probe: one batch item, 8 code steps, and 16
+  quantizers.
+- The decoder-only conversion probe can start from the checked-in code prefix
+  and output-shape expectations before attempting full speech-tokenizer encoder
+  conversion.
+- This fixture is not an audible-quality test. It proves mechanical encode,
+  decode, shape, trimming, and dependency behavior for a synthetic signal.
+
+Validation:
+
+- Runtime encode/decode fixture generation succeeded after the 12 Hz tokenizer
+  weights were available locally.
+- `uv run --with ruff ruff check` passed for all three Core ML Qwen maintainer
+  scripts.
+- `jq empty` passed for the preflight and runtime speech-tokenizer fixtures.
+- A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
+  checked-in Core ML Qwen fixtures, scripts, or Swift tests.
+- `swift test --filter qwen3` passed with 10 tests covering text tokenization,
+  speech-tokenizer config, runtime preflight, and runtime fixture expectations.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

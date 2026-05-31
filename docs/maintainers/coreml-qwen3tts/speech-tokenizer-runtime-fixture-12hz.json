@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "runtime",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e"
+  },
+  "model_file_inventory": {
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "file_count": 6,
+    "total_size_bytes": 682300739,
+    "files": [
+      {
+        "path": "model.safetensors",
+        "size_bytes": 682293092
+      },
+      {
+        "path": "README.md",
+        "size_bytes": 3482
+      },
+      {
+        "path": "config.json",
+        "size_bytes": 2336
+      },
+      {
+        "path": ".gitattributes",
+        "size_bytes": 1519
+      },
+      {
+        "path": "preprocessor_config.json",
+        "size_bytes": 234
+      },
+      {
+        "path": "configuration.json",
+        "size_bytes": 76
+      }
+    ]
+  },
+  "synthetic_audio": {
+    "sample_rate": 24000,
+    "duration_seconds": 0.64,
+    "frequency_hz": 220.0,
+    "sample_count": 15360,
+    "min": -0.05000000074505806,
+    "max": 0.05000000074505806,
+    "mean": 5.385403710533865e-06,
+    "rms": 0.034985799342393875
+  },
+  "encoded": {
+    "audio_codes_shape": [
+      8,
+      16
+    ],
+    "audio_codes_dtype": "int64",
+    "audio_codes_prefix": [
+      [
+        1221,
+        910,
+        262,
+        956,
+        1881,
+        645,
+        1588,
+        1653
+      ],
+      [
+        215,
+        910,
+        469,
+        1151,
+        1331,
+        626,
+        1751,
+        1495
+      ],
+      [
+        1521,
+        910,
+        469,
+        1871,
+        1157,
+        890,
+        1751,
+        1590
+      ],
+      [
+        1095,
+        910,
+        469,
+        1522,
+        139,
+        1985,
+        1751,
+        1495
+      ],
+      [
+        1985,
+        910,
+        469,
+        320,
+        1903,
+        768,
+        1751,
+        1508
+      ],
+      [
+        1985,
+        910,
+        469,
+        1522,
+        501,
+        1025,
+        1904,
+        251
+      ],
+      [
+        1985,
+        910,
+        789,
+        1922,
+        940,
+        1543,
+        1751,
+        1427
+      ],
+      [
+        687,
+        910,
+        203,
+        221,
+        517,
+        1276,
+        1751,
+        1246
+      ]
+    ],
+    "audio_codes_first_quantizer_prefix": [
+      1221,
+      215,
+      1521,
+      1095,
+      1985,
+      1985,
+      1985,
+      687
+    ]
+  },
+  "decoded": {
+    "sample_rate": 24000,
+    "sample_count": 15360,
+    "duration_seconds": 0.64,
+    "min": -0.05528455600142479,
+    "max": 0.055146411061286926,
+    "mean": 1.5837214959901758e-05,
+    "rms": 0.032971180975437164
+  }
+}

@@ -47,5 +47,5 @@
     "sample_count": 15360,
     "expected_code_steps_at_1920_samples": 8
   },
-  "next_command": "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' scripts/repo-maintenance/coreml-qwen3tts/generate-speech-tokenizer-fixture.py --no-preflight-only --qwen-source /path/to/Qwen3-TTS --allow-model-download --output /private/tmp/qwen3tts-speech-tokenizer-fixture.json"
+  "next_command": "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' scripts/repo-maintenance/coreml-qwen3tts/generate-speech-tokenizer-fixture.py --no-preflight-only --qwen-source /path/to/Qwen3-TTS --allow-model-download --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-fixture.json"
 }
