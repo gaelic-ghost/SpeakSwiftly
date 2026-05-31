@@ -267,6 +267,7 @@ extension SpeakSwiftly.Runtime {
             qwenConditioningStrategy: qwenConditioningStrategy,
             defaultVoiceProfile: defaultVoiceProfileName,
             duckMediaVolume: duckMediaVolume,
+            audioOutputDestination: audioOutputDestination,
             textNormalizer: normalizerRef,
         )
     }

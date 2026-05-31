@@ -8,17 +8,13 @@ export REPO_MAINTENANCE_COMMON_DIR="$SELF_DIR/lib"
 load_env_file "$SELF_DIR/config/validation.env"
 ensure_git_repo
 
-benchmark_target="backend"
+benchmark_target="qwen"
 audible="false"
 playback_trace="false"
 iterations=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --backend)
-      benchmark_target="backend"
-      shift
-      ;;
     --qwen)
       benchmark_target="qwen"
       shift
@@ -38,10 +34,10 @@ while [ "$#" -gt 0 ]; do
     -h|--help)
       cat <<'USAGE'
 Usage:
-  run-benchmark.sh [--backend|--qwen] [--audible] [--playback-trace] [--iterations <count>]
+  run-benchmark.sh [--qwen] [--audible] [--playback-trace] [--iterations <count>]
 
 Defaults:
-  --backend is the default benchmark target.
+  --qwen is the default benchmark target.
 
 Examples:
   sh scripts/repo-maintenance/run-benchmark.sh
@@ -56,10 +52,7 @@ USAGE
   esac
 done
 
-suite_name="backend-benchmark"
-if [ "$benchmark_target" = "qwen" ]; then
-  suite_name="qwen-benchmark"
-fi
+suite_name="qwen-benchmark"
 
 suite_args=""
 if [ "$audible" = "true" ]; then

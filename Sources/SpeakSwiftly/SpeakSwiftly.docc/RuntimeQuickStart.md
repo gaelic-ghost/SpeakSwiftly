@@ -98,7 +98,10 @@ let handle = await runtime.generate.speech(
 )
 ```
 
-Use ``SpeakSwiftly/Generate/audioStream(text:voiceProfile:textProfile:requestContext:output:)`` when the generated audio should stream to a host-managed response or LAN transport instead of local playback.
+Pass an explicit nonlocal `output:` when a host is ready to route generated
+audio to an HTTP response or LAN transport. The output modules expose framing
+and discovery primitives, while the host-owned server boundary is responsible
+for attaching those bytes to a response or network connection.
 
 Hosts that want selectable LAN audio receivers can use
 ``SpeakSwiftly/NetworkAudioDestinationBrowser`` to keep an in-memory list of

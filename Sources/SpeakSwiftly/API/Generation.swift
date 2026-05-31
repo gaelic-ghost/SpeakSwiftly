@@ -32,7 +32,7 @@ public extension SpeakSwiftly.Generate {
         await runtime.generateSnapshot()
     }
 
-    /// Queues text for live speech playback.
+    /// Queues text for live speech output.
     ///
     /// - Parameters:
     ///   - text: The text to synthesize.
@@ -40,7 +40,8 @@ public extension SpeakSwiftly.Generate {
     ///   - textProfile: An optional text-normalization profile override.
     ///   - requestContext: Optional metadata that describes where the request came from and what it is related to.
     ///   - qwenPreModelTextChunking: Whether Qwen live playback should split text before model generation.
-    ///   - output: The destination for this live generated-audio stream.
+    ///   - output: Optional request-level destination override for this live generated-audio stream.
+    ///     When omitted, SpeakSwiftly uses the runtime's configured audio output destination.
     /// - Returns: A request handle that can be observed for lifecycle and generation events.
     func speech(
         text: String,
@@ -48,11 +49,13 @@ public extension SpeakSwiftly.Generate {
         textProfile: SpeakSwiftly.TextProfileID? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
         qwenPreModelTextChunking: Bool = false,
-        output: SpeakSwiftly.AudioOutputDestination = .localPlayback,
+        output: SpeakSwiftly.AudioOutputDestination? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         let requestID = UUID().uuidString
         let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
-        await runtime.setAudioOutputDestination(output, for: requestID)
+        if let output {
+            await runtime.setAudioOutputDestination(output, for: requestID)
+        }
         return await runtime.submit(
             .queueSpeech(
                 id: requestID,
@@ -63,24 +66,6 @@ public extension SpeakSwiftly.Generate {
                 requestContext: requestContext,
                 qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
-        )
-    }
-
-    /// Queues text for live generated-audio streaming instead of local playback.
-    func audioStream(
-        text: String,
-        voiceProfile: SpeakSwiftly.Name? = nil,
-        textProfile: SpeakSwiftly.TextProfileID? = nil,
-        requestContext: SpeakSwiftly.RequestContext? = nil,
-        output: SpeakSwiftly.AudioOutputDestination = .httpResponseStream,
-    ) async -> SpeakSwiftly.RequestHandle {
-        await speech(
-            text: text,
-            voiceProfile: voiceProfile,
-            textProfile: textProfile,
-            requestContext: requestContext,
-            qwenPreModelTextChunking: false,
-            output: output,
         )
     }
 

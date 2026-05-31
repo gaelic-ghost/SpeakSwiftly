@@ -267,6 +267,124 @@ private actor EnvironmentEventRecorder {
     } == 1)
 }
 
+@Test func `speech uses configured nonlocal output when call does not override destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        audioOutputDestination: .httpResponseStream,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let failedID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            voiceProfile: "default-femme",
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == failedID
+                && $0["ok"] as? Bool == false
+                && $0["code"] as? String == "invalid_request"
+                && (($0["message"] as? String)?.contains("HTTP audio streaming") ?? false)
+        }
+    })
+}
+
+@Test func `explicit local playback output overrides configured nonlocal destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        audioOutputDestination: .httpResponseStream,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let playedID = await runtime.generate
+        .speech(
+            text: "Hello there",
+            voiceProfile: "default-femme",
+            output: .localPlayback,
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == playedID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+}
+
+@Test func `saving runtime configuration preserves configured audio output destination`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        audioOutputDestination: .networkService(name: "Mac mini"),
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    try await runtime.setDefaultVoiceProfile("testing-profile")
+
+    let configuration = try SpeakSwiftly.Configuration.load(
+        from: storeRoot.appendingPathComponent(ProfileStore.configurationFileName),
+    )
+
+    #expect(configuration.audioOutputDestination == .networkService(name: "Mac mini"))
+}
+
 @Test func `resident preload stays playback cold until the first audible request`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()

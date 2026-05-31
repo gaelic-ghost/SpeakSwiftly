@@ -330,7 +330,7 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
 
 enum BenchmarkHarness {
     static func effectivePlaybackMode() -> BenchmarkPlaybackMode {
-        speakSwiftlyBackendBenchmarkAudibleEnabled() ? .audible : .silent
+        speakSwiftlyAudibleE2ETestsEnabled() ? .audible : .silent
     }
 
     static func withBenchmarkRuntime<T>(

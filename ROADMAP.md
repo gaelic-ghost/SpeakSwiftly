@@ -27,11 +27,11 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Active Milestones](#active-milestones)
 - [Milestone 16: `mlx-audio-swift` Upgrade Review](#milestone-16-mlx-audio-swift-upgrade-review)
 - [Milestone 21: Unified Logging With `Logger`](#milestone-21-unified-logging-with-logger)
-- [Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning](#milestone-22-marvis-mlx-generation-path-investigation-and-playback-tuning)
 - [Milestone 26: Pre-v1 Release Hardening](#milestone-26-pre-v1-release-hardening)
 - [Milestone 29: Security Audit Hardening](#milestone-29-security-audit-hardening)
 - [Milestone 30: Generation Quality Telemetry And Guards](#milestone-30-generation-quality-telemetry-and-guards)
 - [Milestone 31: macOS Retrench And Mobile Split](#milestone-31-macos-retrench-and-mobile-split)
+- [Milestone 32: Qwen-Only Output Modularization](#milestone-32-qwen-only-output-modularization)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -39,11 +39,11 @@ This roadmap now keeps active milestones and the current release-hardening queue
 
 - Milestone 16: `mlx-audio-swift` Upgrade Review - In Progress
 - Milestone 21: Unified Logging With `Logger` - Planned
-- Milestone 22: Marvis MLX Generation-Path Investigation And Playback Tuning - In Progress
 - Milestone 26: Pre-v1 Release Hardening - In Progress
 - Milestone 29: Security Audit Hardening - Planned
 - Milestone 30: Generation Quality Telemetry And Guards - In Progress
 - Milestone 31: macOS Retrench And Mobile Split - In Progress
+- Milestone 32: Qwen-Only Output Modularization - In Progress
 
 ## Active Milestones
 
@@ -113,20 +113,19 @@ Planned
 
 ### Status
 
-In Progress
+Superseded by Milestone 32
 
 ### Scope
 
-- [ ] Keep Marvis behavior simple enough that the runtime policy is easy to reason about and the remaining instability is attributable.
-- [ ] Document whether the remaining Marvis rebuffers are mainly a local playback-policy issue or a throughput limitation in the current `mlx-audio-swift` generation path.
-- [ ] Use the runtime's explicit playback and scheduler observability as the source of truth for each tuning or investigation pass.
+- [x] Stop investing in Marvis playback tuning for the vNext package line.
+- [x] Replace the Marvis investigation path with a Qwen-only output modularization pass.
+- [ ] Preserve the historical notes below as context for why Marvis is being removed instead of tuned further.
 
 ### Tickets
 
-- [ ] Run and record Marvis resident-policy benchmark results for `dual_resident_serialized` versus `single_resident_dynamic` on target Apple-silicon machines.
-- [ ] Verify whether the queued-Marvis playback drain abort remains reproducible after the later playback-drain and cancellation hardening. ([#13](https://github.com/gaelic-ghost/SpeakSwiftly/issues/13))
-- [ ] If Marvis audible instability remains, identify whether it is upstream `mlx-audio-swift` throughput, wrapper behavior, local playback policy, or machine-specific pressure, and record the evidence.
-- [ ] Record subjective audible outcomes and objective stderr metrics together after each meaningful Marvis runtime or upstream investigation pass.
+- [x] Decide that Marvis is outside the vNext supported backend set.
+- [ ] Remove stale Marvis validation-lane and release-hardening references while preserving older release notes as history.
+- [ ] Keep removed backend values rejected clearly so persisted configs and worker requests fail with descriptive unsupported-backend errors.
 
 ### Stage Notes
 
@@ -145,9 +144,9 @@ In Progress
 
 ### Exit Criteria
 
-- [ ] The repository records target-machine benchmark evidence for the resident policy choice instead of only noting that a harness exists.
-- [ ] Marvis audible playback is either measurably steadier after upstream-aware changes or explicitly documented as limited by the current MLX path.
-- [ ] The repository has a documented before-and-after record for the simplified serialized policy and the follow-on upstream investigation.
+- [ ] vNext documentation names Qwen3 as the only supported generation family.
+- [ ] Removed Marvis and Chatterbox values fail clearly in typed config and worker request tests.
+- [ ] Historical Marvis tuning notes remain separated from active prerelease work.
 
 ## Milestone 26: Pre-v1 Release Hardening
 
@@ -163,7 +162,7 @@ In Progress
 
 ### Tickets
 
-- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially logging migration and Marvis playback tuning.
+- [ ] Resolve the remaining active milestones that define the stable public surface and release-operability story, especially logging migration and Qwen-only output modularization.
 - [ ] Streamline runtime persistence configuration so the package has one durable storage contract: platform Application Support by default, or one explicit startup state root that moves profiles, runtime configuration, text profiles, generated files, and generation jobs together. Remove or deprecate profile-root-specific compatibility surfaces in consumers such as `SpeakSwiftlyServer` once they can pass `stateRootURL` directly.
 - [ ] Verify downstream `SpeakSwiftlyServer` adoption separately before release after the Milestone 28 typed observation API cleanup.
 - [ ] Re-run the release checklist against the final tagged-candidate shape and tighten any remaining migration notes or operator guidance before `v1.0.0`.
@@ -263,6 +262,44 @@ In Progress
 - [ ] `SpeakSwiftly` and `SpeakSwiftlyServer` are documented and packaged as macOS-only again.
 - [ ] `TextForSpeech` can be consumed by `SpeakSwiftlyMobile` without inheriting macOS-only behavior or desktop speech-worker concepts.
 - [ ] `SpeakSwiftlyMobile` has a documented first slice that uses `TextForSpeech` for text conditioning and keeps iOS Core ML generation inside the app until a shared boundary is earned.
+
+## Milestone 32: Qwen-Only Output Modularization
+
+### Status
+
+In Progress
+
+### Scope
+
+- [x] Record the major-version plan for removing Marvis and Chatterbox without compatibility shims.
+- [x] Keep Qwen3 as the only supported generation family in the public backend configuration surface.
+- [x] Split generated-audio output primitives into Core, Playback, HTTP, and Network module targets.
+- [x] Model live speech as generation plus an output destination rather than assuming generation always means local playback.
+- [ ] Finish transport adoption so HTTP response streams and LAN streaming can consume canonical generated-audio chunks outside the local playback path.
+- [ ] Keep the current Qwen implementation working while the CoreML and Metal Flash Attention port remains a future generation-module swap.
+
+### Tickets
+
+- [x] Add a maintainer plan note under `docs/maintainers/` for the Qwen-only vNext cleanup.
+- [x] Remove Marvis and Chatterbox backend values from normal configuration and request switching paths.
+- [x] Add the canonical generated-audio chunk type, sample format, output errors, and stream adapter to `SpeakSwiftlyCore`.
+- [x] Add local playback chunk consumption to `SpeakSwiftlyPlayback`.
+- [x] Add HTTP-friendly raw PCM payload framing with metadata headers to `SpeakSwiftlyHTTPAudioOutput`.
+- [x] Add Network.framework audio frame encoding and Bonjour audio-receiver discovery primitives to `SpeakSwiftlyNetworkAudioOutput`.
+- [x] Add `generate.speech(... output:)` to the typed runtime surface.
+- [ ] Add `generate.audioStream(...)` only after the host boundary can return a successful chunk stream instead of a failed request handle.
+- [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
+- [ ] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
+- [ ] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
+- [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
+- [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.
+
+### Exit Criteria
+
+- [ ] The package exposes Qwen-only generation plus selectable local playback, HTTP response stream, and LAN audio output destinations.
+- [ ] Removed backend names fail clearly from persisted config and worker requests.
+- [ ] Unit and integration tests cover module boundaries without requiring two real Macs for default validation.
+- [ ] The prerelease notes clearly call out breaking changes, migration notes, verification performed, and follow-up server adoption work.
 
 ## Backlog Candidates
 

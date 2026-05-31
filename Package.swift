@@ -18,10 +18,6 @@ let package = Package(
             targets: ["SpeakSwiftlyCore"],
         ),
         .library(
-            name: "SpeakSwiftlyQwenGeneration",
-            targets: ["SpeakSwiftlyQwenGeneration"],
-        ),
-        .library(
             name: "SpeakSwiftlyPlayback",
             targets: ["SpeakSwiftlyPlayback"],
         ),
@@ -139,7 +135,6 @@ let package = Package(
             dependencies: [
                 "SpeakSwiftly",
                 "SpeakSwiftlyCore",
-                "SpeakSwiftlyQwenGeneration",
                 "SpeakSwiftlyPlayback",
                 "SpeakSwiftlyHTTPAudioOutput",
                 "SpeakSwiftlyNetworkAudioOutput",

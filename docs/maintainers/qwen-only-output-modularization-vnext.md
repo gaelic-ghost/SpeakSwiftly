@@ -21,8 +21,9 @@ output into small self-contained package modules.
 
 - `SpeakSwiftlyCore` owns shared request identifiers, names, generated-audio
   chunk metadata, output errors, and observation primitives.
-- `SpeakSwiftlyQwenGeneration` owns Qwen generation and emits typed async
-  generated-audio chunks.
+- `SpeakSwiftlyQwenGeneration` is the future Qwen generation module target. It
+  is intentionally not published as a package product until it owns a real
+  public generation entry point that emits typed async generated-audio chunks.
 - `SpeakSwiftlyPlayback` owns local AVAudioEngine playback and consumes generated
   audio chunks.
 - `SpeakSwiftlyHTTPAudioOutput` owns HTTP-friendly generated-audio chunk framing.

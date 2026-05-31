@@ -57,7 +57,6 @@ Suite names:
   trace | TraceCaptureE2ETests
   deep-trace | DeepTraceE2ETests
   qwen-benchmark | QwenBenchmarkE2ETests
-  backend-benchmark | BackendBenchmarkE2ETests
 
 Flags:
   --audible
@@ -87,7 +86,6 @@ resolve_suite_name() {
     trace|TraceCaptureE2ETests) printf '%s\n' "TraceCaptureE2ETests" ;;
     deep-trace|DeepTraceE2ETests) printf '%s\n' "DeepTraceE2ETests" ;;
     qwen-benchmark|QwenBenchmarkE2ETests) printf '%s\n' "QwenBenchmarkE2ETests" ;;
-    backend-benchmark|BackendBenchmarkE2ETests) printf '%s\n' "BackendBenchmarkE2ETests" ;;
     *)
       return 1
       ;;
@@ -98,7 +96,7 @@ suite_name=$(resolve_suite_name "$suite_arg") \
   || die "Unsupported E2E suite '$suite_arg'. Use --help to see the supported top-level suite names."
 
 case "$suite_name" in
-  GeneratedFileE2ETests|GeneratedBatchE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
+  GeneratedFileE2ETests|GeneratedBatchE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests)
     ;;
   *)
     die "Refusing to run '$suite_name' because only one top-level E2E suite may run per invocation."
@@ -137,15 +135,6 @@ fi
 
 if [ -n "$benchmark_iterations" ]; then
   export SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS="$benchmark_iterations"
-  export SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS="$benchmark_iterations"
-fi
-
-if [ "$suite_name" = "BackendBenchmarkE2ETests" ]; then
-  export SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1
-fi
-
-if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$audible" = "true" ]; then
-  export SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1
 fi
 
 restore_status=0

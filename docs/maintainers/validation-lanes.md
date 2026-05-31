@@ -190,8 +190,8 @@ The package also has an opt-in Qwen benchmark suite behind:
 
 - `SPEAKSWIFTLY_E2E=1`
 - `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`
-- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=<n>`
-- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1`
+- optional `SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=<n>`
+- optional `SPEAKSWIFTLY_AUDIBLE_E2E=1`
 
 Prefer the repo-maintenance wrapper instead of exporting those by hand:
 

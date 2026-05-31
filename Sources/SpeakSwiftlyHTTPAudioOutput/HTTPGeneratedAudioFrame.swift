@@ -23,7 +23,19 @@ public struct HTTPGeneratedAudioFrame: Codable, Sendable, Equatable {
         return Data(bytes: &littleEndianBits, count: littleEndianBits.count * MemoryLayout<UInt32>.size)
     }
 
-    private static func decodeFloat32Samples(_ data: Data) -> [Float] {
+    private static func decodeFloat32Samples(_ data: Data, expectedByteCount: Int, requestID: String) throws -> [Float] {
+        guard data.count == expectedByteCount else {
+            throw GeneratedAudioOutputError.invalidChunk(
+                requestID: requestID,
+                message: "HTTP audio frame payload has \(data.count) byte(s), but its metadata declares \(expectedByteCount) byte(s). The response body may be truncated or paired with the wrong frame header.",
+            )
+        }
+        guard data.count.isMultiple(of: MemoryLayout<UInt32>.size) else {
+            throw GeneratedAudioOutputError.invalidChunk(
+                requestID: requestID,
+                message: "HTTP audio frame payload has \(data.count) byte(s), which cannot be decoded as complete little-endian Float32 PCM samples.",
+            )
+        }
         guard !data.isEmpty else {
             return []
         }
@@ -40,8 +52,8 @@ public struct HTTPGeneratedAudioFrame: Codable, Sendable, Equatable {
         }
     }
 
-    public func decodedSamples() -> [Float] {
-        Self.decodeFloat32Samples(payload)
+    public func decodedSamples() throws -> [Float] {
+        try Self.decodeFloat32Samples(payload, expectedByteCount: header.payloadByteCount, requestID: header.requestID)
     }
 }
 
