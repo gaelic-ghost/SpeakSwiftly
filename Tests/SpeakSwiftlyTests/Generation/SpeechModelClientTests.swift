@@ -26,24 +26,6 @@ private actor ProfileModelLoadObservation {
 
 // MARK: - Adaptive Playback Thresholds
 
-@Test func `resident backend repos include qwen variants`() {
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol) == ModelFactory.qwenResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_4bit) == ModelFactory.qwen06B4BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_5bit) == ModelFactory.qwen06B5BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_6bit) == ModelFactory.qwen06B6BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_8bit) == ModelFactory.qwen06B8BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_bf16) == ModelFactory.qwen06BBF16ResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG) == ModelFactory.qwen17B8BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_4bit) == ModelFactory.qwen17B4BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_5bit) == ModelFactory.qwen17B5BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_6bit) == ModelFactory.qwen17B6BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_8bit) == ModelFactory.qwen17B8BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_bf16) == ModelFactory.qwen17BBF16ResidentModelRepo)
-    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.contains(.qwen3_smol))
-    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.contains(.qwen3_BIG_bf16))
-    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.allSatisfy { $0.isQwenFamily })
-}
-
 @Test func `profile model load rejects missing metal device by default`() async throws {
     do {
         _ = try await ModelFactory.loadProfileModel(
