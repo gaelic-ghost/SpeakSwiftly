@@ -61,6 +61,7 @@ public extension SpeakSwiftly {
             case qwenConditioningStrategy
             case defaultVoiceProfile
             case duckMediaVolume
+            case audioOutputDestination
         }
 
         /// The speech backend to activate when the runtime starts.
@@ -71,6 +72,8 @@ public extension SpeakSwiftly {
         public let defaultVoiceProfile: SpeakSwiftly.Name
         /// The supported media-app ducking strength to apply while SpeakSwiftly playback is active.
         public let duckMediaVolume: SpeakSwiftly.DuckMediaVolume
+        /// The generated-audio destination to activate for live speech requests.
+        public let audioOutputDestination: SpeakSwiftly.AudioOutputDestination
         /// Extra bundled system-profile roots supplied by host packages at startup.
         public let systemProfileResourceRoots: [URL]
         /// An optional text normalizer to reuse instead of creating the default one.
@@ -82,6 +85,7 @@ public extension SpeakSwiftly {
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
+            audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
             systemProfileResourceRoots: [URL] = [],
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
@@ -89,6 +93,7 @@ public extension SpeakSwiftly {
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
             self.duckMediaVolume = duckMediaVolume
+            self.audioOutputDestination = audioOutputDestination
             self.systemProfileResourceRoots = systemProfileResourceRoots.map(\.standardizedFileURL)
             self.textNormalizer = textNormalizer
         }
@@ -110,6 +115,10 @@ public extension SpeakSwiftly {
                 SpeakSwiftly.DuckMediaVolume.self,
                 forKey: .duckMediaVolume,
             ) ?? .off
+            audioOutputDestination = try container.decodeIfPresent(
+                SpeakSwiftly.AudioOutputDestination.self,
+                forKey: .audioOutputDestination,
+            ) ?? .localPlayback
             systemProfileResourceRoots = []
             textNormalizer = nil
         }
@@ -187,6 +196,7 @@ public extension SpeakSwiftly {
             try container.encode(qwenConditioningStrategy, forKey: .qwenConditioningStrategy)
             try container.encode(defaultVoiceProfile, forKey: .defaultVoiceProfile)
             try container.encode(duckMediaVolume, forKey: .duckMediaVolume)
+            try container.encode(audioOutputDestination, forKey: .audioOutputDestination)
         }
 
         /// Saves this configuration value to disk.

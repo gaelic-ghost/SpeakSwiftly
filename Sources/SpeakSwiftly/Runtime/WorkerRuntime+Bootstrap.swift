@@ -89,6 +89,10 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredAudioOutputDestination = resolvedAudioOutputDestination(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
         let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             allowsProfileModelCPUFallback: allowsProfileModelCPUFallback,
@@ -134,6 +138,7 @@ extension SpeakSwiftly.Runtime {
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
             duckMediaVolume: configuredDuckMediaVolume,
+            audioOutputDestination: configuredAudioOutputDestination,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
             systemProfileResourceStore: systemProfileResourceStore,
@@ -238,6 +243,12 @@ extension SpeakSwiftly.Runtime {
         configuration: SpeakSwiftly.Configuration?,
     ) -> SpeakSwiftly.DuckMediaVolume {
         configuration?.duckMediaVolume ?? .off
+    }
+
+    static func resolvedAudioOutputDestination(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> SpeakSwiftly.AudioOutputDestination {
+        configuration?.audioOutputDestination ?? .localPlayback
     }
 
     func setDefaultVoiceProfileName(_ profileName: SpeakSwiftly.Name) throws {

@@ -257,6 +257,7 @@ public extension SpeakSwiftly {
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
         var duckMediaVolume: SpeakSwiftly.DuckMediaVolume
+        var audioOutputDestination: SpeakSwiftly.AudioOutputDestination
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let systemProfileResourceStore: ProfileStore?
@@ -293,6 +294,7 @@ public extension SpeakSwiftly {
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
+            audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
             defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             systemProfileResourceStore: ProfileStore? = nil,
@@ -306,6 +308,7 @@ public extension SpeakSwiftly {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.duckMediaVolume = duckMediaVolume
+            self.audioOutputDestination = audioOutputDestination
             self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
             self.systemProfileResourceStore = systemProfileResourceStore
