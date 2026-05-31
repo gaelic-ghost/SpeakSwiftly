@@ -301,6 +301,9 @@ extension SpeakSwiftly.Runtime {
             requestID: id,
             destination: outputDestination,
         ) {
+            let previousPlaybackSnapshot = await playbackSnapshot()
+            _ = await playbackQueue.discard(requestID: id)
+            await publishPlaybackQueueChangedIfNeeded(since: previousPlaybackSnapshot)
             throw unsupportedOutputError
         }
 

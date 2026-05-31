@@ -301,6 +301,7 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
         audioOutputDestination: .httpResponseStream,
         loadedAudioSamples: nil,
         residentModelLoader: { _ in makeStreamOnlyResidentModel() },
@@ -327,6 +328,26 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
                 && $0["ok"] as? Bool == false
                 && $0["code"] as? String == "invalid_request"
                 && (($0["message"] as? String)?.contains("HTTP audio streaming") ?? false)
+        }
+    })
+
+    let rejectedOutputSnapshot = await runtime.playback.snapshot()
+    #expect(rejectedOutputSnapshot.activeRequest == nil)
+    #expect(rejectedOutputSnapshot.queuedRequests.isEmpty)
+
+    let playedID = await runtime.generate
+        .speech(
+            text: "Hello locally",
+            voiceProfile: "default-femme",
+            output: .localPlayback,
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == playedID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
         }
     })
 }
