@@ -118,10 +118,7 @@ def build_fixture(args: argparse.Namespace) -> dict[str, Any]:
 
   return {
     "schema_version": 1,
-    "created_at_utc": datetime.now(timezone.utc)
-    .replace(microsecond=0)
-    .isoformat()
-    .replace("+00:00", "Z"),
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
     "source": {
       "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
       "upstream_commit": args.upstream_commit,
@@ -149,6 +146,15 @@ def build_fixture(args: argparse.Namespace) -> dict[str, Any]:
     },
     "prompts": [prompt.as_json() for prompt in prompts],
   }
+
+
+def current_utc_timestamp() -> str:
+  return (
+    datetime.now(timezone.utc)
+    .replace(microsecond=0)
+    .isoformat()
+    .replace("+00:00", "Z")
+  )
 
 
 def parse_args() -> argparse.Namespace:
@@ -193,6 +199,14 @@ def parse_args() -> argparse.Namespace:
     type=Path,
     default=None,
     help="Optional output JSON path. Defaults to stdout.",
+  )
+  parser.add_argument(
+    "--created-at-utc",
+    default=None,
+    help=(
+      "Optional ISO-8601 UTC timestamp to store in the fixture. "
+      "Use this for stable checked-in fixtures."
+    ),
   )
   return parser.parse_args()
 

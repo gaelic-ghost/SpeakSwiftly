@@ -285,6 +285,10 @@ Added a maintained tokenizer fixture script:
 
 - `scripts/repo-maintenance/coreml-qwen3tts/generate-text-token-fixture.py`
 
+Added a tiny checked-in first fixture:
+
+- `docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json`
+
 The script deliberately does not load model weights. It uses the Hugging Face
 tokenizer files from `Qwen/Qwen3-TTS-12Hz-0.6B-Base`, applies the upstream prompt
 wrappers recorded above, and emits a small JSON fixture with:
@@ -315,12 +319,15 @@ Immediate implications:
 
 - This gives Swift-side work a stable first target: reproduce the exact wrapped
   prompt strings and token IDs before converting the talker graph.
+- The checked-in fixture uses a stable `created_at_utc` value so future diffs
+  only change when the tokenizer inputs or output schema change.
 - The script is a temporary probe tool, not a runtime dependency. A production
   Core ML backend still needs native tokenizer ownership or a clearly vendored
   tokenizer artifact with reproducible provenance.
-- The next useful slice is to add a tiny checked-in JSON fixture or Swift test
-  expectation only after deciding the exact golden sentence and whether token
-  strings should be treated as stable test data.
+- The next useful slice is to write Swift-side prompt wrapper tests against the
+  checked-in fixture, then decide whether native tokenizer parity should be a
+  direct Swift port, a generated tokenizer asset, or a vendored tokenizer
+  library.
 
 ## Open Decisions
 
