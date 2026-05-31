@@ -56,6 +56,82 @@ def load_fixture(path: Path) -> dict[str, Any]:
     raise RuntimeError(f"Unable to read decoder fixture JSON at '{path}'.") from error
 
 
+def fixture_audio_codes(fixture: dict[str, Any]) -> list[list[int]]:
+  try:
+    return fixture["encoded"]["audio_codes"]
+  except KeyError as error:
+    raise RuntimeError("Decoder fixture does not contain encoded.audio_codes.") from error
+
+
+def fixture_audio_codes_dtype(fixture: dict[str, Any]) -> str:
+  return fixture.get("encoded", {}).get("audio_codes_dtype", "int64")
+
+
+def padded_code_shape(args: argparse.Namespace, fixture: dict[str, Any]) -> list[int]:
+  audio_codes = fixture_audio_codes(fixture)
+  original_code_steps = len(audio_codes)
+  quantizer_count = len(audio_codes[0]) if audio_codes else 0
+  requested_code_steps = args.pad_code_steps or original_code_steps
+
+  if requested_code_steps < original_code_steps:
+    raise RuntimeError(
+      f"--pad-code-steps {requested_code_steps} is shorter than the fixture's "
+      f"{original_code_steps} code steps. Use a bucket that preserves the full fixture."
+    )
+
+  return [1, requested_code_steps, quantizer_count]
+
+
+def samples_per_code_step(fixture: dict[str, Any]) -> int | None:
+  audio_codes = fixture_audio_codes(fixture)
+  original_code_steps = len(audio_codes)
+  sample_count = fixture.get("decoded", {}).get("sample_count")
+  if not original_code_steps or sample_count is None:
+    return None
+
+  if sample_count % original_code_steps != 0:
+    return None
+
+  return sample_count // original_code_steps
+
+
+def expected_output_sample_count(args: argparse.Namespace, fixture: dict[str, Any]) -> int | None:
+  step_samples = samples_per_code_step(fixture)
+  if step_samples is None:
+    return fixture.get("decoded", {}).get("sample_count")
+  return padded_code_shape(args, fixture)[1] * step_samples
+
+
+def padding_report(args: argparse.Namespace, fixture: dict[str, Any]) -> dict[str, Any]:
+  audio_codes = fixture_audio_codes(fixture)
+  requested_code_steps = padded_code_shape(args, fixture)[1]
+  original_code_steps = len(audio_codes)
+  return {
+    "original_code_steps": original_code_steps,
+    "requested_code_steps": requested_code_steps,
+    "pad_value": -1,
+    "padded_step_count": requested_code_steps - original_code_steps,
+    "samples_per_code_step": samples_per_code_step(fixture),
+    "valid_output_sample_count": fixture.get("decoded", {}).get("sample_count"),
+    "padded_output_sample_count": expected_output_sample_count(args, fixture),
+  }
+
+
+def padded_audio_codes_array(args: argparse.Namespace, fixture: dict[str, Any], np: Any) -> Any:
+  audio_codes = np.asarray(fixture_audio_codes(fixture), dtype=np.int64)
+  requested_code_steps = padded_code_shape(args, fixture)[1]
+  if audio_codes.shape[0] == requested_code_steps:
+    return audio_codes[None, :, :]
+
+  padded_codes = np.full(
+    (requested_code_steps, audio_codes.shape[1]),
+    -1,
+    dtype=np.int64,
+  )
+  padded_codes[: audio_codes.shape[0], :] = audio_codes
+  return padded_codes[None, :, :]
+
+
 def repo_file_inventory(model_id: str, revision: str | None) -> dict[str, Any]:
   try:
     model_info = HfApi().model_info(model_id, revision=revision, files_metadata=True)
@@ -129,12 +205,7 @@ def sanitize_local_paths(value: Any) -> Any:
 
 
 def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], inventory: dict[str, Any]) -> dict[str, Any]:
-  audio_codes = fixture["encoded"]["audio_codes"]
-  code_shape = [
-    1,
-    len(audio_codes),
-    len(audio_codes[0]) if audio_codes else 0,
-  ]
+  code_shape = padded_code_shape(args, fixture)
 
   return {
     "schema_version": 1,
@@ -154,11 +225,12 @@ def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], in
       "wrapper_mode": args.wrapper_mode,
       "input_name": "audio_codes",
       "input_shape": code_shape,
-      "input_dtype": fixture["encoded"]["audio_codes_dtype"],
-      "expected_output_shape": [1, fixture["decoded"]["sample_count"]],
-      "expected_output_sample_rate": fixture["decoded"]["sample_rate"],
+      "input_dtype": fixture_audio_codes_dtype(fixture),
+      "expected_output_shape": [1, expected_output_sample_count(args, fixture)],
+      "expected_output_sample_rate": fixture.get("decoded", {}).get("sample_rate"),
       "minimum_deployment_target": args.minimum_deployment_target,
       "convert_to": "mlprogram",
+      "padding": padding_report(args, fixture),
     },
     "next_command": (
       "uv run --python 3.12 "
@@ -171,6 +243,7 @@ def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], in
       "--no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask "
       "--verify-coreml-prediction --coreml-compute-units cpuOnly "
       "--qwen-source /path/to/Qwen3-TTS --allow-model-download "
+      f"--pad-code-steps {code_shape[1]} "
       "--output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion.json "
       "--mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
     ),
@@ -289,7 +362,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
         wav = block(wav)
       return wav.clamp(min=-1, max=1).squeeze(1)
 
-  audio_codes = np.asarray(fixture["encoded"]["audio_codes"], dtype=np.int64)[None, :, :]
+  audio_codes = padded_audio_codes_array(args, fixture, np)
   torch_codes = torch.from_numpy(audio_codes)
 
   tokenizer = Qwen3TTSTokenizer.from_pretrained(args.model_id)
@@ -326,6 +399,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "compute_precision": args.compute_precision,
       "capture_mode": args.capture_mode,
       "export_decomposed": args.export_decomposed if args.capture_mode == "export" else False,
+      "padding": padding_report(args, fixture),
     },
     "trace": {
       "status": "not_started",
@@ -525,6 +599,12 @@ def parse_args() -> argparse.Namespace:
     choices=["all", "cpuOnly", "cpuAndGPU", "cpuAndNeuralEngine"],
   )
   parser.add_argument("--created-at-utc", default=None)
+  parser.add_argument(
+    "--pad-code-steps",
+    type=int,
+    default=None,
+    help="Pad fixture audio_codes with -1 to this fixed code-step bucket before conversion.",
+  )
   parser.add_argument("--output", type=Path, default=None)
   parser.add_argument("--mlpackage-output", type=Path, default=None)
   return parser.parse_args()

@@ -13,6 +13,10 @@ import Testing
     #expect(fixture.conversionTarget.expectedOutputShape == [1, 15360])
     #expect(fixture.conversionTarget.expectedOutputSampleRate == 24000)
     #expect(fixture.conversionTarget.convertTo == "mlprogram")
+    #expect(fixture.conversionTarget.padding.originalCodeSteps == 8)
+    #expect(fixture.conversionTarget.padding.requestedCodeSteps == 8)
+    #expect(fixture.conversionTarget.padding.paddedStepCount == 0)
+    #expect(fixture.conversionTarget.padding.samplesPerCodeStep == 1920)
     #expect(fixture.nextCommand.contains("--python 3.12"))
     #expect(fixture.nextCommand.contains("--with 'coremltools>=8.3.0,<10'"))
     #expect(fixture.nextCommand.contains("--with 'torch==2.7.0'"))
@@ -123,8 +127,33 @@ import Testing
     #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0001)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder core ml bucket 40 export converts and predicts`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture.load(
+        "speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json",
+    )
+
+    #expect(fixture.source.coremltoolsVersion == "9.0")
+    #expect(fixture.source.torchVersion == "2.7.0")
+    #expect(fixture.conversionTarget.wrapperMode == "fixed_16q_static_mask")
+    #expect(fixture.conversionTarget.inputShape == [1, 40, 16])
+    #expect(fixture.conversionTarget.torchOutputShape == [1, 76800])
+    #expect(fixture.conversionTarget.upstreamMaxAbsDiff == 0.0)
+    #expect(fixture.trace.status == "succeeded")
+    #expect(fixture.conversion.status == "succeeded")
+    #expect(fixture.outputMatch?.status == "succeeded")
+    #expect(fixture.outputMatch?.coremlOutputShape == [1, 76800])
+    #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0003)
+}
+
 private struct Qwen3TTSSpeechTokenizerDecoderCoreMLPreflightFixture: Decodable {
     struct ConversionTarget: Decodable {
+        struct Padding: Decodable {
+            let originalCodeSteps: Int
+            let requestedCodeSteps: Int
+            let paddedStepCount: Int
+            let samplesPerCodeStep: Int?
+        }
+
         let stage: String
         let inputName: String
         let inputShape: [Int]
@@ -132,6 +161,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLPreflightFixture: Decodable {
         let expectedOutputShape: [Int]
         let expectedOutputSampleRate: Int
         let convertTo: String
+        let padding: Padding
     }
 
     let schemaVersion: Int

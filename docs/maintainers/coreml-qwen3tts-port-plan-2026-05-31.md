@@ -980,6 +980,70 @@ Validation:
 - A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
   new script or fixture.
 
+### 2026-05-31 Decoder Bucket Planning, Pass 1
+
+Added fixed-shape bucket support to the decoder conversion probe:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py`
+
+Added a decoder bucket planner:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/plan-speech-tokenizer-decoder-buckets.py`
+
+Added a checked-in bucket plan fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json`
+
+Added SwiftPM tests for the bucket plan:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLBucketPlanTests.swift`
+
+Implementation notes:
+
+- The conversion script now accepts `--pad-code-steps`.
+- Padding uses `-1`, matching the upstream decoder convention for missing code
+  steps. The decoder wrapper clamps negative codes to zero before lookup, and
+  the report records both valid and padded output sample counts so later runtime
+  code can trim deliberately.
+- The existing 8-step preflight fixture now records padding metadata even though
+  it does not need padding.
+
+Bucket plan:
+
+- Bucket 40 accepts the `[37, 16]` LibriTTS-R sample and pads 3 code steps.
+- Bucket 72 accepts the `[65, 16]` LibriTTS-R sample and pads 7 code steps.
+- Bucket 88 accepts the `[83, 16]` LibriTTS-R sample and pads 5 code steps.
+- Required static decoder input shapes are `[1, 40, 16]`, `[1, 72, 16]`, and
+  `[1, 88, 16]`.
+
+Immediate implications:
+
+- The next heavy runtime step is no longer ambiguous: run the three generated
+  conversion commands, starting with bucket 40 as the smallest real-speech
+  calibration bucket.
+- Bucketed conversion packages can still be created from the synthetic fixture
+  padded to each shape. Representative W8A8 calibration should then use the
+  real LibriTTS-R codes assigned to each bucket.
+- W8A8 remains blocked on activation-quantization scoping around integer
+  `audio_codes`, but it is no longer blocked on deciding bucket shapes.
+
+Validation:
+
+- The bucket planner generated the checked fixture successfully.
+- Bucket-40 conversion preflight generated a local uncommitted preflight report
+  with input shape `[1, 40, 16]`, output shape `[1, 76800]`, and 32 padded
+  synthetic code steps.
+- Bucket-40 runtime conversion also succeeded with the existing static-mask
+  export path.
+- Bucket-40 CPU-only Core ML prediction returned output shape `[1, 76800]`
+  with max absolute difference `0.00019849836826324463` from the PyTorch
+  wrapper output.
+- The bucket-40 local `.mlpackage` disk footprint is about 436 MB, matching the
+  original 8-step package closely enough to confirm weights dominate package
+  size for these fixed decoder shapes.
+- Added checked-in bucket-40 conversion report:
+  `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json`.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:

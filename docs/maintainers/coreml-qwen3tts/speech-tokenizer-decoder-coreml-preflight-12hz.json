@@ -57,7 +57,16 @@
     ],
     "expected_output_sample_rate": 24000,
     "minimum_deployment_target": "macOS15",
-    "convert_to": "mlprogram"
+    "convert_to": "mlprogram",
+    "padding": {
+      "original_code_steps": 8,
+      "requested_code_steps": 8,
+      "pad_value": -1,
+      "padded_step_count": 0,
+      "samples_per_code_step": 1920,
+      "valid_output_sample_count": 15360,
+      "padded_output_sample_count": 15360
+    }
   },
-  "next_command": "uv run --python 3.12 --with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coremltools>=8.3.0,<10' scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py --no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask --verify-coreml-prediction --coreml-compute-units cpuOnly --qwen-source /path/to/Qwen3-TTS --allow-model-download --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion.json --mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
+  "next_command": "uv run --python 3.12 --with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coremltools>=8.3.0,<10' scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py --no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask --verify-coreml-prediction --coreml-compute-units cpuOnly --qwen-source /path/to/Qwen3-TTS --allow-model-download --pad-code-steps 8 --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion.json --mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
 }
