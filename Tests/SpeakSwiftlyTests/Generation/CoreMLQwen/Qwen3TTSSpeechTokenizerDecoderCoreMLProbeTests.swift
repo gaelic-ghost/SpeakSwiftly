@@ -127,6 +127,25 @@ import Testing
     #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0001)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder core ml fp16 export converts and predicts`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture.load(
+        "speech-tokenizer-decoder-coreml-conversion-fp16-12hz.json",
+    )
+
+    #expect(fixture.source.coremltoolsVersion == "9.0")
+    #expect(fixture.source.torchVersion == "2.7.0")
+    #expect(fixture.conversionTarget.wrapperMode == "fixed_16q_static_mask")
+    #expect(fixture.conversionTarget.computePrecision == "float16")
+    #expect(fixture.conversionTarget.inputShape == [1, 8, 16])
+    #expect(fixture.conversionTarget.torchOutputShape == [1, 15360])
+    #expect(fixture.trace.status == "succeeded")
+    #expect(fixture.conversion.status == "succeeded")
+    #expect(fixture.outputMatch?.status == "succeeded")
+    #expect(fixture.outputMatch?.computeUnits == "cpuOnly")
+    #expect(fixture.outputMatch?.coremlOutputShape == [1, 15360])
+    #expect((fixture.outputMatch?.maxAbsDiff ?? 1.0) < 0.0018)
+}
+
 @Test func `qwen3 tts speech tokenizer decoder core ml bucket 40 export converts and predicts`() throws {
     try assertBucketConversion(
         filename: "speech-tokenizer-decoder-coreml-conversion-bucket-40-12hz.json",
@@ -211,6 +230,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLConversionFixture: Decodable 
         let inputShape: [Int]
         let torchOutputShape: [Int]
         let captureMode: String?
+        let computePrecision: String?
         let exportDecomposed: Bool?
         let upstreamMaxAbsDiff: Double?
     }

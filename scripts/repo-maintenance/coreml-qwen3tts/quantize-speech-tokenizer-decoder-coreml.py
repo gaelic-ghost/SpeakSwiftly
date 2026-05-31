@@ -27,11 +27,13 @@ import numpy as np
 DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage"
 DEFAULT_RUNTIME_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
 DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
+DEFAULT_BUCKET_PLAN_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
 DEFAULT_CONVERSION_REPORT_PATH = (
   "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
 )
 DEFAULT_WEIGHT_OUTPUT = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-w8.mlpackage"
 DEFAULT_W8A8_OUTPUT = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-w8a8.mlpackage"
+COMPUTE_ONLY_ACTIVATION_OP_TYPES = ["conv", "linear", "matmul", "conv_transpose"]
 
 
 def current_utc_timestamp() -> str:
@@ -105,10 +107,38 @@ def calibration_code_shapes(calibration_fixture: dict[str, Any]) -> list[dict[st
   ]
 
 
+def bucket_conversion_report_path(bucket: int) -> Path:
+  return Path(f"docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-{bucket}-12hz.json")
+
+
+def bucketed_conversion_report(bucket_plan: dict[str, Any] | None) -> dict[str, Any]:
+  if bucket_plan is None:
+    return {
+      "status": "missing_bucket_plan",
+      "required_input_shapes": [],
+      "pinned_report_count": 0,
+      "missing_reports": [],
+    }
+
+  buckets = bucket_plan.get("bucket_plan", {}).get("buckets", [])
+  missing_reports = [
+    str(bucket_conversion_report_path(int(bucket)))
+    for bucket in buckets
+    if not resolve_package_path(bucket_conversion_report_path(int(bucket))).is_file()
+  ]
+  return {
+    "status": "complete" if not missing_reports else "missing_reports",
+    "required_input_shapes": bucket_plan.get("bucket_plan", {}).get("required_input_shapes", []),
+    "pinned_report_count": len(buckets) - len(missing_reports),
+    "missing_reports": missing_reports,
+  }
+
+
 def compatibility_report(
   model_input_shape: list[int],
   runtime_fixture: dict[str, Any],
   calibration_fixture: dict[str, Any],
+  bucket_plan: dict[str, Any] | None,
 ) -> dict[str, Any]:
   runtime_shape = list(runtime_codes(runtime_fixture).shape)
   fixed_code_steps = model_input_shape[1]
@@ -136,10 +166,11 @@ def compatibility_report(
       "sample_shapes": calibration_shapes,
       "suggested_decoder_buckets": calibration_fixture.get("aggregate", {}).get("suggested_decoder_buckets", []),
     },
+    "bucketed_decoder_conversions": bucketed_conversion_report(bucket_plan),
     "decision": (
-      "The current 8-step decoder package can only run a synthetic W8A8 smoke calibration. "
-      "Representative real-speech activation calibration needs bucketed decoder conversions "
-      "that match the 40, 72, and 88 step calibration buckets."
+      "The original 8-step decoder package can only run a synthetic W8A8 smoke calibration. "
+      "The checked bucketed decoder reports now provide the static shapes needed for representative "
+      "real-speech activation calibration."
     ),
   }
 
@@ -159,6 +190,10 @@ def quantization_api_report() -> dict[str, Any]:
     "w8a8_note": (
       "Core ML Tools W8A8 requires activation quantization from calibration sample_data, "
       "then int8 weight quantization of the activation-quantized model."
+    ),
+    "activation_scope_note": (
+      "OptimizationConfig can scope activation quantization by op type or op name. "
+      "The decoder's integer audio-code lookup path should not be globally activation-quantized."
     ),
   }
 
@@ -220,14 +255,28 @@ def run_w8a8_quantization(
   output_path: Path,
   replace_existing: bool,
   calibration_op_group_size: int,
+  activation_scope: str,
+  baseline_output: np.ndarray | None,
 ) -> dict[str, Any]:
   if replace_existing:
     remove_existing_package(output_path)
 
   start = time.perf_counter()
-  activation_config = cto.coreml.OptimizationConfig(
-    global_config=cto.coreml.OpLinearQuantizerConfig(mode="linear_symmetric")
-  )
+  activation_quantizer_config = cto.coreml.OpLinearQuantizerConfig(mode="linear_symmetric")
+  if activation_scope == "global":
+    activation_config = cto.coreml.OptimizationConfig(global_config=activation_quantizer_config)
+    scoped_op_types: list[str] = []
+  elif activation_scope == "compute_only":
+    activation_config = cto.coreml.OptimizationConfig(
+      op_type_configs={
+        op_type: activation_quantizer_config
+        for op_type in COMPUTE_ONLY_ACTIVATION_OP_TYPES
+      }
+    )
+    scoped_op_types = COMPUTE_ONLY_ACTIVATION_OP_TYPES
+  else:
+    raise RuntimeError(f"Unsupported activation scope '{activation_scope}'.")
+
   activation_quantized = cto.coreml.experimental.linear_quantize_activations(
     model,
     activation_config,
@@ -244,21 +293,42 @@ def run_w8a8_quantization(
   quantized = cto.coreml.linear_quantize_weights(activation_quantized, weight_config)
   quantized.save(str(output_path))
   duration_ms = (time.perf_counter() - start) * 1000
-  return {
+  result: dict[str, Any] = {
     "status": "succeeded",
-    "mode": "w8a8_synthetic_smoke",
+    "mode": f"w8a8_synthetic_smoke_{activation_scope}",
     "output_package": relative_package_path(output_path),
     "duration_ms": duration_ms,
     "package_size_bytes": directory_size_bytes(output_path),
     "calibration_op_group_size": calibration_op_group_size,
     "sample_data_count": len(sample_data),
+    "activation_scope": activation_scope,
+    "activation_op_types": scoped_op_types,
   }
+  if baseline_output is not None:
+    quantized_model = ct.models.MLModel(str(output_path), compute_units=ct.ComputeUnit.CPU_ONLY)
+    prediction = quantized_model.predict(sample_data[0])
+    quantized_output = np.asarray(prediction["audio_values"])
+    delta = quantized_output - baseline_output
+    result["output_match"] = {
+      "baseline": "model_package",
+      "compute_units": "cpuOnly",
+      "quantized_output_shape": list(quantized_output.shape),
+      "quantized_output_dtype": str(quantized_output.dtype),
+      "quantized_output_min": float(quantized_output.min()),
+      "quantized_output_max": float(quantized_output.max()),
+      "quantized_output_rms": float(np.sqrt(np.mean(np.square(quantized_output)))),
+      "max_abs_diff": float(np.max(np.abs(delta))),
+      "mean_abs_diff": float(np.mean(np.abs(delta))),
+    }
+  return result
 
 
 def build_preflight_report(args: argparse.Namespace) -> dict[str, Any]:
   conversion_report = load_json(resolve_package_path(args.conversion_report))
   runtime_fixture = load_json(resolve_package_path(args.runtime_fixture))
   calibration_fixture = load_json(resolve_package_path(args.calibration_fixture))
+  bucket_plan_path = resolve_package_path(args.bucket_plan)
+  bucket_plan = load_json(bucket_plan_path) if bucket_plan_path.is_file() else None
   model_input_shape = fixed_decoder_shape(conversion_report)
   model_package = resolve_package_path(args.model_package)
 
@@ -277,7 +347,12 @@ def build_preflight_report(args: argparse.Namespace) -> dict[str, Any]:
       "conversion_target": conversion_report["conversion_target"],
     },
     "coremltools": quantization_api_report(),
-    "calibration_compatibility": compatibility_report(model_input_shape, runtime_fixture, calibration_fixture),
+    "calibration_compatibility": compatibility_report(
+      model_input_shape,
+      runtime_fixture,
+      calibration_fixture,
+      bucket_plan,
+    ),
     "quantization_plan": {
       "weight_only_int8": {
         "status": "available",
@@ -293,17 +368,34 @@ def build_preflight_report(args: argparse.Namespace) -> dict[str, Any]:
         ),
       },
       "w8a8_representative": {
-        "status": "blocked_until_bucketed_decoder_packages_exist",
+        "status": (
+          "ready_for_scoped_activation_probe"
+          if bucketed_conversion_report(bucket_plan)["status"] == "complete"
+          else "blocked_until_bucketed_decoder_packages_exist"
+        ),
         "required_decoder_input_shapes": [
           [1, bucket, model_input_shape[2]]
           for bucket in calibration_fixture.get("aggregate", {}).get("suggested_decoder_buckets", [])
         ],
       },
+      "w8a8_scope_strategy": {
+        "status": "identified",
+        "base_precision": "float16",
+        "activation_scope": "compute_only",
+        "activation_op_types": COMPUTE_ONLY_ACTIVATION_OP_TYPES,
+        "reason": (
+          "Global activation quantization touches integer code lookup. "
+          "Compute-only activation quantization on the float32 package avoids that path but fails on fp16 scale "
+          "versus fp32 input dtype. The successful local path uses an fp16 base package."
+        ),
+      },
     },
     "next_command": (
       "uv run --python 3.12 "
       "scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py "
-      "--no-preflight-only --run-weight-only --run-w8a8 "
+      "--no-preflight-only --run-weight-only --run-w8a8 --activation-scope compute_only "
+      "--model-package .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16.mlpackage "
+      "--w8a8-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16-w8a8-compute-only.mlpackage "
       "--output .local/coreml-qwen3tts/qwen3tts-decoder-quantization-smoke.json"
     ),
   }
@@ -323,6 +415,11 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
   runtime_fixture = load_json(resolve_package_path(args.runtime_fixture))
   sample_data = build_sample_data(runtime_fixture, report["source"]["conversion_target"]["input_shape"])
   model = ct.models.MLModel(str(model_package), compute_units=ct.ComputeUnit.CPU_ONLY)
+  baseline_output = None
+  if args.verify_prediction:
+    baseline_prediction = model.predict(sample_data[0])
+    baseline_output = np.asarray(baseline_prediction["audio_values"])
+
   report["runtime"] = {
     "sample_data": {
       "count": len(sample_data),
@@ -334,7 +431,13 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
         "package is fixed to 8 code steps."
       ),
     },
-    "baseline_prediction": predict_summary(model, sample_data) if args.verify_prediction else None,
+    "baseline_prediction": {
+      "output_shape": list(baseline_output.shape),
+      "output_dtype": str(baseline_output.dtype),
+      "output_min": float(baseline_output.min()),
+      "output_max": float(baseline_output.max()),
+      "output_rms": float(np.sqrt(np.mean(np.square(baseline_output)))),
+    } if baseline_output is not None else None,
     "results": [],
   }
 
@@ -366,15 +469,18 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
           resolve_package_path(args.w8a8_output),
           args.replace_existing,
           args.calibration_op_group_size,
+          args.activation_scope,
+          baseline_output,
         )
       )
     except Exception as error:
       report["runtime"]["results"].append(
         {
           "status": "failed",
-          "mode": "w8a8_synthetic_smoke",
+          "mode": f"w8a8_synthetic_smoke_{args.activation_scope}",
           "error_type": type(error).__name__,
           "error_message": str(error),
+          "activation_scope": args.activation_scope,
         }
       )
 
@@ -391,6 +497,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--model-package", type=Path, default=Path(DEFAULT_MODEL_PACKAGE))
   parser.add_argument("--runtime-fixture", type=Path, default=Path(DEFAULT_RUNTIME_FIXTURE_PATH))
   parser.add_argument("--calibration-fixture", type=Path, default=Path(DEFAULT_CALIBRATION_FIXTURE_PATH))
+  parser.add_argument("--bucket-plan", type=Path, default=Path(DEFAULT_BUCKET_PLAN_PATH))
   parser.add_argument("--conversion-report", type=Path, default=Path(DEFAULT_CONVERSION_REPORT_PATH))
   parser.add_argument("--weight-output", type=Path, default=Path(DEFAULT_WEIGHT_OUTPUT))
   parser.add_argument("--w8a8-output", type=Path, default=Path(DEFAULT_W8A8_OUTPUT))
@@ -404,6 +511,11 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--replace-existing", action="store_true")
   parser.add_argument("--verify-prediction", action="store_true")
   parser.add_argument("--calibration-op-group-size", type=int, default=16)
+  parser.add_argument(
+    "--activation-scope",
+    default="global",
+    choices=["global", "compute_only"],
+  )
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output", type=Path, default=None)
   return parser.parse_args()

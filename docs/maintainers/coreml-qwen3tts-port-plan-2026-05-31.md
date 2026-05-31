@@ -1058,6 +1058,67 @@ Validation:
   step can load bucket-specific packages and build calibration sample data from
   the real LibriTTS-R code tensors assigned to each bucket.
 
+### 2026-05-31 Decoder Scoped W8A8 Smoke, Pass 1
+
+Extended the decoder quantization probe so activation quantization can be
+scoped by graph role:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py`
+
+Added checked-in reports for the fp16 decoder base and scoped W8A8 smoke:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-fp16-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-fp16-compute-only-12hz.json`
+
+Added SwiftPM fixture coverage:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLProbeTests.swift`
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightTests.swift`
+
+Graph and Core ML Tools findings:
+
+- The converted decoder MIL graph starts with integer `audio_codes` handling:
+  casts, clipping, transposes, slices, and `gather` embedding lookups before the
+  float convolution and transformer work.
+- Core ML Tools `OptimizationConfig` can scope compression globally, by op type,
+  or by op name. That gives us a way to avoid activation quantization on the
+  integer lookup path without splitting the graph yet.
+- Global activation quantization still fails on the integer path with an
+  `int32` input versus `fp32` scale mismatch.
+- Compute-only activation quantization on the fp32 decoder avoids the integer
+  path, but fails later with an `fp32` input versus `fp16` scale mismatch.
+- The successful first W8A8 smoke path is an fp16 base package plus activation
+  quantization scoped to `conv`, `linear`, `matmul`, and `conv_transpose`, then
+  int8 weight quantization of that activation-quantized model.
+
+Validation:
+
+- The fp16 decoder conversion succeeded for the 8-step fixture, producing a
+  local package of about 218 MB.
+- CPU-only Core ML prediction from the fp16 package returned output shape
+  `[1, 15360]` with max absolute difference `0.0017573237419128418` from the
+  PyTorch wrapper output.
+- The scoped W8A8 smoke succeeded against that fp16 package in about 114 seconds
+  and produced a local package of 114795122 bytes, roughly 109 MB.
+- CPU-only prediction from the scoped W8A8 package returned output shape
+  `[1, 15360]` with max absolute difference `0.008880615234375` and mean
+  absolute difference `0.0021852878853678703` versus the fp16 package output.
+- Core ML Tools emitted divide-by-zero and invalid-value runtime warnings during
+  compression. The package still saved, reloaded, and predicted successfully, so
+  the warning is a follow-up inspection item rather than a conversion blocker.
+
+Immediate implications:
+
+- W8A8 is no longer blocked at the "can Core ML Tools produce a decoder package"
+  level for the 8-step speech-tokenizer decoder smoke.
+- This pass still does not prove audio quality, representative calibration, or
+  Neural Engine dispatch. It only proves a scoped conversion route and a
+  CPU-loadable/predictable artifact.
+- The next W8A8 slice should use the bucketed decoder packages with the real
+  LibriTTS-R calibration code tensors, then profile fp16 and W8A8 packages with
+  Instruments before deciding whether this decoder shape is actually useful for
+  an Apple-silicon backend.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:

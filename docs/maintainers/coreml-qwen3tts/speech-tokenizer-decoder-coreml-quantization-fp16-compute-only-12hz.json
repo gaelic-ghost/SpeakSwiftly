@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-05-31T16:55:00Z",
-  "mode": "coreml_quantization_preflight",
+  "created_at_utc": "2026-05-31T16:58:00Z",
+  "mode": "coreml_quantization_runtime",
   "source": {
-    "model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage",
+    "model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16.mlpackage",
     "model_package_exists": true,
-    "model_package_size_bytes": 456688989,
-    "conversion_report_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json",
+    "model_package_size_bytes": 228691492,
+    "conversion_report_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-fp16-12hz.json",
     "runtime_fixture_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json",
     "calibration_fixture_path": "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json",
     "conversion_source": {
@@ -31,9 +31,18 @@
       "input_dtype": "int64",
       "minimum_deployment_target": "macOS15",
       "convert_to": "mlprogram",
-      "compute_precision": "float32",
+      "compute_precision": "float16",
       "capture_mode": "export",
       "export_decomposed": true,
+      "padding": {
+        "original_code_steps": 8,
+        "requested_code_steps": 8,
+        "pad_value": -1,
+        "padded_step_count": 0,
+        "samples_per_code_step": 1920,
+        "valid_output_sample_count": 15360,
+        "padded_output_sample_count": 15360
+      },
       "torch_output_shape": [
         1,
         15360
@@ -169,5 +178,60 @@
       "reason": "Global activation quantization touches integer code lookup. Compute-only activation quantization on the float32 package avoids that path but fails on fp16 scale versus fp32 input dtype. The successful local path uses an fp16 base package."
     }
   },
-  "next_command": "uv run --python 3.12 scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py --no-preflight-only --run-weight-only --run-w8a8 --activation-scope compute_only --model-package .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16.mlpackage --w8a8-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16-w8a8-compute-only.mlpackage --output .local/coreml-qwen3tts/qwen3tts-decoder-quantization-smoke.json"
+  "next_command": "uv run --python 3.12 scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py --no-preflight-only --run-weight-only --run-w8a8 --activation-scope compute_only --model-package .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16.mlpackage --w8a8-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16-w8a8-compute-only.mlpackage --output .local/coreml-qwen3tts/qwen3tts-decoder-quantization-smoke.json",
+  "runtime": {
+    "sample_data": {
+      "count": 1,
+      "input_name": "audio_codes",
+      "input_shape": [
+        1,
+        8,
+        16
+      ],
+      "input_dtype": "int32",
+      "scope_warning": "This runtime probe uses the synthetic 8-step fixture because the current decoder package is fixed to 8 code steps."
+    },
+    "baseline_prediction": {
+      "output_shape": [
+        1,
+        15360
+      ],
+      "output_dtype": "float32",
+      "output_min": -0.054412841796875,
+      "output_max": 0.0537109375,
+      "output_rms": 0.03292258456349373
+    },
+    "results": [
+      {
+        "status": "succeeded",
+        "mode": "w8a8_synthetic_smoke_compute_only",
+        "output_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16-w8a8-compute-only.mlpackage",
+        "duration_ms": 113967.96658299991,
+        "package_size_bytes": 114795122,
+        "calibration_op_group_size": 16,
+        "sample_data_count": 1,
+        "activation_scope": "compute_only",
+        "activation_op_types": [
+          "conv",
+          "linear",
+          "matmul",
+          "conv_transpose"
+        ],
+        "output_match": {
+          "baseline": "model_package",
+          "compute_units": "cpuOnly",
+          "quantized_output_shape": [
+            1,
+            15360
+          ],
+          "quantized_output_dtype": "float32",
+          "quantized_output_min": -0.0538330078125,
+          "quantized_output_max": 0.052978515625,
+          "quantized_output_rms": 0.032811976969242096,
+          "max_abs_diff": 0.008880615234375,
+          "mean_abs_diff": 0.0021852878853678703
+        }
+      }
+    ]
+  }
 }
