@@ -638,6 +638,66 @@ Validation:
   speech-tokenizer config, runtime fixtures, and the decoder Core ML conversion
   probe.
 
+### 2026-05-31 Speech Tokenizer Decoder Core ML Benchmark, Pass 1
+
+Added a decoder Core ML benchmark script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/benchmark-speech-tokenizer-decoder-coreml.py`
+
+Added a checked-in benchmark fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-benchmark-static-mask-12hz.json`
+
+Added SwiftPM tests for the benchmark fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLBenchmarkTests.swift`
+
+Benchmark setup:
+
+- hardware: Apple M4 Pro, 14 logical CPUs, 24 GiB memory
+- local package: `Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage`
+- local package size: about 436 MB
+- input shape: `[1, 8, 16]`
+- warmup runs per compute-unit setting: 3
+- measured runs per compute-unit setting: 10
+
+Measured median prediction times:
+
+- `cpuOnly`: about 32.37 ms
+- `cpuAndGPU`: about 23.71 ms
+- `cpuAndNeuralEngine`: about 32.70 ms
+- `all`: about 23.90 ms
+
+Output parity:
+
+- all compute-unit settings loaded and predicted successfully
+- `cpuAndGPU`, `cpuAndNeuralEngine`, and `all` stayed within `0.000001` max
+  absolute difference from the CPU-only baseline
+
+Immediate implications:
+
+- For this fixed 8-frame decoder graph, `.cpuAndGPU` and `.all` were faster
+  than `.cpuOnly`.
+- `.cpuAndNeuralEngine` was similar to `.cpuOnly`, not faster. That does not
+  prove the Neural Engine was unused, but it means the NE-preferred setting is
+  not an obvious win for this decoder-only graph.
+- The next profiling slice needs real dispatch evidence from Instruments or
+  Core ML performance diagnostics before we make any claim about ANE use.
+- Benchmarking longer code-step buckets is important before drawing conclusions
+  about final synthesis latency. This 8-frame fixture is intentionally tiny.
+
+Validation:
+
+- Benchmark generation succeeded for all four compute-unit settings.
+- `jq empty` passed for the benchmark fixture.
+- A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
+  checked-in Core ML Qwen fixtures, scripts, or Swift tests.
+- `uv run --with ruff ruff check` passed for all five Core ML Qwen maintainer
+  scripts.
+- `swift test --filter qwen3` passed with 18 tests covering text tokenization,
+  speech-tokenizer config, runtime fixtures, decoder Core ML conversion, and
+  decoder Core ML benchmarking.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
