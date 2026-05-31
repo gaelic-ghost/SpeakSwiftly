@@ -27,6 +27,7 @@ import numpy as np
 
 DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage"
 DEFAULT_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+DEFAULT_TALKER_CODE_FIXTURE_PATH = ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
 DEFAULT_CONVERSION_REPORT_PATH = (
   "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
 )
@@ -104,6 +105,60 @@ def stats_ms(values: list[float]) -> dict[str, float]:
   }
 
 
+def synthetic_audio_codes(fixture: dict[str, Any], input_shape: list[int]) -> tuple[np.ndarray, dict[str, Any]]:
+  codes = np.asarray(fixture["encoded"]["audio_codes"], dtype=np.int32)
+  if list(codes.shape) != input_shape[1:]:
+    raise RuntimeError(
+      f"Synthetic fixture audio_codes shape {list(codes.shape)} does not match model input shape {input_shape[1:]}."
+    )
+  return codes[None, :, :], {
+    "source": "synthetic_runtime_fixture",
+    "id": fixture.get("id", "speech-tokenizer-runtime-fixture-12hz"),
+    "audio_codes_shape": list(codes.shape),
+    "padded_input_shape": list(input_shape),
+  }
+
+
+def talker_audio_codes(args: argparse.Namespace, input_shape: list[int]) -> tuple[np.ndarray, dict[str, Any]]:
+  talker_fixture = load_json(resolve_package_path(args.talker_code_fixture))
+  bucket = input_shape[1]
+  matches = [
+    sample for sample in talker_fixture.get("samples", [])
+    if int(sample.get("bucket_assignment", {}).get("assigned_bucket", -1)) == bucket
+    and (args.sample_id is None or sample.get("id") == args.sample_id)
+  ]
+  if not matches:
+    raise RuntimeError(f"Talker-code fixture has no sample assignment for bucket {bucket} and sample id '{args.sample_id}'.")
+  if len(matches) > 1:
+    raise RuntimeError(f"Talker-code fixture has {len(matches)} assignments for bucket {bucket}; pass --sample-id.")
+
+  sample = matches[0]
+  assignment = sample["bucket_assignment"]
+  codes = np.asarray(sample["encoded"]["audio_codes"], dtype=np.int32)
+  if codes.ndim != 2:
+    raise RuntimeError(f"Talker sample '{sample['id']}' audio_codes must be rank 2.")
+  if codes.shape[0] > bucket:
+    raise RuntimeError(f"Talker sample '{sample['id']}' has {codes.shape[0]} code steps, exceeding bucket {bucket}.")
+  if codes.shape[1] != input_shape[2]:
+    raise RuntimeError(
+      f"Talker sample '{sample['id']}' has {codes.shape[1]} quantizers, but model input expects {input_shape[2]}."
+    )
+
+  padded = np.full((bucket, input_shape[2]), int(assignment.get("pad_value", -1)), dtype=np.int32)
+  padded[: codes.shape[0], :] = codes
+  return padded[None, :, :], {
+    "source": "talker_code_fixture",
+    "id": sample["id"],
+    "text": sample.get("text"),
+    "audio_codes_shape": list(codes.shape),
+    "padded_input_shape": list(input_shape),
+    "padded_step_count": bucket - codes.shape[0],
+    "pad_value": int(assignment.get("pad_value", -1)),
+    "valid_output_sample_count": assignment.get("valid_output_sample_count"),
+    "padded_output_sample_count": assignment.get("padded_output_sample_count"),
+  }
+
+
 def benchmark_compute_unit(
   model_package: Path,
   compute_unit: str,
@@ -168,7 +223,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
   fixture = load_json(fixture_path)
   conversion_report = load_json(conversion_report_path)
-  audio_codes = np.asarray(fixture["encoded"]["audio_codes"], dtype=np.int32)[None, :, :]
+  input_shape = conversion_report["conversion_target"]["input_shape"]
+  if args.sample_source == "synthetic":
+    audio_codes, sample_report = synthetic_audio_codes(fixture, input_shape)
+  elif args.sample_source == "talker":
+    audio_codes, sample_report = talker_audio_codes(args, input_shape)
+  else:
+    raise RuntimeError(f"Unsupported sample source '{args.sample_source}'.")
 
   results = []
   baseline_output = None
@@ -210,6 +271,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
       "input_name": "audio_codes",
       "input_shape": list(audio_codes.shape),
       "input_dtype": str(audio_codes.dtype),
+      "sample": sample_report,
       "warmup_runs": args.warmup_runs,
       "measured_runs": args.measured_runs,
       "compute_units_order": args.compute_units,
@@ -229,7 +291,10 @@ def parse_args() -> argparse.Namespace:
   )
   parser.add_argument("--model-package", type=Path, default=Path(DEFAULT_MODEL_PACKAGE))
   parser.add_argument("--fixture", type=Path, default=Path(DEFAULT_FIXTURE_PATH))
+  parser.add_argument("--talker-code-fixture", type=Path, default=Path(DEFAULT_TALKER_CODE_FIXTURE_PATH))
   parser.add_argument("--conversion-report", type=Path, default=Path(DEFAULT_CONVERSION_REPORT_PATH))
+  parser.add_argument("--sample-source", default="synthetic", choices=["synthetic", "talker"])
+  parser.add_argument("--sample-id", default=None)
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--warmup-runs", type=int, default=3)
   parser.add_argument("--measured-runs", type=int, default=10)
