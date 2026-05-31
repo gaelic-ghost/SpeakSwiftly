@@ -907,6 +907,79 @@ Immediate implications:
   quality-sensitive compression decision. This pass intentionally proves the
   extraction path first.
 
+### 2026-05-31 Decoder Quantization Preflight, Pass 1
+
+Added a decoder Core ML quantization preflight script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py`
+
+Added a checked-in quantization preflight fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-preflight-12hz.json`
+
+Added SwiftPM tests for the fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightTests.swift`
+
+Core ML Tools API findings:
+
+- Local Core ML Tools version: `9.0`.
+- `coremltools.optimize.coreml.linear_quantize_weights` is available.
+- `coremltools.optimize.coreml.experimental.linear_quantize_activations` is
+  available.
+- Apple's Core ML Tools docs distinguish weight-only quantization from W8A8.
+  Weight-only quantization compresses stored weights, but consuming ops still
+  compute in float precision. W8A8 requires activation calibration sample data
+  and then int8 weight quantization of the activation-quantized model.
+
+Calibration-shape findings:
+
+- Current converted decoder package input shape: `[1, 8, 16]`.
+- The synthetic runtime fixture has `audio_codes` shape `[8, 16]` and matches
+  the current fixed graph.
+- The real LibriTTS-R calibration fixture has code shapes `[37, 16]`,
+  `[83, 16]`, and `[65, 16]`.
+- None of the real-speech calibration samples match the current 8-step graph.
+
+Immediate implications:
+
+- The current local decoder package can support a synthetic W8A8 smoke probe,
+  which is useful for API compatibility and model-load testing.
+- It cannot support representative real-speech W8A8 activation calibration
+  without either truncating data or converting longer fixed-shape decoder
+  packages. Truncating the samples would be misleading for quality and dispatch
+  decisions.
+- Representative decoder W8A8 now needs bucketed decoder conversions for
+  `[1, 40, 16]`, `[1, 72, 16]`, and `[1, 88, 16]`, matching the first
+  calibration fixture's suggested buckets.
+- After those packages exist, the same quantization script can run activation
+  calibration with real code tensors and feed the benchmark plus Instruments
+  trace scripts.
+
+Validation:
+
+- Quantization preflight generation succeeded with Python 3.12 and Core ML
+  Tools 9.0.
+- A local uncommitted synthetic quantization runtime smoke was also run against
+  the 8-step decoder package under `.local/coreml-qwen3tts`.
+- Weight-only int8 quantization succeeded in about 5.2 seconds and produced a
+  local package of 115025901 bytes, down from the original package's roughly
+  436 MB local disk footprint.
+- The W8A8 synthetic smoke completed activation calibration but failed while
+  saving the quantized model:
+  `ValueError: In op, of type quantize, named quantize_0, the named input
+  scale must have the same data type as the named input input. However, scale
+  has dtype fp32 whereas input has dtype int32.`
+- Interpretation: global activation quantization is likely trying to insert a
+  quantize/dequantize pair on the integer `audio_codes` input path. That does
+  not prove the decoder cannot use W8A8. It means the next W8A8 slice should
+  scope activation quantization to float-producing decoder ops, or split the
+  integer code lookup from the float decoder graph before treating W8A8 as
+  blocked.
+- `jq empty` passed for the quantization preflight fixture.
+- A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
+  new script or fixture.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:
@@ -1219,6 +1292,10 @@ Current recommendation:
   https://apple.github.io/coremltools/docs-guides/source/opt-overview.html
 - Core ML Tools quantization overview:
   https://apple.github.io/coremltools/docs-guides/source/opt-quantization-overview.html
+- Core ML Tools quantization algorithms:
+  https://apple.github.io/coremltools/docs-guides/source/opt-quantization-algos.html
+- Core ML Tools Core ML quantization API reference:
+  https://apple.github.io/coremltools/source/coremltools.optimize.coreml.quantization.html
 - Core ML Tools linear quantization guide:
   https://apple.github.io/coremltools/docs-guides/source/opt-quantization.html
 - Core ML Tools palettization overview:
