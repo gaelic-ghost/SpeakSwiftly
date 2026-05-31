@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import os
 @testable import SpeakSwiftly
 
 struct BenchmarkRuntimeSession {
@@ -39,6 +40,22 @@ struct BenchmarkHost: Codable {
             }
         }
     }
+}
+
+struct BenchmarkResourceSnapshot: Codable {
+    let processResidentBytes: Int?
+    let processPhysFootprintBytes: Int?
+    let processCPUTimeMS: Double?
+    let mlxActiveMemoryBytes: Int?
+    let mlxCacheMemoryBytes: Int?
+    let mlxPeakMemoryBytes: Int?
+}
+
+struct BenchmarkWarningSummary: Codable {
+    let warningCount: Int
+    let playbackWarningCount: Int
+    let generationQualityWarningCount: Int
+    let reasons: [String: Int]
 }
 
 struct BenchmarkMetricSummary: Codable {
@@ -267,6 +284,32 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
         }
     }
 
+    private static func int(_ value: Any?) -> Int? {
+        switch value {
+            case let int as Int:
+                int
+            case let double as Double:
+                Int(double)
+            case let number as NSNumber:
+                number.intValue
+            default:
+                nil
+        }
+    }
+
+    private static func max(_ lhs: Int?, _ rhs: Int?) -> Int? {
+        switch (lhs, rhs) {
+            case let (lhs?, rhs?):
+                Swift.max(lhs, rhs)
+            case let (lhs?, nil):
+                lhs
+            case let (nil, rhs?):
+                rhs
+            case (nil, nil):
+                nil
+        }
+    }
+
     func appendStderr(_ message: String) {
         let lines = message
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -323,6 +366,79 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
                 maxBoundaryDiscontinuity: Self.double(details["max_boundary_discontinuity"]),
                 maxLeadingAbsAmplitude: Self.double(details["max_leading_abs_amplitude"]),
                 maxTrailingAbsAmplitude: Self.double(details["max_trailing_abs_amplitude"]),
+            )
+        }
+    }
+
+    func warningSummary(for requestID: String) -> BenchmarkWarningSummary {
+        warningSummary(for: [requestID])
+    }
+
+    func warningSummary(for requestIDs: [String]) -> BenchmarkWarningSummary {
+        let requestIDSet = Set(requestIDs)
+        return lock.withLock {
+            var reasons = [String: Int]()
+            var warningCount = 0
+            var playbackWarningCount = 0
+            var generationQualityWarningCount = 0
+
+            for object in stderrObjects where requestIDSet.contains(object["request_id"] as? String ?? "") {
+                guard object["level"] as? String == "warning" else { continue }
+
+                warningCount += 1
+                let event = object["event"] as? String ?? "unknown"
+                if event.hasPrefix("playback_") {
+                    playbackWarningCount += 1
+                }
+                if event == "playback_generation_quality_warning" {
+                    generationQualityWarningCount += 1
+                }
+
+                let details = object["details"] as? [String: Any]
+                let reason = details?["reason"] as? String ?? event
+                reasons[reason, default: 0] += 1
+            }
+
+            return BenchmarkWarningSummary(
+                warningCount: warningCount,
+                playbackWarningCount: playbackWarningCount,
+                generationQualityWarningCount: generationQualityWarningCount,
+                reasons: reasons,
+            )
+        }
+    }
+
+    func peakResourceSnapshot() -> BenchmarkResourceSnapshot {
+        lock.withLock {
+            var processResidentBytes: Int?
+            var processPhysFootprintBytes: Int?
+            var processCPUTimeNS: Int?
+            var mlxActiveMemoryBytes: Int?
+            var mlxCacheMemoryBytes: Int?
+            var mlxPeakMemoryBytes: Int?
+
+            for object in stderrObjects {
+                guard let details = object["details"] as? [String: Any] else { continue }
+
+                processResidentBytes = Self.max(processResidentBytes, Self.int(details["process_resident_bytes"]))
+                processPhysFootprintBytes = Self.max(processPhysFootprintBytes, Self.int(details["process_phys_footprint_bytes"]))
+                let userCPUTimeNS = Self.int(details["process_user_cpu_time_ns"]) ?? 0
+                let systemCPUTimeNS = Self.int(details["process_system_cpu_time_ns"]) ?? 0
+                if userCPUTimeNS > 0 || systemCPUTimeNS > 0 {
+                    processCPUTimeNS = Self.max(processCPUTimeNS, userCPUTimeNS + systemCPUTimeNS)
+                }
+                mlxActiveMemoryBytes = Self.max(mlxActiveMemoryBytes, Self.int(details["mlx_active_memory_bytes"]))
+                mlxCacheMemoryBytes = Self.max(mlxCacheMemoryBytes, Self.int(details["mlx_cache_memory_bytes"]))
+                mlxPeakMemoryBytes = Self.max(mlxPeakMemoryBytes, Self.int(details["mlx_peak_memory_bytes"]))
+            }
+
+            return BenchmarkResourceSnapshot(
+                processResidentBytes: processResidentBytes,
+                processPhysFootprintBytes: processPhysFootprintBytes,
+                processCPUTimeMS: processCPUTimeNS.map { Double($0) / 1_000_000 },
+                mlxActiveMemoryBytes: mlxActiveMemoryBytes,
+                mlxCacheMemoryBytes: mlxCacheMemoryBytes,
+                mlxPeakMemoryBytes: mlxPeakMemoryBytes,
             )
         }
     }
@@ -460,19 +576,25 @@ enum BenchmarkHarness {
     static func runRequestBenchmark(
         handle: SpeakSwiftly.RequestHandle,
         logRecorder: BenchmarkLogRecorder? = nil,
+        signposts: BenchmarkSignpostRecorder? = nil,
     ) async throws -> BenchmarkRequest {
         let clock = ContinuousClock()
         let submittedAt = clock.now
+        let signpostInterval = signposts?.beginRequest()
 
         async let lifecycle = collectLifecycleMetrics(
             from: handle.events,
             submittedAt: submittedAt,
             clock: clock,
+            signposts: signposts,
+            signpostID: signpostInterval?.id,
         )
         async let generation = collectGenerationMetrics(
             from: handle.synthesisUpdates,
             submittedAt: submittedAt,
             clock: clock,
+            signposts: signposts,
+            signpostID: signpostInterval?.id,
         )
 
         let (lifecycleMetrics, success) = try await lifecycle
@@ -482,6 +604,7 @@ enum BenchmarkHarness {
             operation: handle.kind.rawValue,
             logRecorder: logRecorder,
         )
+        signpostInterval?.end()
 
         return BenchmarkRequest(
             requestID: handle.id,
@@ -498,9 +621,13 @@ enum BenchmarkHarness {
         timestampedStem: String,
         latestFilename: String,
         generatedAt: Date,
+        subdirectory: String? = nil,
     ) throws -> URL {
-        let benchmarksRoot = try packageRootURL()
+        var benchmarksRoot = try packageRootURL()
             .appendingPathComponent(".local/benchmarks", isDirectory: true)
+        if let subdirectory, !subdirectory.isEmpty {
+            benchmarksRoot = benchmarksRoot.appendingPathComponent(subdirectory, isDirectory: true)
+        }
         try FileManager.default.createDirectory(at: benchmarksRoot, withIntermediateDirectories: true)
 
         let formatter = ISO8601DateFormatter()
@@ -559,6 +686,8 @@ enum BenchmarkHarness {
         from events: AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
+        signposts: BenchmarkSignpostRecorder?,
+        signpostID: OSSignpostID?,
     ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.RequestCompletion) {
         var metrics = BenchmarkRequestLifecycleMetrics()
 
@@ -570,23 +699,29 @@ enum BenchmarkHarness {
                     metrics.queuedAtMS = metrics.queuedAtMS ?? elapsedMS
                     metrics.queueReason = queued.reason.rawValue
                     metrics.queuePosition = queued.queuePosition
+                    if let signpostID { signposts?.emitQueued(id: signpostID) }
                 case .acknowledged:
                     metrics.acknowledgedAtMS = metrics.acknowledgedAtMS ?? elapsedMS
+                    if let signpostID { signposts?.emitAcknowledged(id: signpostID) }
                 case .started:
                     metrics.startedAtMS = metrics.startedAtMS ?? elapsedMS
+                    if let signpostID { signposts?.emitStarted(id: signpostID) }
                 case let .progress(progress):
                     switch progress.stage {
                         case .bufferingAudio:
                             metrics.bufferingAudioAtMS = metrics.bufferingAudioAtMS ?? elapsedMS
                         case .prerollReady:
                             metrics.prerollReadyAtMS = metrics.prerollReadyAtMS ?? elapsedMS
+                            if let signpostID { signposts?.emitPrerollReady(id: signpostID) }
                         case .playbackFinished:
                             metrics.playbackFinishedAtMS = metrics.playbackFinishedAtMS ?? elapsedMS
+                            if let signpostID { signposts?.emitPlaybackFinished(id: signpostID) }
                         default:
                             continue
                     }
                 case let .completed(completion):
                     metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
+                    if let signpostID { signposts?.emitCompleted(id: signpostID) }
                     return (metrics, completion)
             }
         }
@@ -598,6 +733,8 @@ enum BenchmarkHarness {
         from events: AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
+        signposts: BenchmarkSignpostRecorder?,
+        signpostID: OSSignpostID?,
     ) async throws -> BenchmarkRequestGenerationMetrics {
         var metrics = BenchmarkRequestGenerationMetrics()
 
@@ -606,6 +743,9 @@ enum BenchmarkHarness {
 
             switch update.event {
                 case .token:
+                    if metrics.firstTokenAtMS == nil, let signpostID {
+                        signposts?.emitFirstToken(id: signpostID)
+                    }
                     metrics.firstTokenAtMS = metrics.firstTokenAtMS ?? elapsedMS
                     metrics.observedTokenCount += 1
                 case let .info(info):
@@ -617,6 +757,9 @@ enum BenchmarkHarness {
                     metrics.tokensPerSecond = info.tokensPerSecond
                     metrics.peakMemoryUsageGB = info.peakMemoryUsage
                 case let .audioChunk(sampleCount):
+                    if metrics.firstAudioChunkAtMS == nil, let signpostID {
+                        signposts?.emitFirstAudioChunk(id: signpostID)
+                    }
                     metrics.firstAudioChunkAtMS = metrics.firstAudioChunkAtMS ?? elapsedMS
                     metrics.audioChunkCount += 1
                     metrics.totalAudioSampleCount += sampleCount
