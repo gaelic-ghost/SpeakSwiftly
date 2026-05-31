@@ -16,6 +16,11 @@ output into small self-contained package modules.
   implementation swap unless that work is explicitly brought into this branch.
 - Treat `SpeakSwiftlyServer` adoption and real two-Mac LAN testing as follow-up
   integration work after this package exposes stable output modules.
+- Track upstream removal of `TextForSpeech.RequestContext.RequestPurpose.audioStream`
+  in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+  SpeakSwiftly rejects that worker request purpose in this branch so callers use
+  `speech` plus an output destination; once TextForSpeech removes the enum case,
+  remove the local rejection guard and rely on upstream decoding.
 
 ## Target Shape
 

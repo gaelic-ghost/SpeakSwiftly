@@ -54,6 +54,9 @@
 - Wire real HTTP response streaming and LAN transport send/receive behavior.
 - Add `generate.audioStream(...)` after the host boundary can return a
   successful chunk stream instead of a failed request handle.
+- Remove SpeakSwiftly's local `request_context.reqPurpose: "audioStream"`
+  rejection guard after TextForSpeech removes `RequestPurpose.audioStream` in
+  [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
 - Validate `SpeakSwiftlyServer` adoption against the prerelease package.
 - Run opt-in live worker E2E and real LAN receiver tests when the transport
   integration is ready.
