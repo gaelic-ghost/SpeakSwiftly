@@ -198,7 +198,10 @@ def quantization_api_report() -> dict[str, Any]:
   }
 
 
-def build_sample_data(runtime_fixture: dict[str, Any], model_input_shape: list[int]) -> list[dict[str | None, np.ndarray]]:
+def build_synthetic_sample_data(
+  runtime_fixture: dict[str, Any],
+  model_input_shape: list[int],
+) -> tuple[list[dict[str | None, np.ndarray]], dict[str, Any]]:
   codes = runtime_codes(runtime_fixture)
   expected_shape = model_input_shape[1:]
   if list(codes.shape) != expected_shape:
@@ -206,7 +209,126 @@ def build_sample_data(runtime_fixture: dict[str, Any], model_input_shape: list[i
       f"Synthetic runtime fixture has audio_codes shape {list(codes.shape)}, "
       f"but the fixed Core ML decoder expects {expected_shape}."
     )
-  return [{"audio_codes": codes[None, :, :]}]
+  return [{"audio_codes": codes[None, :, :]}], {
+    "source": "synthetic_runtime_fixture",
+    "count": 1,
+    "input_name": "audio_codes",
+    "input_shape": [1, *list(codes.shape)],
+    "input_dtype": str(codes.dtype),
+    "scope_warning": (
+      "This runtime probe uses the synthetic 8-step fixture because the original decoder "
+      "package is fixed to 8 code steps."
+    ),
+  }
+
+
+def representative_bucket_assignments(
+  bucket_plan: dict[str, Any] | None,
+  bucket: int,
+) -> list[dict[str, Any]]:
+  if bucket_plan is None:
+    raise RuntimeError("Representative calibration requires a bucket plan fixture.")
+
+  assignments = bucket_plan.get("bucket_plan", {}).get("sample_assignments", [])
+  return [
+    assignment for assignment in assignments
+    if int(assignment.get("assigned_bucket", -1)) == bucket
+  ]
+
+
+def calibration_sample_by_id(
+  calibration_fixture: dict[str, Any],
+  sample_id: str,
+) -> dict[str, Any]:
+  for sample in calibration_fixture.get("samples", []):
+    if sample.get("id") == sample_id:
+      return sample
+  raise RuntimeError(f"Calibration fixture does not contain sample id '{sample_id}'.")
+
+
+def build_representative_sample_data(
+  calibration_fixture: dict[str, Any],
+  bucket_plan: dict[str, Any] | None,
+  model_input_shape: list[int],
+  requested_bucket: int | None,
+) -> tuple[list[dict[str | None, np.ndarray]], dict[str, Any]]:
+  bucket = requested_bucket or model_input_shape[1]
+  if bucket != model_input_shape[1]:
+    raise RuntimeError(
+      f"Representative bucket {bucket} does not match fixed decoder input steps {model_input_shape[1]}."
+    )
+
+  quantizer_count = model_input_shape[2]
+  assignments = representative_bucket_assignments(bucket_plan, bucket)
+  if not assignments:
+    raise RuntimeError(f"Bucket plan does not assign any calibration samples to bucket {bucket}.")
+
+  sample_data: list[dict[str | None, np.ndarray]] = []
+  sample_reports: list[dict[str, Any]] = []
+  for assignment in assignments:
+    sample = calibration_sample_by_id(calibration_fixture, str(assignment["id"]))
+    codes = np.asarray(sample["encoded"]["audio_codes"], dtype=np.int32)
+    if codes.ndim != 2:
+      raise RuntimeError(f"Calibration sample '{sample['id']}' audio_codes must be rank 2.")
+    if codes.shape[1] != quantizer_count:
+      raise RuntimeError(
+        f"Calibration sample '{sample['id']}' has {codes.shape[1]} quantizers, "
+        f"but the decoder expects {quantizer_count}."
+      )
+    if codes.shape[0] > bucket:
+      raise RuntimeError(
+        f"Calibration sample '{sample['id']}' has {codes.shape[0]} steps, "
+        f"which exceeds bucket {bucket}."
+      )
+
+    padded = np.full((bucket, quantizer_count), int(assignment.get("pad_value", -1)), dtype=np.int32)
+    padded[: codes.shape[0], :] = codes
+    sample_data.append({"audio_codes": padded[None, :, :]})
+    sample_reports.append(
+      {
+        "id": sample["id"],
+        "audio_codes_shape": list(codes.shape),
+        "padded_input_shape": [1, *list(padded.shape)],
+        "padded_step_count": bucket - codes.shape[0],
+        "pad_value": int(assignment.get("pad_value", -1)),
+        "audio_seconds": sample.get("audio", {}).get("duration_seconds"),
+        "valid_output_sample_count": assignment.get("valid_output_sample_count"),
+        "padded_output_sample_count": assignment.get("padded_output_sample_count"),
+      }
+    )
+
+  return sample_data, {
+    "source": "representative_calibration_fixture",
+    "bucket": bucket,
+    "count": len(sample_data),
+    "input_name": "audio_codes",
+    "input_shape": list(sample_data[0]["audio_codes"].shape),
+    "input_dtype": str(sample_data[0]["audio_codes"].dtype),
+    "samples": sample_reports,
+    "scope_warning": (
+      "This runtime probe uses real LibriTTS-R speech-tokenizer codes padded to the fixed bucket shape. "
+      "It is representative for decoder activation ranges, but it is still not an audio-quality decision."
+    ),
+  }
+
+
+def build_runtime_sample_data(
+  args: argparse.Namespace,
+  runtime_fixture: dict[str, Any],
+  calibration_fixture: dict[str, Any],
+  bucket_plan: dict[str, Any] | None,
+  model_input_shape: list[int],
+) -> tuple[list[dict[str | None, np.ndarray]], dict[str, Any]]:
+  if args.sample_source == "synthetic":
+    return build_synthetic_sample_data(runtime_fixture, model_input_shape)
+  if args.sample_source == "representative":
+    return build_representative_sample_data(
+      calibration_fixture,
+      bucket_plan,
+      model_input_shape,
+      args.bucket,
+    )
+  raise RuntimeError(f"Unsupported sample source '{args.sample_source}'.")
 
 
 def predict_summary(model: ct.models.MLModel, sample_data: list[dict[str | None, np.ndarray]]) -> dict[str, Any]:
@@ -252,6 +374,7 @@ def run_weight_quantization(
 def run_w8a8_quantization(
   model: ct.models.MLModel,
   sample_data: list[dict[str | None, np.ndarray]],
+  sample_data_report: dict[str, Any],
   output_path: Path,
   replace_existing: bool,
   calibration_op_group_size: int,
@@ -293,9 +416,10 @@ def run_w8a8_quantization(
   quantized = cto.coreml.linear_quantize_weights(activation_quantized, weight_config)
   quantized.save(str(output_path))
   duration_ms = (time.perf_counter() - start) * 1000
+  sample_mode = "representative_smoke" if sample_data_report.get("source") == "representative_calibration_fixture" else "synthetic_smoke"
   result: dict[str, Any] = {
     "status": "succeeded",
-    "mode": f"w8a8_synthetic_smoke_{activation_scope}",
+    "mode": f"w8a8_{sample_mode}_{activation_scope}",
     "output_package": relative_package_path(output_path),
     "duration_ms": duration_ms,
     "package_size_bytes": directory_size_bytes(output_path),
@@ -320,6 +444,22 @@ def run_w8a8_quantization(
       "max_abs_diff": float(np.max(np.abs(delta))),
       "mean_abs_diff": float(np.mean(np.abs(delta))),
     }
+    samples = sample_data_report.get("samples", [])
+    if len(samples) == 1 and isinstance(samples[0].get("valid_output_sample_count"), int):
+      valid_output_sample_count = samples[0]["valid_output_sample_count"]
+      valid_delta = delta[:, :valid_output_sample_count]
+      result["output_match"]["valid_output"] = {
+        "sample_count": valid_output_sample_count,
+        "max_abs_diff": float(np.max(np.abs(valid_delta))),
+        "mean_abs_diff": float(np.mean(np.abs(valid_delta))),
+      }
+      if valid_output_sample_count < delta.shape[1]:
+        padded_delta = delta[:, valid_output_sample_count:]
+        result["output_match"]["padded_tail"] = {
+          "sample_count": int(delta.shape[1] - valid_output_sample_count),
+          "max_abs_diff": float(np.max(np.abs(padded_delta))),
+          "mean_abs_diff": float(np.mean(np.abs(padded_delta))),
+        }
   return result
 
 
@@ -413,7 +553,16 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
     )
 
   runtime_fixture = load_json(resolve_package_path(args.runtime_fixture))
-  sample_data = build_sample_data(runtime_fixture, report["source"]["conversion_target"]["input_shape"])
+  calibration_fixture = load_json(resolve_package_path(args.calibration_fixture))
+  bucket_plan_path = resolve_package_path(args.bucket_plan)
+  bucket_plan = load_json(bucket_plan_path) if bucket_plan_path.is_file() else None
+  sample_data, sample_data_report = build_runtime_sample_data(
+    args,
+    runtime_fixture,
+    calibration_fixture,
+    bucket_plan,
+    report["source"]["conversion_target"]["input_shape"],
+  )
   model = ct.models.MLModel(str(model_package), compute_units=ct.ComputeUnit.CPU_ONLY)
   baseline_output = None
   if args.verify_prediction:
@@ -421,16 +570,7 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
     baseline_output = np.asarray(baseline_prediction["audio_values"])
 
   report["runtime"] = {
-    "sample_data": {
-      "count": len(sample_data),
-      "input_name": "audio_codes",
-      "input_shape": list(sample_data[0]["audio_codes"].shape),
-      "input_dtype": str(sample_data[0]["audio_codes"].dtype),
-      "scope_warning": (
-        "This runtime probe uses the synthetic 8-step fixture because the current decoder "
-        "package is fixed to 8 code steps."
-      ),
-    },
+    "sample_data": sample_data_report,
     "baseline_prediction": {
       "output_shape": list(baseline_output.shape),
       "output_dtype": str(baseline_output.dtype),
@@ -466,6 +606,7 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
         run_w8a8_quantization(
           model,
           sample_data,
+          sample_data_report,
           resolve_package_path(args.w8a8_output),
           args.replace_existing,
           args.calibration_op_group_size,
@@ -477,7 +618,10 @@ def build_runtime_report(args: argparse.Namespace) -> dict[str, Any]:
       report["runtime"]["results"].append(
         {
           "status": "failed",
-          "mode": f"w8a8_synthetic_smoke_{args.activation_scope}",
+          "mode": (
+            f"w8a8_{'representative_smoke' if args.sample_source == 'representative' else 'synthetic_smoke'}_"
+            f"{args.activation_scope}"
+          ),
           "error_type": type(error).__name__,
           "error_message": str(error),
           "activation_scope": args.activation_scope,
@@ -511,6 +655,12 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--replace-existing", action="store_true")
   parser.add_argument("--verify-prediction", action="store_true")
   parser.add_argument("--calibration-op-group-size", type=int, default=16)
+  parser.add_argument(
+    "--sample-source",
+    default="synthetic",
+    choices=["synthetic", "representative"],
+  )
+  parser.add_argument("--bucket", type=int, default=None)
   parser.add_argument(
     "--activation-scope",
     default="global",

@@ -1119,6 +1119,63 @@ Immediate implications:
   Instruments before deciding whether this decoder shape is actually useful for
   an Apple-silicon backend.
 
+### 2026-05-31 Decoder Representative W8A8, Bucket 40, Pass 1
+
+Extended the decoder quantization probe to build runtime calibration sample data
+from bucketed real-speech code tensors:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py`
+
+Added checked-in bucket-40 fp16 and representative W8A8 reports:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-40-fp16-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-bucket-40-fp16-representative-12hz.json`
+
+Added SwiftPM fixture coverage:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLProbeTests.swift`
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightTests.swift`
+
+Implementation notes:
+
+- Representative calibration now uses the bucket plan to find samples assigned
+  to the fixed decoder input shape.
+- For bucket 40, sample `730_358_000003_000002` has real `audio_codes` shape
+  `[37, 16]`, is padded to `[1, 40, 16]` with `-1`, and records both valid and
+  padded output sample counts.
+- The W8A8 report now distinguishes synthetic and representative smoke modes
+  and records valid-output and padded-tail prediction deltas separately when a
+  bucketed sample has a known valid output length.
+
+Validation:
+
+- Bucket-40 fp16 conversion succeeded with CPU-only Core ML output shape
+  `[1, 76800]`.
+- The bucket-40 fp16 package's mean absolute difference from the PyTorch wrapper
+  was `0.0004596624639816582`. Its max absolute difference was
+  `0.058486729860305786`, which is much larger than the 8-step fp16 smoke and
+  should be inspected before treating bucketed fp16 as quality-equivalent.
+- Representative bucket-40 scoped W8A8 succeeded in about 104.5 seconds and
+  produced a local package of 114801996 bytes.
+- CPU-only prediction from the representative W8A8 package returned output
+  shape `[1, 76800]` with max absolute difference `0.286285400390625` and mean
+  absolute difference `0.012680189684033394` versus the bucket-40 fp16 package.
+- The valid output region, not just the padded tail, has the same max absolute
+  difference: valid-region max `0.286285400390625`, valid-region mean
+  `0.012970197945833206`.
+
+Immediate implications:
+
+- The scoped W8A8 path survives representative bucketed activation calibration
+  at the tool and model-loading level.
+- The representative output drift is large enough that W8A8 should not advance
+  directly to backend integration. The next pass should inspect audio output,
+  try a broader calibration set, and compare alternative activation scopes or
+  quantizer settings before spending much time on dispatch profiling.
+- Bucket 72 and bucket 88 should wait until bucket-40 quality behavior is
+  understood, unless the next goal is only to characterize whether drift scales
+  with output length.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:

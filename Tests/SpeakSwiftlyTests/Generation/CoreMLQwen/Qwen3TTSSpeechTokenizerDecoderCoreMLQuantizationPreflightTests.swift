@@ -34,7 +34,9 @@ import Testing
 }
 
 @Test func `qwen3 tts speech tokenizer decoder scoped w8a8 smoke records fp16 parity`() throws {
-    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load()
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-fp16-compute-only-12hz.json",
+    )
 
     #expect(fixture.mode == "coreml_quantization_runtime")
     #expect(fixture.source.conversionTarget.computePrecision == "float16")
@@ -53,6 +55,33 @@ import Testing
     #expect(result.outputMatch?.quantizedOutputShape == [1, 15360])
     #expect((result.outputMatch?.maxAbsDiff ?? 1.0) < 0.009)
     #expect((result.outputMatch?.meanAbsDiff ?? 1.0) < 0.0023)
+}
+
+@Test func `qwen3 tts speech tokenizer decoder representative bucket 40 w8a8 smoke records output drift`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-40-fp16-representative-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_quantization_runtime")
+    #expect(fixture.source.conversionTarget.computePrecision == "float16")
+    #expect(fixture.source.conversionTarget.inputShape == [1, 40, 16])
+    #expect(fixture.runtime.sampleData.source == "representative_calibration_fixture")
+    #expect(fixture.runtime.sampleData.bucket == 40)
+    #expect(fixture.runtime.sampleData.inputShape == [1, 40, 16])
+    #expect(fixture.runtime.sampleData.samples?.first?.id == "730_358_000003_000002")
+    #expect(fixture.runtime.sampleData.samples?.first?.audioCodesShape == [37, 16])
+    #expect(fixture.runtime.sampleData.samples?.first?.validOutputSampleCount == 71040)
+
+    let result = try #require(fixture.runtime.results.first)
+    #expect(result.status == "succeeded")
+    #expect(result.mode == "w8a8_representative_smoke_compute_only")
+    #expect(result.packageSizeBytes == 114_801_996)
+    #expect(result.outputMatch?.quantizedOutputShape == [1, 76800])
+    #expect((result.outputMatch?.maxAbsDiff ?? 0.0) > 0.28)
+    #expect((result.outputMatch?.meanAbsDiff ?? 0.0) > 0.012)
+    #expect(result.outputMatch?.validOutput?.sampleCount == 71040)
+    #expect((result.outputMatch?.validOutput?.maxAbsDiff ?? 0.0) > 0.28)
+    #expect(result.outputMatch?.paddedTail?.sampleCount == 5760)
 }
 
 private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightFixture: Decodable {
@@ -134,6 +163,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture: D
     struct Source: Decodable {
         struct ConversionTarget: Decodable {
             let computePrecision: String
+            let inputShape: [Int]
         }
 
         let conversionTarget: ConversionTarget
@@ -141,7 +171,16 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture: D
 
     struct Runtime: Decodable {
         struct SampleData: Decodable {
+            struct Sample: Decodable {
+                let id: String
+                let audioCodesShape: [Int]
+                let validOutputSampleCount: Int
+            }
+
+            let source: String?
+            let bucket: Int?
             let inputShape: [Int]
+            let samples: [Sample]?
         }
 
         struct BaselinePrediction: Decodable {
@@ -150,10 +189,18 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture: D
 
         struct Result: Decodable {
             struct OutputMatch: Decodable {
+                struct OutputSlice: Decodable {
+                    let sampleCount: Int
+                    let maxAbsDiff: Double
+                    let meanAbsDiff: Double
+                }
+
                 let computeUnits: String
                 let quantizedOutputShape: [Int]
                 let maxAbsDiff: Double
                 let meanAbsDiff: Double
+                let validOutput: OutputSlice?
+                let paddedTail: OutputSlice?
             }
 
             let status: String
@@ -174,9 +221,9 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture: D
     let source: Source
     let runtime: Runtime
 
-    static func load() throws -> Self {
+    static func load(_ filename: String) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-fp16-compute-only-12hz.json",
+            "docs/maintainers/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
