@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,16 @@ from huggingface_hub import HfApi
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-Tokenizer-12Hz"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
 DEFAULT_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+
+
+def local_path_pattern(path: Path) -> re.Pattern[str]:
+  return re.compile(re.escape(str(path)) + r"/[^\"'\n )]*")
+
+
+LOCAL_PATH_PATTERNS = [
+  (local_path_pattern(Path.home()), "<local-home-path>"),
+  (local_path_pattern(Path("/" + "private") / "tmp"), "<local-temp-path>"),
+]
 
 
 def current_utc_timestamp() -> str:
@@ -104,6 +115,19 @@ def qwen_source_from_args(args: argparse.Namespace) -> Path:
   return source_path
 
 
+def sanitize_local_paths(value: Any) -> Any:
+  if isinstance(value, dict):
+    return {key: sanitize_local_paths(item) for key, item in value.items()}
+  if isinstance(value, list):
+    return [sanitize_local_paths(item) for item in value]
+  if isinstance(value, str):
+    sanitized = value
+    for pattern, replacement in LOCAL_PATH_PATTERNS:
+      sanitized = pattern.sub(replacement, sanitized)
+    return sanitized
+  return value
+
+
 def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], inventory: dict[str, Any]) -> dict[str, Any]:
   audio_codes = fixture["encoded"]["audio_codes"]
   code_shape = [
@@ -127,6 +151,7 @@ def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], in
     "model_file_inventory": inventory,
     "conversion_target": {
       "stage": "speech_tokenizer_decoder",
+      "wrapper_mode": args.wrapper_mode,
       "input_name": "audio_codes",
       "input_shape": code_shape,
       "input_dtype": fixture["encoded"]["audio_codes_dtype"],
@@ -137,12 +162,14 @@ def build_preflight_report(args: argparse.Namespace, fixture: dict[str, Any], in
     },
     "next_command": (
       "uv run --python 3.12 "
-      "--with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' "
+      "--with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' "
+      "--with 'transformers==4.57.3' "
       "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' "
-      "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' "
+      "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' "
       "--with 'coremltools>=8.3.0,<10' "
       "scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py "
-      "--no-preflight-only --qwen-source /path/to/Qwen3-TTS --allow-model-download "
+      "--no-preflight-only --capture-mode export --wrapper-mode fixed_16q "
+      "--qwen-source /path/to/Qwen3-TTS --allow-model-download "
       "--output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion.json "
       "--mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
     ),
@@ -172,7 +199,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       f"Underlying import error: {error!r}"
     ) from error
 
-  class DecoderWrapper(torch.nn.Module):
+  class UpstreamDecoderWrapper(torch.nn.Module):
     def __init__(self, decoder: torch.nn.Module):
       super().__init__()
       self.decoder = decoder
@@ -182,11 +209,49 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       wav = self.decoder(clamped_codes.transpose(1, 2)).squeeze(1)
       return wav
 
+  class Fixed16QuantizerDecoderWrapper(torch.nn.Module):
+    def __init__(self, decoder: torch.nn.Module):
+      super().__init__()
+      self.quantizer = decoder.quantizer
+      self.pre_conv = decoder.pre_conv
+      self.pre_transformer = decoder.pre_transformer
+      self.upsample = decoder.upsample
+      self.decoder = decoder.decoder
+
+    def decode_rvq(self, rvq, codes):
+      quantized = None
+      for idx in range(rvq.n_q):
+        layer = rvq.vq.layers[idx]
+        layer_codes = codes[:, idx, :]
+        layer_quantized = layer.decode(layer_codes)
+        quantized = layer_quantized if quantized is None else quantized + layer_quantized
+      return rvq.output_proj(quantized)
+
+    def forward(self, audio_codes):
+      codes = torch.clamp(audio_codes, min=0).transpose(1, 2)
+      semantic = self.decode_rvq(self.quantizer.rvq_first, codes[:, :1, :])
+      acoustic = self.decode_rvq(self.quantizer.rvq_rest, codes[:, 1:, :])
+      hidden = semantic + acoustic
+      hidden = self.pre_conv(hidden).transpose(1, 2)
+      hidden = self.pre_transformer(inputs_embeds=hidden).last_hidden_state
+      hidden = hidden.permute(0, 2, 1)
+      for blocks in self.upsample:
+        for block in blocks:
+          hidden = block(hidden)
+      wav = hidden
+      for block in self.decoder:
+        wav = block(wav)
+      return wav.clamp(min=-1, max=1).squeeze(1)
+
   audio_codes = np.asarray(fixture["encoded"]["audio_codes"], dtype=np.int64)[None, :, :]
   torch_codes = torch.from_numpy(audio_codes)
 
   tokenizer = Qwen3TTSTokenizer.from_pretrained(args.model_id)
-  decoder = DecoderWrapper(tokenizer.model.decoder).eval()
+  upstream_decoder = UpstreamDecoderWrapper(tokenizer.model.decoder).eval()
+  if args.wrapper_mode == "fixed_16q":
+    decoder = Fixed16QuantizerDecoderWrapper(tokenizer.model.decoder).eval()
+  else:
+    decoder = upstream_decoder
 
   report: dict[str, Any] = {
     "schema_version": 1,
@@ -204,16 +269,19 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
     },
     "conversion_target": {
       "stage": "speech_tokenizer_decoder",
+      "wrapper_mode": args.wrapper_mode,
       "input_name": "audio_codes",
       "input_shape": list(audio_codes.shape),
       "input_dtype": str(audio_codes.dtype),
       "minimum_deployment_target": args.minimum_deployment_target,
       "convert_to": "mlprogram",
       "compute_precision": args.compute_precision,
+      "capture_mode": args.capture_mode,
     },
     "trace": {
       "status": "not_started",
-      "strict": False,
+      "capture_mode": args.capture_mode,
+      "strict": args.export_strict if args.capture_mode == "export" else False,
       "check_trace": False,
     },
     "conversion": {
@@ -223,6 +291,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
   }
 
   with torch.inference_mode():
+    upstream_output = upstream_decoder(torch_codes).detach().cpu().numpy()
     torch_output = decoder(torch_codes).detach().cpu().numpy()
 
   report["conversion_target"].update(
@@ -232,21 +301,27 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
       "torch_output_max": float(torch_output.max()),
       "torch_output_mean": float(torch_output.mean()),
       "torch_output_rms": float(np.sqrt(np.mean(np.square(torch_output)))),
+      "upstream_max_abs_diff": float(np.max(np.abs(torch_output - upstream_output))),
     }
   )
 
   try:
     with torch.inference_mode():
-      traced = torch.jit.trace(decoder, torch_codes, strict=False, check_trace=False)
+      if args.capture_mode == "export":
+        captured_model = torch.export.export(decoder, (torch_codes,), strict=args.export_strict)
+      else:
+        captured_model = torch.jit.trace(decoder, torch_codes, strict=False, check_trace=False)
     report["trace"] = {
       "status": "succeeded",
-      "strict": False,
+      "capture_mode": args.capture_mode,
+      "strict": args.export_strict if args.capture_mode == "export" else False,
       "check_trace": False,
     }
   except Exception as error:
     report["trace"] = {
       "status": "failed",
-      "strict": False,
+      "capture_mode": args.capture_mode,
+      "strict": args.export_strict if args.capture_mode == "export" else False,
       "check_trace": False,
       "error_type": type(error).__name__,
       "error_message": str(error),
@@ -257,8 +332,7 @@ def build_runtime_report(args: argparse.Namespace, fixture: dict[str, Any], inve
     target = getattr(ct.target, args.minimum_deployment_target)
     compute_precision = ct.precision.FLOAT32 if args.compute_precision == "float32" else ct.precision.FLOAT16
     mlmodel = ct.convert(
-      traced,
-      source="pytorch",
+      captured_model,
       convert_to="mlprogram",
       minimum_deployment_target=target,
       compute_precision=compute_precision,
@@ -332,6 +406,21 @@ def parse_args() -> argparse.Namespace:
     default="float32",
     choices=["float16", "float32"],
   )
+  parser.add_argument(
+    "--wrapper-mode",
+    default="upstream",
+    choices=["upstream", "fixed_16q"],
+  )
+  parser.add_argument(
+    "--capture-mode",
+    default="trace",
+    choices=["trace", "export"],
+  )
+  parser.add_argument(
+    "--export-strict",
+    action=argparse.BooleanOptionalAction,
+    default=False,
+  )
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output", type=Path, default=None)
   parser.add_argument("--mlpackage-output", type=Path, default=None)
@@ -339,6 +428,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def write_report(report: dict[str, Any], output: Path | None) -> None:
+  report = sanitize_local_paths(report)
   rendered = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
 
   if output is None:

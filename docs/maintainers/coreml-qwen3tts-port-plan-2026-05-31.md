@@ -537,6 +537,10 @@ Added checked-in conversion fixtures:
 
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-preflight-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-torch27-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-fixed16q-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-export-fixed16q-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-export-strict-fixed16q-12hz.json`
 
 Added SwiftPM tests for the conversion fixtures:
 
@@ -568,6 +572,19 @@ Runtime findings:
   Core ML Tools-tested Torch version reported by the tool, Torch 2.7.0.
 - Torch tracing failed before Core ML conversion started:
   `RuntimeError: unordered_map::at: key not found`
+- A third conversion attempt pinned Python 3.12, Torch 2.7.0, and Torchaudio
+  2.7.0. It produced the same trace failure:
+  `RuntimeError: unordered_map::at: key not found`
+- A fixed-shape wrapper then removed the split residual quantizer's tensor
+  iteration and shape checks for the `[1, 8, 16]` probe. It matched upstream
+  PyTorch output exactly with `upstream_max_abs_diff: 0.0`, but TorchScript
+  tracing still failed with the same `unordered_map::at: key not found` error.
+- A non-strict `torch.export` capture attempt against the fixed wrapper failed
+  before Core ML conversion with:
+  `RuntimeError: NYI: querying is_contiguous inside of vmap for memory_format other than torch.contiguous_format`
+- A strict `torch.export` capture attempt failed in the decoder transformer
+  masking path. The actionable part of the error is that PyTorch export hit a
+  vmap path that calls `.item()` on a Tensor inside the causal mask helper.
 - The script now records this as a structured trace failure with conversion
   status `not_started`.
 
@@ -584,11 +601,12 @@ Immediate implications:
 
 - The blocker is now the PyTorch trace/export boundary, not Core ML execution
   quality and not Neural Engine dispatch.
-- The next conversion slice should try the Core ML Tools-tested Torch line,
-  preferably Torch 2.7.x with Python 3.12, before rewriting model code.
-- If Torch 2.7 still fails, the likely next option is a narrower decoder wrapper
-  that removes or rewrites the split residual quantizer's Python iteration and
-  shape checks for this fixed `[1, 8, 16]` probe.
+- The Core ML Tools-tested Torch line did not fix the trace failure.
+- Removing the quantizer iteration was useful because it eliminated several
+  trace warnings without changing output, but it was not sufficient.
+- The next conversion slice should isolate or rewrite the decoder transformer's
+  causal-mask path for this fixed `[1, 8, 16]` probe before spending time on
+  Core ML compute-unit or Neural Engine measurement.
 - No `.mlpackage` was produced in this pass.
 
 Validation:

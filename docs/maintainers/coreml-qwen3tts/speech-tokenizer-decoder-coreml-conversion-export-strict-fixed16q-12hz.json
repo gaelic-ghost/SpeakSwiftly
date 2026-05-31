@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "runtime",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "coremltools_version": "9.0",
+    "torch_version": "2.7.0"
+  },
+  "conversion_target": {
+    "stage": "speech_tokenizer_decoder",
+    "wrapper_mode": "fixed_16q",
+    "input_name": "audio_codes",
+    "input_shape": [
+      1,
+      8,
+      16
+    ],
+    "input_dtype": "int64",
+    "minimum_deployment_target": "macOS15",
+    "convert_to": "mlprogram",
+    "compute_precision": "float32",
+    "capture_mode": "export",
+    "torch_output_shape": [
+      1,
+      15360
+    ],
+    "torch_output_min": -0.055284563452005386,
+    "torch_output_max": 0.055146411061286926,
+    "torch_output_mean": 1.583719495101832e-05,
+    "torch_output_rms": 0.032971180975437164,
+    "upstream_max_abs_diff": 0.0
+  },
+  "trace": {
+    "status": "failed",
+    "capture_mode": "export",
+    "strict": true,
+    "check_trace": false,
+    "error_type": "TorchRuntimeError",
+    "error_message": "Dynamo failed to run FX node with fake tensors: call_function <built-in function getitem>(*(FakeTensor(..., size=(1, 8), dtype=torch.int64), (BatchedTensor(lvl=1, bdim=0, value=\n    FakeTensor(..., size=(1,), dtype=torch.int64)\n), BatchedTensor(lvl=3, bdim=0, value=\n    FakeTensor(..., size=(8,), dtype=torch.int64)\n))), **{}): got RuntimeError(\"vmap: It looks like you're calling .item() on a Tensor. We don't support vmap over calling .item() on a Tensor, please try to rewrite what you're doing with other operations. If error is occurring somewhere inside PyTorch internals, please file a bug report.\")\n\nfrom user code:\n   File \"<local-home-path>\", line 232, in forward\n    hidden = self.pre_transformer(inputs_embeds=hidden).last_hidden_state\n  File \"<local-home-path>\", line 1762, in _call_impl\n    return forward_call(*args, **kwargs)\n  File \"<local-home-path>\", line 1072, in wrapper\n    outputs = func(self, *args, **kwargs)\n  File \"<local-temp-path>\", line 547, in forward\n    \"full_attention\": create_causal_mask(**mask_kwargs),\n  File \"<local-home-path>\", line 825, in create_causal_mask\n    causal_mask = mask_interface(\n  File \"<local-home-path>\", line 392, in sdpa_mask_recent_torch\n    causal_mask = _vmap_for_bhqkv(mask_function)(batch_arange, head_arange, cache_position, kv_arange)\n  File \"<local-home-path>\", line 202, in wrapped\n    return vmap_impl(\n  File \"<local-home-path>\", line 334, in vmap_impl\n    return _flat_vmap(\n  File \"<local-home-path>\", line 484, in _flat_vmap\n    batched_outputs = func(*batched_inputs, **kwargs)\n  File \"<local-home-path>\", line 202, in wrapped\n    return vmap_impl(\n  File \"<local-home-path>\", line 334, in vmap_impl\n    return _flat_vmap(\n  File \"<local-home-path>\", line 484, in _flat_vmap\n    batched_outputs = func(*batched_inputs, **kwargs)\n  File \"<local-home-path>\", line 202, in wrapped\n    return vmap_impl(\n  File \"<local-home-path>\", line 334, in vmap_impl\n    return _flat_vmap(\n  File \"<local-home-path>\", line 484, in _flat_vmap\n    batched_outputs = func(*batched_inputs, **kwargs)\n  File \"<local-home-path>\", line 202, in wrapped\n    return vmap_impl(\n  File \"<local-home-path>\", line 334, in vmap_impl\n    return _flat_vmap(\n  File \"<local-home-path>\", line 484, in _flat_vmap\n    batched_outputs = func(*batched_inputs, **kwargs)\n  File \"<local-home-path>\", line 54, in and_mask\n    result = result & mask(batch_idx, head_idx, q_idx, kv_idx).to(result.device)\n  File \"<local-home-path>\", line 153, in inner_mask\n    return packed_sequence_mask[batch_idx, q_idx] == packed_sequence_mask[batch_idx, kv_idx]\n  File \"<local-home-path>\", line 142, in __torch_function__\n    return func(*args, **(kwargs or {}))\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS=\"+dynamo\"\n"
+  },
+  "conversion": {
+    "status": "not_started",
+    "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-export-strict-fixed16q.mlpackage"
+  }
+}
