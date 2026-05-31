@@ -698,6 +698,85 @@ Validation:
   speech-tokenizer config, runtime fixtures, decoder Core ML conversion, and
   decoder Core ML benchmarking.
 
+### 2026-05-31 Speech Tokenizer Decoder Core ML Instruments Trace, Pass 1
+
+Added an Instruments capture script:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/profile-speech-tokenizer-decoder-coreml-xctrace.py`
+
+Added a checked-in trace summary fixture:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-xctrace-static-mask-12hz.json`
+
+Added SwiftPM tests for the trace summary:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceTests.swift`
+
+Trace setup:
+
+- Instruments template: `Core ML`
+- local trace artifacts: `.local/coreml-qwen3tts/traces`
+- hardware: Apple M4 Pro, macOS 26.5
+- warmup runs per compute-unit setting: 2
+- measured runs per compute-unit setting: 20
+- exported tables:
+  - `coreml-os-signpost`
+  - `ane-hw-intervals-internal`
+  - `mps-hw-intervals`
+  - `metal-gpu-intervals`
+  - `metal-application-command-buffer-submissions`
+
+Trace findings:
+
+- All four compute-unit settings ran successfully under Instruments.
+- `cpuOnly` recorded no `mps-hw-intervals` rows and no
+  `ane-hw-intervals-internal` rows.
+- `cpuAndNeuralEngine` recorded no `mps-hw-intervals` rows and no
+  `ane-hw-intervals-internal` rows.
+- `cpuAndGPU` recorded 22 `mps-hw-intervals` rows labeled `MPSGraph` and no
+  ANE interval rows.
+- `all` recorded 22 `mps-hw-intervals` rows labeled `MPSGraph` and no ANE
+  interval rows.
+
+Immediate implications:
+
+- The timing difference from the benchmark is now backed by Instruments trace
+  evidence: the faster `cpuAndGPU` and `all` settings exercised the MPSGraph /
+  Metal path for this fixed decoder graph.
+- The `cpuAndNeuralEngine` run produced no recorded ANE intervals and behaved
+  like the CPU-only run for this fixed decoder graph.
+- This does not mean Qwen3-TTS cannot use ANE anywhere. It means this current
+  float32, fixed-shape speech-tokenizer decoder package is not naturally landing
+  on ANE with the `cpuAndNeuralEngine` preference.
+- The next ANE-relevant work should be compression and quantization probing,
+  especially W8A8 where Core ML Tools documents newer A17 Pro and M4 hardware
+  as having optimized int8 Neural Engine compute paths.
+
+Quantization and compression notes:
+
+- Core ML Tools supports weight quantization to 8-bit and 4-bit forms.
+- Weight-only Core ML quantization compresses stored weights, but runtime
+  computation still uses float precision for the consuming operations.
+- Activation quantization is 8-bit and is the part that can pair with 8-bit
+  weights for W8A8 execution.
+- Core ML Tools documents W8A8 as a mode that can use newer Neural Engine
+  int8-int8 compute paths on A17 Pro and M4-class hardware.
+- Palettization can reduce model storage with 1, 2, 3, 4, 6, or 8 bit lookup
+  tables. Starting at macOS 15, grouped-channel palettization and 8-bit LUT
+  storage become relevant options.
+
+Validation:
+
+- Instruments `Core ML` capture succeeded for all four compute-unit settings.
+- `xcrun xctrace export --toc` confirmed the local template exposes ANE, MPS,
+  Metal, and Core ML tables.
+- `jq empty` passed for the trace summary fixture.
+- `uv run --with ruff ruff check` passed for all six Core ML Qwen maintainer
+  scripts.
+- `swift test --filter qwen3` passed with 21 tests covering text tokenization,
+  speech-tokenizer config, runtime fixtures, decoder Core ML conversion,
+  decoder Core ML benchmarking, and decoder Instruments trace summaries.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
@@ -722,6 +801,14 @@ Validation:
   https://apple.github.io/coremltools/docs-guides/source/convert-to-ml-program.html
 - Core ML Tools typed execution guide:
   https://apple.github.io/coremltools/docs-guides/source/typed-execution.html
+- Core ML Tools optimization overview:
+  https://apple.github.io/coremltools/docs-guides/source/opt-overview.html
+- Core ML Tools quantization overview:
+  https://apple.github.io/coremltools/docs-guides/source/opt-quantization-overview.html
+- Core ML Tools linear quantization guide:
+  https://apple.github.io/coremltools/docs-guides/source/opt-quantization.html
+- Core ML Tools palettization overview:
+  https://apple.github.io/coremltools/docs-guides/source/opt-palettization-overview.html
 - Apple MLComputeUnits documentation:
   https://developer.apple.com/documentation/coreml/mlcomputeunits
 - Apple Neural Engine transformer guidance:
