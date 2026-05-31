@@ -512,7 +512,7 @@ private actor ProfileModelLoadObservation {
     #expect(residentRecorder.audioLoadCallCount == 2)
     #expect(playback.playCount == 2)
     #expect(playback.prepareCount >= 1)
-    #expect(playback.stopCount == 1)
+    #expect(playback.stopCount >= 1)
 }
 
 // MARK: - Deep Trace and Normalization

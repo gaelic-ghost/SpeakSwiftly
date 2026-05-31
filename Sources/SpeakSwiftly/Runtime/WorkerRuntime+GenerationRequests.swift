@@ -323,16 +323,10 @@ extension SpeakSwiftly.Runtime {
             ),
             streamingInterval: playbackState.request.residentStreamingInterval,
         )
-        let chunkStream = SpeakSwiftly.QwenGeneratedAudioStream.chunks(
-            requestID: id,
-            sampleRate: residentModel.sampleRate,
-            samples: sampleStream,
-        )
-
         do {
             switch audioOutputDestination {
                 case .localPlayback:
-                    for try await samples in SpeakSwiftly.LocalPlaybackAudioOutput.sampleChunks(from: chunkStream) {
+                    for try await samples in sampleStream {
                         try Task.checkCancellation()
                         playbackState.execution.continuation.yield(samples)
                     }
