@@ -1846,6 +1846,47 @@ Operational note:
   warning even though the report saved prediction metrics. Clear the e5rt cache
   before more Core ML candidate batches.
 
+## 2026-05-31 Linear Matmul Audio Inspection And Bucket 88 Follow-Up
+
+The `linear` + `matmul` activation scope was carried into audio inspection and
+the next talker bucket.
+
+Bucket 72 prompt-000 audio inspection:
+
+| Candidate | Valid mean abs diff | Valid max abs diff | Alert windows |
+| --- | ---: | ---: | ---: |
+| broad compute-only W8A8 | `0.012348570860922337` | `0.3759765625` | 15 / 24 |
+| `linear` + `matmul` W8A8 | `0.006237064488232136` | `0.24884033203125` | 5 / 24 |
+
+Bucket 88 prompt-002 `linear` + `matmul` follow-up:
+
+| Stage | Mean abs diff | Max abs diff | Notes |
+| --- | ---: | ---: | --- |
+| fp16 Core ML conversion vs PyTorch wrapper | `0.00041774153942242265` | `0.04213841259479523` | CPU-only verification, bucket 88 fp16 package regenerated locally |
+| W8A8 quantization, full padded output | `0.004930480383336544` | `0.3194580078125` | one talker calibration sample |
+| W8A8 quantization, valid output only | `0.004826558753848076` | `0.3194580078125` | 84 valid code steps, 4 padded steps |
+| W8A8 audio inspection windows | `0.004826558753848076` | `0.3194580078125` | 2 alert windows out of 27 |
+
+Artifacts:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-000-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-88-fp16-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-bucket-88-fp16-talker-qwen3-linear-matmul-group-16-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002-12hz.json`
+
+Interpretation:
+
+- `linear` + `matmul` activation quantization is no longer just the best numeric
+  candidate; it also materially reduces valid-region audio drift on the
+  bucket-72 talker sample.
+- Bucket 88 does not show a new obvious failure mode from the longer fixed
+  shape. The padded tail is noisier than the valid region, so backend evaluation
+  must continue trimming to valid output before comparing or playing audio.
+- The remaining max-diff spikes are still large enough that this should not move
+  directly to backend integration. Next checks should widen held-out talker and
+  LibriTTS-R samples for `linear` + `matmul`, then compare listening artifacts
+  before Instruments dispatch profiling.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

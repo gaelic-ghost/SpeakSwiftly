@@ -214,6 +214,70 @@ import Testing
     #expect(noConvTransposeMeanDiff > 0.011)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder bucket 72 linear matmul audio inspection improves drift`() throws {
+    let broad = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-group-16-prompt-000-12hz.json",
+    )
+    let linearMatmul = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-000-12hz.json",
+    )
+
+    #expect(linearMatmul.mode == "coreml_decoder_audio_inspection")
+    #expect(linearMatmul.sample.id == "prompt-000")
+    #expect(linearMatmul.sample.audioCodesShape == [72, 16])
+    #expect(linearMatmul.sample.paddedInputShape == [1, 72, 16])
+    #expect(linearMatmul.sample.validOutputSampleCount == 138_240)
+    #expect(linearMatmul.audio.validOutputDiff.sampleCount == 138_240)
+    #expect(linearMatmul.audio.validOutputDiff.meanAbsDiff < broad.audio.validOutputDiff.meanAbsDiff)
+    #expect(linearMatmul.audio.validOutputDiff.meanAbsDiff < 0.0063)
+    #expect(linearMatmul.audio.windows.alertCount < broad.audio.windows.alertCount)
+    #expect(linearMatmul.audio.windows.alertCount == 5)
+    #expect(linearMatmul.audio.windows.topByMeanAbsDiff.first?.startSeconds == 4.25)
+}
+
+@Test func `qwen3 tts speech tokenizer decoder bucket 88 linear matmul records lower drift`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
+        "speech-tokenizer-decoder-coreml-quantization-bucket-88-fp16-talker-qwen3-linear-matmul-group-16-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_quantization_runtime")
+    #expect(fixture.source.conversionTarget.computePrecision == "float16")
+    #expect(fixture.source.conversionTarget.inputShape == [1, 88, 16])
+    #expect(fixture.runtime.sampleData.source == "talker_code_fixture")
+    #expect(fixture.runtime.sampleData.bucket == 88)
+    #expect(fixture.runtime.sampleData.count == 1)
+    #expect(fixture.runtime.sampleData.samples?.first?.id == "prompt-002")
+    #expect(fixture.runtime.sampleData.samples?.first?.audioCodesShape == [84, 16])
+    #expect(fixture.runtime.sampleData.samples?.first?.validOutputSampleCount == 161_280)
+
+    let result = try #require(fixture.runtime.results.first)
+    #expect(result.status == "succeeded")
+    #expect(result.candidateLabel == "talker-qwen3-bucket-88-linear-matmul-group-16")
+    #expect(result.activationOpTypes == ["linear", "matmul"])
+    #expect(result.packageSizeBytes == 114_776_495)
+    #expect(result.outputMatch?.validOutput?.sampleCount == 161_280)
+    #expect((result.outputMatch?.meanAbsDiff ?? 1.0) < 0.005)
+    #expect((result.outputMatch?.validOutput?.meanAbsDiff ?? 1.0) < 0.0049)
+}
+
+@Test func `qwen3 tts speech tokenizer decoder bucket 88 linear matmul audio inspection stays localized`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_decoder_audio_inspection")
+    #expect(fixture.sample.id == "prompt-002")
+    #expect(fixture.sample.audioCodesShape == [84, 16])
+    #expect(fixture.sample.paddedInputShape == [1, 88, 16])
+    #expect(fixture.sample.validOutputSampleCount == 161_280)
+    #expect(fixture.audio.validOutputDiff.sampleCount == 161_280)
+    #expect(fixture.audio.validOutputDiff.meanAbsDiff < 0.0049)
+    #expect(fixture.audio.paddedTailDiff?.sampleCount == 7680)
+    #expect(fixture.audio.windows.count == 27)
+    #expect(fixture.audio.windows.alertCount == 2)
+    #expect(fixture.audio.windows.topByMeanAbsDiff.first?.startSeconds == 2.0)
+}
+
 @Test func `qwen3 tts speech tokenizer decoder diverse calibration does not clear valid audio drift`() throws {
     let original = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
         "speech-tokenizer-decoder-coreml-audio-inspection-bucket-40-w8a8-12hz.json",
