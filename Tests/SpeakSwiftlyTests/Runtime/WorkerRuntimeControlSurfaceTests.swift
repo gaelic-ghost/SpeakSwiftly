@@ -383,120 +383,6 @@ import TextForSpeech
     await generationDrain.open()
 }
 
-@Test func `runtime overview captures serialized marvis generation`() async throws {
-    let output = OutputRecorder()
-    let playbackDrain = AsyncGate()
-    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
-    let laneAGenerationDrain = AsyncGate()
-    let laneBGenerationDrain = AsyncGate()
-    let storeRoot = makeTempDirectoryURL()
-    defer { try? FileManager.default.removeItem(at: storeRoot) }
-
-    @Sendable func makeLaneModel(_ gate: AsyncGate) -> AnySpeechModel {
-        AnySpeechModel(
-            sampleRate: 24000,
-            generate: { _, _, _, _, _, _ in
-                [0.1, 0.2]
-            },
-            generateSamplesStream: { _, _, _, _, _, _, _ in
-                AsyncThrowingStream { continuation in
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    Task {
-                        await gate.wait()
-                        continuation.finish()
-                    }
-                }
-            },
-        )
-    }
-
-    let store = try makeProfileStore(rootURL: storeRoot)
-    _ = try store.createProfile(
-        profileName: "lane-a-primary",
-        modelRepo: "test-model",
-        voiceDescription: "Warm and bright.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x01, 0x02]),
-    )
-    _ = try store.createProfile(
-        profileName: "lane-b-secondary",
-        vibe: .masc,
-        modelRepo: "test-model",
-        voiceDescription: "Grounded and rich.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x03, 0x04]),
-    )
-    let runtime = try await makeRuntime(
-        rootURL: storeRoot,
-        output: output,
-        playback: playback,
-        speechBackend: .marvis,
-        residentModelLoader: { _ in
-            ResidentSpeechModels.marvis(
-                .dual(
-                    conversationalA: makeLaneModel(laneAGenerationDrain),
-                    conversationalB: makeLaneModel(laneBGenerationDrain),
-                ),
-            )
-        },
-    )
-
-    await runtime.start()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "marvis"
-        }
-    })
-
-    let firstHandle = await runtime.generate.speech(text: "First request", voiceProfile: "lane-a-primary")
-    let secondHandle = await runtime.generate.speech(text: "Second request", voiceProfile: "lane-b-secondary")
-
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == firstHandle.id
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        }
-    })
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == secondHandle.id
-                && $0["event"] as? String == "queued"
-                && (($0["reason"] as? String == "waiting_for_playback_stability")
-                    || ($0["reason"] as? String == "waiting_for_active_request"))
-        }
-    })
-    let runtimeSnapshot = await runtime.snapshot()
-    let generateSnapshot = await runtime.generate.snapshot()
-    let playbackSnapshot = await runtime.playback.snapshot()
-    let activeIDs = Set(generateSnapshot.activeRequests.map(\.id))
-    let queuedIDs = Set(generateSnapshot.queuedRequests.map(\.id))
-
-    #expect(runtimeSnapshot.speechBackend == .marvis)
-    #expect(runtimeSnapshot.storage.stateRootPath == storeRoot.standardizedFileURL.path)
-    #expect(runtimeSnapshot.storage.profileStoreRootPath == storeRoot.standardizedFileURL.path)
-    #expect(runtimeSnapshot.storage.configurationPath == storeRoot.appendingPathComponent("configuration.json").path)
-    #expect(runtimeSnapshot.storage.textProfilesPath == storeRoot.appendingPathComponent("text-profiles.json").path)
-    #expect(runtimeSnapshot.storage.generatedFilesRootPath == storeRoot.appendingPathComponent("generated-files").path)
-    #expect(runtimeSnapshot.storage.generationJobsRootPath == storeRoot.appendingPathComponent("generation-jobs").path)
-    #expect(activeIDs == Set([firstHandle.id]))
-    #expect(queuedIDs == Set([secondHandle.id]))
-    #expect(playbackSnapshot.state == .playing)
-    #expect((playbackSnapshot.stableBufferedAudioMS ?? 0) >= 0)
-    #expect((playbackSnapshot.stableBufferTargetMS ?? 0) >= 0)
-    #expect(playbackSnapshot.activeRequest?.id == firstHandle.id)
-
-    await laneAGenerationDrain.open()
-    await laneBGenerationDrain.open()
-    await playbackDrain.open()
-}
-
 @Test func `status returns current resident backend and stage`() async throws {
     let output = OutputRecorder()
     let runtime = try await makeRuntime(
@@ -539,63 +425,27 @@ import TextForSpeech
         }
     })
 
-    let switchID = await runtime.switchSpeechBackend(to: .marvis).id
+    let switchID = await runtime.switchSpeechBackend(to: .qwen3_BIG).id
     #expect(await waitUntil {
         output.containsJSONObject {
             guard
                 $0["id"] as? String == switchID,
                 $0["ok"] as? Bool == true,
-                $0["speech_backend"] as? String == "marvis",
+                $0["speech_backend"] as? String == "qwen3_big",
                 let status = $0["status"] as? [String: Any]
             else {
                 return false
             }
 
             return status["stage"] as? String == "resident_model_ready"
-                && status["speech_backend"] as? String == "marvis"
+                && status["speech_backend"] as? String == "qwen3_big"
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "marvis"
-        }
-    })
-}
-
-@Test func `switch speech backend can move from qwen to chatterbox turbo`() async throws {
-    let output = OutputRecorder()
-    let runtime = try await makeRuntime(
-        output: output,
-        playback: PlaybackSpy(),
-        speechBackend: .qwen3_smol,
-        residentModelLoader: { _ in makeResidentModel() },
-    )
-
-    await runtime.start()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "qwen3_smol"
-        }
-    })
-
-    let switchID = await runtime.switchSpeechBackend(to: .chatterboxTurbo).id
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            guard
-                $0["id"] as? String == switchID,
-                $0["ok"] as? Bool == true,
-                $0["speech_backend"] as? String == "chatterbox_turbo",
-                let status = $0["status"] as? [String: Any]
-            else {
-                return false
-            }
-
-            return status["stage"] as? String == "resident_model_ready"
-                && status["speech_backend"] as? String == "chatterbox_turbo"
+                && $0["speech_backend"] as? String == "qwen3_big"
         }
     })
 }
@@ -759,7 +609,7 @@ import TextForSpeech
         }
     })
 
-    let switchID = await runtime.switchSpeechBackend(to: .marvis).id
+    let switchID = await runtime.switchSpeechBackend(to: .qwen3_BIG).id
     let queuedFileID = await runtime.generate
         .audio(
             text: "Save this request after the backend switch barrier.",
@@ -779,14 +629,14 @@ import TextForSpeech
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "warming_resident_model"
-                && $0["speech_backend"] as? String == "marvis"
+                && $0["speech_backend"] as? String == "qwen3_big"
         }
     })
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "marvis"
+                && $0["speech_backend"] as? String == "qwen3_big"
         }
     })
     #expect(await waitUntil {
@@ -794,14 +644,14 @@ import TextForSpeech
             guard
                 $0["id"] as? String == switchID,
                 $0["ok"] as? Bool == true,
-                $0["speech_backend"] as? String == "marvis",
+                $0["speech_backend"] as? String == "qwen3_big",
                 let status = $0["status"] as? [String: Any]
             else {
                 return false
             }
 
             return status["stage"] as? String == "resident_model_ready"
-                && status["speech_backend"] as? String == "marvis"
+                && status["speech_backend"] as? String == "qwen3_big"
         }
     })
     #expect(await waitUntil {
@@ -829,10 +679,10 @@ import TextForSpeech
                 return false
             }
 
-            return generationJob["speech_backend"] as? String == "marvis"
+            return generationJob["speech_backend"] as? String == "qwen3_big"
         }
     })
-    #expect(await backendLoads.values() == [.qwen3_smol, .marvis])
+    #expect(await backendLoads.values() == [.qwen3_smol, .qwen3_BIG])
 }
 
 @Test func `clear queue fails queued requests when generation queue has waiting work`() async throws {

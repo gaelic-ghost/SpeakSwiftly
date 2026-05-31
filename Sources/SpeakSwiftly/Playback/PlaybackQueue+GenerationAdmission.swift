@@ -31,26 +31,15 @@ extension PlaybackQueue {
 
     struct GenerationAdmissionSnapshot: Equatable {
         let activeRequestID: String?
-        let activeRequestTuningProfile: PlaybackTuningProfile?
         let allowsConcurrentGeneration: Bool
     }
 
     static func concurrencyAdmissionThresholds(
-        tuningProfile: PlaybackTuningProfile,
         startupBufferTargetMS: Int,
-        lowWaterTargetMS: Int,
     ) -> ConcurrencyAdmissionThresholds {
-        guard tuningProfile == .firstDrainedLiveMarvis else {
-            return ConcurrencyAdmissionThresholds(
-                startupBufferTargetMS: startupBufferTargetMS,
-                concurrentGenerationTargetMS: startupBufferTargetMS,
-            )
-        }
-
-        let additionalReserveMS = min(960, max(720, lowWaterTargetMS / 2))
-        return ConcurrencyAdmissionThresholds(
+        ConcurrencyAdmissionThresholds(
             startupBufferTargetMS: startupBufferTargetMS,
-            concurrentGenerationTargetMS: startupBufferTargetMS + additionalReserveMS,
+            concurrentGenerationTargetMS: startupBufferTargetMS,
         )
     }
 
@@ -59,20 +48,6 @@ extension PlaybackQueue {
         targetMS: Int,
     ) -> Bool {
         bufferedAudioMS >= targetMS
-    }
-
-    static func fragileOverlapWindowConfiguration(
-        tuningProfile: PlaybackTuningProfile,
-        concurrentGenerationTargetMS: Int,
-        lowWaterTargetMS: Int,
-    ) -> FragileOverlapWindowConfiguration? {
-        guard tuningProfile == .firstDrainedLiveMarvis else { return nil }
-
-        let additionalHoldReserveMS = min(640, max(480, lowWaterTargetMS / 2))
-        return FragileOverlapWindowConfiguration(
-            holdBufferTargetMS: concurrentGenerationTargetMS + additionalHoldReserveMS,
-            requiredStableBufferEventCount: 4,
-        )
     }
 
     static func resolveConcurrentGenerationAdmission(
@@ -146,8 +121,6 @@ extension PlaybackQueue {
     func generationAdmissionSnapshot() -> GenerationAdmissionSnapshot {
         GenerationAdmissionSnapshot(
             activeRequestID: activePlayback?.requestID,
-            activeRequestTuningProfile: activePlayback
-                .flatMap { jobs[$0.requestID]?.request.playbackTuningProfile },
             allowsConcurrentGeneration: activePlayback == nil || activePlaybackIsStableForConcurrentGeneration,
         )
     }
@@ -157,26 +130,11 @@ extension PlaybackQueue {
 
         switch event {
             case let .prerollReady(startupBufferedAudioMS, thresholds):
-                let requestTuningProfile = jobs[requestID]?.request.playbackTuningProfile ?? .standard
                 let admissionThresholds = Self.concurrencyAdmissionThresholds(
-                    tuningProfile: requestTuningProfile,
                     startupBufferTargetMS: thresholds.startupBufferTargetMS,
-                    lowWaterTargetMS: thresholds.lowWaterTargetMS,
                 )
                 activePlaybackConcurrentGenerationTargetMS = admissionThresholds.concurrentGenerationTargetMS
-                if let fragileOverlapWindowConfiguration = Self.fragileOverlapWindowConfiguration(
-                    tuningProfile: requestTuningProfile,
-                    concurrentGenerationTargetMS: admissionThresholds.concurrentGenerationTargetMS,
-                    lowWaterTargetMS: thresholds.lowWaterTargetMS,
-                ) {
-                    activePlaybackFragileOverlapWindowProgress = FragileOverlapWindowProgress(
-                        configuration: fragileOverlapWindowConfiguration,
-                        stableBufferEventCount: 0,
-                        hasSatisfiedHold: false,
-                    )
-                } else {
-                    activePlaybackFragileOverlapWindowProgress = nil
-                }
+                activePlaybackFragileOverlapWindowProgress = nil
                 applyConcurrentGenerationAdmission(
                     bufferedAudioMS: startupBufferedAudioMS,
                     concurrentGenerationTargetMS: admissionThresholds.concurrentGenerationTargetMS,

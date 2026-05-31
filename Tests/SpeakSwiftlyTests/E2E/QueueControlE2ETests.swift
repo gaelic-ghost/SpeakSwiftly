@@ -5,7 +5,7 @@ import Testing
 
 @Suite(
     .serialized,
-    .tags(.e2e, .chatterbox),
+    .tags(.e2e, .qwen),
     .enabled(
         if: speakSwiftlyE2ETestsEnabled(),
         "These end-to-end worker tests are opt-in and require SPEAKSWIFTLY_E2E=1.",
@@ -21,7 +21,7 @@ struct QueueControlE2ETests {
         let worker = try WorkerProcess(
             profileRootURL: sandbox.profileRootURL,
             silentPlayback: true,
-            speechBackend: .chatterboxTurbo,
+            speechBackend: .qwen3_smol,
         )
         defer { Task { await worker.stop() } }
 
@@ -103,7 +103,7 @@ struct QueueControlE2ETests {
         let worker = try WorkerProcess(
             profileRootURL: sandbox.profileRootURL,
             silentPlayback: true,
-            speechBackend: .chatterboxTurbo,
+            speechBackend: .qwen3_smol,
         )
         defer { Task { await worker.stop() } }
 

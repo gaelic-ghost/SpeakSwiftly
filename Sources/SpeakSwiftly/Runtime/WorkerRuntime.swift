@@ -23,31 +23,14 @@ public extension SpeakSwiftly {
         enum PlaybackConfiguration {
             enum ResidentStreamingCadenceProfile: String, Equatable {
                 case standard
-                case firstDrainedLiveMarvis = "first_drained_live_marvis"
             }
 
-            /// Use a less aggressive resident cadence for Chatterbox and the normal
-            /// Marvis path so backend chunk delivery stays closer to upstream timing.
-            static let standardResidentStreamingInterval = 0.5
             static let qwenResidentStreamingInterval = 0.32
-
-            /// Keep the Marvis-specific cadence roles for scheduling and playback
-            /// policy, but align their timing to the current upstream streaming
-            /// cadence instead of a SpeakSwiftly-specific faster interval.
-            static let firstDrainedLiveMarvisStreamingInterval = 0.5
 
             static func residentStreamingCadenceProfile(
                 speechBackend: SpeakSwiftly.SpeechBackend,
-                existingPlaybackJobCount: Int,
             ) -> ResidentStreamingCadenceProfile {
-                guard speechBackend.isMarvisFamily else { return .standard }
-
-                return switch existingPlaybackJobCount {
-                    case 0:
-                        .firstDrainedLiveMarvis
-                    default:
-                        .standard
-                }
+                .standard
             }
 
             static func residentStreamingInterval(
@@ -56,9 +39,7 @@ public extension SpeakSwiftly {
             ) -> Double {
                 switch cadenceProfile {
                     case .standard:
-                        speechBackend.isQwenFamily ? qwenResidentStreamingInterval : standardResidentStreamingInterval
-                    case .firstDrainedLiveMarvis:
-                        firstDrainedLiveMarvisStreamingInterval
+                        qwenResidentStreamingInterval
                 }
             }
 
@@ -67,9 +48,7 @@ public extension SpeakSwiftly {
             ) -> Double {
                 switch cadenceProfile {
                     case .standard:
-                        standardResidentStreamingInterval
-                    case .firstDrainedLiveMarvis:
-                        firstDrainedLiveMarvisStreamingInterval
+                        qwenResidentStreamingInterval
                 }
             }
         }
@@ -278,7 +257,6 @@ public extension SpeakSwiftly {
         var speechBackend: SpeakSwiftly.SpeechBackend
         var qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy
         var duckMediaVolume: SpeakSwiftly.DuckMediaVolume
-        let marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy
         let encoder = JSONEncoder()
         let profileStore: ProfileStore
         let systemProfileResourceStore: ProfileStore?
@@ -305,7 +283,6 @@ public extension SpeakSwiftly {
         var workerOutputContinuations = [UUID: AsyncStream<SpeakSwiftly.WorkerOutputEvent>.Continuation]()
         var activeGenerations = [UUID: ActiveRequest]()
         var activeGenerationCancellations = [String: WorkerError]()
-        var lastLoggedMarvisSchedulerState: String?
         var qwenConditioningCache = [QwenConditioningCacheKey: Qwen3TTSModel.Qwen3TTSReferenceConditioning]()
         var defaultVoiceProfileName: SpeakSwiftly.Name
 
@@ -316,7 +293,6 @@ public extension SpeakSwiftly {
             speechBackend: SpeakSwiftly.SpeechBackend,
             qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
             duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
-            marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
             defaultVoiceProfileName: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             profileStore: ProfileStore,
             systemProfileResourceStore: ProfileStore? = nil,
@@ -330,7 +306,6 @@ public extension SpeakSwiftly {
             self.speechBackend = speechBackend
             self.qwenConditioningStrategy = qwenConditioningStrategy
             self.duckMediaVolume = duckMediaVolume
-            self.marvisResidentPolicy = marvisResidentPolicy
             self.defaultVoiceProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(defaultVoiceProfileName)
             self.profileStore = profileStore
             self.systemProfileResourceStore = systemProfileResourceStore

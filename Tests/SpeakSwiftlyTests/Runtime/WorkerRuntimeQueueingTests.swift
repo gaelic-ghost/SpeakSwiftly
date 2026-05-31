@@ -74,144 +74,6 @@ import TextForSpeech
     })
 }
 
-@Test func `marvis live generation stays serialized across resident voices`() async throws {
-    let output = OutputRecorder()
-    let playbackDrain = AsyncGate()
-    let playback = PlaybackSpy(behavior: .gate(playbackDrain))
-    let laneAGenerationDrain = AsyncGate()
-    let laneBGenerationDrain = AsyncGate()
-    let storeRoot = makeTempDirectoryURL()
-    defer { try? FileManager.default.removeItem(at: storeRoot) }
-
-    @Sendable func makeLaneModel(_ gate: AsyncGate) -> AnySpeechModel {
-        AnySpeechModel(
-            sampleRate: 24000,
-            generate: { _, _, _, _, _, _ in
-                [0.1, 0.2]
-            },
-            generateSamplesStream: { _, _, _, _, _, _, _ in
-                AsyncThrowingStream { continuation in
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    continuation.yield(Array(repeating: 0.1, count: 24000))
-                    Task {
-                        await gate.wait()
-                        continuation.finish()
-                    }
-                }
-            },
-        )
-    }
-
-    let store = try makeProfileStore(rootURL: storeRoot)
-    _ = try store.createProfile(
-        profileName: "lane-a-primary",
-        modelRepo: "test-model",
-        voiceDescription: "Warm and bright.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x01, 0x02]),
-    )
-    _ = try store.createProfile(
-        profileName: "lane-b-secondary",
-        vibe: .masc,
-        modelRepo: "test-model",
-        voiceDescription: "Grounded and rich.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x03, 0x04]),
-    )
-    let runtime = try await makeRuntime(
-        rootURL: storeRoot,
-        output: output,
-        playback: playback,
-        speechBackend: .marvis,
-        residentModelLoader: { _ in
-            ResidentSpeechModels.marvis(
-                .dual(
-                    conversationalA: makeLaneModel(laneAGenerationDrain),
-                    conversationalB: makeLaneModel(laneBGenerationDrain),
-                ),
-            )
-        },
-    )
-
-    await runtime.start()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "marvis"
-        }
-    })
-
-    await runtime.accept(line: #"{"id":"req-live-1","op":"generate_speech","text":"Hello there","profile_name":"lane-a-primary"}"#)
-    await runtime.accept(line: #"{"id":"req-live-2","op":"generate_speech","text":"Hi there","profile_name":"lane-b-secondary"}"#)
-
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-live-1"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        }
-    })
-
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-live-2"
-                && $0["event"] as? String == "queued"
-                && (($0["reason"] as? String == "waiting_for_playback_stability")
-                    || ($0["reason"] as? String == "waiting_for_active_request"))
-        }
-    })
-    let generationQueueID = await (runtime.jobs.generationQueue()).id
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            guard
-                $0["id"] as? String == generationQueueID,
-                $0["ok"] as? Bool == true,
-                let activeRequests = $0["active_requests"] as? [[String: Any]],
-                let queuedRequests = $0["queue"] as? [[String: Any]]
-            else {
-                return false
-            }
-
-            let activeIDs = Set(activeRequests.compactMap { $0["id"] as? String })
-            let queuedIDs = Set(queuedRequests.compactMap { $0["id"] as? String })
-            return activeIDs == Set(["req-live-1"]) && queuedIDs == Set(["req-live-2"])
-        }
-    })
-    #expect(!output.containsJSONObject {
-        $0["id"] as? String == "req-live-2"
-            && $0["event"] as? String == "started"
-    })
-    #expect(output.containsStderrJSONObject {
-        $0["request_id"] as? String == "req-live-1"
-            && $0["event"] as? String == "marvis_generation_lane_reserved"
-            && (($0["details"] as? [String: Any])?["marvis_lane"] as? String) == "conversational_a"
-    })
-    #expect(output.containsStderrJSONObject {
-        $0["event"] as? String == "marvis_generation_scheduler_snapshot"
-            && (($0["details"] as? [String: Any])?["active_generation_request_ids"] as? String) == "req-live-1"
-    })
-
-    await laneAGenerationDrain.open()
-    await playbackDrain.open()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-live-2"
-                && $0["event"] as? String == "started"
-        }
-    })
-    #expect(output.containsStderrJSONObject {
-        $0["request_id"] as? String == "req-live-2"
-            && $0["event"] as? String == "marvis_generation_lane_reserved"
-            && (($0["details"] as? [String: Any])?["marvis_lane"] as? String) == "conversational_b"
-    })
-
-    await laneBGenerationDrain.open()
-}
-
 @Test func `resident generation stays serialized while playback is already stable`() async throws {
     let output = OutputRecorder()
     let generationDrain = AsyncGate()
@@ -233,7 +95,7 @@ import TextForSpeech
         rootURL: storeRoot,
         output: output,
         playback: playback,
-        speechBackend: .chatterboxTurbo,
+        speechBackend: .qwen3_smol,
         residentModelLoader: { _ in
             AnySpeechModel(
                 sampleRate: 24000,
@@ -260,7 +122,7 @@ import TextForSpeech
         output.containsJSONObject {
             $0["event"] as? String == "worker_status"
                 && $0["stage"] as? String == "resident_model_ready"
-                && $0["speech_backend"] as? String == "chatterbox_turbo"
+                && $0["speech_backend"] as? String == "qwen3_smol"
         }
     })
 
@@ -323,13 +185,16 @@ import TextForSpeech
         preparingJobTokens: [preparingLiveJob.token],
         playbackAdmission: PlaybackQueue.GenerationAdmissionSnapshot(
             activeRequestID: nil,
-            activeRequestTuningProfile: nil,
             allowsConcurrentGeneration: true,
         ),
     )
 
     #expect(decision.runnableJobs.isEmpty)
-    #expect(decision.parkReasons == [preparingLiveJob.token: .waitingForActiveRequest])
+    #expect(
+        decision.parkReasons == [
+            preparingLiveJob.token: SpeakSwiftly.Runtime.GenerationParkReason.waitingForActiveRequest,
+        ],
+    )
 }
 
 @Test func `runtime uses configured speech backend for resident model preload`() async throws {
@@ -338,7 +203,7 @@ import TextForSpeech
     let runtime = try await makeRuntime(
         output: output,
         playback: PlaybackSpy(),
-        speechBackend: .marvis,
+        speechBackend: .qwen3_BIG,
         residentModelLoader: { backend in
             await recorder.record(backend)
             return makeResidentModel()
@@ -353,7 +218,7 @@ import TextForSpeech
                 && $0["stage"] as? String == "resident_model_ready"
         }
     })
-    #expect(await recorder.backends == [.marvis])
+    #expect(await recorder.backends == [.qwen3_BIG])
 }
 
 @Test func `resolved speech backend prefers explicit configuration over persisted value`() throws {
@@ -369,10 +234,10 @@ import TextForSpeech
     let resolved = WorkerRuntime.resolvedSpeechBackend(
         dependencies: dependencies,
         environment: [ProfileStore.runtimeStateRootOverrideEnvironmentVariable: stateRoot.path],
-        configuration: SpeakSwiftly.Configuration(speechBackend: .marvis),
+        configuration: SpeakSwiftly.Configuration(speechBackend: .qwen3_BIG),
     )
 
-    #expect(resolved == .marvis)
+    #expect(resolved == .qwen3_BIG)
 }
 
 @Test func `resolved speech backend prefers environment over persisted configuration`() throws {
@@ -389,12 +254,12 @@ import TextForSpeech
         dependencies: dependencies,
         environment: [
             ProfileStore.runtimeStateRootOverrideEnvironmentVariable: stateRoot.path,
-            SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.marvis.rawValue,
+            SpeakSwiftly.SpeechBackend.environmentVariable: SpeakSwiftly.SpeechBackend.qwen3_BIG.rawValue,
         ],
         configuration: nil,
     )
 
-    #expect(resolved == .marvis)
+    #expect(resolved == .qwen3_BIG)
 }
 
 @Test func `resident model preload failure fails queued requests`() async throws {

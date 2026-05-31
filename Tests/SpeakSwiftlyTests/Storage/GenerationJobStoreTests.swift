@@ -14,7 +14,7 @@ import Testing
         jobID: "job-file-1",
         voiceProfile: "default-femme",
         textProfile: "logs",
-        speechBackend: .marvis,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-1",
             text: "Hello from a file job.",
@@ -30,7 +30,7 @@ import Testing
     #expect(queued.state == .queued)
     #expect(queued.voiceProfile == "default-femme")
     #expect(queued.textProfile == "logs")
-    #expect(queued.speechBackend == .marvis)
+    #expect(queued.speechBackend == .qwen3_smol)
     #expect(queued.items.count == 1)
     #expect(queued.items[0].artifactID == "artifact-1")
 
@@ -131,7 +131,7 @@ import Testing
         jobID: "job-batch-1",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .marvis,
+        speechBackend: .qwen3_smol,
         items: [
             SpeakSwiftly.GenerationJobItem(
                 artifactID: "job-batch-1-artifact-1",
@@ -169,7 +169,7 @@ import Testing
         jobID: "job-file-2",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .marvis,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-2",
             text: "Hello from a completed file job.",
@@ -219,7 +219,7 @@ import Testing
         jobID: "job-file-queued",
         voiceProfile: "default-femme",
         textProfile: nil,
-        speechBackend: .marvis,
+        speechBackend: .qwen3_smol,
         item: SpeakSwiftly.GenerationJobItem(
             artifactID: "artifact-queued",
             text: "Queued",

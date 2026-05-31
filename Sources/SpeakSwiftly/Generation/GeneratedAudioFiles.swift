@@ -128,23 +128,6 @@ extension SpeakSwiftly.Runtime {
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )
-            case let .chatterboxTurbo(model, _, refAudio):
-                chatterboxGenerationStream(
-                    requestID: requestID,
-                    model: model,
-                    text: text,
-                    refAudio: refAudio,
-                    generationParameters: generationParameters,
-                    streamingInterval: streamingInterval,
-                )
-            case let .marvis(model, _, voice):
-                marvisGenerationStream(
-                    model: model,
-                    text: text,
-                    voice: voice,
-                    generationParameters: generationParameters,
-                    streamingInterval: streamingInterval,
-                )
         }
     }
 
@@ -181,23 +164,6 @@ extension SpeakSwiftly.Runtime {
                     text: text,
                     plannedChunks: plannedTextChunks,
                     conditioning: conditioning,
-                    generationParameters: generationParameters,
-                    streamingInterval: streamingInterval,
-                )
-            case let .chatterboxTurbo(model, _, refAudio):
-                chatterboxGenerationStream(
-                    requestID: requestID,
-                    model: model,
-                    text: text,
-                    refAudio: refAudio,
-                    generationParameters: generationParameters,
-                    streamingInterval: streamingInterval,
-                )
-            case let .marvis(model, _, voice):
-                marvisGenerationStream(
-                    model: model,
-                    text: text,
-                    voice: voice,
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )

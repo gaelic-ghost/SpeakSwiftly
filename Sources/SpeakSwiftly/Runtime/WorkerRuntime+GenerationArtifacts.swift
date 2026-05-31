@@ -223,16 +223,8 @@ extension SpeakSwiftly.Runtime {
             normalizedText: normalizedText,
         )
         let textSections = SpeakSwiftly.DeepTrace.sections(originalText: text)
-        let existingPlaybackJobCount = await playbackQueue.jobCount()
-        let playbackTuningProfile: PlaybackTuningProfile =
-            if speechBackend.isMarvisFamily {
-                .firstDrainedLiveMarvis
-            } else {
-                .standard
-            }
         let residentStreamingCadenceProfile = PlaybackConfiguration.residentStreamingCadenceProfile(
             speechBackend: speechBackend,
-            existingPlaybackJobCount: existingPlaybackJobCount,
         )
         let residentStreamingInterval = PlaybackConfiguration.residentStreamingInterval(
             for: speechBackend,
@@ -244,7 +236,7 @@ extension SpeakSwiftly.Runtime {
             normalizedLiveChunks: normalizedLiveChunks,
             textFeatures: textFeatures,
             textSections: textSections,
-            playbackTuningProfile: playbackTuningProfile,
+            playbackTuningProfile: .standard,
             residentStreamingCadenceProfile: residentStreamingCadenceProfile,
             residentStreamingInterval: residentStreamingInterval,
         )
@@ -264,16 +256,11 @@ extension SpeakSwiftly.Runtime {
         request: WorkerRequest,
         disposition: GenerationCompletionDisposition,
     ) async {
-        guard let activeGeneration = activeGenerations[token] else { return }
+        guard activeGenerations[token] != nil else { return }
 
         activeGenerations.removeValue(forKey: token)
         await generationQueue.finishActive(token: token)
         await publishGenerateUpdate()
-        await logMarvisGenerationLaneReleasedIfNeeded(
-            for: activeGeneration.request,
-            activeJobs: generationQueue.activeJobsOrdered(),
-            disposition: disposition,
-        )
         let cancellation = activeGenerationCancellations.removeValue(forKey: request.id)
         let finalDisposition: GenerationCompletionDisposition = if let cancellation {
             .requestCompleted(.failure(cancellation))

@@ -27,12 +27,10 @@ Usage:
   run-e2e-full.sh [--audible] [--playback-trace]
 
 Runs the default release-safe top-level E2E suite list sequentially:
-  GeneratedFileE2ETests
-  GeneratedBatchE2ETests
-  ChatterboxE2ETests
-  QueueControlE2ETests
-  MarvisE2ETests
-  QwenE2ETests
+	  GeneratedFileE2ETests
+	  GeneratedBatchE2ETests
+	  QueueControlE2ETests
+	  QwenE2ETests
 USAGE
       exit 0
       ;;
@@ -82,12 +80,10 @@ run_suite() {
 }
 
 for suite_name in \
-  GeneratedFileE2ETests \
-  GeneratedBatchE2ETests \
-  ChatterboxE2ETests \
-  QueueControlE2ETests \
-  MarvisE2ETests \
-  QwenE2ETests
+	  GeneratedFileE2ETests \
+	  GeneratedBatchE2ETests \
+	  QueueControlE2ETests \
+	  QwenE2ETests
 do
   set +e
   run_suite "$suite_name"

@@ -36,10 +36,10 @@ import Darwin
 
 @Test func `public library surface constructs configuration`() {
     let configuration = SpeakSwiftly.Configuration(
-        speechBackend: .marvis,
+        speechBackend: .qwen3_BIG,
         qwenConditioningStrategy: .preparedConditioning,
     )
-    #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.speechBackend == .qwen3_BIG)
     #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
     #expect(configuration.duckMediaVolume == .off)
@@ -62,14 +62,6 @@ import Darwin
     #expect(SpeakSwiftly.DuckMediaVolume.aLot.requiresMediaAutomation)
     #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Spotify"))
     #expect(SpeakSwiftly.DuckMediaVolume.automationUsageDescription.contains("Music"))
-}
-
-@Test func `public configuration supports chatterbox turbo backend`() {
-    let configuration = SpeakSwiftly.Configuration(speechBackend: .chatterboxTurbo)
-
-    #expect(configuration.speechBackend == .chatterboxTurbo)
-    #expect(configuration.qwenConditioningStrategy == .preparedConditioning)
-    #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
 }
 
 @Test func `public configuration carries startup system profile resource roots`() {
@@ -135,7 +127,7 @@ import Darwin
     }
 }
 
-@Test func `public configuration ignores removed marvis resident policy key`() throws {
+@Test func `public configuration rejects removed marvis backend values`() throws {
     let rootURL = URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     defer { try? FileManager.default.removeItem(at: rootURL) }
@@ -143,7 +135,6 @@ import Darwin
     let persistenceURL = rootURL.appendingPathComponent("configuration.json")
     let configurationJSON = """
     {
-      "marvisResidentPolicy" : "dual_resident_serialized",
       "speechBackend" : "marvis"
     }
     """
@@ -151,20 +142,20 @@ import Darwin
     try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
     try Data(configurationJSON.utf8).write(to: persistenceURL, options: .atomic)
 
-    let loaded = try SpeakSwiftly.Configuration.load(from: persistenceURL)
-
-    #expect(loaded.speechBackend == .marvis)
+    #expect(throws: SpeakSwiftly.Configuration.LoadError.self) {
+        try SpeakSwiftly.Configuration.load(from: persistenceURL)
+    }
 }
 
 @Test func `public configuration can carry A text normalizer`() throws {
     let normalizer = try SpeakSwiftly.Normalizer()
     let configuration = SpeakSwiftly.Configuration(
-        speechBackend: .marvis,
+        speechBackend: .qwen3_smol_6bit,
         qwenConditioningStrategy: .legacyRaw,
         textNormalizer: normalizer,
     )
 
-    #expect(configuration.speechBackend == .marvis)
+    #expect(configuration.speechBackend == .qwen3_smol_6bit)
     #expect(configuration.qwenConditioningStrategy == .legacyRaw)
     #expect(configuration.textNormalizer != nil)
 }
@@ -247,13 +238,13 @@ import Darwin
     let stateRoot = makeTempDirectoryURL()
     defer { try? FileManager.default.removeItem(at: stateRoot) }
 
-    try SpeakSwiftly.Configuration(speechBackend: .marvis).saveDefault(
+    try SpeakSwiftly.Configuration(speechBackend: .qwen3_BIG).saveDefault(
         stateRootOverride: stateRoot.path,
     )
 
     let runtime = await SpeakSwiftly.liftoff(stateRootURL: stateRoot)
 
-    #expect(await runtime.speechBackend == .marvis)
+    #expect(await runtime.speechBackend == .qwen3_BIG)
 }
 
 @Test func `liftoff seeds configured system profile resource roots`() async throws {

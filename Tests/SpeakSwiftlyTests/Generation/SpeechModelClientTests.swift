@@ -26,7 +26,7 @@ private actor ProfileModelLoadObservation {
 
 // MARK: - Adaptive Playback Thresholds
 
-@Test func `resident backend repos include chatterbox turbo 8bit`() {
+@Test func `resident backend repos include qwen variants`() {
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol) == ModelFactory.qwenResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_4bit) == ModelFactory.qwen06B4BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_smol_5bit) == ModelFactory.qwen06B5BitResidentModelRepo)
@@ -39,12 +39,9 @@ private actor ProfileModelLoadObservation {
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_6bit) == ModelFactory.qwen17B6BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_8bit) == ModelFactory.qwen17B8BitResidentModelRepo)
     #expect(ModelFactory.residentModelRepo(for: .qwen3_BIG_bf16) == ModelFactory.qwen17BBF16ResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .chatterboxTurbo) == "mlx-community/chatterbox-turbo-8bit")
-    #expect(ModelFactory.residentModelRepo(for: .marvis) == ModelFactory.marvisResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .marvis_4bit) == ModelFactory.marvis4BitResidentModelRepo)
-    #expect(ModelFactory.residentModelRepo(for: .marvis_6bit) == ModelFactory.marvis6BitResidentModelRepo)
-    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends == [.marvis, .marvis_4bit, .marvis_6bit])
-    #expect(SpeakSwiftly.SpeechBackend.marvisFamilyBackends.allSatisfy { $0.isMarvisFamily })
+    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.contains(.qwen3_smol))
+    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.contains(.qwen3_BIG_bf16))
+    #expect(SpeakSwiftly.SpeechBackend.qwenFamilyBackends.allSatisfy { $0.isQwenFamily })
 }
 
 @Test func `profile model load rejects missing metal device by default`() async throws {
@@ -160,34 +157,6 @@ private actor ProfileModelLoadObservation {
     #expect(extended.resumeBufferTargetMS == 16480)
 }
 
-@Test func `first drained live marvis tuning raises compact and balanced warmup floors`() {
-    let compact = PlaybackThresholdController(
-        text: "Hello there.",
-        tuningProfile: .firstDrainedLiveMarvis,
-    ).thresholds
-    let balanced = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
-        tuningProfile: .firstDrainedLiveMarvis,
-    ).thresholds
-    let extended = PlaybackThresholdController(
-        text: String(
-            repeating: "This is a deliberately long spoken paragraph used to seed playback buffering from length alone. ",
-            count: 9,
-        ),
-        tuningProfile: .firstDrainedLiveMarvis,
-    ).thresholds
-
-    #expect(compact.startupBufferTargetMS == 2880)
-    #expect(compact.lowWaterTargetMS == 1200)
-    #expect(compact.resumeBufferTargetMS == 3360)
-    #expect(balanced.startupBufferTargetMS == 5280)
-    #expect(balanced.lowWaterTargetMS == 2240)
-    #expect(balanced.resumeBufferTargetMS == 6140)
-    #expect(extended.startupBufferTargetMS == 13120)
-    #expect(extended.lowWaterTargetMS == 5000)
-    #expect(extended.resumeBufferTargetMS == 16480)
-}
-
 @Test func `adaptive playback thresholds ignore content shape when lengths match`() {
     let plainText = String(repeating: "Please explain this clearly. ", count: 8)
     let codeishSeed = """
@@ -257,23 +226,6 @@ private actor ProfileModelLoadObservation {
     #expect(afterThirdRebuffer.resumeBufferTargetMS > afterSecondRebuffer.resumeBufferTargetMS)
 }
 
-@Test func `first drained live marvis tuning escalates on the first rebuffer`() {
-    var controller = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
-        tuningProfile: .firstDrainedLiveMarvis,
-    )
-
-    for _ in 0..<6 {
-        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
-    }
-
-    let adapted = controller.thresholds
-    controller.recordRebuffer()
-    let afterFirstRebuffer = controller.thresholds
-
-    #expect(afterFirstRebuffer == adapted)
-}
-
 @Test func `adaptive playback thresholds keep escalated rebuffer targets across later chunks`() {
     var controller = PlaybackThresholdController(
         text: """
@@ -304,63 +256,8 @@ private actor ProfileModelLoadObservation {
     #expect(afterMoreChunks.scheduleGapWarningMS >= escalated.scheduleGapWarningMS)
 }
 
-@Test func `first drained live marvis tuning keeps stronger recovery floors during later chunks`() {
-    var controller = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
-        tuningProfile: .firstDrainedLiveMarvis,
-    )
-
-    for _ in 0..<6 {
-        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
-    }
-
-    controller.recordRebuffer()
-    let escalated = controller.thresholds
-
-    for _ in 0..<6 {
-        controller.recordChunk(durationMS: 160, interChunkGapMS: 190)
-    }
-
-    let afterMoreChunks = controller.thresholds
-
-    #expect(controller.phase == .recovery || controller.phase == .steady)
-    #expect(afterMoreChunks.startupBufferTargetMS >= 2600)
-    #expect(afterMoreChunks.lowWaterTargetMS >= 1100)
-    #expect(afterMoreChunks.resumeBufferTargetMS >= 3000)
-    #expect(afterMoreChunks.startupBufferTargetMS >= escalated.startupBufferTargetMS)
-    #expect(afterMoreChunks.lowWaterTargetMS >= escalated.lowWaterTargetMS)
-    #expect(afterMoreChunks.resumeBufferTargetMS >= escalated.resumeBufferTargetMS)
-}
-
-@Test func `first drained live marvis tuning hardens on repeated pre-rebuffer schedule gaps`() {
-    var controller = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
-        tuningProfile: .firstDrainedLiveMarvis,
-    )
-
-    for _ in 0..<6 {
-        controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
-    }
-
-    let adapted = controller.thresholds
-    controller.recordScheduleGapDistress(gapMS: 460, queuedAudioMS: 1920)
-    #expect(controller.thresholds == adapted)
-
-    controller.recordScheduleGapDistress(gapMS: 440, queuedAudioMS: 1600)
-    let hardened = controller.thresholds
-
-    #expect(controller.phase == .recovery)
-    #expect(hardened.lowWaterTargetMS >= adapted.lowWaterTargetMS)
-    #expect(hardened.resumeBufferTargetMS >= adapted.resumeBufferTargetMS)
-    #expect(hardened.startupBufferTargetMS >= adapted.startupBufferTargetMS)
-    #expect(hardened.startupBufferTargetMS >= hardened.resumeBufferTargetMS)
-}
-
 @Test func `pre-rebuffer schedule gap hardening ignores low-risk queued audio`() {
-    var controller = PlaybackThresholdController(
-        text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7),
-        tuningProfile: .firstDrainedLiveMarvis,
-    )
+    var controller = PlaybackThresholdController(text: String(repeating: "This is ordinary spoken prose for playback buffering. ", count: 7))
 
     for _ in 0..<6 {
         controller.recordChunk(durationMS: 160, interChunkGapMS: 205)
@@ -374,89 +271,21 @@ private actor ProfileModelLoadObservation {
     #expect(controller.thresholds == adapted)
 }
 
-@Test func `resident cadence aligns chatterbox and marvis with the looser baseline`() {
+@Test func `resident cadence uses qwen baseline`() {
     let qwenStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
         for: .qwen3_smol,
         cadenceProfile: .standard,
     )
-    let marvisStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .marvis,
-        cadenceProfile: .standard,
-    )
-    let chatterboxStandardInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .chatterboxTurbo,
-        cadenceProfile: .standard,
-    )
-    let firstRequestInterval = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingInterval(
-        for: .firstDrainedLiveMarvis,
-    )
 
     #expect(qwenStandardInterval == 0.32)
-    #expect(marvisStandardInterval == 0.5)
-    #expect(chatterboxStandardInterval == 0.5)
-    #expect(firstRequestInterval == 0.5)
-    #expect(firstRequestInterval == marvisStandardInterval)
 }
 
-@Test func `marvis live cadence role selection reserves the special role for the first request only`() {
+@Test func `resident cadence profile stays standard for qwen requests`() {
     let qwenProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
         speechBackend: .qwen3_smol,
-        existingPlaybackJobCount: 0,
-    )
-    let firstMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
-        speechBackend: .marvis,
-        existingPlaybackJobCount: 0,
-    )
-    let secondMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
-        speechBackend: .marvis,
-        existingPlaybackJobCount: 1,
-    )
-    let laterMarvisProfile = SpeakSwiftly.Runtime.PlaybackConfiguration.residentStreamingCadenceProfile(
-        speechBackend: .marvis,
-        existingPlaybackJobCount: 2,
     )
 
     #expect(qwenProfile == .standard)
-    #expect(firstMarvisProfile == .firstDrainedLiveMarvis)
-    #expect(secondMarvisProfile == .standard)
-    #expect(laterMarvisProfile == .standard)
-}
-
-@Test func `first drained live marvis requires extra reserve before overlap opens`() {
-    let standardAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
-        tuningProfile: .standard,
-        startupBufferTargetMS: 2320,
-        lowWaterTargetMS: 1040,
-    )
-    let firstRequestAdmission = PlaybackQueue.concurrencyAdmissionThresholds(
-        tuningProfile: .firstDrainedLiveMarvis,
-        startupBufferTargetMS: 2320,
-        lowWaterTargetMS: 1040,
-    )
-
-    #expect(standardAdmission.concurrentGenerationTargetMS == 2320)
-    #expect(firstRequestAdmission.concurrentGenerationTargetMS == 3040)
-    #expect(firstRequestAdmission.concurrentGenerationTargetMS > firstRequestAdmission.startupBufferTargetMS)
-}
-
-@Test func `first drained live marvis adds a short fragile overlap hold above the ordinary target`() {
-    let configuration = PlaybackQueue.fragileOverlapWindowConfiguration(
-        tuningProfile: .firstDrainedLiveMarvis,
-        concurrentGenerationTargetMS: 3160,
-        lowWaterTargetMS: 1040,
-    )
-
-    #expect(configuration == PlaybackQueue.FragileOverlapWindowConfiguration(
-        holdBufferTargetMS: 3680,
-        requiredStableBufferEventCount: 4,
-    ))
-    #expect(
-        PlaybackQueue.fragileOverlapWindowConfiguration(
-            tuningProfile: .standard,
-            concurrentGenerationTargetMS: 3160,
-            lowWaterTargetMS: 1040,
-        ) == nil,
-    )
 }
 
 @Test func `concurrent generation stays closed below the claimed reserve target`() {
@@ -1757,71 +1586,6 @@ private actor ProfileModelLoadObservation {
     #expect(chunks.count > 1)
     #expect(chunks.allSatisfy { $0.text.last == "." })
     #expect(chunks.allSatisfy { $0.segmentation == .punctuationBoundary || $0.segmentation == .forcedBreak })
-}
-
-@Test func `chatterbox live speech splits one request into multiple text chunks`() async throws {
-    let output = OutputRecorder()
-    let playback = PlaybackSpy()
-    let residentRecorder = ResidentModelRecorder()
-    let storeRoot = makeTempDirectoryURL()
-    defer { try? FileManager.default.removeItem(at: storeRoot) }
-
-    let store = try makeProfileStore(rootURL: storeRoot)
-    _ = try store.createProfile(
-        profileName: "default-femme",
-        modelRepo: "test-model",
-        voiceDescription: "Warm and bright.",
-        sourceText: "Reference transcript",
-        sampleRate: 24000,
-        canonicalAudioData: Data([0x01, 0x02]),
-    )
-
-    let text = """
-    Please read this first sentence slowly and clearly for testing.
-    Please read this second sentence slowly and clearly for testing.
-    Please read this third sentence slowly and clearly for testing.
-    Please read this fourth sentence slowly and clearly for testing.
-    """
-    let expectedChunkTexts = LiveSpeechChunkPlanner.chunks(for: text).map(\.text)
-
-    let runtime = try await makeRuntime(
-        rootURL: storeRoot,
-        output: output,
-        playback: playback,
-        speechBackend: .chatterboxTurbo,
-        audioLoadRecorder: residentRecorder,
-        residentModelLoader: { _ in
-            makeResidentModel(recorder: residentRecorder, chunkCount: 1)
-        },
-    )
-
-    await runtime.start()
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["event"] as? String == "worker_status"
-                && $0["stage"] as? String == "resident_model_ready"
-        }
-    })
-
-    await runtime.accept(
-        line: #"""
-        {"id":"req-chatterbox","op":"generate_speech","text":"Please read this first sentence slowly and clearly for testing. Please read this second sentence slowly and clearly for testing. Please read this third sentence slowly and clearly for testing. Please read this fourth sentence slowly and clearly for testing.","profile_name":"default-femme"}
-        """#,
-    )
-
-    #expect(await waitUntil {
-        output.containsJSONObject {
-            $0["id"] as? String == "req-chatterbox"
-                && $0["event"] as? String == "progress"
-                && $0["stage"] as? String == "preroll_ready"
-        }
-    })
-    #expect(await waitUntil { residentRecorder.recordedTexts.count == expectedChunkTexts.count })
-
-    #expect(residentRecorder.recordedTexts == expectedChunkTexts)
-    #expect(residentRecorder.recordedTexts.count == 2)
-    #expect(residentRecorder.lastRefAudioWasProvided == true)
-    #expect(residentRecorder.lastRefText == nil)
 }
 
 @Test func `qwen pre-model text chunking is opt in for live playback`() async throws {

@@ -55,7 +55,6 @@ extension SpeakSwiftly.Runtime {
         stateRootURL: URL? = nil,
         systemProfileResourceRootURL: URL? = nil,
         allowsProfileModelCPUFallback: Bool? = nil,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .singleResidentDynamic,
         startsResidentModelsAutomatically: Bool = true,
     ) async -> SpeakSwiftly.Runtime {
         let environment = ProcessInfo.processInfo.environment
@@ -93,7 +92,6 @@ extension SpeakSwiftly.Runtime {
         let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             allowsProfileModelCPUFallback: allowsProfileModelCPUFallback,
-            marvisResidentPolicy: marvisResidentPolicy,
             duckMediaVolume: configuredDuckMediaVolume,
         )
         let profileStore = ProfileStore(
@@ -136,7 +134,6 @@ extension SpeakSwiftly.Runtime {
             speechBackend: configuredSpeechBackend,
             qwenConditioningStrategy: configuredQwenConditioningStrategy,
             duckMediaVolume: configuredDuckMediaVolume,
-            marvisResidentPolicy: marvisResidentPolicy,
             defaultVoiceProfileName: configuredDefaultVoiceProfile,
             profileStore: profileStore,
             systemProfileResourceStore: systemProfileResourceStore,
