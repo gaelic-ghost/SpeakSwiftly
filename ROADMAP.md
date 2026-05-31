@@ -214,6 +214,7 @@ In Progress
 ### Scope
 
 - [ ] Improve generation-quality telemetry so live playback can distinguish healthy buffer delivery from suspicious or runaway generated audio. ([#83](https://github.com/gaelic-ghost/SpeakSwiftly/issues/83))
+- [ ] Add resource-pressure telemetry and conservative low-memory gates around Qwen generation work so the runtime can fail clearly before memory pressure becomes an operator-visible playback or process failure. ([#82](https://github.com/gaelic-ghost/SpeakSwiftly/issues/82))
 - [ ] Start with Qwen3 live generation while keeping audio-derived metrics reusable across backends.
 - [ ] Prefer a staged rollout: trace-only metrics first, warning events second, conservative cutoff behavior only after thresholds have evidence.
 - [ ] Keep the first guard point before generated sample chunks are scheduled into `AVAudioPlayerNode`, with playback drain and rebuffer telemetry as supporting evidence.
@@ -227,6 +228,8 @@ In Progress
 - [ ] Collect warning telemetry from live-service use before enabling any cutoff behavior, especially `playback_generation_quality_warning` events from real Qwen usage.
 - [ ] Use collected warning logs to tune thresholds and decide whether duration-budget, repeated-window, clipping, DC-offset, or non-finite-sample signals need different severities.
 - [ ] Add conservative cutoff behavior for high-confidence runaway patterns after trace data proves the thresholds.
+- [ ] Capture memory-pressure signals before and during generation, including available memory, resident-model state, active generation count, queued work, and any low-memory warnings that should block new retained or live generation requests.
+- [ ] Define a clear low-memory rejection path that emits a specific operator-facing error instead of allowing generation to start when the current device does not have enough headroom.
 - [ ] Keep raw spoken request text out of normal quality logs while preserving enough context for debugging.
 - [ ] Use `docs/maintainers/generation-quality-guards-plan-2026-05-30.md` and `docs/maintainers/qwen-sampling-headroom-report-2026-04-24.md` as the initial planning notes for the implementation pass.
 
@@ -310,6 +313,8 @@ In Progress
 ## Backlog Candidates
 
 - Notification-linked priority playback is a backlog candidate, not an active milestone. It should only return to Active Milestones after a current issue or implementation plan proves the package should own notification-triggered priority playback instead of leaving that concern to a parent app.
+- Revisit richer public playback event types after the v11 output-destination split settles, especially whether local playback, HTTP response streams, and LAN streams need distinct typed event surfaces or one shared generated-audio observation model. ([#45](https://github.com/gaelic-ghost/SpeakSwiftly/issues/45))
+- Re-test the startup-side playback preload allocator warning against the Qwen-only vNext runtime and close it if the eager playback-preload path is no longer reproducible. ([#7](https://github.com/gaelic-ghost/SpeakSwiftly/issues/7))
 
 ## History
 
