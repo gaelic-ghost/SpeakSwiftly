@@ -92,6 +92,9 @@ extension PlaybackQueue {
         await hooks.playbackCompleted(requestID)
         await hooks.activeRequestChanged()
         await hooks.queueChanged()
+        if queue.isEmpty {
+            await driver.stop()
+        }
         await hooks.resumeQueue()
     }
 }

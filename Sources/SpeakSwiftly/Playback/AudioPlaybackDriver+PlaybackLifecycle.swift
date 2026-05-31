@@ -102,7 +102,7 @@ extension AudioPlaybackDriver {
     }
 
     func rebuildEngine(sampleRate: Double) async throws {
-        tearDownPlaybackHardware(leavingPlaybackEnvironment: true)
+        await tearDownPlaybackHardware(leavingPlaybackEnvironment: false)
         try await playbackEnvironment.prepareForPlaybackStart()
 
         let engine = AVAudioEngine()
@@ -136,7 +136,7 @@ extension AudioPlaybackDriver {
         playerNode?.reset()
     }
 
-    func tearDownPlaybackHardware(leavingPlaybackEnvironment: Bool) {
+    func tearDownPlaybackHardware(leavingPlaybackEnvironment: Bool) async {
         playerNode?.stop()
         audioEngine?.stop()
         playerNode = nil
@@ -144,7 +144,7 @@ extension AudioPlaybackDriver {
         streamingFormat = nil
         engineSampleRate = nil
         if leavingPlaybackEnvironment {
-            playbackEnvironment.finishPlayback()
+            await playbackEnvironment.finishPlayback()
         }
     }
 
@@ -154,7 +154,9 @@ extension AudioPlaybackDriver {
 
         activeRuntimeFailure = error
         shouldPlayInterJobBoop = false
-        stop()
+        Task { @MainActor in
+            await stop()
+        }
         activeRequestState?.resumeDrainContinuation(throwing: error)
     }
 

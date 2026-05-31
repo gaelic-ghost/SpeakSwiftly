@@ -7,6 +7,7 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
     private let audioSession = AVAudioSession.sharedInstance()
     private var observerTasks = [Task<Void, Never>]()
     private var observersInstalled = false
+    private var playbackSessionActive = false
 
     var currentOutputDeviceDescription: String? {
         Self.currentOutputRouteDescription(audioSession.currentRoute)
@@ -81,9 +82,12 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
     }
 
     func prepareForPlaybackStart() async throws {
+        guard !playbackSessionActive else { return }
+
         do {
             try audioSession.setCategory(.playback)
             try audioSession.setActive(true)
+            playbackSessionActive = true
         } catch {
             throw WorkerError(
                 code: .audioPlaybackFailed,
@@ -92,21 +96,24 @@ final class IOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator {
         }
     }
 
-    func finishPlayback() {
+    func finishPlayback() async {
+        guard playbackSessionActive else { return }
+
         do {
             try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            playbackSessionActive = false
         } catch {
             // Keep teardown best-effort so playback shutdown does not mask the real request result.
         }
     }
 
-    func invalidate() {
+    func invalidate() async {
         for observerTask in observerTasks {
             observerTask.cancel()
         }
         observerTasks.removeAll()
         observersInstalled = false
-        finishPlayback()
+        await finishPlayback()
     }
 }
 #endif

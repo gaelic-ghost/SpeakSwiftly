@@ -16,6 +16,7 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
     private var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
     private var routingArbitration = AVAudioRoutingArbiter.shared
     private var observersInstalled = false
+    private var playbackSessionActive = false
 
     var currentOutputDeviceDescription: String? {
         Self.currentDefaultAudioPlaybackDeviceDescription()
@@ -172,6 +173,8 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
     }
 
     func prepareForPlaybackStart() async throws {
+        guard !playbackSessionActive else { return }
+
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             routingArbitration.begin(category: .playback) { _, error in
                 if let error {
@@ -186,15 +189,19 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
                 }
             }
         }
-        mediaVolumeDucker.duckRunningMediaApps()
+        playbackSessionActive = true
+        await mediaVolumeDucker.duckRunningMediaApps()
     }
 
-    func finishPlayback() {
-        mediaVolumeDucker.restoreDuckedMediaApps()
+    func finishPlayback() async {
+        guard playbackSessionActive else { return }
+
+        await mediaVolumeDucker.restoreDuckedMediaApps()
         routingArbitration.leave()
+        playbackSessionActive = false
     }
 
-    func invalidate() {
+    func invalidate() async {
         let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
         for observer in workspaceObservers {
             workspaceNotificationCenter.removeObserver(observer)
@@ -211,7 +218,7 @@ final class MacOSPlaybackEnvironmentCoordinator: PlaybackEnvironmentCoordinator 
             self.defaultOutputDeviceListener = nil
         }
 
-        finishPlayback()
+        await finishPlayback()
         observersInstalled = false
     }
 }

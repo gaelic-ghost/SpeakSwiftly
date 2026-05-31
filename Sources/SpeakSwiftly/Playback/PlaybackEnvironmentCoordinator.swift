@@ -13,8 +13,8 @@ protocol PlaybackEnvironmentCoordinator: AnyObject, Sendable {
     )
 
     func prepareForPlaybackStart() async throws
-    func finishPlayback()
-    func invalidate()
+    func finishPlayback() async
+    func invalidate() async
 }
 
 // MARK: - Playback Environment Factory
