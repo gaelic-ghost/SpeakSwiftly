@@ -17,6 +17,21 @@ private actor EnvironmentEventRecorder {
 
 // MARK: - Playback Utilities
 
+private func makeStreamOnlyResidentModel() -> AnySpeechModel {
+    AnySpeechModel(
+        sampleRate: 24000,
+        generate: { _, _, _, _, _, _ in
+            [0.1, 0.2]
+        },
+        generateSamplesStream: { _, _, _, _, _, _, _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield([0.1, 0.2])
+                continuation.finish()
+            }
+        },
+    )
+}
+
 @Test func `inter job boop samples are short faded and audible`() {
     let sampleRate = 24000.0
     let samples = makeInterJobBoopSamples(sampleRate: sampleRate)
@@ -287,7 +302,8 @@ private actor EnvironmentEventRecorder {
         output: output,
         playback: PlaybackSpy(),
         audioOutputDestination: .httpResponseStream,
-        residentModelLoader: { _ in makeResidentModel() },
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
     )
 
     await runtime.start()
@@ -334,8 +350,10 @@ private actor EnvironmentEventRecorder {
         rootURL: storeRoot,
         output: output,
         playback: PlaybackSpy(),
+        qwenConditioningStrategy: .legacyRaw,
         audioOutputDestination: .httpResponseStream,
-        residentModelLoader: { _ in makeResidentModel() },
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
     )
 
     await runtime.start()
@@ -373,7 +391,9 @@ private actor EnvironmentEventRecorder {
         output: output,
         playback: PlaybackSpy(),
         audioOutputDestination: .networkService(name: "Mac mini"),
-        residentModelLoader: { _ in makeResidentModel() },
+        loadedAudioSamples: nil,
+        residentModelLoader: { _ in makeStreamOnlyResidentModel() },
+        startsResidentModelsAutomatically: false,
     )
 
     try await runtime.setDefaultVoiceProfile("testing-profile")
