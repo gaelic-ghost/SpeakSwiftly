@@ -1236,6 +1236,53 @@ Immediate implications:
   encoded through Qwen3-TTS's tokenizer, not codes from another TTS model, but
   they may still differ from the code distribution produced by the Qwen3 talker.
 
+### Later Decoder Windowing Experiment
+
+Record this as a later experiment, not the next W8A8 fix:
+
+- Take complete generated code sequences with known full-sequence decoder output.
+- Decode fixed-size windows of code steps with left and right overlap.
+- Keep only the stable center region from each decoded window.
+- Crossfade or otherwise smooth joins between retained center regions.
+- Decode the final remainder with padding.
+- Compare the reconstructed stream-like output against full-sequence decode
+  numerically and by listening before considering any streaming-style decoder
+  path.
+
+This is a conscious approximation because the Qwen3-TTS speech tokenizer decoder
+is a full-sequence decoder, not a proven causal streaming decoder.
+
+### Calibration Clarification
+
+Core ML Tools activation quantization calibration is input-only. The API takes
+`sample_data` dictionaries in the same shape as `MLModel.predict(...)`, runs
+those inputs through the original float model, records intermediate activation
+ranges, and inserts quantize/dequantize pairs from those observed ranges. It
+does not take target output waveforms, compare candidate outputs to reference
+audio, or optimize quantization parameters against an output loss.
+
+For the current decoder W8A8 work, that means:
+
+- Our calibration samples are only `audio_codes` inputs.
+- Output audio is used for evaluation after conversion, not for calibration.
+- Better calibration can improve observed activation ranges if the inputs are
+  more representative, but it will not directly teach the quantizer which audio
+  errors matter.
+- A true input-output calibration or tuning lane would be a separate post-training
+  quantization or distillation-style project, not the current Core ML Tools
+  activation-calibration API.
+
+Likely next calibration/evaluation variants:
+
+- Increase LibriTTS-R sample count and speaker/text diversity.
+- Add longer utterances and near-boundary bucket examples.
+- Add Qwen3 talker-generated code histories as a separate calibration/eval
+  source because generated codes may occupy a different distribution than human
+  audio re-encoded through the tokenizer.
+- Compare per-tensor versus any available scoped/per-op quantization variants,
+  and consider disabling activation quantization for numerically sensitive
+  decoder regions if audio drift localizes to specific op families.
+
 ### 2026-05-31 Metal Flash Attention Survey, Pass 1
 
 Reviewed the Swift/Metal FlashAttention port:
