@@ -1858,6 +1858,13 @@ Bucket 72 prompt-000 audio inspection:
 | broad compute-only W8A8 | `0.012348570860922337` | `0.3759765625` | 15 / 24 |
 | `linear` + `matmul` W8A8 | `0.006237064488232136` | `0.24884033203125` | 5 / 24 |
 
+Bucket 72 prompt-001 held-out audio inspection:
+
+| Candidate | Valid mean abs diff | Valid max abs diff | Padded-tail mean abs diff | Alert windows |
+| --- | ---: | ---: | ---: | ---: |
+| broad compute-only W8A8 | `0.006542564835399389` | `0.17669677734375` | `0.005281392019242048` | 3 / 22 |
+| `linear` + `matmul` W8A8 | `0.00341379689052701` | `0.109619140625` | `0.0026827759575098753` | 0 / 22 |
+
 Bucket 88 prompt-002 `linear` + `matmul` follow-up:
 
 | Stage | Mean abs diff | Max abs diff | Notes |
@@ -1870,6 +1877,8 @@ Bucket 88 prompt-002 `linear` + `matmul` follow-up:
 Artifacts:
 
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-000-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-group-16-prompt-001-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-88-fp16-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-bucket-88-fp16-talker-qwen3-linear-matmul-group-16-12hz.json`
 - `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002-12hz.json`

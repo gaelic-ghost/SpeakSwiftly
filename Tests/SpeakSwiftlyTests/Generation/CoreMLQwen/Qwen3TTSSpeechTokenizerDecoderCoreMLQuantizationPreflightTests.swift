@@ -235,6 +235,28 @@ import Testing
     #expect(linearMatmul.audio.windows.topByMeanAbsDiff.first?.startSeconds == 4.25)
 }
 
+@Test func `qwen3 tts speech tokenizer decoder bucket 72 held out linear matmul audio inspection improves drift`() throws {
+    let broad = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-group-16-prompt-001-12hz.json",
+    )
+    let linearMatmul = try Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture.load(
+        "speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001-12hz.json",
+    )
+
+    #expect(linearMatmul.mode == "coreml_decoder_audio_inspection")
+    #expect(linearMatmul.sample.id == "prompt-001")
+    #expect(linearMatmul.sample.audioCodesShape == [67, 16])
+    #expect(linearMatmul.sample.paddedInputShape == [1, 72, 16])
+    #expect(linearMatmul.sample.validOutputSampleCount == 128_640)
+    #expect(linearMatmul.audio.validOutputDiff.sampleCount == 128_640)
+    #expect(linearMatmul.audio.validOutputDiff.meanAbsDiff < broad.audio.validOutputDiff.meanAbsDiff)
+    #expect(linearMatmul.audio.validOutputDiff.meanAbsDiff < 0.0035)
+    #expect(linearMatmul.audio.validOutputDiff.maxAbsDiff < broad.audio.validOutputDiff.maxAbsDiff)
+    #expect(linearMatmul.audio.windows.alertCount == 0)
+    #expect(broad.audio.windows.alertCount == 3)
+    #expect(linearMatmul.audio.windows.topByMeanAbsDiff.first?.startSeconds == 3.25)
+}
+
 @Test func `qwen3 tts speech tokenizer decoder bucket 88 linear matmul records lower drift`() throws {
     let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture.load(
         "speech-tokenizer-decoder-coreml-quantization-bucket-88-fp16-talker-qwen3-linear-matmul-group-16-12hz.json",
