@@ -289,7 +289,7 @@ In Progress
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.
 - [ ] Add `generate.audioStream(...)` only after the host boundary can return a successful chunk stream instead of a failed request handle.
 - [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
-- [ ] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
+- [x] Add runtime routing tests for request-scoped nonlocal output failure paths until real transports are wired.
 - [ ] Remove stale Marvis and Chatterbox E2E lanes and validation-lane references instead of skipping them.
 - [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
 - [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.

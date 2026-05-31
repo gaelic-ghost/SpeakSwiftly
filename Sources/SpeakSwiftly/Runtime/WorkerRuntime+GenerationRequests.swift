@@ -296,9 +296,10 @@ extension SpeakSwiftly.Runtime {
             )
         }
 
+        let outputDestination = audioOutputDestination(for: id)
         if let unsupportedOutputError = unsupportedLiveSpeechOutputError(
             requestID: id,
-            destination: audioOutputDestination(for: id),
+            destination: outputDestination,
         ) {
             throw unsupportedOutputError
         }
@@ -331,31 +332,25 @@ extension SpeakSwiftly.Runtime {
             streamingInterval: playbackState.request.residentStreamingInterval,
         )
         do {
-            switch audioOutputDestination(for: id) {
+            switch outputDestination {
                 case .localPlayback:
                     for try await samples in sampleStream {
                         try Task.checkCancellation()
                         playbackState.execution.continuation.yield(samples)
                     }
                     playbackState.execution.continuation.finish()
-                case .httpResponseStream:
+                case .httpResponseStream,
+                     .networkStream,
+                     .networkService:
                     playbackState.execution.continuation.finish()
-                    throw WorkerError(
-                        code: .invalidRequest,
-                        message: "Request '\(id)' selected HTTP audio streaming, but the worker runtime does not yet expose an HTTP response stream for JSONL live-speech requests. Use the SpeakSwiftlyHTTPAudioOutput module to frame generated chunks at an HTTP server boundary.",
+                    throw unsupportedLiveSpeechOutputError(
+                        requestID: id,
+                        destination: outputDestination,
                     )
-                case let .networkStream(host, port):
-                    playbackState.execution.continuation.finish()
-                    throw WorkerError(
-                        code: .invalidRequest,
-                        message: "Request '\(id)' selected LAN audio streaming to '\(host):\(port)', but the worker runtime does not yet own a Network.framework connection for JSONL live-speech requests. Use the SpeakSwiftlyNetworkAudioOutput module to encode chunks at a LAN transport boundary.",
-                    )
-                case let .networkService(name, type, domain):
-                    playbackState.execution.continuation.finish()
-                    throw WorkerError(
-                        code: .invalidRequest,
-                        message: "Request '\(id)' selected LAN audio streaming to Bonjour service '\(name)' of type '\(type)' in domain '\(domain)', but the worker runtime does not yet own a Network.framework connection for JSONL live-speech requests. Use the SpeakSwiftlyNetworkAudioOutput module to discover receivers and encode chunks at a LAN transport boundary.",
-                    )
+                        ?? WorkerError(
+                            code: .internalError,
+                            message: "Request '\(id)' selected an unsupported live speech output destination, but SpeakSwiftly could not describe the selected output. This indicates a runtime routing bug.",
+                        )
             }
         } catch {
             playbackState.execution.continuation.finish(throwing: error)
