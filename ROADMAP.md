@@ -344,6 +344,7 @@ Research
 - [ ] Use Instruments and Core ML performance reports to verify actual CPU, GPU, and Neural Engine dispatch instead of inferring dispatch from configuration alone.
 - [ ] Build a calibration-data lane for Core ML compression, starting with decoder-only audio-code calibration from open speech datasets and widening later to full-stack prompts, code histories, and reference-conditioning cases.
 - [ ] Probe W8A8 quantization for stages where Core ML Tools and Instruments show a realistic path to M4 Neural Engine execution.
+- [ ] Evaluate Swift/Metal FlashAttention as a separate custom-GPU-kernel lane for autoregressive Qwen attention if Core ML or MLX dispatch overhead becomes the limiting factor.
 - [ ] Evaluate whether autoregressive work can be batched, bucketed, prefetched, or otherwise shaped to avoid tiny per-token prediction overhead.
 - [ ] Compare the first-party Core ML probe against the existing SpeakSwiftly Qwen MLX benchmark lane using matched input text, voice strategy, output duration, real-time factor, memory, startup time, and audible quality notes.
 - [ ] Decide whether the result should become a hidden experimental backend, stay probe-only, feed `SpeakSwiftlyMobile`, or be dropped with evidence.
@@ -354,6 +355,7 @@ Research
 - A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
 - The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
+- The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
 - Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria

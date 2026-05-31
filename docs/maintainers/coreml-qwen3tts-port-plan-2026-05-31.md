@@ -907,6 +907,82 @@ Immediate implications:
   quality-sensitive compression decision. This pass intentionally proves the
   extraction path first.
 
+### 2026-05-31 Metal Flash Attention Survey, Pass 1
+
+Reviewed the Swift/Metal FlashAttention port:
+
+- repository: `https://github.com/philipturner/metal-flash-attention`
+- current `main` commit inspected:
+  `8671cddc38f19a6eadb804dee6a3ca2954b8bf32`
+- latest tag observed: `v1.0.1`
+- license: MIT
+- package product: `FlashAttention`
+- declared platforms: iOS 17, macOS 14, tvOS 17, visionOS 1
+
+Package shape:
+
+- The package exposes a Swift `AttentionDescriptor` plus generated Metal
+  attention kernels.
+- It is a Swift Package Manager library, not a Core ML or MLX layer.
+- The implementation focuses on single-headed attention kernels and uses
+  runtime Metal shader generation.
+- It has separate forward, backward-query, and backward-key-value kernel types.
+- The README recommends `swift build -Xswiftc -Ounchecked` and
+  `swift test -Xswiftc -Ounchecked` for the intended workflow.
+
+Qwen3-TTS shape fit:
+
+- `Qwen/Qwen3-TTS-12Hz-0.6B-Base` talker config has hidden size 1024,
+  16 attention heads, 8 key-value heads, head dimension 128, and 28 hidden
+  layers.
+- Its code predictor config has hidden size 1024, 16 attention heads, 8
+  key-value heads, head dimension 128, and 5 hidden layers.
+- The 12 Hz speech-tokenizer decoder config has hidden size 512, 16 attention
+  heads, 16 key-value heads, and 8 hidden layers.
+- The head dimension and Apple GPU target make this relevant to a custom
+  Swift/Metal talker or decoder path, but the current package is not already a
+  multi-head, grouped-query, causal, KV-cache-aware Qwen attention replacement.
+
+Local validation:
+
+- Environment: Apple M4 Pro, macOS 26.5, Xcode 26.5.
+- `swift test -Xswiftc -Ounchecked --filter SquareAttentionTest.testCorrectness`
+  built the package successfully.
+- The test failed when the package tried to compile generated Metal source at
+  runtime.
+- The Metal compiler rejected inline assembly strings such as
+  `air.simdgroup_async_copy_1d.p3i8.p1i8` and reported missing
+  `__metal_simdgroup_async_copy_1d`, `__metal_simdgroup_async_copy_2d`, and
+  `__metal_wait_simdgroup_events` symbols.
+
+Compatibility notes:
+
+- This failure matches current public notes around macOS 15+ restricting
+  `__asm` in runtime-compiled Metal shaders.
+- A Python package named `mps-flash-attn` documents a fork-like adaptation that
+  adds an `xcrun metal` fallback for macOS 15+ and causal masking support.
+- That package is useful evidence, but it is not a Swift dependency decision for
+  SpeakSwiftly. It should be inspected separately before trusting its forked
+  kernel path.
+
+Immediate implications:
+
+- Metal FlashAttention is not useful for the current decoder-only Core ML path.
+  Core ML owns its own graph execution and cannot call this Swift package inside
+  an ML Program.
+- It could be useful if the first-party Qwen3-TTS effort grows a separate
+  Swift/Metal backend or a custom MLX-adjacent attention stage.
+- The likely target would be the autoregressive talker and code predictor, not
+  the speech-tokenizer decoder-only fixture we are currently quantizing.
+- Before any dependency adoption, the next research slice should build a tiny
+  standalone causal forward-attention probe with Qwen-like dimensions
+  `(heads: 16, kv_heads: 8, head_dim: 128)`, verify current macOS/Xcode
+  compilation behavior, and compare it against MLX/Core ML attention timing.
+- If we pursue it, treat the work as a durable custom GPU-kernel building block,
+  not a local Core ML implementation detail. It would require explicit buffer
+  layout, causal masking, grouped-query attention, KV-cache ownership, and
+  Instruments verification.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
@@ -916,6 +992,9 @@ Immediate implications:
   evidence exists?
 - Should the tokenizer ultimately be ported directly to Swift, shared through a
   generated vocabulary artifact, or vendored from a proven tokenizer library?
+- Should Metal FlashAttention stay as a separate custom-GPU-kernel research
+  lane, or should it become part of the Qwen3-TTS backend story only if Core ML
+  cannot handle autoregressive attention efficiently?
 - What is the minimum evidence needed before adding a public
   `SpeechBackend` case?
 
@@ -943,3 +1022,7 @@ Immediate implications:
   https://developer.apple.com/documentation/coreml/mlcomputeunits
 - Apple Neural Engine transformer guidance:
   https://machinelearning.apple.com/research/neural-engine-transformers
+- Metal FlashAttention Swift package:
+  https://github.com/philipturner/metal-flash-attention
+- mps-flash-attn package notes:
+  https://pypi.org/project/mps-flash-attn/
