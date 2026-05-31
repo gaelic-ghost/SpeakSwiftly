@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "runtime",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "coremltools_version": "9.0",
+    "torch_version": "2.12.0"
+  },
+  "conversion_target": {
+    "stage": "speech_tokenizer_decoder",
+    "input_name": "audio_codes",
+    "input_shape": [
+      1,
+      8,
+      16
+    ],
+    "input_dtype": "int64",
+    "minimum_deployment_target": "macOS15",
+    "convert_to": "mlprogram",
+    "compute_precision": "float32",
+    "torch_output_shape": [
+      1,
+      15360
+    ],
+    "torch_output_min": -0.05528455600142479,
+    "torch_output_max": 0.055146411061286926,
+    "torch_output_mean": 1.5837214959901758e-05,
+    "torch_output_rms": 0.032971180975437164
+  },
+  "trace": {
+    "status": "failed",
+    "strict": false,
+    "check_trace": false,
+    "error_type": "RuntimeError",
+    "error_message": "unordered_map::at: key not found"
+  },
+  "conversion": {
+    "status": "not_started",
+    "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder.mlpackage"
+  }
+}

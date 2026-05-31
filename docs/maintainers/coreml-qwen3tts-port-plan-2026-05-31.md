@@ -527,6 +527,84 @@ Validation:
 - `swift test --filter qwen3` passed with 10 tests covering text tokenization,
   speech-tokenizer config, runtime preflight, and runtime fixture expectations.
 
+### 2026-05-31 Speech Tokenizer Decoder Core ML Probe, Pass 1
+
+Added a decoder-only Core ML conversion probe:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py`
+
+Added checked-in conversion fixtures:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-preflight-12hz.json`
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-12hz.json`
+
+Added SwiftPM tests for the conversion fixtures:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSSpeechTokenizerDecoderCoreMLProbeTests.swift`
+
+Conversion target:
+
+- stage: `speech_tokenizer_decoder`
+- Core ML Tools target: ML Program
+- minimum deployment target: macOS 15
+- input name: `audio_codes`
+- input shape: `[1, 8, 16]`
+- input dtype: `int64`
+- expected output shape: `[1, 15360]`
+- expected output sample rate: 24000 Hz
+- compute precision attempted: float32
+
+Runtime findings:
+
+- The script executes the PyTorch decoder wrapper successfully before tracing.
+- PyTorch output shape is `[1, 15360]`.
+- PyTorch output RMS is `0.032971180975437164`, matching the earlier
+  speech-tokenizer runtime fixture.
+- The first conversion attempt used Python 3.14. Core ML Tools 9.0 installed,
+  but native pieces such as `libcoremlpython` and `libmilstoragepython` failed
+  to load. That attempt is not a useful Core ML conversion result.
+- The second conversion attempt pinned Python 3.12. Core ML Tools native import
+  warnings disappeared, but Torch 2.12.0 remains newer than the latest
+  Core ML Tools-tested Torch version reported by the tool, Torch 2.7.0.
+- Torch tracing failed before Core ML conversion started:
+  `RuntimeError: unordered_map::at: key not found`
+- The script now records this as a structured trace failure with conversion
+  status `not_started`.
+
+Trace warnings before the failure:
+
+- The decoder checks `codes.shape[1]` against the configured quantizer count,
+  which becomes a trace-time constant.
+- The split residual quantizer iterates over codebook tensors, which also
+  becomes shape-specialized.
+- Causal convolution length math and Transformers masking utilities also emit
+  shape-specialization warnings.
+
+Immediate implications:
+
+- The blocker is now the PyTorch trace/export boundary, not Core ML execution
+  quality and not Neural Engine dispatch.
+- The next conversion slice should try the Core ML Tools-tested Torch line,
+  preferably Torch 2.7.x with Python 3.12, before rewriting model code.
+- If Torch 2.7 still fails, the likely next option is a narrower decoder wrapper
+  that removes or rewrites the split residual quantizer's Python iteration and
+  shape checks for this fixed `[1, 8, 16]` probe.
+- No `.mlpackage` was produced in this pass.
+
+Validation:
+
+- Conversion preflight generation succeeded.
+- Runtime conversion probe produced a structured failure report.
+- `jq empty` passed for the Core ML preflight, conversion, and runtime
+  speech-tokenizer fixtures.
+- A path hygiene scan found no `/private`, `/Users`, or `~/` strings in the
+  checked-in Core ML conversion fixtures or script.
+- `uv run --with ruff ruff check` passed for all four Core ML Qwen maintainer
+  scripts.
+- `swift test --filter qwen3` passed with 12 tests covering text tokenization,
+  speech-tokenizer config, runtime fixtures, and the decoder Core ML conversion
+  probe.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

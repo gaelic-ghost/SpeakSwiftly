@@ -210,6 +210,7 @@ def build_runtime_fixture(args: argparse.Namespace, inventory: dict[str, Any]) -
     "encoded": {
       "audio_codes_shape": list(codes.shape),
       "audio_codes_dtype": str(codes.dtype),
+      "audio_codes": codes.astype(int).tolist(),
       "audio_codes_prefix": codes[: min(8, codes.shape[0]), : min(8, codes.shape[1])].astype(int).tolist(),
       "audio_codes_first_quantizer_prefix": codes[: min(24, codes.shape[0]), 0].astype(int).tolist(),
     },

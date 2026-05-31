@@ -13,6 +13,8 @@ import Testing
 
     #expect(fixture.encoded.audioCodesShape == [8, 16])
     #expect(fixture.encoded.audioCodesDtype == "int64")
+    #expect(fixture.encoded.audioCodes.count == 8)
+    #expect(fixture.encoded.audioCodes.allSatisfy { $0.count == 16 })
     #expect(fixture.encoded.audioCodesFirstQuantizerPrefix == [1221, 215, 1521, 1095, 1985, 1985, 1985, 687])
     #expect(fixture.encoded.audioCodesPrefix.first == [1221, 910, 262, 956, 1881, 645, 1588, 1653])
 }
@@ -44,6 +46,7 @@ private struct Qwen3TTSSpeechTokenizerRuntimeFixture: Decodable {
     struct Encoded: Decodable {
         let audioCodesShape: [Int]
         let audioCodesDtype: String
+        let audioCodes: [[Int]]
         let audioCodesPrefix: [[Int]]
         let audioCodesFirstQuantizerPrefix: [Int]
     }
