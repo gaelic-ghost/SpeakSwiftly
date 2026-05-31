@@ -983,6 +983,127 @@ Immediate implications:
   layout, causal masking, grouped-query attention, KV-cache ownership, and
   Instruments verification.
 
+### 2026-05-31 Metal Flash Attention Blocker Triage, Pass 1
+
+Documented Apple/Metal behavior relied on in this triage:
+
+- `MTLDevice.supportsFamily(...)` is the public feature-family check. The local
+  M4 Pro reports support for Apple family 9, Metal 3, and Metal 4.
+- `MTLDevice.makeLibrary(source:options:)` is the public runtime source
+  compilation entry point.
+- `MTLDevice.makeLibrary(data:)` is the public entry point for loading compiled
+  Metal library data.
+- Apple guidance still favors compiling `.metallib` artifacts ahead of time
+  when practical because runtime source compilation adds latency and runtime
+  compiler exposure.
+
+Original Swift package blocker:
+
+- Package inspected: `philipturner/metal-flash-attention`
+- Command:
+  `swift test -Xswiftc -Ounchecked --filter SquareAttentionTest.testCorrectness`
+- Result: Swift package build succeeded, but runtime Metal source compilation
+  failed before kernel execution.
+- Failure mode: the Metal compiler rejected inline assembly strings such as
+  `air.simdgroup_async_copy_1d.p3i8.p1i8`, and reported missing
+  `__metal_simdgroup_async_copy_1d`, `__metal_simdgroup_async_copy_2d`, and
+  `__metal_wait_simdgroup_events`.
+- Practical interpretation: this path is blocked on current macOS/Xcode because
+  it relies on private AIR/simdgroup async-copy compiler hooks that the public
+  runtime Metal source compiler does not accept.
+
+`mpsops/mps-flash-attention` triage:
+
+- Repository inspected: `https://github.com/mpsops/mps-flash-attention`
+- Current commit inspected:
+  `39c2ba51cd009d02c0aa8c9b46ac7db2d1385e77`
+- Submodule inspected:
+  `https://github.com/imperatormk/metal-flash-attention`
+- Submodule commit inspected:
+  `077f1b3db785a8a9f3ccf56300a4142f249fb3fe`
+- MetalASM dependency pinned in the Swift bridge:
+  `https://github.com/mpsops/MetalASM.git` at version `0.1.2`.
+
+Findings:
+
+- `mpsops/mps-flash-attention` is not just the original Swift package wrapped
+  in Python. It carries a forked Metal FlashAttention submodule that emits
+  LLVM IR and assembles it through MetalASM into metallib data, then calls
+  `MTLDevice.makeLibrary(data:)`.
+- That fork adds features relevant to transformer inference: causal masking,
+  external masks, sliding-window masking, attention bias, quantized KV support,
+  batched dispatch, and a `kvRepeatFactor` path in the batched parameter buffer.
+- The Swift bridge builds locally with:
+  `swift build -Xswiftc -Ounchecked`
+- A temporary Swift probe that called `mfa_create_kernel_v7(...)` for a small
+  causal attention kernel still failed during Metal pipeline creation.
+- Failure mode:
+  `AGXMetalG16X Code=2`, `Compilation failed due to an interrupted connection:
+  XPC_ERROR_CONNECTION_INTERRUPTED. This error occurred after multiple retries.`
+- The same failure occurred when running the published `mps-flash-attn` wheel
+  through a Qwen-like MPS tensor probe.
+
+Practical interpretation:
+
+- MetalASM avoids the original public Metal source parser failure, so it is a
+  real workaround for the private `__asm` syntax problem.
+- It does not currently clear the local M4 Pro / macOS 26.5 / Xcode 26.5 path,
+  because the assembled metallib still causes the AGX pipeline compiler service
+  to abort.
+- Before adopting or forking this lane, the next useful work would be to reduce
+  the generated IR to the smallest reproducer that still crashes
+  `makeComputePipelineState(function:)`, then compare that with the package's
+  supported macOS/Xcode matrix.
+
+`alliprice/metal-flash-sdpa` triage:
+
+- Repository inspected: `https://github.com/alliprice/metal-flash-sdpa`
+- Current commit inspected:
+  `28506caae17d638d5af077d2b945b769f21d7441`
+- Implementation family: ccv Metal Flash Attention v2 through a Python/PyTorch
+  C++ bridge.
+- This path is separate from the Swift `metal-flash-attention` package and does
+  not use the same Swift API surface.
+
+Local probe results:
+
+- Non-causal forward tests passed locally:
+  `pytest -q tests/test_forward.py` reported `10 passed`.
+- A Qwen-like non-causal probe with shape `[1, 8, 256, 64]` matched native MPS
+  SDPA with max absolute difference `0.000244140625`.
+- Causal attention ran and produced finite output, but parity was poor.
+- A Qwen-like causal probe with shape `[1, 8, 256, 64]` produced max absolute
+  difference `3.236328125` and mean absolute difference `0.10986328125` versus
+  native SDPA.
+- The repository's own causal test file failed locally:
+  `pytest -q tests/test_causal.py` reported `4 failed, 4 passed`.
+- Representative causal failures had max differences around `3.15` to `3.91`
+  for forward and around `2.91` for `dQ`.
+
+Practical interpretation:
+
+- The ccv-backed package is not blocked by the same MetalASM/AGX pipeline crash.
+- It may be useful evidence for non-causal attention or for understanding
+  ccv/Draw Things kernel design.
+- It is not safe for autoregressive Qwen3-TTS attention in its current local
+  behavior because causal correctness is exactly the requirement we need.
+
+Current decision:
+
+- Do not add any Metal FlashAttention dependency to SpeakSwiftly yet.
+- Do not spend Qwen3-TTS Core ML decoder time on Metal FlashAttention; it cannot
+  accelerate the current Core ML ML Program.
+- Keep the lane open only as a custom Swift/Metal talker/code-predictor research
+  path.
+- The next concrete slice, if we pursue this lane, should be a tiny independent
+  Metal attention harness with:
+  - Qwen-like shapes: 16 Q heads, 8 KV heads, head dimension 128
+  - explicit causal masking
+  - explicit GQA expansion or native grouped-query support
+  - parity against native PyTorch/MLX SDPA
+  - Instruments timing and dispatch evidence
+  - no dependency adoption until both compile and causal parity are proven
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
@@ -1024,5 +1145,17 @@ Immediate implications:
   https://machinelearning.apple.com/research/neural-engine-transformers
 - Metal FlashAttention Swift package:
   https://github.com/philipturner/metal-flash-attention
+- mps-flash-attention package:
+  https://github.com/mpsops/mps-flash-attention
+- metal-flash-sdpa package:
+  https://github.com/alliprice/metal-flash-sdpa
 - mps-flash-attn package notes:
   https://pypi.org/project/mps-flash-attn/
+- Apple `MTLDevice.supportsFamily(...)` documentation:
+  https://developer.apple.com/documentation/metal/mtldevice/3143473-supportsfamily
+- Apple `MTLDevice.makeLibrary(source:options:)` documentation:
+  https://developer.apple.com/documentation/metal/mtldevice/makelibrary%28source%3Aoptions%3A%29
+- Apple `MTLLibrary` documentation:
+  https://developer.apple.com/documentation/metal/mtllibrary/
+- Apple Metal tools guide:
+  https://developer.apple.com/library/archive/documentation/Miscellaneous/Conceptual/MetalProgrammingGuide/Dev-Technique/Dev-Technique.html

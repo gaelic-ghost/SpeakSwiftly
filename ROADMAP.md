@@ -356,6 +356,7 @@ Research
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
 - The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
 - The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
+- Follow-up FlashAttention triage found that `mpsops/mps-flash-attention` moves past the original runtime source parser problem by using MetalASM and `makeLibrary(data:)`, but local pipeline creation still crashes inside the AGX compiler service. The ccv-backed `metal-flash-sdpa` path runs non-causal attention accurately, but local causal tests fail by multi-point differences, so neither path is ready for Qwen autoregressive attention.
 - Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
