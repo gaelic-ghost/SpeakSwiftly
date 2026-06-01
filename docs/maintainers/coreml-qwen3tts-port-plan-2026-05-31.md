@@ -2025,6 +2025,15 @@ First prototype result:
 - The first Swift run compiled the raw package in about `128 ms`, loaded the
   model in about `40.4 s`, warmed once in about `1.58 s`, and measured two hot
   resident predictions at about `83.4 ms`.
+- A second pinned report is
+  `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-probe-bucket-88-w8a8-linear-matmul-prompt-002-12hz.json`.
+  It used the bucket-88 W8A8 `linear` + `matmul` package, Qwen talker
+  `prompt-002`, and `.all` compute units.
+- The bucket-88 sample had 84 valid code steps, padded to `[1, 88, 16]`, with
+  161,280 valid output samples and a 7,680-sample padded tail.
+- The bucket-88 Swift run compiled the raw package in about `118 ms`, loaded the
+  model in about `29.8 s`, warmed once in about `1.59 s`, and measured two hot
+  resident predictions at about `124.6 ms`.
 - Core ML attempted to create an execution cache under the macOS user cache
   directory for `SpeakSwiftlyProbeTool`; the first sandboxed run failed at that
   cache step, while the live-service wrapper still reloaded resident models

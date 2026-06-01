@@ -2,23 +2,26 @@ import Foundation
 import Testing
 
 @Test func `qwen3 tts speech tokenizer decoder resident probe records padded talker decode`() throws {
-    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.load()
-
-    #expect(fixture.schemaVersion == 1)
-    #expect(fixture.toolName == "coreml-qwen-decoder")
-    #expect(fixture.source.computeUnits == "all")
-    #expect(fixture.source.sampleId == "prompt-001")
-    #expect(fixture.sample.audioCodesShape == [67, 16])
-    #expect(fixture.sample.paddedInputShape == [1, 72, 16])
-    #expect(fixture.sample.paddedStepCount == 5)
-    #expect(fixture.sample.padValue == -1)
-    #expect(fixture.sample.validOutputSampleCount == 128_640)
-    #expect(fixture.sample.paddedOutputSampleCount == 138_240)
-    #expect(fixture.prediction.warmupRuns == 1)
-    #expect(fixture.prediction.measuredRuns == 2)
-    #expect(fixture.prediction.outputShape == [1, 138_240])
-    #expect(fixture.prediction.validOutput.sampleCount == 128_640)
-    #expect(fixture.prediction.paddedTail?.sampleCount == 9600)
+    try assertResidentProbe(
+        filename: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.bucket72Filename,
+        sampleId: "prompt-001",
+        audioCodesShape: [67, 16],
+        paddedInputShape: [1, 72, 16],
+        paddedStepCount: 5,
+        validOutputSampleCount: 128_640,
+        paddedOutputSampleCount: 138_240,
+        paddedTailSampleCount: 9600,
+    )
+    try assertResidentProbe(
+        filename: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.bucket88Filename,
+        sampleId: "prompt-002",
+        audioCodesShape: [84, 16],
+        paddedInputShape: [1, 88, 16],
+        paddedStepCount: 4,
+        validOutputSampleCount: 161_280,
+        paddedOutputSampleCount: 168_960,
+        paddedTailSampleCount: 7680,
+    )
 }
 
 @Test func `qwen3 tts speech tokenizer decoder resident probe records hot prediction timing`() throws {
@@ -70,8 +73,10 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture: Decodab
         let paddedTail: AudioSummary?
     }
 
-    static let defaultFilename =
+    static let bucket72Filename =
         "speech-tokenizer-decoder-coreml-resident-probe-bucket-72-w8a8-linear-matmul-prompt-001-12hz.json"
+    static let bucket88Filename =
+        "speech-tokenizer-decoder-coreml-resident-probe-bucket-88-w8a8-linear-matmul-prompt-002-12hz.json"
 
     let schemaVersion: Int
     let toolName: String
@@ -80,7 +85,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture: Decodab
     let prediction: Prediction
 
     static func load(
-        _ filename: String = defaultFilename,
+        _ filename: String = bucket72Filename,
     ) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
             "docs/maintainers/coreml-qwen3tts/\(filename)",
@@ -90,4 +95,33 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture: Decodab
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(Self.self, from: data)
     }
+}
+
+private func assertResidentProbe(
+    filename: String,
+    sampleId: String,
+    audioCodesShape: [Int],
+    paddedInputShape: [Int],
+    paddedStepCount: Int,
+    validOutputSampleCount: Int,
+    paddedOutputSampleCount: Int,
+    paddedTailSampleCount: Int,
+) throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.load(filename)
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.toolName == "coreml-qwen-decoder")
+    #expect(fixture.source.computeUnits == "all")
+    #expect(fixture.source.sampleId == sampleId)
+    #expect(fixture.sample.audioCodesShape == audioCodesShape)
+    #expect(fixture.sample.paddedInputShape == paddedInputShape)
+    #expect(fixture.sample.paddedStepCount == paddedStepCount)
+    #expect(fixture.sample.padValue == -1)
+    #expect(fixture.sample.validOutputSampleCount == validOutputSampleCount)
+    #expect(fixture.sample.paddedOutputSampleCount == paddedOutputSampleCount)
+    #expect(fixture.prediction.warmupRuns == 1)
+    #expect(fixture.prediction.measuredRuns == 2)
+    #expect(fixture.prediction.outputShape == [1, paddedOutputSampleCount])
+    #expect(fixture.prediction.validOutput.sampleCount == validOutputSampleCount)
+    #expect(fixture.prediction.paddedTail?.sampleCount == paddedTailSampleCount)
 }
