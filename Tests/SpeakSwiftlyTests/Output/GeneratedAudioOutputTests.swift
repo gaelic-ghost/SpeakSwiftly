@@ -78,6 +78,50 @@ import Testing
     #expect(sampleChunks == [[0.4, 0.5]])
 }
 
+@MainActor
+@Test func `local generated audio player consumes chunk stream through sample sink`() async throws {
+    let collector = GeneratedAudioChunkCollector()
+    let player = LocalGeneratedAudioPlayer { chunk in
+        await collector.append(chunk)
+    }
+    let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-play",
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [0.4, 0.5],
+        ))
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-play",
+            sequenceNumber: 1,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+
+    try await player.play(chunks: source)
+
+    let received = await collector.chunks()
+    #expect(received.map(\.sequenceNumber) == [0])
+    #expect(received.first?.samples == [0.4, 0.5])
+}
+
+private actor GeneratedAudioChunkCollector {
+    private var values = [GeneratedAudioChunk]()
+
+    func append(_ chunk: GeneratedAudioChunk) {
+        values.append(chunk)
+    }
+
+    func chunks() -> [GeneratedAudioChunk] {
+        values
+    }
+}
+
 @Test func `http audio frames preserve chunk metadata and pcm payload`() throws {
     let chunk = GeneratedAudioChunk(
         requestID: "req-http",

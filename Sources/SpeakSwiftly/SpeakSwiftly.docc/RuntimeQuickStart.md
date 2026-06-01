@@ -108,6 +108,10 @@ Hosts that want selectable LAN audio receivers can use
 Bonjour-advertised audio receivers. A receiver host can attach
 ``SpeakSwiftly/NetworkAudioServiceAdvertisement/listenerService`` to its
 Network.framework listener so other SpeakSwiftly instances can discover it.
+Use ``SpeakSwiftly/NetworkAudioStreamSender`` to send generated chunks to a
+selected endpoint, ``SpeakSwiftly/NetworkAudioStreamListener`` to accept
+token-authenticated inbound streams, and ``SpeakSwiftly/LocalGeneratedAudioPlayer``
+to play the received chunk stream on the local machine.
 
 Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:format:)`` when you want retained file output instead:
 

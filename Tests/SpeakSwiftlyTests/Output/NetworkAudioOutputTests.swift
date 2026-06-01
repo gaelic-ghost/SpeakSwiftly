@@ -21,6 +21,42 @@ import Testing
     #expect(decoded == frame)
 }
 
+@Test func `network audio length prefixed frames decode after partial reads`() throws {
+    let handshake = NetworkAudioStreamHandshake(
+        requestID: "req-lan",
+        senderName: "Mac mini",
+        sharedToken: "secret",
+    )
+    let chunk = GeneratedAudioChunk(
+        requestID: "req-lan",
+        sequenceNumber: 0,
+        sampleRate: 24000,
+        channelCount: 1,
+        samples: [0.1, 0.2],
+    )
+    let handshakeData = try NetworkAudioLengthPrefixedFrameCodec.encode(.handshake(handshake))
+    let audioData = try NetworkAudioLengthPrefixedFrameCodec.encode(.audio(NetworkGeneratedAudioFrame(chunk: chunk)))
+    let combined = handshakeData + audioData
+
+    var partialBuffer = Data(combined.prefix(2))
+    #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer).isEmpty)
+    partialBuffer.append(combined.dropFirst(2).prefix(handshakeData.count - 2))
+    #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer) == [.handshake(handshake)])
+    partialBuffer.append(combined.dropFirst(handshakeData.count))
+    #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer) == [.audio(NetworkGeneratedAudioFrame(chunk: chunk))])
+    #expect(partialBuffer.isEmpty)
+}
+
+@Test func `network audio length prefixed frames reject oversized declarations`() throws {
+    var declaredLength = UInt32(NetworkAudioLengthPrefixedFrameCodec.defaultMaximumFrameByteCount + 1).bigEndian
+    var data = Data(bytes: &declaredLength, count: NetworkAudioLengthPrefixedFrameCodec.prefixByteCount)
+    data.append(Data([0]))
+
+    #expect(throws: GeneratedAudioOutputError.self) {
+        _ = try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &data)
+    }
+}
+
 @Test func `network audio endpoint encodes manual and bonjour destinations`() throws {
     let endpoints: [NetworkAudioEndpoint] = [
         NetworkAudioEndpoint(host: "mac-mini.local", port: 17371),
@@ -83,6 +119,100 @@ import Testing
     #expect(await browser.snapshot().isEmpty)
 }
 
+@Test func `network audio sender streams chunks to loopback listener`() async throws {
+    let listener = NetworkAudioStreamListener(
+        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        port: 0,
+        sharedToken: "secret",
+    )
+    let inboundStreams = await listener.inboundStreams()
+    try await listener.start()
+    let port = try await waitForListeningPort(listener)
+
+    let chunks = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-loopback",
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [0.25],
+        ))
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-loopback",
+            sequenceNumber: 1,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+    let sender = NetworkAudioStreamSender(
+        endpoint: NetworkAudioEndpoint(host: "127.0.0.1", port: port),
+        handshake: NetworkAudioStreamHandshake(
+            requestID: "req-loopback",
+            senderName: "test-sender",
+            sharedToken: "secret",
+        ),
+    )
+    async let sendResult: Void = sender.send(chunks: chunks)
+
+    var iterator = inboundStreams.makeAsyncIterator()
+    let inbound = try #require(await iterator.next())
+    var receivedChunks = [GeneratedAudioChunk]()
+    for try await chunk in inbound.chunks {
+        receivedChunks.append(chunk)
+    }
+    try await sendResult
+    await listener.stop()
+
+    #expect(inbound.requestID == "req-loopback")
+    #expect(inbound.handshake.senderName == "test-sender")
+    #expect(receivedChunks.map(\.sequenceNumber) == [0, 1])
+    #expect(receivedChunks.last?.isFinal == true)
+}
+
+@Test func `network audio listener rejects wrong shared token`() async throws {
+    let listener = NetworkAudioStreamListener(
+        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        port: 0,
+        sharedToken: "secret",
+    )
+    let inboundStreams = await listener.inboundStreams()
+    try await listener.start()
+    let port = try await waitForListeningPort(listener)
+    let chunks = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-rejected",
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+    let sender = NetworkAudioStreamSender(
+        endpoint: NetworkAudioEndpoint(host: "127.0.0.1", port: port),
+        handshake: NetworkAudioStreamHandshake(
+            requestID: "req-rejected",
+            senderName: "test-sender",
+            sharedToken: "wrong",
+        ),
+    )
+
+    do {
+        try await sender.send(chunks: chunks)
+    } catch {
+        // The peer may close before the sender observes success; either way the listener must
+        // not publish an accepted inbound stream.
+    }
+    await listener.stop()
+
+    var iterator = inboundStreams.makeAsyncIterator()
+    #expect(await iterator.next() == nil)
+}
+
 @Test func `configuration carries manual network output destination`() throws {
     let configuration = SpeakSwiftly.Configuration(
         audioOutputDestination: .networkStream(host: "mac-mini.local", port: 17371),
@@ -101,4 +231,16 @@ import Testing
     let decoded = try JSONDecoder().decode(SpeakSwiftly.Configuration.self, from: data)
 
     #expect(decoded.audioOutputDestination == .networkService(name: "Mac mini"))
+}
+
+private func waitForListeningPort(_ listener: NetworkAudioStreamListener) async throws -> UInt16 {
+    for _ in 0..<100 {
+        if case let .listening(port?) = await listener.state {
+            return port
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+
+    Issue.record("Network audio listener did not report a loopback port in time.")
+    throw CancellationError()
 }

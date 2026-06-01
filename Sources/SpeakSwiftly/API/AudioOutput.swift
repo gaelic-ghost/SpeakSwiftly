@@ -19,8 +19,16 @@ public extension SpeakSwiftly {
     typealias NetworkAudioDestinationBrowserState = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestinationBrowserState
     typealias NetworkAudioEndpoint = SpeakSwiftlyNetworkAudioOutput.NetworkAudioEndpoint
     typealias NetworkAudioServiceAdvertisement = SpeakSwiftlyNetworkAudioOutput.NetworkAudioServiceAdvertisement
+    typealias NetworkAudioInboundStream = SpeakSwiftlyNetworkAudioOutput.NetworkAudioInboundStream
+    typealias NetworkAudioLengthPrefixedFrameCodec = SpeakSwiftlyNetworkAudioOutput.NetworkAudioLengthPrefixedFrameCodec
+    typealias NetworkAudioStreamFrame = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamFrame
+    typealias NetworkAudioStreamHandshake = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamHandshake
+    typealias NetworkAudioStreamListener = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamListener
+    typealias NetworkAudioStreamSender = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamSender
+    typealias NetworkAudioStreamState = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamState
     typealias NetworkGeneratedAudioFrame = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrame
     typealias NetworkGeneratedAudioFrameCodec = SpeakSwiftlyNetworkAudioOutput.NetworkGeneratedAudioFrameCodec
+    typealias LocalGeneratedAudioPlayer = SpeakSwiftlyPlayback.LocalGeneratedAudioPlayer
 
     enum AudioOutputDestination: Codable, Sendable, Equatable {
         case localPlayback
