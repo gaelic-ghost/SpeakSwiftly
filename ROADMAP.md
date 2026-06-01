@@ -304,6 +304,10 @@ In Progress
 - [ ] Expand Qwen3 quant benchmarking across macOS power modes, battery versus AC state, sustained thermal states, unrelated CPU load, unrelated GPU or MLX load, unrelated memory pressure, active live-service residency, and longer audible fixtures before deciding automatic backend selection.
 - [ ] Use the Qwen3 benchmark results to decide which quant variants should remain in the supported public matrix and slim any variants that do not justify their maintenance, download, memory, latency, or quality tradeoff.
 - [ ] Design a hardware-sensitive default backend selection system that records detected device facts, explains its selected Qwen backend, and still allows explicit operator configuration.
+- [ ] Harden `SpeakSwiftlyNetworkAudioOutput` after the first server receiver adoption by adding package-level LAN sender/receiver E2E coverage for real chunk streams, transport failure telemetry, receiver/sender cancellation, and reconnection behavior that does not require two Macs in default validation.
+- [ ] Clarify inbound LAN playback policy in `SpeakSwiftlyPlayback`, including whether concurrent inbound streams are queued, mixed, rejected, or delegated to a host-provided policy.
+- [ ] Extend LAN discovery and transport observability so hosts can show discovered receiver metadata, listener state, active stream counts, failed handshakes, and request-scoped transport errors without pretending remote output is a local playback device.
+- [ ] Plan the post-alpha security model for LAN audio beyond a shared token, including pairing, token rotation, Keychain storage, and per-device trust without committing secrets to sample config.
 - [ ] Draft and review `v11.0.0-alpha.1` release notes before starting the release script.
 - [ ] Validate downstream `SpeakSwiftlyServer` adoption separately after the package output modules settle.
 
