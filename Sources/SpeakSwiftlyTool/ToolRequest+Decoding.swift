@@ -68,6 +68,7 @@ extension ToolRequest {
                     voiceProfile: profileName,
                     textProfileID: resolved.textProfileID,
                     requestContext: requestContext,
+                    format: raw.audioFormat ?? .wav,
                 )
 
             case "generate_batch":

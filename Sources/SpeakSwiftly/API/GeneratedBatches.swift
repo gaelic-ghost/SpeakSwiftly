@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftlyFileAudioOutput
 import TextForSpeech
 
 // MARK: - Generated Batch API
@@ -15,6 +16,7 @@ public extension SpeakSwiftly {
             case text
             case textProfile = "text_profile"
             case requestContext = "request_context"
+            case audioFormat = "audio_format"
         }
 
         // MARK: Properties
@@ -23,6 +25,7 @@ public extension SpeakSwiftly {
         public let text: String
         public let textProfile: SpeakSwiftly.TextProfileID?
         public let requestContext: SpeakSwiftly.RequestContext?
+        public let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat
 
         // MARK: Lifecycle
 
@@ -31,11 +34,13 @@ public extension SpeakSwiftly {
             text: String,
             textProfile: SpeakSwiftly.TextProfileID? = nil,
             requestContext: SpeakSwiftly.RequestContext? = nil,
+            audioFormat: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
         ) {
             self.artifactID = artifactID
             self.text = text
             self.textProfile = textProfile
             self.requestContext = requestContext
+            self.audioFormat = audioFormat
         }
     }
 }
@@ -130,6 +135,7 @@ extension SpeakSwiftly.Runtime {
                 textProfile: item.textProfile,
                 sourceFormat: nil,
                 requestContext: item.requestContext,
+                audioFormat: item.audioFormat,
             )
         }
     }
@@ -139,10 +145,12 @@ extension SpeakSwiftly.GenerationArtifact {
     init(_ generatedFile: SpeakSwiftly.GeneratedFile) {
         self.init(
             artifactID: generatedFile.artifactID,
-            kind: .audioWAV,
+            kind: .init(audioFormat: generatedFile.audioFormat),
             createdAt: generatedFile.createdAt,
             filePath: generatedFile.filePath,
             sampleRate: generatedFile.sampleRate,
+            audioFormat: generatedFile.audioFormat,
+            contentType: generatedFile.contentType,
             voiceProfile: generatedFile.voiceProfile,
             textProfile: generatedFile.textProfile,
             sourceFormat: generatedFile.sourceFormat,

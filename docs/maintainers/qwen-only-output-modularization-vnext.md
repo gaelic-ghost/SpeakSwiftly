@@ -31,6 +31,8 @@ output into small self-contained package modules.
   public generation entry point that emits typed async generated-audio chunks.
 - `SpeakSwiftlyPlayback` owns local AVAudioEngine playback and consumes generated
   audio chunks.
+- `SpeakSwiftlyFileAudioOutput` owns retained generated-audio file formats,
+  WAV and AAC/M4A encoding, and generated-file artifact storage.
 - `SpeakSwiftlyHTTPAudioOutput` owns HTTP-friendly generated-audio chunk framing.
 - `SpeakSwiftlyNetworkAudioOutput` owns Network.framework LAN audio stream
   encoding, Bonjour audio-receiver discovery, advertisement metadata, and

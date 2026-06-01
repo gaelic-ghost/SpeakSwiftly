@@ -1,70 +1,40 @@
 import Foundation
 import TextForSpeech
 
-struct GeneratedFileManifest: Codable, Equatable {
-    let version: Int
-    let artifactID: String
-    let createdAt: Date
-    let voiceProfile: String
-    let textProfile: SpeakSwiftly.TextProfileID?
-    let sourceFormat: TextForSpeech.SourceFormat?
-    let requestContext: SpeakSwiftly.RequestContext?
-    let sampleRate: Int
-    let audioFile: String
+public struct GeneratedFileManifest: Codable, Equatable, Sendable {
+    public let version: Int
+    public let artifactID: String
+    public let createdAt: Date
+    public let voiceProfile: String
+    public let textProfile: String?
+    public let sourceFormat: TextForSpeech.SourceFormat?
+    public let requestContext: TextForSpeech.RequestContext?
+    public let sampleRate: Int
+    public let audioFormat: GeneratedAudioFileFormat
+    public let contentType: String
+    public let audioFile: String
 }
 
-extension SpeakSwiftly {
-    /// Metadata for one retained generated audio file.
-    struct GeneratedFile: Codable, Equatable {
-        let artifactID: String
-        let createdAt: Date
-        let voiceProfile: String
-        let textProfile: SpeakSwiftly.TextProfileID?
-        let sourceFormat: TextForSpeech.SourceFormat?
-        let requestContext: SpeakSwiftly.RequestContext?
-        let sampleRate: Int
-        let filePath: String
-
-        enum CodingKeys: String, CodingKey {
-            case artifactID = "artifact_id"
-            case createdAt = "created_at"
-            case voiceProfile = "voice_profile"
-            case textProfile = "text_profile"
-            case sourceFormat = "source_format"
-            case requestContext = "request_context"
-            case sampleRate = "sample_rate"
-            case filePath = "file_path"
-        }
-
-        init(
-            artifactID: String,
-            createdAt: Date,
-            voiceProfile: String,
-            textProfile: SpeakSwiftly.TextProfileID?,
-            sourceFormat: TextForSpeech.SourceFormat?,
-            requestContext: SpeakSwiftly.RequestContext?,
-            sampleRate: Int,
-            filePath: String,
-        ) {
-            self.artifactID = artifactID
-            self.createdAt = createdAt
-            self.voiceProfile = voiceProfile
-            self.textProfile = textProfile
-            self.sourceFormat = sourceFormat
-            self.requestContext = requestContext
-            self.sampleRate = sampleRate
-            self.filePath = filePath
-        }
-    }
+public struct GeneratedFileSummary: Codable, Equatable, Sendable {
+    public let artifactID: String
+    public let createdAt: Date
+    public let voiceProfile: String
+    public let textProfile: String?
+    public let sourceFormat: TextForSpeech.SourceFormat?
+    public let requestContext: TextForSpeech.RequestContext?
+    public let sampleRate: Int
+    public let audioFormat: GeneratedAudioFileFormat
+    public let contentType: String
+    public let filePath: String
 }
 
-struct StoredGeneratedFile: Equatable {
-    let manifest: GeneratedFileManifest
-    let directoryURL: URL
-    let audioURL: URL
+public struct StoredGeneratedFile: Equatable, Sendable {
+    public let manifest: GeneratedFileManifest
+    public let directoryURL: URL
+    public let audioURL: URL
 
-    var summary: SpeakSwiftly.GeneratedFile {
-        SpeakSwiftly.GeneratedFile(
+    public var summary: GeneratedFileSummary {
+        GeneratedFileSummary(
             artifactID: manifest.artifactID,
             createdAt: manifest.createdAt,
             voiceProfile: manifest.voiceProfile,
@@ -72,22 +42,24 @@ struct StoredGeneratedFile: Equatable {
             sourceFormat: manifest.sourceFormat,
             requestContext: manifest.requestContext,
             sampleRate: manifest.sampleRate,
+            audioFormat: manifest.audioFormat,
+            contentType: manifest.contentType,
             filePath: audioURL.standardizedFileURL.path,
         )
     }
 }
 
-struct GeneratedFileStore {
-    static let directoryName = "generated-files"
-    static let manifestFileName = "generated-file.json"
-    static let audioFileName = "generated.wav"
+public struct GeneratedFileStore: @unchecked Sendable {
+    public static let directoryName = "generated-files"
+    public static let manifestFileName = "generated-file.json"
+    public static let defaultAudioFileName = GeneratedAudioFileFormat.wav.fileName
 
-    let rootURL: URL
-    let fileManager: FileManager
-    let encoder: JSONEncoder
-    let decoder: JSONDecoder
+    public let rootURL: URL
+    public let fileManager: FileManager
+    public let encoder: JSONEncoder
+    public let decoder: JSONDecoder
 
-    init(
+    public init(
         rootURL: URL,
         fileManager: FileManager = .default,
         encoder: JSONEncoder = GeneratedFileStore.makeEncoder(),
@@ -99,38 +71,38 @@ struct GeneratedFileStore {
         self.decoder = decoder
     }
 
-    private static func makeEncoder() -> JSONEncoder {
+    public static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }
 
-    private static func makeDecoder() -> JSONDecoder {
+    public static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }
 
-    func ensureRootExists() throws {
+    public func ensureRootExists() throws {
         try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
     }
 
-    func createGeneratedFile(
+    public func createGeneratedFile(
         artifactID: String,
         voiceProfile: String,
-        textProfile: SpeakSwiftly.TextProfileID?,
+        textProfile: String?,
         sourceFormat: TextForSpeech.SourceFormat?,
-        requestContext: SpeakSwiftly.RequestContext?,
+        requestContext: TextForSpeech.RequestContext?,
         sampleRate: Int,
+        audioFormat: GeneratedAudioFileFormat = .wav,
         audioData: Data,
     ) throws -> StoredGeneratedFile {
         try ensureRootExists()
 
         let directoryURL = generatedFileDirectoryURL(for: artifactID)
         guard !fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .generatedFileAlreadyExists,
+            throw GeneratedFileStoreError.generatedFileAlreadyExists(
                 message: "Generated file '\(artifactID)' already exists in the SpeakSwiftly generated-file store and cannot be overwritten.",
             )
         }
@@ -138,7 +110,7 @@ struct GeneratedFileStore {
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: false)
 
         let manifest = GeneratedFileManifest(
-            version: 1,
+            version: 2,
             artifactID: artifactID,
             createdAt: Date(),
             voiceProfile: voiceProfile,
@@ -146,17 +118,18 @@ struct GeneratedFileStore {
             sourceFormat: sourceFormat,
             requestContext: requestContext,
             sampleRate: sampleRate,
-            audioFile: Self.audioFileName,
+            audioFormat: audioFormat,
+            contentType: audioFormat.contentType,
+            audioFile: audioFormat.fileName,
         )
 
         do {
-            try audioData.write(to: audioURL(for: directoryURL), options: .atomic)
+            try audioData.write(to: audioURL(for: directoryURL, fileName: manifest.audioFile), options: .atomic)
             let manifestData = try encoder.encode(manifest)
             try manifestData.write(to: manifestURL(for: directoryURL), options: .atomic)
         } catch {
             try? fileManager.removeItem(at: directoryURL)
-            throw WorkerError(
-                code: .filesystemError,
+            throw GeneratedFileStoreError.filesystemError(
                 message: "Generated file '\(artifactID)' could not be written to disk. \(error.localizedDescription)",
             )
         }
@@ -164,17 +137,16 @@ struct GeneratedFileStore {
         return StoredGeneratedFile(
             manifest: manifest,
             directoryURL: directoryURL,
-            audioURL: audioURL(for: directoryURL),
+            audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile),
         )
     }
 
-    func loadGeneratedFile(id artifactID: String) throws -> StoredGeneratedFile {
+    public func loadGeneratedFile(id artifactID: String) throws -> StoredGeneratedFile {
         try ensureRootExists()
 
         let directoryURL = generatedFileDirectoryURL(for: artifactID)
         guard fileManager.fileExists(atPath: directoryURL.path) else {
-            throw WorkerError(
-                code: .generatedFileNotFound,
+            throw GeneratedFileStoreError.generatedFileNotFound(
                 message: "Generated file '\(artifactID)' was not found in the SpeakSwiftly generated-file store.",
             )
         }
@@ -187,17 +159,16 @@ struct GeneratedFileStore {
                 directoryURL: directoryURL,
                 audioURL: audioURL(for: directoryURL, fileName: manifest.audioFile),
             )
-        } catch let workerError as WorkerError {
-            throw workerError
+        } catch let storeError as GeneratedFileStoreError {
+            throw storeError
         } catch {
-            throw WorkerError(
-                code: .filesystemError,
+            throw GeneratedFileStoreError.filesystemError(
                 message: "Generated file '\(artifactID)' exists, but its metadata could not be read. \(error.localizedDescription)",
             )
         }
     }
 
-    func listGeneratedFiles() throws -> [SpeakSwiftly.GeneratedFile] {
+    public func listGeneratedFiles() throws -> [GeneratedFileSummary] {
         try ensureRootExists()
 
         let urls = try fileManager.contentsOfDirectory(
@@ -224,7 +195,7 @@ struct GeneratedFileStore {
     }
 
     @discardableResult
-    func removeGeneratedFile(id artifactID: String) throws -> SpeakSwiftly.GeneratedFile? {
+    public func removeGeneratedFile(id artifactID: String) throws -> GeneratedFileSummary? {
         try ensureRootExists()
 
         let directoryURL = generatedFileDirectoryURL(for: artifactID)
@@ -237,8 +208,7 @@ struct GeneratedFileStore {
         do {
             try fileManager.removeItem(at: directoryURL)
         } catch {
-            throw WorkerError(
-                code: .filesystemError,
+            throw GeneratedFileStoreError.filesystemError(
                 message: "Generated file '\(artifactID)' was found, but SpeakSwiftly could not remove its stored artifact directory at '\(directoryURL.path)'. \(error.localizedDescription)",
             )
         }
@@ -246,19 +216,25 @@ struct GeneratedFileStore {
         return storedFile.summary
     }
 
-    func generatedFileDirectoryURL(for artifactID: String) -> URL {
+    public func generatedFileDirectoryURL(for artifactID: String) -> URL {
         rootURL.appendingPathComponent(encodedDirectoryName(for: artifactID), isDirectory: true)
     }
 
-    func manifestURL(for directoryURL: URL) -> URL {
+    public func manifestURL(for directoryURL: URL) -> URL {
         directoryURL.appendingPathComponent(Self.manifestFileName)
     }
 
-    func audioURL(for directoryURL: URL, fileName: String = Self.audioFileName) -> URL {
+    public func audioURL(for directoryURL: URL, fileName: String = Self.defaultAudioFileName) -> URL {
         directoryURL.appendingPathComponent(fileName)
     }
 
     private func encodedDirectoryName(for artifactID: String) -> String {
         artifactID.utf8.map { String(format: "%02x", $0) }.joined()
     }
+}
+
+public enum GeneratedFileStoreError: Error, Sendable, Equatable {
+    case generatedFileAlreadyExists(message: String)
+    case generatedFileNotFound(message: String)
+    case filesystemError(message: String)
 }

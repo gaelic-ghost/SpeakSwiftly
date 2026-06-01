@@ -4,6 +4,31 @@ import TextForSpeech
 // MARK: - Worker Runtime Generation Support
 
 extension SpeakSwiftly.Runtime {
+    func loadGeneratedFileSummary(id artifactID: String) throws -> SpeakSwiftly.GeneratedFile {
+        do {
+            return try SpeakSwiftly.GeneratedFile(generatedFileStore.loadGeneratedFile(id: artifactID).summary)
+        } catch let storeError as GeneratedFileStoreError {
+            throw storeError.workerError
+        }
+    }
+
+    func listGeneratedFileSummaries() throws -> [SpeakSwiftly.GeneratedFile] {
+        do {
+            return try generatedFileStore.listGeneratedFiles().map(SpeakSwiftly.GeneratedFile.init)
+        } catch let storeError as GeneratedFileStoreError {
+            throw storeError.workerError
+        }
+    }
+
+    @discardableResult
+    func removeGeneratedFileSummary(id artifactID: String) throws -> SpeakSwiftly.GeneratedFile? {
+        do {
+            return try generatedFileStore.removeGeneratedFile(id: artifactID).map(SpeakSwiftly.GeneratedFile.init)
+        } catch let storeError as GeneratedFileStoreError {
+            throw storeError.workerError
+        }
+    }
+
     private func normalizeSpeechText(
         _ text: String,
         requestContext: SpeakSwiftly.RequestContext?,
@@ -36,7 +61,7 @@ extension SpeakSwiftly.Runtime {
         }
 
         for artifact in job.artifacts {
-            _ = try generatedFileStore.removeGeneratedFile(id: artifact.artifactID)
+            _ = try removeGeneratedFileSummary(id: artifact.artifactID)
         }
 
         return try generationJobStore.markExpired(id: jobID, expiredAt: dependencies.now())
@@ -97,10 +122,12 @@ extension SpeakSwiftly.Runtime {
             profileName: let profileName,
             textProfileID: let textProfileID,
             jobType: .file,
+            audioFormat: let audioFormat,
             requestContext: let requestContext,
             qwenPreModelTextChunking: _,
         ):
-                try generationJobStore.createFileJob(
+                let resolvedAudioFormat = audioFormat ?? .wav
+                return try generationJobStore.createFileJob(
                     jobID: id,
                     voiceProfile: profileName,
                     textProfile: textProfileID,
@@ -111,11 +138,12 @@ extension SpeakSwiftly.Runtime {
                         textProfile: textProfileID,
                         sourceFormat: nil,
                         requestContext: requestContext,
+                        audioFormat: resolvedAudioFormat,
                     ),
                     createdAt: dependencies.now(),
                 )
             case let .queueBatch(id: id, profileName: profileName, items: items):
-                try generationJobStore.createBatchJob(
+                return try generationJobStore.createBatchJob(
                     jobID: id,
                     voiceProfile: profileName,
                     textProfile: request.textProfileID,
@@ -124,7 +152,7 @@ extension SpeakSwiftly.Runtime {
                     createdAt: dependencies.now(),
                 )
             default:
-                nil
+                return nil
         }
     }
 
@@ -136,6 +164,7 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .file,
+            audioFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ),
@@ -161,6 +190,7 @@ extension SpeakSwiftly.Runtime {
             profileName: _,
             textProfileID: _,
             jobType: .file,
+            audioFormat: _,
             requestContext: _,
             qwenPreModelTextChunking: _,
         ),
@@ -177,7 +207,7 @@ extension SpeakSwiftly.Runtime {
 
     func makeSpeechJobState(for request: WorkerRequest) async throws -> LiveSpeechRequestState {
         let text = switch request {
-            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: let text, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 text
             default:
                 ""
@@ -244,7 +274,7 @@ extension SpeakSwiftly.Runtime {
 
     func fileArtifactID(for request: WorkerRequest) -> String {
         switch request {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 "\(id)-artifact-1"
             default:
                 request.id
@@ -304,7 +334,7 @@ extension SpeakSwiftly.Runtime {
             []
         } else {
             try job.artifacts.map { artifact in
-                try generatedFileStore.loadGeneratedFile(id: artifact.artifactID).summary
+                try loadGeneratedFileSummary(id: artifact.artifactID)
             }
         }
 
@@ -342,6 +372,7 @@ extension SpeakSwiftly.Runtime {
                     profileName: _,
                     textProfileID: _,
                     jobType: .file,
+                    audioFormat: _,
                     requestContext: _,
                     qwenPreModelTextChunking: _,
                 ):
@@ -351,10 +382,12 @@ extension SpeakSwiftly.Runtime {
                         if let generatedFile = payload.generatedFile {
                             let artifact = SpeakSwiftly.GenerationArtifact(
                                 artifactID: generatedFile.artifactID,
-                                kind: .audioWAV,
+                                kind: .init(audioFormat: generatedFile.audioFormat),
                                 createdAt: generatedFile.createdAt,
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
+                                audioFormat: generatedFile.audioFormat,
+                                contentType: generatedFile.contentType,
                                 voiceProfile: generatedFile.voiceProfile,
                                 textProfile: generatedFile.textProfile,
                                 sourceFormat: generatedFile.sourceFormat,
@@ -374,10 +407,12 @@ extension SpeakSwiftly.Runtime {
                             let artifacts = generatedBatch.artifacts.map { generatedFile in
                                 SpeakSwiftly.GenerationArtifact(
                                     artifactID: generatedFile.artifactID,
-                                    kind: .audioWAV,
+                                    kind: .init(audioFormat: generatedFile.audioFormat),
                                     createdAt: generatedFile.createdAt,
                                     filePath: generatedFile.filePath,
                                     sampleRate: generatedFile.sampleRate,
+                                    audioFormat: generatedFile.audioFormat,
+                                    contentType: generatedFile.contentType,
                                     voiceProfile: generatedFile.voiceProfile,
                                     textProfile: generatedFile.textProfile,
                                     sourceFormat: generatedFile.sourceFormat,

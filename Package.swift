@@ -26,6 +26,10 @@ let package = Package(
             targets: ["SpeakSwiftlyHTTPAudioOutput"],
         ),
         .library(
+            name: "SpeakSwiftlyFileAudioOutput",
+            targets: ["SpeakSwiftlyFileAudioOutput"],
+        ),
+        .library(
             name: "SpeakSwiftlyNetworkAudioOutput",
             targets: ["SpeakSwiftlyNetworkAudioOutput"],
         ),
@@ -64,6 +68,7 @@ let package = Package(
                 "SpeakSwiftlyQwenGeneration",
                 "SpeakSwiftlyPlayback",
                 "SpeakSwiftlyHTTPAudioOutput",
+                "SpeakSwiftlyFileAudioOutput",
                 "SpeakSwiftlyNetworkAudioOutput",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
@@ -98,6 +103,12 @@ let package = Package(
             name: "SpeakSwiftlyHTTPAudioOutput",
             dependencies: [
                 "SpeakSwiftlyCore",
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyFileAudioOutput",
+            dependencies: [
+                .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
         ),
         .target(
@@ -137,6 +148,7 @@ let package = Package(
                 "SpeakSwiftlyCore",
                 "SpeakSwiftlyPlayback",
                 "SpeakSwiftlyHTTPAudioOutput",
+                "SpeakSwiftlyFileAudioOutput",
                 "SpeakSwiftlyNetworkAudioOutput",
                 "SpeakSwiftlyTool",
                 "SpeakSwiftlyTestSupport",

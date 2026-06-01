@@ -109,13 +109,15 @@ Bonjour-advertised audio receivers. A receiver host can attach
 ``SpeakSwiftly/NetworkAudioServiceAdvertisement/listenerService`` to its
 Network.framework listener so other SpeakSwiftly instances can discover it.
 
-Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)`` when you want retained file output instead:
+Use ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:format:)`` when you want retained file output instead:
 
 ```swift
 let handle = await runtime.generate.audio(
     text: "Keep this as a generated artifact."
 )
 ```
+
+Pass `format: .m4a` when you want Apple-native AAC compression instead of the default WAV artifact.
 
 If a call omits `voiceProfile:`, SpeakSwiftly uses `runtime.defaultVoiceProfile`. The package fallback is `swift-signal`.
 

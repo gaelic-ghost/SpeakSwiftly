@@ -46,6 +46,7 @@ private func makePlaybackRequest(id: String) -> LiveSpeechRequestState {
             profileName: "testing-profile",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),

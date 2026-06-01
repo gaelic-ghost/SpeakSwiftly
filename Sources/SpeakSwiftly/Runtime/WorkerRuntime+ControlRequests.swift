@@ -14,7 +14,7 @@ extension SpeakSwiftly.Runtime {
                     result = try .success(
                         WorkerSuccessPayload(
                             id: id,
-                            generatedFile: generatedFileStore.loadGeneratedFile(id: artifactID).summary,
+                            generatedFile: loadGeneratedFileSummary(id: artifactID),
                         ),
                     )
 
@@ -22,7 +22,7 @@ extension SpeakSwiftly.Runtime {
                     result = try .success(
                         WorkerSuccessPayload(
                             id: id,
-                            generatedFiles: generatedFileStore.listGeneratedFiles(),
+                            generatedFiles: listGeneratedFileSummaries(),
                         ),
                     )
 

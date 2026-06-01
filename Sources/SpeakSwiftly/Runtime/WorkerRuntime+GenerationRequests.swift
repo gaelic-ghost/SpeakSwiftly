@@ -9,7 +9,7 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
-                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, requestContext: _, qwenPreModelTextChunking: _):
+                case .queueSpeech(id: let id, text: let text, profileName: let profileName, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
@@ -19,6 +19,7 @@ extension SpeakSwiftly.Runtime {
                 profileName: let profileName,
                 textProfileID: let textProfileID,
                 jobType: .file,
+                audioFormat: let audioFormat,
                 requestContext: let requestContext,
                 qwenPreModelTextChunking: _,
             ):
@@ -30,16 +31,19 @@ extension SpeakSwiftly.Runtime {
                         voiceProfile: profileName,
                         textProfile: textProfileID,
                         requestContext: requestContext,
+                        audioFormat: audioFormat ?? .wav,
                     )
                     let completedJob = try generationJobStore.markCompleted(
                         id: id,
                         artifacts: [
                             SpeakSwiftly.GenerationArtifact(
                                 artifactID: generatedFile.artifactID,
-                                kind: .audioWAV,
+                                kind: .init(audioFormat: generatedFile.audioFormat),
                                 createdAt: generatedFile.createdAt,
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
+                                audioFormat: generatedFile.audioFormat,
+                                contentType: generatedFile.contentType,
                                 voiceProfile: generatedFile.voiceProfile,
                                 textProfile: generatedFile.textProfile,
                                 sourceFormat: generatedFile.sourceFormat,
@@ -72,10 +76,12 @@ extension SpeakSwiftly.Runtime {
                         artifacts: generatedFiles.map { generatedFile in
                             SpeakSwiftly.GenerationArtifact(
                                 artifactID: generatedFile.artifactID,
-                                kind: .audioWAV,
+                                kind: .init(audioFormat: generatedFile.audioFormat),
                                 createdAt: generatedFile.createdAt,
                                 filePath: generatedFile.filePath,
                                 sampleRate: generatedFile.sampleRate,
+                                audioFormat: generatedFile.audioFormat,
+                                contentType: generatedFile.contentType,
                                 voiceProfile: generatedFile.voiceProfile,
                                 textProfile: generatedFile.textProfile,
                                 sourceFormat: generatedFile.sourceFormat,
@@ -423,6 +429,7 @@ extension SpeakSwiftly.Runtime {
                     voiceProfile: profileName,
                     textProfile: item.textProfile,
                     requestContext: item.requestContext,
+                    audioFormat: item.audioFormat,
                 ),
             )
         }

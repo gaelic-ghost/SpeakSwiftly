@@ -26,6 +26,8 @@ import Testing
     #expect(loaded.summary.voiceProfile == "default-femme")
     #expect(loaded.summary.textProfile == "logs")
     #expect(loaded.summary.sampleRate == 24000)
+    #expect(loaded.summary.audioFormat == .wav)
+    #expect(loaded.summary.contentType == "audio/wav")
     #expect(loaded.summary.filePath == created.audioURL.path)
 
     let listed = try store.listGeneratedFiles()
@@ -65,7 +67,7 @@ import Testing
     try Data([0x04, 0x05, 0x06]).write(to: store.audioURL(for: staleDirectoryURL))
 
     #expect(try store.listGeneratedFiles() == [loaded.summary])
-    #expect(throws: WorkerError.self) {
+    #expect(throws: GeneratedFileStoreError.self) {
         _ = try store.loadGeneratedFile(id: staleArtifactID)
     }
 }
@@ -76,9 +78,31 @@ import Testing
 
     let store = try makeGeneratedFileStore(rootURL: rootURL)
 
-    #expect(throws: WorkerError(code: .generatedFileNotFound, message: "Generated file 'missing' was not found in the SpeakSwiftly generated-file store.")) {
+    #expect(throws: GeneratedFileStoreError.generatedFileNotFound(message: "Generated file 'missing' was not found in the SpeakSwiftly generated-file store.")) {
         _ = try store.loadGeneratedFile(id: "missing")
     }
+}
+
+@Test func `generated file store writes m4a artifacts with format metadata`() throws {
+    let rootURL = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: rootURL) }
+
+    let store = try makeGeneratedFileStore(rootURL: rootURL)
+    let created = try store.createGeneratedFile(
+        artifactID: "req-file-m4a",
+        voiceProfile: "default-femme",
+        textProfile: nil,
+        sourceFormat: nil,
+        requestContext: nil,
+        sampleRate: 24000,
+        audioFormat: .m4a,
+        audioData: Data([0x01, 0x02, 0x03]),
+    )
+
+    #expect(created.audioURL.lastPathComponent == "generated.m4a")
+    #expect(created.summary.audioFormat == .m4a)
+    #expect(created.summary.contentType == "audio/mp4")
+    #expect(created.summary.filePath.hasSuffix("generated.m4a"))
 }
 
 @Test func `generated file store removes persisted artifacts`() throws {

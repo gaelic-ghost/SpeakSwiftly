@@ -28,6 +28,7 @@ enum ToolRequest: Equatable {
         voiceProfile: SpeakSwiftly.Name?,
         textProfileID: SpeakSwiftly.TextProfileID?,
         requestContext: SpeakSwiftly.RequestContext?,
+        format: SpeakSwiftly.GeneratedAudioFileFormat,
     )
     case batch(id: String, voiceProfile: SpeakSwiftly.Name?, items: [SpeakSwiftly.BatchItem])
     case generatedFile(id: String, artifactID: String)
@@ -104,7 +105,7 @@ enum ToolRequest: Equatable {
     var id: String {
         switch self {
             case let .speech(id, _, _, _, _, _),
-                 let .audio(id, _, _, _, _),
+                 let .audio(id, _, _, _, _, _),
                  let .batch(id, _, _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
@@ -167,13 +168,14 @@ enum ToolRequest: Equatable {
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
-            case let .audio(id, text, voiceProfile, textProfileID, requestContext):
+            case let .audio(id, text, voiceProfile, textProfileID, requestContext, format):
                 return await tool.audio(
                     requestID: id,
                     text: text,
                     voiceProfile: voiceProfile,
                     textProfile: textProfileID,
                     requestContext: requestContext,
+                    format: format,
                 )
             case let .batch(id, voiceProfile, items):
                 return await tool.batch(requestID: id, items, voiceProfile: voiceProfile)
@@ -306,6 +308,7 @@ extension ToolRequest {
         profileName: SpeakSwiftly.Name?,
         textProfileID: SpeakSwiftly.TextProfileID?,
         jobType: ToolSpeechJobType,
+        audioFormat: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
         requestContext: SpeakSwiftly.RequestContext?,
         qwenPreModelTextChunking: Bool?,
     ) -> ToolRequest {
@@ -327,6 +330,7 @@ extension ToolRequest {
                     voiceProfile: voiceProfile,
                     textProfileID: textProfileID,
                     requestContext: requestContext,
+                    format: audioFormat,
                 )
         }
     }
@@ -421,13 +425,14 @@ extension ToolRequest {
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
-            case let .audio(id, text, nil, textProfileID, requestContext):
+            case let .audio(id, text, nil, textProfileID, requestContext, format):
                 .audio(
                     id: id,
                     text: text,
                     voiceProfile: defaultVoiceProfileName,
                     textProfileID: textProfileID,
                     requestContext: requestContext,
+                    format: format,
                 )
             case let .batch(id, nil, items):
                 .batch(id: id, voiceProfile: defaultVoiceProfileName, items: items)

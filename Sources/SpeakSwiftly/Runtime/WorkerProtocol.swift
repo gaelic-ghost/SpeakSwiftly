@@ -8,6 +8,7 @@ enum WorkerRequest: Equatable {
         profileName: String,
         textProfileID: String?,
         jobType: SpeechJobType,
+        audioFormat: SpeakSwiftly.GeneratedAudioFileFormat?,
         requestContext: SpeakSwiftly.RequestContext?,
         qwenPreModelTextChunking: Bool?,
     )
@@ -81,7 +82,7 @@ enum WorkerRequest: Equatable {
 
     var id: String {
         switch self {
-            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, requestContext: _, qwenPreModelTextChunking: _),
+            case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch(id: let id, profileName: _, items: _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
@@ -132,9 +133,9 @@ enum WorkerRequest: Equatable {
 
     var opName: String {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 "generate_speech"
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 "generate_audio_file"
             case .queueBatch:
                 "generate_batch"
@@ -279,7 +280,7 @@ enum WorkerRequest: Equatable {
 
     var requiresPlayback: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 true
             default:
                 false
@@ -297,7 +298,7 @@ enum WorkerRequest: Equatable {
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, requestContext: _, qwenPreModelTextChunking: _),
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch,
                  .switchSpeechBackend,
                  .reloadModels,
@@ -369,7 +370,7 @@ enum WorkerRequest: Equatable {
 
     var voiceProfile: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, requestContext: _, qwenPreModelTextChunking: _),
+            case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch(id: _, profileName: let profileName, items: _),
                  let .createProfile(_, profileName, _, _, _, _, _, _, _),
                  let .createClone(_, profileName, _, _, _, _),
@@ -424,7 +425,7 @@ enum WorkerRequest: Equatable {
 
     var textProfileID: String? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: let textProfileID, jobType: _, requestContext: _, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: let textProfileID, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 return textProfileID
             case .queueBatch(id: _, profileName: _, items: let items):
                 let ids = Set(items.compactMap(\.textProfile))
@@ -481,7 +482,7 @@ enum WorkerRequest: Equatable {
 
     var requestContext: SpeakSwiftly.RequestContext? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, requestContext: let requestContext, qwenPreModelTextChunking: _):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: let requestContext, qwenPreModelTextChunking: _):
                 requestContext
             case .queueBatch:
                 nil
@@ -534,7 +535,7 @@ enum WorkerRequest: Equatable {
 
     var qwenPreModelTextChunking: Bool? {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, requestContext: _, qwenPreModelTextChunking: let qwenPreModelTextChunking):
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: let qwenPreModelTextChunking):
                 qwenPreModelTextChunking
             default:
                 nil
@@ -543,13 +544,14 @@ enum WorkerRequest: Equatable {
 
     func resolvingRuntimeDefaultVoiceProfile(_ defaultVoiceProfileName: String) -> WorkerRequest {
         switch self {
-            case let .queueSpeech(id, text, profileName, textProfileID, jobType, requestContext, qwenPreModelTextChunking):
+            case let .queueSpeech(id, text, profileName, textProfileID, jobType, audioFormat, requestContext, qwenPreModelTextChunking):
                 .queueSpeech(
                     id: id,
                     text: text,
                     profileName: profileName == Self.runtimeDefaultVoiceProfilePlaceholder ? defaultVoiceProfileName : profileName,
                     textProfileID: textProfileID,
                     jobType: jobType,
+                    audioFormat: audioFormat,
                     requestContext: requestContext,
                     qwenPreModelTextChunking: qwenPreModelTextChunking,
                 )
