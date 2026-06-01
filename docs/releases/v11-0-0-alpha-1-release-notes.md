@@ -14,6 +14,8 @@
   response streaming.
 - Added Network.framework audio frame encoding plus Bonjour audio-receiver
   discovery primitives for LAN receiver selection.
+- Added follow-up LAN stream sender/listener primitives for length-prefixed,
+  token-authenticated Network.framework audio receiver workflows.
 - Raised the `TextForSpeech` dependency floor to `0.23.0`.
 
 ## Breaking Changes
