@@ -2039,10 +2039,16 @@ First prototype result:
   `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json`.
   It loaded bucket 72 and bucket 88 once in one process, then routed
   `prompt-001` to bucket 72 and `prompt-002` to bucket 88.
-- In the catalog run, bucket 72 compiled in about `112 ms` and loaded in about
-  `17.4 s`, while bucket 88 compiled in about `109 ms` and loaded in about
-  `30.9 s`. Hot resident prediction means were about `84.3 ms` for prompt-001
-  and about `109.6 ms` for prompt-002.
+- In the refreshed catalog run, bucket 72 compiled in about `129 ms` and loaded
+  in about `39.1 s`, while bucket 88 compiled in about `116 ms` and loaded in
+  about `27.4 s`. Hot resident prediction means were about `83.8 ms` for
+  prompt-001 and about `107.9 ms` for prompt-002.
+- The refreshed report records process RSS snapshots around the resident-catalog
+  work: about `22 MiB` at start, `144 MiB` after bucket 72 loads, `218 MiB`
+  after bucket 88 loads, `524 MiB` after prompt-001 predicts, and `630 MiB`
+  after prompt-002 predicts. That suggests model construction is not the whole
+  memory story; first prediction per bucket is also material and should be
+  included in backend residency planning.
 - This confirms the backend-relevant shape is feasible at the probe level:
   declare bucket packages, load them once, route by code length, trim valid
   output, and keep public runtime surfaces unchanged while gathering evidence.

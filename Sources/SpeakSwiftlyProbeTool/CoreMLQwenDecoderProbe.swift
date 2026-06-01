@@ -1,4 +1,5 @@
 import CoreML
+import Darwin
 import Foundation
 
 extension SpeakSwiftlyProbeToolMain {
@@ -110,12 +111,18 @@ extension SpeakSwiftlyProbeToolMain {
             let paddedTail: CoreMLQwenDecoderReport.AudioSummary?
         }
 
+        struct MemorySnapshot: Encodable {
+            let label: String
+            let residentSizeBytes: UInt64?
+        }
+
         let schemaVersion: Int
         let toolName: String
         let mode: String
         let createdAtUTC: String
         let source: Source
         let buckets: [Bucket]
+        let memorySnapshots: [MemorySnapshot]
         let predictions: [Prediction]
     }
 
@@ -350,11 +357,20 @@ extension SpeakSwiftlyProbeToolMain {
                 )
             }
             .sorted { $0.bucket < $1.bucket }
-        let loadedBuckets = try bucketModels.map { option in
-            try loadCoreMLQwenBucket(
+
+        var memorySnapshots = [
+            coreMLQwenMemorySnapshot(label: "start"),
+        ]
+        var loadedBuckets = [CoreMLQwenLoadedBucket]()
+        for option in bucketModels {
+            let loadedBucket = try loadCoreMLQwenBucket(
                 bucket: option.bucket,
                 modelPackage: option.modelPackage,
                 computeUnits: computeUnits,
+            )
+            loadedBuckets.append(loadedBucket)
+            memorySnapshots.append(
+                coreMLQwenMemorySnapshot(label: "after_load_bucket_\(option.bucket)"),
             )
         }
 
@@ -385,7 +401,11 @@ extension SpeakSwiftlyProbeToolMain {
                     paddedTail: prediction.tailSamples.isEmpty ? nil : audioSummary(prediction.tailSamples),
                 ),
             )
+            memorySnapshots.append(
+                coreMLQwenMemorySnapshot(label: "after_prediction_\(sampleID)"),
+            )
         }
+        memorySnapshots.append(coreMLQwenMemorySnapshot(label: "end"))
 
         let report = CoreMLQwenDecoderCatalogReport(
             schemaVersion: 1,
@@ -408,6 +428,7 @@ extension SpeakSwiftlyProbeToolMain {
                     loadDurationMs: $0.loadDurationMs,
                 )
             },
+            memorySnapshots: memorySnapshots,
             predictions: predictions,
         )
 
@@ -456,6 +477,36 @@ extension SpeakSwiftlyProbeToolMain {
         let start = monotonicMilliseconds()
         let compiledURL = try MLModel.compileModel(at: url)
         return (compiledURL, monotonicMilliseconds() - start)
+    }
+
+    static func coreMLQwenMemorySnapshot(
+        label: String,
+    ) -> CoreMLQwenDecoderCatalogReport.MemorySnapshot {
+        .init(
+            label: label,
+            residentSizeBytes: currentResidentMemoryBytes(),
+        )
+    }
+
+    static func currentResidentMemoryBytes() -> UInt64? {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { reboundPointer in
+                task_info(
+                    mach_task_self_,
+                    task_flavor_t(MACH_TASK_BASIC_INFO),
+                    reboundPointer,
+                    &count,
+                )
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            return nil
+        }
+
+        return UInt64(info.resident_size)
     }
 
     static func requiredPath(_ value: String?, label: String) throws -> String {

@@ -47,6 +47,15 @@ import Testing
     #expect(fixture.buckets.map(\.bucket) == [72, 88])
     #expect(fixture.buckets.allSatisfy { $0.compileDurationMs ?? 0 > 0 })
     #expect(fixture.buckets.allSatisfy { $0.loadDurationMs > 0 })
+    #expect(fixture.memorySnapshots.map(\.label) == [
+        "start",
+        "after_load_bucket_72",
+        "after_load_bucket_88",
+        "after_prediction_prompt-001",
+        "after_prediction_prompt-002",
+        "end",
+    ])
+    #expect(fixture.memorySnapshots.allSatisfy { ($0.residentSizeBytes ?? 0) > 0 })
 
     try assertResidentCatalogPrediction(
         fixture.predictionForSample(id: "prompt-001"),
@@ -148,6 +157,11 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
         let loadDurationMs: Double
     }
 
+    struct MemorySnapshot: Decodable {
+        let label: String
+        let residentSizeBytes: UInt64?
+    }
+
     struct Prediction: Decodable {
         let sample: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.Sample
         let selectedBucket: Int
@@ -168,6 +182,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
     let mode: String
     let source: Source
     let buckets: [Bucket]
+    let memorySnapshots: [MemorySnapshot]
     let predictions: [Prediction]
 
     static func load() throws -> Self {
