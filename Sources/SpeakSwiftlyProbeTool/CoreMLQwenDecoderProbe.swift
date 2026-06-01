@@ -9,6 +9,7 @@ extension SpeakSwiftlyProbeToolMain {
         var talkerCodeFixture: String?
         var sampleIDs = [String]()
         var computeUnits = "all"
+        var catalogPasses = 1
         var warmupRuns = 1
         var measuredRuns = 5
         var output: String?
@@ -81,6 +82,7 @@ extension SpeakSwiftlyProbeToolMain {
             let talkerCodeFixture: String
             let sampleIds: [String]
             let computeUnits: String
+            let catalogPasses: Int
             let bucketModels: [BucketModel]
         }
 
@@ -97,6 +99,7 @@ extension SpeakSwiftlyProbeToolMain {
         }
 
         struct Prediction: Encodable {
+            let passIndex: Int
             let sample: CoreMLQwenDecoderReport.Sample
             let selectedBucket: Int
             let fixtureAssignedBucket: Int
@@ -208,6 +211,14 @@ extension SpeakSwiftlyProbeToolMain {
                     }
 
                     options.computeUnits = value
+                case "--catalog-passes":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    guard let passes = Int(value), passes > 0 else {
+                        throw UsageError.invalidOptionValue(argument, value)
+                    }
+
+                    options.catalogPasses = passes
                 case "--warmup-runs":
                     index += 1
                     let value = try requireOptionValue(arguments, index: index, for: argument)
@@ -249,6 +260,12 @@ extension SpeakSwiftlyProbeToolMain {
                 throw CoreMLQwenProbeError(
                     message: "SpeakSwiftlyProbeTool single-package Core ML decoder mode requires exactly " +
                         "one --sample-id. Use --bucket-model for a multi-sample resident bucket catalog run.",
+                )
+            }
+            guard options.catalogPasses == 1 else {
+                throw CoreMLQwenProbeError(
+                    message: "SpeakSwiftlyProbeTool --catalog-passes is only valid with " +
+                        "resident bucket catalog mode. Add repeatable --bucket-model entries to use it.",
                 )
             }
         } else {
@@ -375,35 +392,38 @@ extension SpeakSwiftlyProbeToolMain {
         }
 
         var predictions = [CoreMLQwenDecoderCatalogReport.Prediction]()
-        for sampleID in options.sampleIDs {
-            let sample = try loadTalkerCodeSample(fixturePath: talkerCodeFixture, sampleID: sampleID)
-            let selectedBucket = try selectedBucket(for: sample, loadedBuckets: loadedBuckets)
-            let paddedCodes = try paddedTalkerCodes(sample: sample, bucket: selectedBucket.bucket)
-            let prediction = try runCoreMLQwenPrediction(
-                model: selectedBucket.model,
-                paddedCodes: paddedCodes,
-                warmupRuns: options.warmupRuns,
-                measuredRuns: options.measuredRuns,
-            )
-            try predictions.append(
-                .init(
-                    sample: reportSample(for: paddedCodes),
-                    selectedBucket: selectedBucket.bucket,
-                    fixtureAssignedBucket: sample.bucketAssignment.assignedBucket,
+        for passIndex in 1...options.catalogPasses {
+            for sampleID in options.sampleIDs {
+                let sample = try loadTalkerCodeSample(fixturePath: talkerCodeFixture, sampleID: sampleID)
+                let selectedBucket = try selectedBucket(for: sample, loadedBuckets: loadedBuckets)
+                let paddedCodes = try paddedTalkerCodes(sample: sample, bucket: selectedBucket.bucket)
+                let prediction = try runCoreMLQwenPrediction(
+                    model: selectedBucket.model,
+                    paddedCodes: paddedCodes,
                     warmupRuns: options.warmupRuns,
                     measuredRuns: options.measuredRuns,
-                    warmup: timingStats(prediction.warmupDurations),
-                    measured: requiredTimingStats(prediction.measuredDurations),
-                    outputShape: prediction.audioValues.shape.map(\.intValue),
-                    outputDataType: "\(prediction.audioValues.dataType)",
-                    fullOutput: audioSummary(prediction.allSamples),
-                    validOutput: audioSummary(prediction.validSamples),
-                    paddedTail: prediction.tailSamples.isEmpty ? nil : audioSummary(prediction.tailSamples),
-                ),
-            )
-            memorySnapshots.append(
-                coreMLQwenMemorySnapshot(label: "after_prediction_\(sampleID)"),
-            )
+                )
+                try predictions.append(
+                    .init(
+                        passIndex: passIndex,
+                        sample: reportSample(for: paddedCodes),
+                        selectedBucket: selectedBucket.bucket,
+                        fixtureAssignedBucket: sample.bucketAssignment.assignedBucket,
+                        warmupRuns: options.warmupRuns,
+                        measuredRuns: options.measuredRuns,
+                        warmup: timingStats(prediction.warmupDurations),
+                        measured: requiredTimingStats(prediction.measuredDurations),
+                        outputShape: prediction.audioValues.shape.map(\.intValue),
+                        outputDataType: "\(prediction.audioValues.dataType)",
+                        fullOutput: audioSummary(prediction.allSamples),
+                        validOutput: audioSummary(prediction.validSamples),
+                        paddedTail: prediction.tailSamples.isEmpty ? nil : audioSummary(prediction.tailSamples),
+                    ),
+                )
+                memorySnapshots.append(
+                    coreMLQwenMemorySnapshot(label: "after_prediction_pass_\(passIndex)_\(sampleID)"),
+                )
+            }
         }
         memorySnapshots.append(coreMLQwenMemorySnapshot(label: "end"))
 
@@ -416,6 +436,7 @@ extension SpeakSwiftlyProbeToolMain {
                 talkerCodeFixture: talkerCodeFixture,
                 sampleIds: options.sampleIDs,
                 computeUnits: options.computeUnits,
+                catalogPasses: options.catalogPasses,
                 bucketModels: bucketModels.map {
                     .init(bucket: $0.bucket, modelPackage: $0.modelPackage)
                 },

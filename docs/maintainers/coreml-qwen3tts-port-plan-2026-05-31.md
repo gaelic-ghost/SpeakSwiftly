@@ -2035,20 +2035,24 @@ First prototype result:
   model in about `29.8 s`, warmed once in about `1.59 s`, and measured two hot
   resident predictions at about `124.6 ms`.
 - The command now also has a resident bucket-catalog mode through repeatable
-  `--bucket-model BUCKET=PATH` arguments. The first pinned catalog report is
+  `--bucket-model BUCKET=PATH` arguments and repeatable in-process catalog
+  passes through `--catalog-passes COUNT`. The current pinned catalog report is
   `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json`.
   It loaded bucket 72 and bucket 88 once in one process, then routed
-  `prompt-001` to bucket 72 and `prompt-002` to bucket 88.
-- In the refreshed catalog run, bucket 72 compiled in about `129 ms` and loaded
-  in about `39.1 s`, while bucket 88 compiled in about `116 ms` and loaded in
-  about `27.4 s`. Hot resident prediction means were about `83.8 ms` for
-  prompt-001 and about `107.9 ms` for prompt-002.
+  `prompt-001` to bucket 72 and `prompt-002` to bucket 88 across two catalog
+  passes.
+- In the two-pass catalog run, bucket 72 compiled in about `144 ms` and loaded
+  in about `36.3 s`, while bucket 88 compiled in about `114 ms` and loaded in
+  about `31.6 s`. First pass warmups were about `1.74 s` for prompt-001 and
+  `1.62 s` for prompt-002, while second pass warmups fell to about `100 ms` and
+  `109 ms`. Pass-two measured means were about `84.6 ms` for prompt-001 and
+  about `109.2 ms` for prompt-002.
 - The refreshed report records process RSS snapshots around the resident-catalog
-  work: about `22 MiB` at start, `144 MiB` after bucket 72 loads, `218 MiB`
-  after bucket 88 loads, `524 MiB` after prompt-001 predicts, and `630 MiB`
-  after prompt-002 predicts. That suggests model construction is not the whole
-  memory story; first prediction per bucket is also material and should be
-  included in backend residency planning.
+  work: about `22 MiB` at start, `235 MiB` after bucket 72 loads, `220 MiB`
+  after bucket 88 loads, `513 MiB` after bucket 72 first predicts, and `616 MiB`
+  after bucket 88 first predicts. The second pass stayed essentially flat around
+  `616 MiB`, which supports treating first prediction per bucket as an explicit
+  warm-residency step.
 - This confirms the backend-relevant shape is feasible at the probe level:
   declare bucket packages, load them once, route by code length, trim valid
   output, and keep public runtime surfaces unchanged while gathering evidence.

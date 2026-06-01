@@ -42,6 +42,7 @@ import Testing
     #expect(fixture.toolName == "coreml-qwen-decoder")
     #expect(fixture.mode == "resident_bucket_catalog")
     #expect(fixture.source.computeUnits == "all")
+    #expect(fixture.source.catalogPasses == 2)
     #expect(fixture.source.sampleIds == ["prompt-001", "prompt-002"])
     #expect(fixture.source.bucketModels.map(\.bucket) == [72, 88])
     #expect(fixture.buckets.map(\.bucket) == [72, 88])
@@ -51,14 +52,18 @@ import Testing
         "start",
         "after_load_bucket_72",
         "after_load_bucket_88",
-        "after_prediction_prompt-001",
-        "after_prediction_prompt-002",
+        "after_prediction_pass_1_prompt-001",
+        "after_prediction_pass_1_prompt-002",
+        "after_prediction_pass_2_prompt-001",
+        "after_prediction_pass_2_prompt-002",
         "end",
     ])
     #expect(fixture.memorySnapshots.allSatisfy { ($0.residentSizeBytes ?? 0) > 0 })
+    #expect(fixture.predictions.count == 4)
 
     try assertResidentCatalogPrediction(
-        fixture.predictionForSample(id: "prompt-001"),
+        fixture.predictionForSample(id: "prompt-001", passIndex: 1),
+        passIndex: 1,
         selectedBucket: 72,
         audioCodesShape: [67, 16],
         paddedInputShape: [1, 72, 16],
@@ -67,7 +72,28 @@ import Testing
         paddedTailSampleCount: 9600,
     )
     try assertResidentCatalogPrediction(
-        fixture.predictionForSample(id: "prompt-002"),
+        fixture.predictionForSample(id: "prompt-002", passIndex: 1),
+        passIndex: 1,
+        selectedBucket: 88,
+        audioCodesShape: [84, 16],
+        paddedInputShape: [1, 88, 16],
+        validOutputSampleCount: 161_280,
+        paddedOutputSampleCount: 168_960,
+        paddedTailSampleCount: 7680,
+    )
+    try assertResidentCatalogPrediction(
+        fixture.predictionForSample(id: "prompt-001", passIndex: 2),
+        passIndex: 2,
+        selectedBucket: 72,
+        audioCodesShape: [67, 16],
+        paddedInputShape: [1, 72, 16],
+        validOutputSampleCount: 128_640,
+        paddedOutputSampleCount: 138_240,
+        paddedTailSampleCount: 9600,
+    )
+    try assertResidentCatalogPrediction(
+        fixture.predictionForSample(id: "prompt-002", passIndex: 2),
+        passIndex: 2,
         selectedBucket: 88,
         audioCodesShape: [84, 16],
         paddedInputShape: [1, 88, 16],
@@ -147,6 +173,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
         }
 
         let computeUnits: String
+        let catalogPasses: Int
         let sampleIds: [String]
         let bucketModels: [BucketModel]
     }
@@ -163,6 +190,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
     }
 
     struct Prediction: Decodable {
+        let passIndex: Int
         let sample: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.Sample
         let selectedBucket: Int
         let fixtureAssignedBucket: Int
@@ -195,8 +223,8 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
         return try decoder.decode(Self.self, from: data)
     }
 
-    func predictionForSample(id: String) -> Prediction? {
-        for prediction in predictions where prediction.sample.id == id {
+    func predictionForSample(id: String, passIndex: Int) -> Prediction? {
+        for prediction in predictions where prediction.sample.id == id && prediction.passIndex == passIndex {
             return prediction
         }
         return nil
@@ -234,6 +262,7 @@ private func assertResidentProbe(
 
 private func assertResidentCatalogPrediction(
     _ prediction: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.Prediction?,
+    passIndex: Int,
     selectedBucket: Int,
     audioCodesShape: [Int],
     paddedInputShape: [Int],
@@ -243,6 +272,7 @@ private func assertResidentCatalogPrediction(
 ) throws {
     let prediction = try #require(prediction)
 
+    #expect(prediction.passIndex == passIndex)
     #expect(prediction.selectedBucket == selectedBucket)
     #expect(prediction.fixtureAssignedBucket == selectedBucket)
     #expect(prediction.sample.audioCodesShape == audioCodesShape)

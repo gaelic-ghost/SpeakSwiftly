@@ -952,7 +952,7 @@ extension SpeakSwiftlyProbeToolMain {
               swift run SpeakSwiftlyProbeTool volume-probe [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
               swift run SpeakSwiftlyProbeTool compare-volume [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
               swift run SpeakSwiftlyProbeTool coreml-qwen-decoder --model-package PATH --talker-code-fixture PATH --sample-id ID [--compute-units all|cpuOnly|cpuAndGPU|cpuAndNeuralEngine] [--warmup-runs COUNT] [--measured-runs COUNT] [--output PATH]
-              swift run SpeakSwiftlyProbeTool coreml-qwen-decoder --bucket-model BUCKET=PATH [--bucket-model BUCKET=PATH ...] --talker-code-fixture PATH --sample-id ID [--sample-id ID ...] [--compute-units all|cpuOnly|cpuAndGPU|cpuAndNeuralEngine] [--warmup-runs COUNT] [--measured-runs COUNT] [--output PATH]
+              swift run SpeakSwiftlyProbeTool coreml-qwen-decoder --bucket-model BUCKET=PATH [--bucket-model BUCKET=PATH ...] --talker-code-fixture PATH --sample-id ID [--sample-id ID ...] [--compute-units all|cpuOnly|cpuAndGPU|cpuAndNeuralEngine] [--catalog-passes COUNT] [--warmup-runs COUNT] [--measured-runs COUNT] [--output PATH]
             """
         }
     }
