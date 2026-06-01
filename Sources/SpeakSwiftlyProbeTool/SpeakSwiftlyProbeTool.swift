@@ -14,6 +14,7 @@ struct SpeakSwiftlyProbeToolMain {
         case createDesignProfile = "create-design-profile"
         case volumeProbe = "volume-probe"
         case compareVolume = "compare-volume"
+        case coreMLQwenDecoder = "coreml-qwen-decoder"
     }
 
     struct CreateDesignProfileOptions {
@@ -166,6 +167,9 @@ struct SpeakSwiftlyProbeToolMain {
             case .compareVolume:
                 let options = try parseVolumeProbeOptions(arguments: arguments)
                 try await runCompareVolume(options: options)
+            case .coreMLQwenDecoder:
+                let options = try parseCoreMLQwenDecoderOptions(arguments: arguments)
+                try runCoreMLQwenDecoderProbe(options: options)
         }
     }
 
@@ -180,6 +184,7 @@ struct SpeakSwiftlyProbeToolMain {
         if command != .volumeProbe,
            command != .compareVolume,
            command != .createDesignProfile,
+           command != .coreMLQwenDecoder,
            arguments.count != 1 {
             throw UsageError.unexpectedArguments(arguments.dropFirst().joined(separator: " "))
         }
@@ -946,6 +951,7 @@ extension SpeakSwiftlyProbeToolMain {
               swift run SpeakSwiftlyProbeTool create-design-profile --profile NAME --voice DESCRIPTION [--text SOURCE] [--vibe femme|masc|neutral] [--state-root PATH]
               swift run SpeakSwiftlyProbeTool volume-probe [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS]
               swift run SpeakSwiftlyProbeTool compare-volume [--profile NAME] [--state-root PATH] [--text-file PATH] [--repeat COUNT] [--window-seconds SECONDS] [--matched-duration refuse|trim-to-shorter]
+              swift run SpeakSwiftlyProbeTool coreml-qwen-decoder --model-package PATH --talker-code-fixture PATH --sample-id ID [--compute-units all|cpuOnly|cpuAndGPU|cpuAndNeuralEngine] [--warmup-runs COUNT] [--measured-runs COUNT] [--output PATH]
             """
         }
     }

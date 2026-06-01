@@ -1,0 +1,74 @@
+{
+  "created_at_utc" : "2026-06-01T01:29:22Z",
+  "prediction" : {
+    "compile_duration_ms" : 128.22924999892712,
+    "full_output" : {
+      "max" : 0.47192383,
+      "mean" : -0.0002138018500301297,
+      "min" : -0.41601562,
+      "rms" : 0.04943042027278818,
+      "sample_count" : 138240
+    },
+    "load_duration_ms" : 40423.45566666871,
+    "measured" : {
+      "max_ms" : 83.59191666543484,
+      "mean_ms" : 83.44914582744241,
+      "median_ms" : 83.59191666543484,
+      "min_ms" : 83.30637498944998,
+      "p95_ms" : 83.59191666543484
+    },
+    "measured_runs" : 2,
+    "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+    "output_shape" : [
+      1,
+      138240
+    ],
+    "padded_tail" : {
+      "max" : 0.13989258,
+      "mean" : -0.0013466045260429383,
+      "min" : -0.22839355,
+      "rms" : 0.021701293785462077,
+      "sample_count" : 9600
+    },
+    "valid_output" : {
+      "max" : 0.47192383,
+      "mean" : -0.0001292643368948455,
+      "min" : -0.41601562,
+      "rms" : 0.050897563722152345,
+      "sample_count" : 128640
+    },
+    "warmup" : {
+      "max_ms" : 1581.9379166662693,
+      "mean_ms" : 1581.9379166662693,
+      "median_ms" : 1581.9379166662693,
+      "min_ms" : 1581.9379166662693,
+      "p95_ms" : 1581.9379166662693
+    },
+    "warmup_runs" : 1
+  },
+  "sample" : {
+    "audio_codes_shape" : [
+      67,
+      16
+    ],
+    "id" : "prompt-001",
+    "pad_value" : -1,
+    "padded_input_shape" : [
+      1,
+      72,
+      16
+    ],
+    "padded_output_sample_count" : 138240,
+    "padded_step_count" : 5,
+    "text" : "The quick brown fox jumps over the lazy dog while the room stays quiet.",
+    "valid_output_sample_count" : 128640
+  },
+  "schema_version" : 1,
+  "source" : {
+    "compute_units" : "all",
+    "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-bucket-72-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage",
+    "sample_id" : "prompt-001",
+    "talker_code_fixture" : ".local\/coreml-qwen3tts\/talker-code-fixture-qwen3-12hz.json"
+  },
+  "tool_name" : "coreml-qwen-decoder"
+}

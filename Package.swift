@@ -171,6 +171,9 @@ let package = Package(
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
                 .product(name: "MLX", package: "mlx-swift"),
             ],
+            linkerSettings: [
+                .linkedFramework("CoreML", .when(platforms: [.macOS])),
+            ],
         ),
     ],
     swiftLanguageModes: [

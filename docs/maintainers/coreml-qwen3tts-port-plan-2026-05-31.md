@@ -2005,6 +2005,32 @@ Why this matters:
 - A private runner lets us test residency, bucket selection, valid-region
   trimming, and dispatch policy before taking on the harder Qwen talker graph.
 
+First prototype result:
+
+- Added `SpeakSwiftlyProbeTool coreml-qwen-decoder` as a private maintainer
+  command. It accepts a bucketed Core ML decoder package, a talker-code fixture,
+  a sample id, compute units, warmup/measured run counts, and an optional report
+  path.
+- The command compiles raw `.mlpackage` inputs when needed, loads one `MLModel`
+  with the requested `MLComputeUnits`, pads captured Qwen talker codes to the
+  fixture bucket with `-1`, runs repeated predictions against the resident model,
+  trims valid output samples separately from the padded tail, and writes a compact
+  JSON report.
+- The first pinned report is
+  `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-probe-bucket-72-w8a8-linear-matmul-prompt-001-12hz.json`.
+  It used the bucket-72 W8A8 `linear` + `matmul` package, Qwen talker
+  `prompt-001`, and `.all` compute units.
+- The sample had 67 valid code steps, padded to `[1, 72, 16]`, with 128,640
+  valid output samples and a 9,600-sample padded tail.
+- The first Swift run compiled the raw package in about `128 ms`, loaded the
+  model in about `40.4 s`, warmed once in about `1.58 s`, and measured two hot
+  resident predictions at about `83.4 ms`.
+- Core ML attempted to create an execution cache under the macOS user cache
+  directory for `SpeakSwiftlyProbeTool`; the first sandboxed run failed at that
+  cache step, while the live-service wrapper still reloaded resident models
+  afterward. The successful run used the same wrapper with permissions that let
+  Core ML create its cache.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
