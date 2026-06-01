@@ -15,12 +15,14 @@ struct RawBatchItem: Decodable {
         case inputTextContext = "input_text_context"
         case textFormat = "text_format"
         case nestedSourceFormat = "nested_source_format"
+        case audioFormat = "audio_format"
     }
 
     let artifactID: String?
     let text: String?
     let textProfile: SpeakSwiftly.TextProfileID?
     let requestContext: SpeakSwiftly.RequestContext?
+    let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat?
     let cwd: String?
     let repoRoot: String?
 
@@ -37,6 +39,7 @@ struct RawBatchItem: Decodable {
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
         )
+        audioFormat = try container.decodeIfPresent(SpeakSwiftly.GeneratedAudioFileFormat.self, forKey: .audioFormat)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
     }
@@ -82,6 +85,7 @@ struct RawWorkerRequest: Decodable {
         case transcript
         case speechBackend = "speech_backend"
         case qwenPreModelTextChunking = "qwen_pre_model_text_chunking"
+        case audioFormat = "audio_format"
     }
 
     private struct LegacyReplacementPayload: Decodable {
@@ -254,6 +258,7 @@ struct RawWorkerRequest: Decodable {
     let transcript: String?
     let speechBackend: SpeakSwiftly.SpeechBackend?
     let qwenPreModelTextChunking: Bool?
+    let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -300,6 +305,7 @@ struct RawWorkerRequest: Decodable {
         transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
         speechBackend = try container.decodeIfPresent(SpeakSwiftly.SpeechBackend.self, forKey: .speechBackend)
         qwenPreModelTextChunking = try container.decodeIfPresent(Bool.self, forKey: .qwenPreModelTextChunking)
+        audioFormat = try container.decodeIfPresent(SpeakSwiftly.GeneratedAudioFileFormat.self, forKey: .audioFormat)
     }
 
     static func resolveSpeechTextInput(
@@ -359,6 +365,7 @@ struct RawWorkerRequest: Decodable {
                 text: resolved.text,
                 textProfile: resolved.textProfileID,
                 requestContext: requestContext,
+                audioFormat: rawItem.audioFormat ?? .wav,
             )
         }
     }

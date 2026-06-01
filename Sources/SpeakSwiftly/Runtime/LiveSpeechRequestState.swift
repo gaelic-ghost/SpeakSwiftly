@@ -46,6 +46,7 @@ final class LiveSpeechRequestState: @unchecked Sendable {
             profileName: profileName,
             textProfileID: textProfileID,
             jobType: .live,
+            audioFormat: _,
             requestContext: requestContext,
             qwenPreModelTextChunking: _,
         ) = request else {

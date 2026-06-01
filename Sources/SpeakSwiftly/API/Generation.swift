@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftlyFileAudioOutput
 import TextForSpeech
 
 public extension SpeakSwiftly {
@@ -63,6 +64,7 @@ public extension SpeakSwiftly.Generate {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .live,
+                audioFormat: nil,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: qwenPreModelTextChunking,
             ),
@@ -78,6 +80,7 @@ public extension SpeakSwiftly.Generate {
         voiceProfile: SpeakSwiftly.Name? = nil,
         textProfile: SpeakSwiftly.TextProfileID? = nil,
         requestContext: SpeakSwiftly.RequestContext? = nil,
+        format: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
     ) async -> SpeakSwiftly.RequestHandle {
         let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
         return await runtime.submit(
@@ -87,6 +90,7 @@ public extension SpeakSwiftly.Generate {
                 profileName: resolvedVoiceProfile,
                 textProfileID: textProfile,
                 jobType: .file,
+                audioFormat: format,
                 requestContext: requestContext,
                 qwenPreModelTextChunking: nil,
             ),

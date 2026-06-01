@@ -239,6 +239,7 @@ final class LockedFlag: @unchecked Sendable {
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),

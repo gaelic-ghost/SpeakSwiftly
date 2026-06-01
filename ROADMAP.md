@@ -278,7 +278,7 @@ In Progress
 
 - [x] Record the major-version plan for removing Marvis and Chatterbox without compatibility shims.
 - [x] Keep Qwen3 as the only supported generation family in the public backend configuration surface.
-- [x] Split generated-audio output primitives into Core, Playback, HTTP, and Network module targets.
+- [x] Split generated-audio output primitives into Core, Playback, File, HTTP, and Network module targets.
 - [x] Model live speech as generation plus an output destination rather than assuming generation always means local playback.
 - [ ] Finish transport adoption so HTTP response streams and LAN streaming can consume canonical generated-audio chunks outside the local playback path.
 - [ ] Keep the current Qwen implementation working while the CoreML and Metal Flash Attention port remains a future generation-module swap.
@@ -289,6 +289,7 @@ In Progress
 - [x] Remove Marvis and Chatterbox backend values from normal configuration and request switching paths.
 - [x] Add the canonical generated-audio chunk type, sample format, output errors, and stream adapter to `SpeakSwiftlyCore`.
 - [x] Add local playback chunk consumption to `SpeakSwiftlyPlayback`.
+- [x] Add retained WAV and AAC/M4A file encoding and generated-file storage to `SpeakSwiftlyFileAudioOutput`.
 - [x] Add HTTP-friendly raw PCM payload framing with metadata headers to `SpeakSwiftlyHTTPAudioOutput`.
 - [x] Add Network.framework audio frame encoding and Bonjour audio-receiver discovery primitives to `SpeakSwiftlyNetworkAudioOutput`.
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.

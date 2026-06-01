@@ -66,6 +66,10 @@ Agent-facing maintainer guidance lives in [AGENTS.md](./AGENTS.md).
 |   |-- Playback/
 |   |-- Runtime/
 |   `-- SpeakSwiftly.docc/
+|-- Sources/SpeakSwiftlyFileAudioOutput/
+|-- Sources/SpeakSwiftlyHTTPAudioOutput/
+|-- Sources/SpeakSwiftlyNetworkAudioOutput/
+|-- Sources/SpeakSwiftlyPlayback/
 |-- Tests/SpeakSwiftlyTests/
 |-- docs/maintainers/
 |-- docs/releases/

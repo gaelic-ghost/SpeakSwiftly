@@ -16,6 +16,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -32,6 +33,7 @@ import TextForSpeech
             profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -50,6 +52,26 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .file,
+            audioFormat: .wav,
+            requestContext: nil,
+            qwenPreModelTextChunking: nil,
+        ),
+    )
+}
+
+@Test func `decodes speak file request with m4a audio format`() throws {
+    let request = try ToolRequest.decode(
+        from: #"{"id":"req-file-m4a","op":"generate_audio_file","text":"Hello","profile_name":"default-femme","audio_format":"m4a"}"#,
+    )
+
+    #expect(
+        request == .queueSpeech(
+            id: "req-file-m4a",
+            text: "Hello",
+            profileName: "default-femme",
+            textProfileID: nil,
+            jobType: .file,
+            audioFormat: .m4a,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -68,6 +90,7 @@ import TextForSpeech
             profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
             textProfileID: nil,
             jobType: .file,
+            audioFormat: .wav,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
         ),
@@ -161,6 +184,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: "logs",
             jobType: .live,
+            audioFormat: .wav,
             requestContext: .init(
                 reqPurpose: .speech,
                 cwd: "/Users/galew/Workspace/SpeakSwiftly",
@@ -183,6 +207,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: nil,
             qwenPreModelTextChunking: false,
         ),
@@ -201,6 +226,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: .init(
                 reqPurpose: .speech,
                 source: "status_panel",
@@ -223,6 +249,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: .init(
                 reqPurpose: .speech,
                 source: "status_panel",
@@ -244,6 +271,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .file,
+            audioFormat: .wav,
             requestContext: .init(
                 reqPurpose: .audioFile,
                 source: "status_panel",
@@ -267,6 +295,7 @@ import TextForSpeech
             profileName: "default-femme",
             textProfileID: nil,
             jobType: .live,
+            audioFormat: .wav,
             requestContext: nil,
             qwenPreModelTextChunking: true,
         ),
@@ -563,6 +592,7 @@ import TextForSpeech
         profileName: ToolRequest.runtimeDefaultVoiceProfilePlaceholder,
         textProfileID: nil,
         jobType: .live,
+        audioFormat: .wav,
         requestContext: nil,
         qwenPreModelTextChunking: false,
     )
@@ -575,6 +605,7 @@ import TextForSpeech
                 profileName: "swift-signal",
                 textProfileID: nil,
                 jobType: .live,
+                audioFormat: .wav,
                 requestContext: nil,
                 qwenPreModelTextChunking: false,
             ),

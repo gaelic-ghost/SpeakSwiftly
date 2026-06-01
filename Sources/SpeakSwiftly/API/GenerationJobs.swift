@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftlyFileAudioOutput
 import TextForSpeech
 
 // MARK: - Generation Job API
@@ -16,6 +17,7 @@ public extension SpeakSwiftly {
             case textProfile = "text_profile"
             case sourceFormat = "source_format"
             case requestContext = "request_context"
+            case audioFormat = "audio_format"
         }
 
         // MARK: Properties
@@ -25,6 +27,7 @@ public extension SpeakSwiftly {
         public let textProfile: SpeakSwiftly.TextProfileID?
         public let sourceFormat: TextForSpeech.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
+        public let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat
 
         // MARK: Lifecycle
 
@@ -34,12 +37,14 @@ public extension SpeakSwiftly {
             textProfile: SpeakSwiftly.TextProfileID?,
             sourceFormat: TextForSpeech.SourceFormat? = nil,
             requestContext: SpeakSwiftly.RequestContext?,
+            audioFormat: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
         ) {
             self.artifactID = artifactID
             self.text = text
             self.textProfile = textProfile
             self.sourceFormat = sourceFormat
             self.requestContext = requestContext
+            self.audioFormat = audioFormat
         }
     }
 
@@ -61,6 +66,16 @@ public extension SpeakSwiftly {
     /// The retained artifact type produced by a generation job.
     enum GenerationArtifactKind: String, Codable, Sendable, Equatable {
         case audioWAV = "audio_wav"
+        case audioM4A = "audio_m4a"
+
+        init(audioFormat: SpeakSwiftly.GeneratedAudioFileFormat) {
+            switch audioFormat {
+                case .wav:
+                    self = .audioWAV
+                case .m4a:
+                    self = .audioM4A
+            }
+        }
     }
 
     /// The retention behavior applied to a generated artifact or job.
@@ -98,6 +113,8 @@ public extension SpeakSwiftly {
             case createdAt = "created_at"
             case filePath = "file_path"
             case sampleRate = "sample_rate"
+            case audioFormat = "audio_format"
+            case contentType = "content_type"
             case voiceProfile = "voice_profile"
             case textProfile = "text_profile"
             case sourceFormat = "source_format"
@@ -109,6 +126,8 @@ public extension SpeakSwiftly {
         public let createdAt: Date
         public let filePath: String
         public let sampleRate: Int
+        public let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat
+        public let contentType: String
         public let voiceProfile: String
         public let textProfile: SpeakSwiftly.TextProfileID?
         public let sourceFormat: TextForSpeech.SourceFormat?
@@ -120,6 +139,8 @@ public extension SpeakSwiftly {
             createdAt: Date,
             filePath: String,
             sampleRate: Int,
+            audioFormat: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
+            contentType: String = SpeakSwiftly.GeneratedAudioFileFormat.wav.contentType,
             voiceProfile: String,
             textProfile: SpeakSwiftly.TextProfileID?,
             sourceFormat: TextForSpeech.SourceFormat?,
@@ -130,6 +151,8 @@ public extension SpeakSwiftly {
             self.createdAt = createdAt
             self.filePath = filePath
             self.sampleRate = sampleRate
+            self.audioFormat = audioFormat
+            self.contentType = contentType
             self.voiceProfile = voiceProfile
             self.textProfile = textProfile
             self.sourceFormat = sourceFormat

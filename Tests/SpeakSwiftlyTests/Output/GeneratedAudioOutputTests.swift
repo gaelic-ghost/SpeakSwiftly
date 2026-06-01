@@ -1,5 +1,7 @@
+import AVFoundation
 import Foundation
 import SpeakSwiftlyCore
+import SpeakSwiftlyFileAudioOutput
 import SpeakSwiftlyHTTPAudioOutput
 import SpeakSwiftlyPlayback
 import Testing
@@ -119,4 +121,32 @@ import Testing
     #expect(throws: GeneratedAudioOutputError.self) {
         _ = try frame.decodedSamples()
     }
+}
+
+@Test func `file audio output encodes wav and m4a data`() throws {
+    let samples: [Float] = [0, 0.25, -0.25, 0]
+
+    let wav = try GeneratedAudioFileEncoder.encodedAudioData(
+        samples: samples,
+        sampleRate: 24000,
+        format: .wav,
+    )
+    #expect(wav.starts(with: Data("RIFF".utf8)))
+    #expect(wav.count > 44)
+
+    let m4a = try GeneratedAudioFileEncoder.encodedAudioData(
+        samples: samples,
+        sampleRate: 24000,
+        format: .m4a,
+    )
+    #expect(!m4a.isEmpty)
+
+    let url = FileManager.default
+        .temporaryDirectory
+        .appendingPathComponent("speakswiftly-file-output-\(UUID().uuidString).m4a")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try m4a.write(to: url)
+
+    let file = try AVAudioFile(forReading: url)
+    #expect(Int(file.processingFormat.sampleRate.rounded()) == 24000)
 }

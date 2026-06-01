@@ -85,7 +85,9 @@ Older generation-request aliases such as `profile_name` and `text_profile_id` ar
 Representative operations include:
 
 - `generate_speech` for live playback work.
-- `generate_audio_file` for retained file output.
+- `generate_audio_file` for retained file output. It accepts optional
+  `audio_format` values `wav` and `m4a`; omitted `audio_format` requests keep
+  the default WAV artifact.
 - `generate_batch` for grouped retained artifacts.
 - `create_voice_profile_from_description`, `create_voice_profile_from_audio`, `list_voice_profiles`, and related voice-management operations.
 - `get_status`, `get_default_voice_profile`, `set_default_voice_profile`, `reload_models`, and `unload_models` for runtime control.

@@ -21,11 +21,22 @@ In practice, that means:
 
 ## Create Retained Output
 
-The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:)``:
+The most direct path to a retained artifact is ``SpeakSwiftly/Generate/audio(text:voiceProfile:textProfile:requestContext:format:)``:
 
 ```swift
 let handle = await runtime.generate.audio(
     text: "Persist this clip for later use."
+)
+```
+
+The default format is ``SpeakSwiftly/GeneratedAudioFileFormat/wav``. Use
+``SpeakSwiftly/GeneratedAudioFileFormat/m4a`` when the stored artifact should be
+compressed AAC in an `.m4a` container:
+
+```swift
+let handle = await runtime.generate.audio(
+    text: "Persist this compressed clip for later use.",
+    format: .m4a
 )
 ```
 
