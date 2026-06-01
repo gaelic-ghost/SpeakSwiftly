@@ -201,6 +201,20 @@ sh scripts/repo-maintenance/run-benchmark.sh --audible --iterations 3
 sh scripts/repo-maintenance/run-benchmark.sh --qwen --iterations 5
 ```
 
+For repeatable local Instruments captures, wrap one benchmark run with one
+template at a time:
+
+```bash
+sh scripts/repo-maintenance/run-benchmark-trace.sh --backend qwen3_smol_8bit --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --metal-system-trace --backend qwen3_smol_8bit --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --allocations --backend qwen3_smol_8bit --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --backend qwen3_smol_8bit --iterations 1
+```
+
+The trace wrapper stores `.trace` files under `.local/traces` and leaves
+benchmark JSON summaries under `.local/benchmarks`. Do not run more than one
+trace template at the same time.
+
 ## Practical Rules
 
 - Never run multiple heavy validation commands at the same time.
