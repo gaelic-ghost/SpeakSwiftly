@@ -2034,6 +2034,18 @@ First prototype result:
 - The bucket-88 Swift run compiled the raw package in about `118 ms`, loaded the
   model in about `29.8 s`, warmed once in about `1.59 s`, and measured two hot
   resident predictions at about `124.6 ms`.
+- The command now also has a resident bucket-catalog mode through repeatable
+  `--bucket-model BUCKET=PATH` arguments. The first pinned catalog report is
+  `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json`.
+  It loaded bucket 72 and bucket 88 once in one process, then routed
+  `prompt-001` to bucket 72 and `prompt-002` to bucket 88.
+- In the catalog run, bucket 72 compiled in about `112 ms` and loaded in about
+  `17.4 s`, while bucket 88 compiled in about `109 ms` and loaded in about
+  `30.9 s`. Hot resident prediction means were about `84.3 ms` for prompt-001
+  and about `109.6 ms` for prompt-002.
+- This confirms the backend-relevant shape is feasible at the probe level:
+  declare bucket packages, load them once, route by code length, trim valid
+  output, and keep public runtime surfaces unchanged while gathering evidence.
 - Core ML attempted to create an execution cache under the macOS user cache
   directory for `SpeakSwiftlyProbeTool`; the first sandboxed run failed at that
   cache step, while the live-service wrapper still reloaded resident models

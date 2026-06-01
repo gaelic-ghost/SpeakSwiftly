@@ -4,12 +4,18 @@ import Foundation
 extension SpeakSwiftlyProbeToolMain {
     struct CoreMLQwenDecoderOptions {
         var modelPackage: String?
+        var bucketModels = [CoreMLQwenBucketModelOption]()
         var talkerCodeFixture: String?
-        var sampleID: String?
+        var sampleIDs = [String]()
         var computeUnits = "all"
         var warmupRuns = 1
         var measuredRuns = 5
         var output: String?
+    }
+
+    struct CoreMLQwenBucketModelOption {
+        let bucket: Int
+        let modelPackage: String
     }
 
     struct CoreMLQwenDecoderReport: Encodable {
@@ -69,6 +75,50 @@ extension SpeakSwiftlyProbeToolMain {
         let prediction: Prediction
     }
 
+    struct CoreMLQwenDecoderCatalogReport: Encodable {
+        struct Source: Encodable {
+            let talkerCodeFixture: String
+            let sampleIds: [String]
+            let computeUnits: String
+            let bucketModels: [BucketModel]
+        }
+
+        struct BucketModel: Encodable {
+            let bucket: Int
+            let modelPackage: String
+        }
+
+        struct Bucket: Encodable {
+            let bucket: Int
+            let modelPackage: String
+            let compileDurationMs: Double?
+            let loadDurationMs: Double
+        }
+
+        struct Prediction: Encodable {
+            let sample: CoreMLQwenDecoderReport.Sample
+            let selectedBucket: Int
+            let fixtureAssignedBucket: Int
+            let warmupRuns: Int
+            let measuredRuns: Int
+            let warmup: CoreMLQwenDecoderReport.TimingStats?
+            let measured: CoreMLQwenDecoderReport.TimingStats
+            let outputShape: [Int]
+            let outputDataType: String
+            let fullOutput: CoreMLQwenDecoderReport.AudioSummary
+            let validOutput: CoreMLQwenDecoderReport.AudioSummary
+            let paddedTail: CoreMLQwenDecoderReport.AudioSummary?
+        }
+
+        let schemaVersion: Int
+        let toolName: String
+        let mode: String
+        let createdAtUTC: String
+        let source: Source
+        let buckets: [Bucket]
+        let predictions: [Prediction]
+    }
+
     struct CoreMLQwenTalkerFixture: Decodable {
         struct Sample: Decodable {
             struct Encoded: Decodable {
@@ -98,6 +148,23 @@ extension SpeakSwiftlyProbeToolMain {
         let paddedStepCount: Int
     }
 
+    struct CoreMLQwenLoadedBucket {
+        let bucket: Int
+        let modelPackage: String
+        let compileDurationMs: Double?
+        let loadDurationMs: Double
+        let model: MLModel
+    }
+
+    struct CoreMLQwenPredictionSummary {
+        let warmupDurations: [Double]
+        let measuredDurations: [Double]
+        let audioValues: MLMultiArray
+        let allSamples: [Float]
+        let validSamples: [Float]
+        let tailSamples: [Float]
+    }
+
     struct CoreMLQwenProbeError: LocalizedError {
         let message: String
 
@@ -116,12 +183,16 @@ extension SpeakSwiftlyProbeToolMain {
                 case "--model-package":
                     index += 1
                     options.modelPackage = try requireOptionValue(arguments, index: index, for: argument)
+                case "--bucket-model":
+                    index += 1
+                    let value = try requireOptionValue(arguments, index: index, for: argument)
+                    try options.bucketModels.append(parseBucketModelOption(value))
                 case "--talker-code-fixture":
                     index += 1
                     options.talkerCodeFixture = try requireOptionValue(arguments, index: index, for: argument)
                 case "--sample-id":
                     index += 1
-                    options.sampleID = try requireOptionValue(arguments, index: index, for: argument)
+                    try options.sampleIDs.append(requireOptionValue(arguments, index: index, for: argument))
                 case "--compute-units":
                     index += 1
                     let value = try requireOptionValue(arguments, index: index, for: argument)
@@ -156,12 +227,47 @@ extension SpeakSwiftlyProbeToolMain {
         }
 
         guard options.modelPackage != nil else {
-            throw UsageError.missingRequiredOption("--model-package")
+            if options.bucketModels.isEmpty {
+                throw UsageError.missingRequiredOption("--model-package")
+            }
+            return try validatedCoreMLQwenDecoderOptions(options)
         }
+
+        return try validatedCoreMLQwenDecoderOptions(options)
+    }
+
+    static func validatedCoreMLQwenDecoderOptions(_ options: CoreMLQwenDecoderOptions) throws -> CoreMLQwenDecoderOptions {
+        if options.bucketModels.isEmpty {
+            guard options.sampleIDs.count == 1 else {
+                throw CoreMLQwenProbeError(
+                    message: "SpeakSwiftlyProbeTool single-package Core ML decoder mode requires exactly " +
+                        "one --sample-id. Use --bucket-model for a multi-sample resident bucket catalog run.",
+                )
+            }
+        } else {
+            if options.modelPackage != nil {
+                throw CoreMLQwenProbeError(
+                    message: "SpeakSwiftlyProbeTool accepts either --model-package for one-shot " +
+                        "decoder runs or repeatable --bucket-model entries for resident catalog runs, not both.",
+                )
+            }
+            guard !options.sampleIDs.isEmpty else {
+                throw UsageError.missingRequiredOption("--sample-id")
+            }
+
+            let buckets = options.bucketModels.map(\.bucket)
+            guard Set(buckets).count == buckets.count else {
+                throw CoreMLQwenProbeError(
+                    message: "SpeakSwiftlyProbeTool received duplicate --bucket-model bucket ids. " +
+                        "Each resident Core ML decoder bucket must be declared once.",
+                )
+            }
+        }
+
         guard options.talkerCodeFixture != nil else {
             throw UsageError.missingRequiredOption("--talker-code-fixture")
         }
-        guard options.sampleID != nil else {
+        guard !options.sampleIDs.isEmpty else {
             throw UsageError.missingRequiredOption("--sample-id")
         }
 
@@ -169,40 +275,28 @@ extension SpeakSwiftlyProbeToolMain {
     }
 
     static func runCoreMLQwenDecoderProbe(options: CoreMLQwenDecoderOptions) throws {
+        if !options.bucketModels.isEmpty {
+            try runCoreMLQwenDecoderBucketCatalogProbe(options: options)
+            return
+        }
+
         let modelPackage = try requiredPath(options.modelPackage, label: "--model-package")
         let talkerCodeFixture = try requiredPath(options.talkerCodeFixture, label: "--talker-code-fixture")
-        let sampleID = try requiredValue(options.sampleID, label: "--sample-id")
+        let sampleID = options.sampleIDs[0]
         let computeUnits = try requiredComputeUnits(options.computeUnits)
-        let paddedCodes = try loadPaddedTalkerCodes(fixturePath: talkerCodeFixture, sampleID: sampleID)
-        let compiledModel = try compileModelIfNeeded(at: URL(fileURLWithPath: modelPackage))
-
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = computeUnits
-
-        let loadStart = monotonicMilliseconds()
-        let model = try MLModel(contentsOf: compiledModel.url, configuration: configuration)
-        let loadDurationMs = monotonicMilliseconds() - loadStart
-
-        let input = try makeAudioCodesMultiArray(paddedCodes)
-        let provider = try MLDictionaryFeatureProvider(dictionary: ["audio_codes": input])
-        var warmupDurations = [Double]()
-        for _ in 0..<options.warmupRuns {
-            try warmupDurations.append(predict(model: model, provider: provider).durationMs)
-        }
-
-        var measuredDurations = [Double]()
-        var lastOutput: MLMultiArray?
-        for _ in 0..<options.measuredRuns {
-            let result = try predict(model: model, provider: provider)
-            measuredDurations.append(result.durationMs)
-            lastOutput = result.audioValues
-        }
-
-        let audioValues = try requireOutputValues(lastOutput)
-        let allSamples = arrayValues(audioValues)
-        let validCount = paddedCodes.sample.bucketAssignment.validOutputSampleCount
-        let validSamples = Array(allSamples.prefix(validCount))
-        let tailSamples = Array(allSamples.dropFirst(validCount))
+        let sample = try loadTalkerCodeSample(fixturePath: talkerCodeFixture, sampleID: sampleID)
+        let paddedCodes = try paddedTalkerCodes(sample: sample, bucket: sample.bucketAssignment.assignedBucket)
+        let loadedBucket = try loadCoreMLQwenBucket(
+            bucket: sample.bucketAssignment.assignedBucket,
+            modelPackage: modelPackage,
+            computeUnits: computeUnits,
+        )
+        let prediction = try runCoreMLQwenPrediction(
+            model: loadedBucket.model,
+            paddedCodes: paddedCodes,
+            warmupRuns: options.warmupRuns,
+            measuredRuns: options.measuredRuns,
+        )
 
         let report = try CoreMLQwenDecoderReport(
             schemaVersion: 1,
@@ -228,21 +322,130 @@ extension SpeakSwiftlyProbeToolMain {
                 paddedOutputSampleCount: paddedCodes.sample.bucketAssignment.paddedOutputSampleCount,
             ),
             prediction: .init(
-                compileDurationMs: compiledModel.compileDurationMs,
-                loadDurationMs: loadDurationMs,
+                compileDurationMs: loadedBucket.compileDurationMs,
+                loadDurationMs: loadedBucket.loadDurationMs,
                 warmupRuns: options.warmupRuns,
                 measuredRuns: options.measuredRuns,
-                warmup: timingStats(warmupDurations),
-                measured: requiredTimingStats(measuredDurations),
-                outputShape: audioValues.shape.map(\.intValue),
-                outputDataType: "\(audioValues.dataType)",
-                fullOutput: audioSummary(allSamples),
-                validOutput: audioSummary(validSamples),
-                paddedTail: tailSamples.isEmpty ? nil : audioSummary(tailSamples),
+                warmup: timingStats(prediction.warmupDurations),
+                measured: requiredTimingStats(prediction.measuredDurations),
+                outputShape: prediction.audioValues.shape.map(\.intValue),
+                outputDataType: "\(prediction.audioValues.dataType)",
+                fullOutput: audioSummary(prediction.allSamples),
+                validOutput: audioSummary(prediction.validSamples),
+                paddedTail: prediction.tailSamples.isEmpty ? nil : audioSummary(prediction.tailSamples),
             ),
         )
 
-        try writeCoreMLQwenDecoderReport(report, output: options.output)
+        try writeCoreMLQwenReport(report, output: options.output)
+    }
+
+    static func runCoreMLQwenDecoderBucketCatalogProbe(options: CoreMLQwenDecoderOptions) throws {
+        let talkerCodeFixture = try requiredPath(options.talkerCodeFixture, label: "--talker-code-fixture")
+        let computeUnits = try requiredComputeUnits(options.computeUnits)
+        let bucketModels = try options.bucketModels
+            .map { option in
+                try CoreMLQwenBucketModelOption(
+                    bucket: option.bucket,
+                    modelPackage: requiredPath(option.modelPackage, label: "--bucket-model \(option.bucket)"),
+                )
+            }
+            .sorted { $0.bucket < $1.bucket }
+        let loadedBuckets = try bucketModels.map { option in
+            try loadCoreMLQwenBucket(
+                bucket: option.bucket,
+                modelPackage: option.modelPackage,
+                computeUnits: computeUnits,
+            )
+        }
+
+        var predictions = [CoreMLQwenDecoderCatalogReport.Prediction]()
+        for sampleID in options.sampleIDs {
+            let sample = try loadTalkerCodeSample(fixturePath: talkerCodeFixture, sampleID: sampleID)
+            let selectedBucket = try selectedBucket(for: sample, loadedBuckets: loadedBuckets)
+            let paddedCodes = try paddedTalkerCodes(sample: sample, bucket: selectedBucket.bucket)
+            let prediction = try runCoreMLQwenPrediction(
+                model: selectedBucket.model,
+                paddedCodes: paddedCodes,
+                warmupRuns: options.warmupRuns,
+                measuredRuns: options.measuredRuns,
+            )
+            try predictions.append(
+                .init(
+                    sample: reportSample(for: paddedCodes),
+                    selectedBucket: selectedBucket.bucket,
+                    fixtureAssignedBucket: sample.bucketAssignment.assignedBucket,
+                    warmupRuns: options.warmupRuns,
+                    measuredRuns: options.measuredRuns,
+                    warmup: timingStats(prediction.warmupDurations),
+                    measured: requiredTimingStats(prediction.measuredDurations),
+                    outputShape: prediction.audioValues.shape.map(\.intValue),
+                    outputDataType: "\(prediction.audioValues.dataType)",
+                    fullOutput: audioSummary(prediction.allSamples),
+                    validOutput: audioSummary(prediction.validSamples),
+                    paddedTail: prediction.tailSamples.isEmpty ? nil : audioSummary(prediction.tailSamples),
+                ),
+            )
+        }
+
+        let report = CoreMLQwenDecoderCatalogReport(
+            schemaVersion: 1,
+            toolName: "coreml-qwen-decoder",
+            mode: "resident_bucket_catalog",
+            createdAtUTC: ISO8601DateFormatter().string(from: Date()),
+            source: .init(
+                talkerCodeFixture: talkerCodeFixture,
+                sampleIds: options.sampleIDs,
+                computeUnits: options.computeUnits,
+                bucketModels: bucketModels.map {
+                    .init(bucket: $0.bucket, modelPackage: $0.modelPackage)
+                },
+            ),
+            buckets: loadedBuckets.map {
+                .init(
+                    bucket: $0.bucket,
+                    modelPackage: $0.modelPackage,
+                    compileDurationMs: $0.compileDurationMs,
+                    loadDurationMs: $0.loadDurationMs,
+                )
+            },
+            predictions: predictions,
+        )
+
+        try writeCoreMLQwenReport(report, output: options.output)
+    }
+
+    static func parseBucketModelOption(_ value: String) throws -> CoreMLQwenBucketModelOption {
+        let parts = value.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let bucket = Int(parts[0]),
+              bucket > 0,
+              !parts[1].isEmpty else {
+            throw UsageError.invalidOptionValue("--bucket-model", value)
+        }
+
+        return .init(bucket: bucket, modelPackage: String(parts[1]))
+    }
+
+    static func loadCoreMLQwenBucket(
+        bucket: Int,
+        modelPackage: String,
+        computeUnits: MLComputeUnits,
+    ) throws -> CoreMLQwenLoadedBucket {
+        let compiledModel = try compileModelIfNeeded(at: URL(fileURLWithPath: modelPackage))
+
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = computeUnits
+
+        let loadStart = monotonicMilliseconds()
+        let model = try MLModel(contentsOf: compiledModel.url, configuration: configuration)
+        let loadDurationMs = monotonicMilliseconds() - loadStart
+        return .init(
+            bucket: bucket,
+            modelPackage: modelPackage,
+            compileDurationMs: compiledModel.compileDurationMs,
+            loadDurationMs: loadDurationMs,
+            model: model,
+        )
     }
 
     static func compileModelIfNeeded(at url: URL) throws -> (url: URL, compileDurationMs: Double?) {
@@ -298,7 +501,10 @@ extension SpeakSwiftlyProbeToolMain {
         }
     }
 
-    static func loadPaddedTalkerCodes(fixturePath: String, sampleID: String) throws -> CoreMLQwenPaddedCodes {
+    static func loadTalkerCodeSample(
+        fixturePath: String,
+        sampleID: String,
+    ) throws -> CoreMLQwenTalkerFixture.Sample {
         let data = try Data(contentsOf: URL(fileURLWithPath: fixturePath))
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -317,24 +523,29 @@ extension SpeakSwiftlyProbeToolMain {
             )
         }
 
+        return sample
+    }
+
+    static func paddedTalkerCodes(
+        sample: CoreMLQwenTalkerFixture.Sample,
+        bucket: Int,
+    ) throws -> CoreMLQwenPaddedCodes {
         let codes = sample.encoded.audioCodes
         guard let quantizerCount = codes.first?.count, quantizerCount > 0 else {
             throw CoreMLQwenProbeError(
                 message: "SpeakSwiftlyProbeTool found empty audio_codes for " +
-                    "talker-code sample '\(sampleID)'.",
+                    "talker-code sample '\(sample.id)'.",
             )
         }
         guard codes.allSatisfy({ $0.count == quantizerCount }) else {
             throw CoreMLQwenProbeError(
                 message: "SpeakSwiftlyProbeTool found ragged audio_codes for " +
-                    "talker-code sample '\(sampleID)'.",
+                    "talker-code sample '\(sample.id)'.",
             )
         }
-
-        let bucket = sample.bucketAssignment.assignedBucket
         guard codes.count <= bucket else {
             throw CoreMLQwenProbeError(
-                message: "SpeakSwiftlyProbeTool cannot pad sample '\(sampleID)' because " +
+                message: "SpeakSwiftlyProbeTool cannot pad sample '\(sample.id)' because " +
                     "\(codes.count) code steps exceed bucket \(bucket).",
             )
         }
@@ -354,6 +565,82 @@ extension SpeakSwiftlyProbeToolMain {
             inputShape: [1, bucket, quantizerCount],
             values: values,
             paddedStepCount: bucket - codes.count,
+        )
+    }
+
+    static func selectedBucket(
+        for sample: CoreMLQwenTalkerFixture.Sample,
+        loadedBuckets: [CoreMLQwenLoadedBucket],
+    ) throws -> CoreMLQwenLoadedBucket {
+        guard let bucket = loadedBuckets.first(where: { sample.encoded.audioCodes.count <= $0.bucket }) else {
+            let largestBucket = loadedBuckets.map(\.bucket).max() ?? 0
+            throw CoreMLQwenProbeError(
+                message: "SpeakSwiftlyProbeTool cannot route talker-code sample '\(sample.id)' " +
+                    "with \(sample.encoded.audioCodes.count) code steps because the largest loaded " +
+                    "Core ML decoder bucket is \(largestBucket).",
+            )
+        }
+
+        return bucket
+    }
+
+    static func reportSample(for paddedCodes: CoreMLQwenPaddedCodes) -> CoreMLQwenDecoderReport.Sample {
+        let assignedBucket = paddedCodes.sample.bucketAssignment.assignedBucket
+        let samplesPerStep: Int = if assignedBucket > 0 {
+            paddedCodes.sample.bucketAssignment.paddedOutputSampleCount / assignedBucket
+        } else {
+            1920
+        }
+        let selectedBucketValue = paddedCodes.inputShape[1]
+
+        return CoreMLQwenDecoderReport.Sample(
+            id: paddedCodes.sample.id,
+            text: paddedCodes.sample.text,
+            audioCodesShape: [
+                paddedCodes.sample.encoded.audioCodes.count,
+                paddedCodes.sample.encoded.audioCodes.first?.count ?? 0,
+            ],
+            paddedInputShape: paddedCodes.inputShape,
+            paddedStepCount: paddedCodes.paddedStepCount,
+            padValue: paddedCodes.sample.bucketAssignment.padValue,
+            validOutputSampleCount: paddedCodes.sample.bucketAssignment.validOutputSampleCount,
+            paddedOutputSampleCount: selectedBucketValue * samplesPerStep,
+        )
+    }
+
+    static func runCoreMLQwenPrediction(
+        model: MLModel,
+        paddedCodes: CoreMLQwenPaddedCodes,
+        warmupRuns: Int,
+        measuredRuns: Int,
+    ) throws -> CoreMLQwenPredictionSummary {
+        let input = try makeAudioCodesMultiArray(paddedCodes)
+        let provider = try MLDictionaryFeatureProvider(dictionary: ["audio_codes": input])
+        var warmupDurations = [Double]()
+        for _ in 0..<warmupRuns {
+            try warmupDurations.append(predict(model: model, provider: provider).durationMs)
+        }
+
+        var measuredDurations = [Double]()
+        var lastOutput: MLMultiArray?
+        for _ in 0..<measuredRuns {
+            let result = try predict(model: model, provider: provider)
+            measuredDurations.append(result.durationMs)
+            lastOutput = result.audioValues
+        }
+
+        let audioValues = try requireOutputValues(lastOutput)
+        let allSamples = arrayValues(audioValues)
+        let validCount = paddedCodes.sample.bucketAssignment.validOutputSampleCount
+        let validSamples = Array(allSamples.prefix(validCount))
+        let tailSamples = Array(allSamples.dropFirst(validCount))
+        return .init(
+            warmupDurations: warmupDurations,
+            measuredDurations: measuredDurations,
+            audioValues: audioValues,
+            allSamples: allSamples,
+            validSamples: validSamples,
+            tailSamples: tailSamples,
         )
     }
 
@@ -453,7 +740,7 @@ extension SpeakSwiftlyProbeToolMain {
         return stats
     }
 
-    static func writeCoreMLQwenDecoderReport(_ report: CoreMLQwenDecoderReport, output: String?) throws {
+    static func writeCoreMLQwenReport(_ report: some Encodable, output: String?) throws {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
