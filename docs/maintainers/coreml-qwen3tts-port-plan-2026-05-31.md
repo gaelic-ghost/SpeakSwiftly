@@ -1937,6 +1937,74 @@ Interpretation:
   interval activity during the benchmark process and enough speedup to justify
   deeper dispatch work after more audio/listening coverage.
 
+## 2026-06-01 Bucket 88 W8A8 Dispatch Trace
+
+Bucket 88 was profiled with the same W8A8 `linear` + `matmul` scope to check
+whether the ANE result survives the longer padded shape.
+
+Profiled package:
+
+- `.local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-88-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage`
+
+Profiled sample:
+
+- `prompt-002`, 84 code steps padded to bucket 88, valid output 161,280 samples
+
+Trace report:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-xctrace-bucket-88-w8a8-linear-matmul-prompt-002-12hz.json`
+
+Results:
+
+| Compute units | Mean predict time | ANE rows | MPS rows | GPU interval rows | Load/compile |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `cpuOnly` | `178.79936680110404 ms` | 0 | 0 | 11,034 | `1.75 s` |
+| `cpuAndNeuralEngine` | `134.62576680176426 ms` | 78 | 0 | 85,127 | `84.39 s` |
+| `all` | `110.43449199933093 ms` | 80 | 84 | 16,450 | `51.58 s` |
+
+Interpretation:
+
+- The longer bucket confirms the bucket-72 dispatch finding. W8A8
+  `linear` + `matmul` records Neural Engine activity under NE-capable compute
+  settings and improves hot prediction time versus CPU-only.
+- `all` remains the fastest measured setting and uses both ANE and MPS/GPU
+  surfaces, so the first backend experiment should prefer `.all` after parity
+  and audio checks.
+- Load/compile time gets worse with bucket 88. A practical backend must keep
+  one or more decoder buckets resident, avoid cold loads in request handling,
+  and expose explicit unload/reload behavior consistent with the existing
+  resident-model control surface.
+
+## Decoder Residency Prototype Shape
+
+The next local implementation target should be a private decoder runner, not a
+public backend case yet.
+
+Near-term behavior:
+
+- Load bucketed Core ML decoder packages once per selected compute-unit policy.
+- Start with `.all` for W8A8 `linear` + `matmul` packages because current traces
+  show the best hot prediction time there.
+- Keep loaded `MLModel` instances resident across requests until explicit
+  unload, memory pressure, or maintenance control asks them to leave memory.
+- Accept captured or generated `audio_codes`, choose the smallest fixed bucket
+  that can hold the code-step count, pad remaining steps with `-1`, and record
+  valid output sample count.
+- Run prediction, trim to valid output samples before playback/evaluation, and
+  report timing split into model-load, warm prediction, measured prediction,
+  padding, and trimming.
+- Keep this runner under maintainer/probe tooling first. Do not expose a public
+  `SpeechBackend` until the talker graph boundary and decoder listening quality
+  are both clearer.
+
+Why this matters:
+
+- SpeakSwiftly's resident-model control is a real advantage over cold Core ML
+  demos: the current W8A8 decoder has promising hot latency, but poor cold
+  compile/load behavior.
+- A private runner lets us test residency, bucket selection, valid-region
+  trimming, and dispatch policy before taking on the harder Qwen talker graph.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
