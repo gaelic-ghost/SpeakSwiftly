@@ -2053,6 +2053,29 @@ First prototype result:
   after bucket 88 first predicts. The second pass stayed essentially flat around
   `616 MiB`, which supports treating first prediction per bucket as an explicit
   warm-residency step.
+- The matching fp16 resident catalog is
+  `coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-fp16-prompts-001-002-12hz.json`.
+  It uses the same samples, compute policy, and two-pass shape. Bucket 72 loaded
+  in about `15.9 s` and bucket 88 loaded in about `28.8 s`; first-use warmups
+  were about `455 ms` and `240 ms`, while pass-two measured means were about
+  `83.4 ms` and `111.0 ms`.
+- The compact closeout comparison is
+  `coreml-qwen3tts/decoder-closeout-fp16-vs-w8a8-resident-catalog-12hz.json`.
+  W8A8 `linear` + `matmul` cuts each bucket package from about `229 MB` to about
+  `115 MB`, but does not materially improve pass-two hot timing in the Swift
+  resident catalog. Its first-use warmups are larger than fp16, so any
+  backend-shaped use must explicitly warm each resident bucket before serving
+  user-facing audio.
+- Decoder closeout status: W8A8 `linear` + `matmul` remains the only current
+  decoder W8A8 candidate; convolution and upsampling activations stay fp16; no
+  public Core ML `SpeechBackend` should be added until the Qwen talker graph
+  boundary is understood; and decoder quality remains pending until Gale
+  completes manual listening.
+- The morning listening manifest is
+  `coreml-qwen3tts/decoder-closeout-listening-manifest-12hz.json`. It verifies
+  the existing local valid-region WAV pairs for bucket 72 `prompt-001` and
+  bucket 88 `prompt-002`, and intentionally records
+  `manual_listening_pending` instead of accepting audio quality.
 - This confirms the backend-relevant shape is feasible at the probe level:
   declare bucket packages, load them once, route by code length, trim valid
   output, and keep public runtime surfaces unchanged while gathering evidence.

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "mode": "decoder_resident_catalog_closeout",
+  "status": "manual_listening_pending",
+  "source_reports": {
+    "fp16_catalog": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-fp16-prompts-001-002-12hz.json",
+    "w8a8_catalog": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json",
+    "bucket_72_audio_inspection": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001-12hz.json",
+    "bucket_88_audio_inspection": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002-12hz.json"
+  },
+  "packages": [
+    {
+      "bucket": 72,
+      "fp16_package_size_bytes": 228718254,
+      "w8a8_linear_matmul_package_size_bytes": 114769327,
+      "size_ratio_w8a8_to_fp16": 0.5017899523441347
+    },
+    {
+      "bucket": 88,
+      "fp16_package_size_bytes": 228727470,
+      "w8a8_linear_matmul_package_size_bytes": 114776495,
+      "size_ratio_w8a8_to_fp16": 0.5018056962438894
+    }
+  ],
+  "resident_catalog_comparison": [
+    {
+      "bucket": 72,
+      "sample_id": "prompt-001",
+      "fp16_load_duration_ms": 15874.783124998212,
+      "w8a8_load_duration_ms": 36347.42704166472,
+      "fp16_first_use_warmup_ms": 455.31904166191816,
+      "w8a8_first_use_warmup_ms": 1738.9077916666865,
+      "fp16_pass_2_measured_mean_ms": 83.44085416942835,
+      "w8a8_pass_2_measured_mean_ms": 84.61689583212137,
+      "fp16_rss_after_first_prediction_bytes": 607600640,
+      "w8a8_rss_after_first_prediction_bytes": 538214400,
+      "valid_output_mean_abs_diff": 0.00341379689052701,
+      "valid_output_max_abs_diff": 0.109619140625,
+      "alert_window_count": 0
+    },
+    {
+      "bucket": 88,
+      "sample_id": "prompt-002",
+      "fp16_load_duration_ms": 28820.475458338857,
+      "w8a8_load_duration_ms": 31587.143666662276,
+      "fp16_first_use_warmup_ms": 239.8078749999404,
+      "w8a8_first_use_warmup_ms": 1622.6988333389163,
+      "fp16_pass_2_measured_mean_ms": 111.01500000059605,
+      "w8a8_pass_2_measured_mean_ms": 109.18316666409373,
+      "fp16_rss_after_first_prediction_bytes": 613613568,
+      "w8a8_rss_after_first_prediction_bytes": 645529600,
+      "valid_output_mean_abs_diff": 0.004826558753848076,
+      "valid_output_max_abs_diff": 0.3194580078125,
+      "alert_window_count": 2
+    }
+  ],
+  "process_residency": {
+    "fp16_final_rss_bytes": 613662720,
+    "w8a8_final_rss_bytes": 645496832,
+    "interpretation": "Both catalogs settle after first prediction per bucket. W8A8 halves package size, but did not materially improve pass-two hot latency in this two-bucket Swift probe."
+  },
+  "decision": {
+    "candidate": "W8A8 linear + matmul remains the only current W8A8 decoder candidate.",
+    "keep_fp16": "Convolution and upsampling activations stay fp16 unless decoder tuning changes the quality tradeoff.",
+    "backend_gate": "Any backend-shaped use must keep models resident and explicitly warm each loaded bucket before serving user-facing audio.",
+    "public_backend": "Do not add a public Core ML SpeechBackend until the Qwen talker graph boundary is understood and manual decoder listening passes."
+  }
+}

@@ -36,8 +36,55 @@ import Testing
 }
 
 @Test func `qwen3 tts speech tokenizer decoder resident catalog routes selected buckets`() throws {
-    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.load()
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.load(
+        Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.w8a8Filename,
+    )
 
+    try assertResidentCatalogFixture(fixture, expectedModelPackageFragment: "linear-matmul")
+}
+
+@Test func `qwen3 tts speech tokenizer decoder fp16 resident catalog routes selected buckets`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.load(
+        Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture.fp16Filename,
+    )
+
+    try assertResidentCatalogFixture(fixture, expectedModelPackageFragment: "bucket-72-fp16")
+    #expect(fixture.source.bucketModels[1].modelPackage.contains("bucket-88-fp16"))
+}
+
+@Test func `qwen3 tts decoder closeout manifests listening artifacts`() throws {
+    let manifest = try Qwen3TTSDecoderCloseoutListeningManifest.load()
+
+    #expect(manifest.schemaVersion == 1)
+    #expect(manifest.status == "manual_listening_pending")
+    #expect(manifest.listenInOrder.map(\.sampleId) == ["prompt-001", "prompt-002"])
+    #expect(manifest.listenInOrder.map(\.bucket) == [72, 88])
+    #expect(manifest.listenInOrder.allSatisfy { $0.validDurationSeconds > 0 })
+    #expect(manifest.listenInOrder.allSatisfy { $0.baselineValidWav.hasPrefix(".local/coreml-qwen3tts/") })
+    #expect(manifest.listenInOrder.allSatisfy { $0.candidateValidWav.hasPrefix(".local/coreml-qwen3tts/") })
+    #expect(manifest.listenInOrder.allSatisfy { $0.audioInspectionReport.hasPrefix("docs/maintainers/") })
+}
+
+@Test func `qwen3 tts decoder closeout compares fp16 and w8a8 residency`() throws {
+    let report = try Qwen3TTSDecoderCloseoutComparisonReport.load()
+
+    #expect(report.schemaVersion == 1)
+    #expect(report.status == "manual_listening_pending")
+    #expect(report.packages.map(\.bucket) == [72, 88])
+    #expect(report.packages.allSatisfy { $0.w8a8LinearMatmulPackageSizeBytes < $0.fp16PackageSizeBytes })
+    #expect(report.residentCatalogComparison.map(\.sampleId) == ["prompt-001", "prompt-002"])
+    #expect(report.residentCatalogComparison.allSatisfy { $0.fp16Pass2MeasuredMeanMs > 0 })
+    #expect(report.residentCatalogComparison.allSatisfy { $0.w8a8Pass2MeasuredMeanMs > 0 })
+    #expect(report.residentCatalogComparison.allSatisfy { $0.validOutputMeanAbsDiff > 0 })
+    #expect(report.processResidency.fp16FinalRssBytes > 0)
+    #expect(report.processResidency.w8a8FinalRssBytes > 0)
+    #expect(report.decision.publicBackend.contains("Do not add"))
+}
+
+private func assertResidentCatalogFixture(
+    _ fixture: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture,
+    expectedModelPackageFragment: String,
+) throws {
     #expect(fixture.schemaVersion == 1)
     #expect(fixture.toolName == "coreml-qwen-decoder")
     #expect(fixture.mode == "resident_bucket_catalog")
@@ -45,6 +92,7 @@ import Testing
     #expect(fixture.source.catalogPasses == 2)
     #expect(fixture.source.sampleIds == ["prompt-001", "prompt-002"])
     #expect(fixture.source.bucketModels.map(\.bucket) == [72, 88])
+    #expect(fixture.source.bucketModels[0].modelPackage.contains(expectedModelPackageFragment))
     #expect(fixture.buckets.map(\.bucket) == [72, 88])
     #expect(fixture.buckets.allSatisfy { $0.compileDurationMs ?? 0 > 0 })
     #expect(fixture.buckets.allSatisfy { $0.loadDurationMs > 0 })
@@ -170,6 +218,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
     struct Source: Decodable {
         struct BucketModel: Decodable {
             let bucket: Int
+            let modelPackage: String
         }
 
         let computeUnits: String
@@ -202,8 +251,10 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
         let paddedTail: Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture.Prediction.AudioSummary?
     }
 
-    static let filename =
+    static let w8a8Filename =
         "speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json"
+    static let fp16Filename =
+        "speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-fp16-prompts-001-002-12hz.json"
 
     let schemaVersion: Int
     let toolName: String
@@ -213,7 +264,9 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
     let memorySnapshots: [MemorySnapshot]
     let predictions: [Prediction]
 
-    static func load() throws -> Self {
+    static func load(
+        _ filename: String = w8a8Filename,
+    ) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
             "docs/maintainers/coreml-qwen3tts/\(filename)",
         )
@@ -228,6 +281,72 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
             return prediction
         }
         return nil
+    }
+}
+
+private struct Qwen3TTSDecoderCloseoutListeningManifest: Decodable {
+    struct ListeningItem: Decodable {
+        let sampleId: String
+        let bucket: Int
+        let validDurationSeconds: Double
+        let baselineValidWav: String
+        let candidateValidWav: String
+        let audioInspectionReport: String
+    }
+
+    let schemaVersion: Int
+    let status: String
+    let listenInOrder: [ListeningItem]
+
+    static func load() throws -> Self {
+        let fixtureURL = try qwen3TTSFixtureURL(
+            "docs/maintainers/coreml-qwen3tts/decoder-closeout-listening-manifest-12hz.json",
+        )
+        let data = try Data(contentsOf: fixtureURL)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(Self.self, from: data)
+    }
+}
+
+private struct Qwen3TTSDecoderCloseoutComparisonReport: Decodable {
+    struct Package: Decodable {
+        let bucket: Int
+        let fp16PackageSizeBytes: Int
+        let w8a8LinearMatmulPackageSizeBytes: Int
+    }
+
+    struct Comparison: Decodable {
+        let sampleId: String
+        let fp16Pass2MeasuredMeanMs: Double
+        let w8a8Pass2MeasuredMeanMs: Double
+        let validOutputMeanAbsDiff: Double
+    }
+
+    struct ProcessResidency: Decodable {
+        let fp16FinalRssBytes: UInt64
+        let w8a8FinalRssBytes: UInt64
+    }
+
+    struct Decision: Decodable {
+        let publicBackend: String
+    }
+
+    let schemaVersion: Int
+    let status: String
+    let packages: [Package]
+    let residentCatalogComparison: [Comparison]
+    let processResidency: ProcessResidency
+    let decision: Decision
+
+    static func load() throws -> Self {
+        let fixtureURL = try qwen3TTSFixtureURL(
+            "docs/maintainers/coreml-qwen3tts/decoder-closeout-fp16-vs-w8a8-resident-catalog-12hz.json",
+        )
+        let data = try Data(contentsOf: fixtureURL)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(Self.self, from: data)
     }
 }
 

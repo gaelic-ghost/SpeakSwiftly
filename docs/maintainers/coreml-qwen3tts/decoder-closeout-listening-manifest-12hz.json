@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "status": "manual_listening_pending",
+  "purpose": "Morning manual listening checklist for the Qwen3-TTS speech-tokenizer decoder closeout. Listen to valid-region WAVs first; full padded WAVs are listed in the audio-inspection reports for debugging only.",
+  "candidate": "bucketed fp16 base with W8A8 activation quantization scoped to linear + matmul",
+  "baseline": "bucketed fp16 Core ML decoder",
+  "listen_in_order": [
+    {
+      "order": 1,
+      "sample_id": "prompt-001",
+      "bucket": 72,
+      "valid_duration_seconds": 5.36,
+      "audio_inspection_report": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001-12hz.json",
+      "baseline_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/baseline-fp16-valid.wav",
+      "candidate_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/candidate-w8a8-valid.wav",
+      "diff_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/candidate-minus-baseline.wav",
+      "valid_output_mean_abs_diff": 0.00341379689052701,
+      "valid_output_max_abs_diff": 0.109619140625,
+      "alert_window_count": 0,
+      "listen_for": "Obvious buzz, dullness, warble, transient smearing, or pronunciation change relative to fp16."
+    },
+    {
+      "order": 2,
+      "sample_id": "prompt-002",
+      "bucket": 88,
+      "valid_duration_seconds": 6.72,
+      "audio_inspection_report": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-audio-inspection-bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002-12hz.json",
+      "baseline_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002/baseline-fp16-valid.wav",
+      "candidate_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002/candidate-w8a8-valid.wav",
+      "diff_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-88-talker-qwen3-linear-matmul-group-16-prompt-002/candidate-minus-baseline.wav",
+      "valid_output_mean_abs_diff": 0.004826558753848076,
+      "valid_output_max_abs_diff": 0.3194580078125,
+      "alert_window_count": 2,
+      "listen_for": "Late-sentence drift, roughness around high-diff windows, cadence change, or any artifact that would block W8A8 decoder use."
+    }
+  ],
+  "acceptance_note": "Manual listening has not been performed yet. Decoder quality should remain pending until Gale listens to the listed valid-region pairs."
+}
