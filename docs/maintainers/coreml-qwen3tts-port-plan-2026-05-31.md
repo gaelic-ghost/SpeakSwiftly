@@ -1896,6 +1896,47 @@ Interpretation:
   LibriTTS-R samples for `linear` + `matmul`, then compare listening artifacts
   before Instruments dispatch profiling.
 
+## 2026-06-01 W8A8 Linear Matmul Dispatch Trace
+
+The xctrace profiling scripts now accept a model package, conversion report,
+sample source, and talker-code sample id so they can profile bucketed W8A8
+packages instead of only the original static-mask decoder fixture.
+
+Profiled package:
+
+- `.local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-72-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage`
+
+Profiled sample:
+
+- `prompt-001`, 67 code steps padded to bucket 72, valid output 128,640 samples
+
+Trace report:
+
+- `docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-xctrace-bucket-72-w8a8-linear-matmul-prompt-001-12hz.json`
+
+Results:
+
+| Compute units | Mean predict time | ANE rows | MPS rows | GPU interval rows | Notes |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `cpuOnly` | `138.2119083980797 ms` | 0 | 0 | 919 | baseline for this trace |
+| `cpuAndNeuralEngine` | `106.08462500094902 ms` | 74 | 0 | 35,858 | ANE intervals recorded, model load/compile about 54.3s |
+| `all` | `84.25714159820927 ms` | 44 | 48 | 6,204 | fastest measured path, ANE plus MPS/GPU rows |
+
+Interpretation:
+
+- W8A8 `linear` + `matmul` is not only numerically promising; it can produce
+  Instruments-visible Neural Engine activity on the local M4 Pro.
+- `cpuAndNeuralEngine` is faster than `cpuOnly`, and `all` is faster than both
+  for this bucket/sample. That suggests Core ML is splitting useful work across
+  compute devices when allowed.
+- Load/compile time is still a serious backend concern. The NE-preferred load
+  took about 54 seconds in this trace, and `all` took about 21.5 seconds. Any
+  backend experiment must treat model residency, cache warmup, and artifact
+  cleanup as first-class behavior rather than measuring only hot prediction.
+- This trace does not provide a complete per-op placement map. It proves ANE
+  interval activity during the benchmark process and enough speedup to justify
+  deeper dispatch work after more audio/listening coverage.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or

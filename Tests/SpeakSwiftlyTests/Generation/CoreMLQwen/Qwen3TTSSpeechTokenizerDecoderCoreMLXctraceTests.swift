@@ -38,6 +38,33 @@ import Testing
     }
 }
 
+@Test func `qwen3 tts speech tokenizer decoder w8a8 xctrace profile shows ane intervals`() throws {
+    let fixture = try Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceFixture.load(
+        "speech-tokenizer-decoder-coreml-xctrace-bucket-72-w8a8-linear-matmul-prompt-001-12hz.json",
+    )
+
+    #expect(fixture.mode == "coreml_xctrace_profile")
+    #expect(fixture.profile.warmupRuns == 1)
+    #expect(fixture.profile.measuredRuns == 5)
+    #expect(fixture.profile.computeUnitsOrder == ["cpuOnly", "cpuAndNeuralEngine", "all"])
+
+    let cpuOnly = try #require(fixture.result(for: "cpuOnly"))
+    let cpuAndNeuralEngine = try #require(fixture.result(for: "cpuAndNeuralEngine"))
+    let all = try #require(fixture.result(for: "all"))
+
+    #expect(cpuOnly.table("ane-hw-intervals-internal")?.rowCount == 0)
+    #expect((cpuAndNeuralEngine.table("ane-hw-intervals-internal")?.rowCount ?? 0) > 0)
+    #expect((all.table("ane-hw-intervals-internal")?.rowCount ?? 0) > 0)
+    #expect((all.table("mps-hw-intervals")?.rowCount ?? 0) > 0)
+    #expect(cpuAndNeuralEngine.table("ane-hw-intervals-internal")?.labels.contains("Apple Neural Engine") == true)
+    #expect(all.table("ane-hw-intervals-internal")?.labels.contains("Apple Neural Engine") == true)
+    let cpuOnlyMean = try #require(cpuOnly.benchmarkResult?.measured.meanMs)
+    let cpuAndNeuralEngineMean = try #require(cpuAndNeuralEngine.benchmarkResult?.measured.meanMs)
+    let allMean = try #require(all.benchmarkResult?.measured.meanMs)
+    #expect(cpuAndNeuralEngineMean < cpuOnlyMean)
+    #expect(allMean < cpuAndNeuralEngineMean)
+}
+
 private struct Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceFixture: Decodable {
     struct Source: Decodable {
         let template: String
@@ -52,8 +79,17 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceFixture: Decodable {
                 let labels: [String]
             }
 
+            struct BenchmarkResult: Decodable {
+                struct Measured: Decodable {
+                    let meanMs: Double
+                }
+
+                let measured: Measured
+            }
+
             let status: String
             let computeUnits: String
+            let benchmarkResult: BenchmarkResult?
             let traceTables: [TraceTable]
 
             func table(_ schema: String) -> TraceTable? {
@@ -72,9 +108,9 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceFixture: Decodable {
     let source: Source
     let profile: Profile
 
-    static func load() throws -> Self {
+    static func load(_ filename: String = "speech-tokenizer-decoder-coreml-xctrace-static-mask-12hz.json") throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-xctrace-static-mask-12hz.json",
+            "docs/maintainers/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
