@@ -10,6 +10,7 @@ public enum SpeakSwiftly {
 
     enum SpeechJobType: Equatable {
         case live
+        case stream
         case file
     }
 

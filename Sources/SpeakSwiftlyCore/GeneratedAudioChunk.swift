@@ -38,13 +38,15 @@ public enum GeneratedAudioOutputError: Error, Codable, Sendable, Equatable {
     case transportFailed(requestID: String, message: String)
 }
 
-public enum GeneratedAudioChunkStream {
+public typealias GeneratedAudioChunkStream = AsyncThrowingStream<GeneratedAudioChunk, any Error>
+
+public enum GeneratedAudioChunkStreams {
     public static func chunks(
         requestID: String,
         sampleRate: Int,
         channelCount: Int = 1,
         samples: some AsyncSequence<[Float], any Error> & Sendable,
-    ) -> AsyncThrowingStream<GeneratedAudioChunk, any Error> {
+    ) -> GeneratedAudioChunkStream {
         AsyncThrowingStream { continuation in
             let task = Task {
                 var sequenceNumber = 0

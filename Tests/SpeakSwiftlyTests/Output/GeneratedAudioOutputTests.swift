@@ -33,7 +33,7 @@ import Testing
     }
     var chunks = [GeneratedAudioChunk]()
 
-    for try await chunk in GeneratedAudioChunkStream.chunks(
+    for try await chunk in GeneratedAudioChunkStreams.chunks(
         requestID: "req-qwen",
         sampleRate: 24000,
         samples: source,

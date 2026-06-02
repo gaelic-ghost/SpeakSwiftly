@@ -323,6 +323,20 @@ import Darwin
     let generateAudioWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.RequestHandle = { generate, text in
         await generate.audio(text: text)
     }
+    let generateAudioStream: @Sendable (SpeakSwiftly.Generate, String, SpeakSwiftly.Name, SpeakSwiftly.TextProfileID?) async -> SpeakSwiftly.GeneratedAudioStream = {
+        generate,
+        text,
+        profileName,
+        textProfile in
+        await generate.audioStream(
+            text: text,
+            voiceProfile: profileName,
+            textProfile: textProfile,
+        )
+    }
+    let generateAudioStreamWithDefaultVoice: @Sendable (SpeakSwiftly.Generate, String) async -> SpeakSwiftly.GeneratedAudioStream = { generate, text in
+        await generate.audioStream(text: text)
+    }
     let generateHandle: @Sendable (SpeakSwiftly.Runtime) -> SpeakSwiftly.Generate = { runtime in
         runtime.generate
     }
@@ -739,6 +753,8 @@ import Darwin
     _ = speakWithDefaultVoice
     _ = generateAudio
     _ = generateAudioWithDefaultVoice
+    _ = generateAudioStream
+    _ = generateAudioStreamWithDefaultVoice
     _ = generateHandle
     _ = playbackHandle
     _ = voicesHandle
