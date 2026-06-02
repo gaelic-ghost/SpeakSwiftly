@@ -103,6 +103,20 @@ audio to an HTTP response or LAN transport. The output modules expose framing
 and discovery primitives, while the host-owned server boundary is responsible
 for attaching those bytes to a response or network connection.
 
+Use ``SpeakSwiftly/Generate/audioStream(text:voiceProfile:textProfile:requestContext:qwenPreModelTextChunking:)``
+when the host owns that boundary directly and needs canonical generated-audio
+chunks instead of local playback:
+
+```swift
+let stream = await runtime.generate.audioStream(
+    text: "Stream this as generated speech."
+)
+
+for try await chunk in stream.chunks {
+    // Frame the chunk for HTTP, send it over LAN, or play it with a custom sink.
+}
+```
+
 Hosts that want selectable LAN audio receivers can use
 ``SpeakSwiftly/NetworkAudioDestinationBrowser`` to keep an in-memory list of
 Bonjour-advertised audio receivers. A receiver host can attach

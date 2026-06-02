@@ -7,6 +7,7 @@ import SpeakSwiftlyPlayback
 public extension SpeakSwiftly {
     typealias GeneratedAudioChunk = SpeakSwiftlyCore.GeneratedAudioChunk
     typealias GeneratedAudioChunkStream = SpeakSwiftlyCore.GeneratedAudioChunkStream
+    typealias GeneratedAudioChunkStreams = SpeakSwiftlyCore.GeneratedAudioChunkStreams
     typealias GeneratedAudioSampleFormat = SpeakSwiftlyCore.GeneratedAudioSampleFormat
     typealias GeneratedAudioOutputError = SpeakSwiftlyCore.GeneratedAudioOutputError
     typealias LocalPlaybackAudioOutput = SpeakSwiftlyPlayback.LocalPlaybackAudioOutput

@@ -5,6 +5,71 @@ import TextForSpeech
 
 // MARK: - Generated File Queueing
 
+@Test func `audio stream returns canonical generated chunks without local playback`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let generatedStream = await runtime.generate.audioStream(
+        text: "Hello from the generated stream path.",
+        voiceProfile: "default-femme",
+    )
+
+    var chunks = [SpeakSwiftly.GeneratedAudioChunk]()
+    for try await chunk in generatedStream.chunks {
+        chunks.append(chunk)
+    }
+
+    #expect(chunks.map(\.sequenceNumber) == [0, 1, 2])
+    #expect(chunks.map(\.samples) == [[0.1, 0.2], [0.2, 0.3], []])
+    #expect(chunks.map(\.isFinal) == [false, false, true])
+    #expect(chunks.allSatisfy { $0.requestID == generatedStream.handle.id })
+    #expect(chunks.allSatisfy { $0.sampleRate == 24000 })
+    #expect(chunks.allSatisfy { $0.channelCount == 1 })
+    #expect(chunks.allSatisfy { $0.sampleFormat == .float32PCM })
+    #expect(playback.playCount == 0)
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == generatedStream.handle.id
+                && $0["event"] as? String == "started"
+                && $0["op"] as? String == "generate_audio_stream"
+        }
+    })
+    #expect(await waitUntil {
+        output.countJSONObjects {
+            $0["id"] as? String == generatedStream.handle.id
+                && $0["ok"] as? Bool == true
+        } == 2
+    })
+}
+
 @Test func `speak file acknowledges queue then completes with generated file metadata`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()

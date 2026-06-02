@@ -135,6 +135,8 @@ enum WorkerRequest: Equatable {
         switch self {
             case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 "generate_speech"
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .stream, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+                "generate_audio_stream"
             case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
                 "generate_audio_file"
             case .queueBatch:
@@ -298,7 +300,8 @@ enum WorkerRequest: Equatable {
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
         switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .stream, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
+                 .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch,
                  .switchSpeechBackend,
                  .reloadModels,

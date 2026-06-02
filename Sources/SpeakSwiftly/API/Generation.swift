@@ -97,6 +97,29 @@ public extension SpeakSwiftly.Generate {
         )
     }
 
+    /// Generates speech audio as canonical chunk metadata plus Float32 PCM samples.
+    ///
+    /// Use this lower-level surface when the caller owns the output boundary, such as an
+    /// HTTP response stream, LAN transport sender, file encoder, benchmark, or custom player.
+    func audioStream(
+        text: String,
+        voiceProfile: SpeakSwiftly.Name? = nil,
+        textProfile: SpeakSwiftly.TextProfileID? = nil,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
+        qwenPreModelTextChunking: Bool = false,
+    ) async -> SpeakSwiftly.GeneratedAudioStream {
+        let requestID = UUID().uuidString
+        let resolvedVoiceProfile = await runtime.resolveGenerationVoiceProfile(voiceProfile)
+        return await runtime.submitGeneratedAudioStream(
+            requestID: requestID,
+            text: text,
+            profileName: resolvedVoiceProfile,
+            textProfileID: textProfile,
+            requestContext: requestContext,
+            qwenPreModelTextChunking: qwenPreModelTextChunking,
+        )
+    }
+
     /// Queues a batch of retained audio-file generation requests under one voice profile.
     ///
     /// - Parameters:

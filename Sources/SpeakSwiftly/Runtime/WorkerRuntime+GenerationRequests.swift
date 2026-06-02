@@ -13,6 +13,10 @@ extension SpeakSwiftly.Runtime {
                     try await handleQueueSpeechLiveGeneration(id: id, op: request.opName, text: text, profileName: profileName)
                     disposition = .requestStillPendingPlayback
 
+                case .queueSpeech(id: let id, text: _, profileName: let profileName, textProfileID: _, jobType: .stream, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+                    try await handleQueueSpeechStreamGeneration(id: id, op: request.opName, profileName: profileName, request: request)
+                    disposition = .requestCompleted(.success(WorkerSuccessPayload(id: id)))
+
                 case .queueSpeech(
                 id: let id,
                 text: let text,
@@ -372,6 +376,65 @@ extension SpeakSwiftly.Runtime {
             throw WorkerError(
                 code: .modelGenerationFailed,
                 message: "Live speech generation failed while streaming audio for request '\(id)'. \(error.localizedDescription)",
+            )
+        }
+    }
+
+    private func handleQueueSpeechStreamGeneration(
+        id: String,
+        op: String,
+        profileName: String,
+        request: WorkerRequest,
+    ) async throws {
+        let speechState = try await makeSpeechJobState(for: request)
+        let residentInputs = try await loadResidentSpeechInputs(
+            requestID: id,
+            op: op,
+            profileName: profileName,
+        )
+        let residentModel = residentInputs.model
+
+        if speechBackend.isQwenFamily {
+            await logQwenLiveChunkPlan(for: speechState)
+        }
+
+        await emitProgress(id: id, stage: .bufferingAudio)
+        let sampleStream = residentLiveGenerationStream(
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            text: speechState.normalizedText,
+            plannedTextChunks: speechState.normalizedLiveChunks,
+            inputs: residentInputs,
+            generationParameters: GenerationPolicy.residentParameters(
+                for: speechBackend,
+                text: speechState.normalizedText,
+            ),
+            streamingInterval: speechState.residentStreamingInterval,
+        )
+        let chunkStream = SpeakSwiftly.GeneratedAudioChunkStreams.chunks(
+            requestID: id,
+            sampleRate: residentModel.sampleRate,
+            samples: sampleStream,
+        )
+
+        do {
+            for try await chunk in chunkStream {
+                try Task.checkCancellation()
+                try yieldGeneratedAudioChunk(chunk, for: id)
+            }
+            finishGeneratedAudioStream(for: id)
+        } catch {
+            finishGeneratedAudioStream(for: id, throwing: error)
+            if let workerError = error as? WorkerError {
+                throw workerError
+            }
+            if error is CancellationError {
+                throw CancellationError()
+            }
+            throw WorkerError(
+                code: .modelGenerationFailed,
+                message: "Generated-audio stream request '\(id)' failed while streaming canonical audio chunks. \(error.localizedDescription)",
             )
         }
     }
