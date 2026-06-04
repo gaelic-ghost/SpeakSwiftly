@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "airpods_listening_acceptable_followup_optional",
+  "status": "macbook_pro_speaker_listening_acceptable_followup_optional",
   "purpose": "Manual listening record for the Qwen3-TTS speech-tokenizer decoder closeout. Valid-region WAVs are the primary listening artifacts; full padded WAVs are listed in the audio-inspection reports for debugging only.",
   "candidate": "bucketed fp16 base with W8A8 activation quantization scoped to linear + matmul",
   "baseline": "bucketed fp16 Core ML decoder",
@@ -18,8 +18,8 @@
       "valid_output_max_abs_diff": 0.109619140625,
       "alert_window_count": 0,
       "listen_for": "Obvious buzz, dullness, warble, transient smearing, or pronunciation change relative to fp16.",
-      "airpods_listening_result": "acceptable",
-      "airpods_listening_note": "W8A8 was very close to fp16. The fp16 baseline came in a tiny bit stronger and fuller, but the difference was small enough to be acceptable for continued ANE-oriented performance work."
+      "macbook_pro_speaker_listening_result": "acceptable",
+      "macbook_pro_speaker_listening_note": "On MacBook Pro speakers at roughly 60% volume, W8A8 was very close to fp16. The fp16 baseline came in a tiny bit stronger and fuller, but the difference was small enough to be acceptable for continued ANE-oriented performance work."
     },
     {
       "order": 2,
@@ -34,9 +34,9 @@
       "valid_output_max_abs_diff": 0.3194580078125,
       "alert_window_count": 2,
       "listen_for": "Late-sentence drift, roughness around high-diff windows, cadence change, or any artifact that would block W8A8 decoder use.",
-      "airpods_listening_result": "acceptable_with_muffled_quality",
-      "airpods_listening_note": "W8A8 sounded a bit muffled, like a lower-quality microphone recording compared with fp16. It was definitely not as good as fp16, but the difference was not large enough to block continued performance work if end-to-end performance improves."
+      "macbook_pro_speaker_listening_result": "acceptable_with_muffled_quality",
+      "macbook_pro_speaker_listening_note": "On MacBook Pro speakers at roughly 60% volume, W8A8 sounded a bit muffled, like a lower-quality microphone recording compared with fp16. It was definitely not as good as fp16, but the difference was not large enough to block continued performance work if end-to-end performance improves."
     }
   ],
-  "acceptance_note": "AirPods 4 listening found the W8A8 linear + matmul decoder acceptable for continued Core ML performance exploration, but not quality-equal to fp16. A real-headphones or speakers pass remains optional before any final backend-quality decision."
+  "acceptance_note": "MacBook Pro speaker listening at roughly 60% volume found the W8A8 linear + matmul decoder acceptable for continued Core ML performance exploration, but not quality-equal to fp16. A headphones follow-up remains optional before any final backend-quality decision."
 }
