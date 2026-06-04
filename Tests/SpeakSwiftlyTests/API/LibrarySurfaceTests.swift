@@ -44,6 +44,7 @@ import Darwin
     #expect(configuration.defaultVoiceProfile == SpeakSwiftly.DefaultVoiceProfiles.signal)
     #expect(configuration.duckMediaVolume == .off)
     #expect(configuration.audioOutputDestination == .localPlayback)
+    #expect(configuration.recentGeneratedAudioLimit == 5)
     #expect(configuration.textNormalizer == nil)
 }
 
@@ -85,6 +86,7 @@ import Darwin
         defaultVoiceProfile: SpeakSwiftly.DefaultVoiceProfiles.anchor,
         duckMediaVolume: .default,
         audioOutputDestination: .httpResponseStream,
+        recentGeneratedAudioLimit: 8,
     )
 
     try configuration.save(to: persistenceURL)
@@ -95,8 +97,29 @@ import Darwin
     #expect(loaded.defaultVoiceProfile == configuration.defaultVoiceProfile)
     #expect(loaded.duckMediaVolume == .default)
     #expect(loaded.audioOutputDestination == .httpResponseStream)
+    #expect(loaded.recentGeneratedAudioLimit == 8)
     #expect(loaded.systemProfileResourceRoots.isEmpty)
     #expect(loaded.textNormalizer == nil)
+}
+
+@Test func `public configuration clamps recent generated audio limit`() throws {
+    let disabled = SpeakSwiftly.Configuration(recentGeneratedAudioLimit: -12)
+    let capped = SpeakSwiftly.Configuration(recentGeneratedAudioLimit: 42)
+
+    #expect(disabled.recentGeneratedAudioLimit == 0)
+    #expect(capped.recentGeneratedAudioLimit == 8)
+
+    let decodedLow = try JSONDecoder().decode(
+        SpeakSwiftly.Configuration.self,
+        from: Data(#"{"speechBackend":"qwen3_smol","recentGeneratedAudioLimit":-1}"#.utf8),
+    )
+    let decodedHigh = try JSONDecoder().decode(
+        SpeakSwiftly.Configuration.self,
+        from: Data(#"{"speechBackend":"qwen3_smol","recentGeneratedAudioLimit":99}"#.utf8),
+    )
+
+    #expect(decodedLow.recentGeneratedAudioLimit == 0)
+    #expect(decodedHigh.recentGeneratedAudioLimit == 8)
 }
 
 @Test func `public configuration load throws typed error when file is missing`() throws {

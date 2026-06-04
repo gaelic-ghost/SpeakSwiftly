@@ -16,6 +16,43 @@ extension SpeakSwiftly.Runtime {
                         message: "Replay request '\(request.id)' was routed through immediate control handling unexpectedly. This indicates a runtime bug in SpeakSwiftly.",
                     ))
 
+                case let .recentGeneratedAudio(id):
+                    result = await .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            recentGeneratedAudio: recentGeneratedAudioSnapshot(),
+                        ),
+                    )
+
+                case let .recentGeneratedAudioChunks(id, recentAudioID):
+                    result = await .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            recentGeneratedAudioChunks: recentGeneratedAudioChunks(for: recentAudioID),
+                        ),
+                    )
+
+                case let .replayRecentAudioAll(id, replayMode, requestContext):
+                    let handles = await replayRecentGeneratedAudioAll(
+                        mode: replayMode,
+                        requestContext: requestContext,
+                    )
+                    result = .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            replayRequestIDs: handles.map(\.id),
+                        ),
+                    )
+
+                case let .clearRecentGeneratedAudio(id):
+                    await clearRecentGeneratedAudio()
+                    result = await .success(
+                        WorkerSuccessPayload(
+                            id: id,
+                            recentGeneratedAudio: recentGeneratedAudioSnapshot(),
+                        ),
+                    )
+
                 case let .generatedFile(id, artifactID):
                     result = try .success(
                         WorkerSuccessPayload(

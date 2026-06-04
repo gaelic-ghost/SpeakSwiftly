@@ -163,6 +163,29 @@ import Testing
     #expect(await store.item(id: "recent-1") == nil)
 }
 
+@Test func `recent generated audio store clamps limit and disables capture at zero`() async {
+    let capped = RecentGeneratedAudioStore(limit: 99, memorySecondsPerItem: 10)
+    #expect(await capped.snapshot().limit == 8)
+    #expect(await capped.isCaptureEnabled())
+
+    let disabled = RecentGeneratedAudioStore(limit: 0, memorySecondsPerItem: 10)
+    #expect(await disabled.snapshot().limit == 0)
+    #expect(await !(disabled.isCaptureEnabled()))
+
+    await disabled.begin(
+        RecentGeneratedAudioMetadata(
+            id: "recent-disabled",
+            requestID: "request-disabled",
+            textPreview: "Disabled capture should not retain this.",
+            voiceProfileName: "swift-signal",
+        ),
+    )
+
+    let snapshot = await disabled.snapshot()
+    #expect(snapshot.items.isEmpty)
+    #expect(await disabled.item(id: "recent-disabled") == nil)
+}
+
 @Test func `recent generated audio store records failed items and clears history`() async {
     let store = RecentGeneratedAudioStore(limit: 5, memorySecondsPerItem: 10)
     await store.begin(

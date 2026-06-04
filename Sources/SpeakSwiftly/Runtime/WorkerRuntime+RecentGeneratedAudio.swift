@@ -6,7 +6,11 @@ extension SpeakSwiftly.Runtime {
         text: String,
         voiceProfileName: String,
         retentionPolicy: SpeakSwiftly.RecentGeneratedAudioRetentionPolicy = .recentCache,
-    ) async -> String {
+    ) async -> String? {
+        guard await recentGeneratedAudioStore.isCaptureEnabled() else {
+            return nil
+        }
+
         let metadata = SpeakSwiftly.RecentGeneratedAudioMetadata(
             requestID: requestID,
             textPreview: recentGeneratedAudioTextPreview(for: text),
@@ -18,7 +22,9 @@ extension SpeakSwiftly.Runtime {
         return metadata.id
     }
 
-    func recordRecentGeneratedAudioChunk(_ chunk: SpeakSwiftly.GeneratedAudioChunk, recentAudioID: String) async {
+    func recordRecentGeneratedAudioChunk(_ chunk: SpeakSwiftly.GeneratedAudioChunk, recentAudioID: String?) async {
+        guard let recentAudioID else { return }
+
         do {
             try await recentGeneratedAudioStore.append(chunk, to: recentAudioID)
         } catch {
@@ -34,14 +40,18 @@ extension SpeakSwiftly.Runtime {
         }
     }
 
-    func finishRecentGeneratedAudioCapture(recentAudioID: String) async {
+    func finishRecentGeneratedAudioCapture(recentAudioID: String?) async {
+        guard let recentAudioID else { return }
+
         await recentGeneratedAudioStore.finish(
             id: recentAudioID,
             completedAt: dependencies.now(),
         )
     }
 
-    func failRecentGeneratedAudioCapture(recentAudioID: String, error: any Swift.Error) async {
+    func failRecentGeneratedAudioCapture(recentAudioID: String?, error: any Swift.Error) async {
+        guard let recentAudioID else { return }
+
         await recentGeneratedAudioStore.fail(
             id: recentAudioID,
             message: error.localizedDescription,
@@ -61,8 +71,8 @@ extension SpeakSwiftly.Runtime {
         recentAudioID: String,
         mode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
         requestContext: SpeakSwiftly.RequestContext?,
+        requestID: String = UUID().uuidString,
     ) async -> SpeakSwiftly.RequestHandle {
-        let requestID = UUID().uuidString
         let item = await recentGeneratedAudioStore.item(id: recentAudioID)
         let request = WorkerRequest.replayRecentAudio(
             id: requestID,
@@ -74,6 +84,14 @@ extension SpeakSwiftly.Runtime {
         ensureRequestBroker(for: request)
         let handle = makeRequestHandle(for: request)
 
+        guard await recentGeneratedAudioStore.isCaptureEnabled() else {
+            await failRecentGeneratedAudioReplay(
+                request,
+                code: .invalidRequest,
+                message: "Replay request '\(requestID)' cannot play recent generated audio because recentGeneratedAudioLimit is 0, so SpeakSwiftly is not capturing recent generated audio in memory.",
+            )
+            return handle
+        }
         guard let item else {
             await failRecentGeneratedAudioReplay(
                 request,
@@ -158,6 +176,31 @@ extension SpeakSwiftly.Runtime {
         })
         await playbackQueue.startNextIfPossible()
         return handle
+    }
+
+    func replayRecentGeneratedAudioAll(
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+        requestContext: SpeakSwiftly.RequestContext?,
+    ) async -> [SpeakSwiftly.RequestHandle] {
+        let snapshot = await recentGeneratedAudioStore.snapshot()
+        let completeItems = snapshot.items.filter { $0.bufferState == .complete }
+        let replayItems = mode == .enqueueNext ? Array(completeItems.reversed()) : completeItems
+
+        var handles = [SpeakSwiftly.RequestHandle]()
+        handles.reserveCapacity(completeItems.count)
+        for item in replayItems {
+            let handle = await replayRecentGeneratedAudio(
+                recentAudioID: item.id,
+                mode: mode,
+                requestContext: requestContext,
+            )
+            handles.append(handle)
+        }
+
+        if mode == .enqueueNext {
+            handles.reverse()
+        }
+        return handles
     }
 
     func clearRecentGeneratedAudio() async {

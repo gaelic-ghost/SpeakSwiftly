@@ -62,6 +62,7 @@ public extension SpeakSwiftly {
             case defaultVoiceProfile
             case duckMediaVolume
             case audioOutputDestination
+            case recentGeneratedAudioLimit
         }
 
         /// The speech backend to activate when the runtime starts.
@@ -74,6 +75,8 @@ public extension SpeakSwiftly {
         public let duckMediaVolume: SpeakSwiftly.DuckMediaVolume
         /// The generated-audio destination to activate for live speech requests.
         public let audioOutputDestination: SpeakSwiftly.AudioOutputDestination
+        /// The number of recent live generated-audio items to keep in memory for replay.
+        public let recentGeneratedAudioLimit: Int
         /// Extra bundled system-profile roots supplied by host packages at startup.
         public let systemProfileResourceRoots: [URL]
         /// An optional text normalizer to reuse instead of creating the default one.
@@ -86,6 +89,7 @@ public extension SpeakSwiftly {
             defaultVoiceProfile: SpeakSwiftly.Name = SpeakSwiftly.DefaultVoiceProfiles.signal,
             duckMediaVolume: SpeakSwiftly.DuckMediaVolume = .off,
             audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
+            recentGeneratedAudioLimit: Int = 5,
             systemProfileResourceRoots: [URL] = [],
             textNormalizer: SpeakSwiftly.Normalizer? = nil,
         ) {
@@ -94,6 +98,7 @@ public extension SpeakSwiftly {
             self.defaultVoiceProfile = Self.normalizedDefaultVoiceProfile(defaultVoiceProfile)
             self.duckMediaVolume = duckMediaVolume
             self.audioOutputDestination = audioOutputDestination
+            self.recentGeneratedAudioLimit = Self.normalizedRecentGeneratedAudioLimit(recentGeneratedAudioLimit)
             self.systemProfileResourceRoots = systemProfileResourceRoots.map(\.standardizedFileURL)
             self.textNormalizer = textNormalizer
         }
@@ -119,6 +124,12 @@ public extension SpeakSwiftly {
                 SpeakSwiftly.AudioOutputDestination.self,
                 forKey: .audioOutputDestination,
             ) ?? .localPlayback
+            recentGeneratedAudioLimit = try Self.normalizedRecentGeneratedAudioLimit(
+                container.decodeIfPresent(
+                    Int.self,
+                    forKey: .recentGeneratedAudioLimit,
+                ) ?? 5,
+            )
             systemProfileResourceRoots = []
             textNormalizer = nil
         }
@@ -180,6 +191,10 @@ public extension SpeakSwiftly {
             return trimmed.isEmpty ? SpeakSwiftly.DefaultVoiceProfiles.signal : trimmed
         }
 
+        static func normalizedRecentGeneratedAudioLimit(_ limit: Int) -> Int {
+            min(8, max(0, limit))
+        }
+
         private static func makeEncoder() -> JSONEncoder {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -197,6 +212,7 @@ public extension SpeakSwiftly {
             try container.encode(defaultVoiceProfile, forKey: .defaultVoiceProfile)
             try container.encode(duckMediaVolume, forKey: .duckMediaVolume)
             try container.encode(audioOutputDestination, forKey: .audioOutputDestination)
+            try container.encode(recentGeneratedAudioLimit, forKey: .recentGeneratedAudioLimit)
         }
 
         /// Saves this configuration value to disk.

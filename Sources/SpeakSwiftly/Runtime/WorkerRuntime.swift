@@ -186,6 +186,9 @@ public extension SpeakSwiftly {
             let status: WorkerStatusEvent?
             let speechBackend: SpeakSwiftly.SpeechBackend?
             let defaultVoiceProfile: SpeakSwiftly.Name?
+            let recentGeneratedAudio: SpeakSwiftly.RecentGeneratedAudioSnapshot?
+            let recentGeneratedAudioChunks: [SpeakSwiftly.GeneratedAudioChunk]?
+            let replayRequestIDs: [String]?
             let clearedCount: Int?
             let cancelledRequestID: String?
 
@@ -213,6 +216,9 @@ public extension SpeakSwiftly {
                 status: WorkerStatusEvent? = nil,
                 speechBackend: SpeakSwiftly.SpeechBackend? = nil,
                 defaultVoiceProfile: SpeakSwiftly.Name? = nil,
+                recentGeneratedAudio: SpeakSwiftly.RecentGeneratedAudioSnapshot? = nil,
+                recentGeneratedAudioChunks: [SpeakSwiftly.GeneratedAudioChunk]? = nil,
+                replayRequestIDs: [String]? = nil,
                 clearedCount: Int? = nil,
                 cancelledRequestID: String? = nil,
             ) {
@@ -239,6 +245,9 @@ public extension SpeakSwiftly {
                 self.status = status
                 self.speechBackend = speechBackend
                 self.defaultVoiceProfile = defaultVoiceProfile
+                self.recentGeneratedAudio = recentGeneratedAudio
+                self.recentGeneratedAudioChunks = recentGeneratedAudioChunks
+                self.replayRequestIDs = replayRequestIDs
                 self.clearedCount = clearedCount
                 self.cancelledRequestID = cancelledRequestID
             }
@@ -264,6 +273,7 @@ public extension SpeakSwiftly {
         let generatedFileStore: GeneratedFileStore
         let generationJobStore: GenerationJobStore
         let recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore
+        let recentGeneratedAudioLimit: Int
         let normalizerRef: SpeakSwiftly.Normalizer
         let playbackQueue: PlaybackQueue
         let startsResidentModelsAutomatically: Bool
@@ -304,6 +314,7 @@ public extension SpeakSwiftly {
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
             recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore = SpeakSwiftly.RecentGeneratedAudioStore(),
+            recentGeneratedAudioLimit: Int = 5,
             normalizer: SpeakSwiftly.Normalizer,
             playbackQueue: PlaybackQueue,
             startsResidentModelsAutomatically: Bool = true,
@@ -319,6 +330,8 @@ public extension SpeakSwiftly {
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore
             self.recentGeneratedAudioStore = recentGeneratedAudioStore
+            self.recentGeneratedAudioLimit = SpeakSwiftly.Configuration
+                .normalizedRecentGeneratedAudioLimit(recentGeneratedAudioLimit)
             normalizerRef = normalizer
             self.playbackQueue = playbackQueue
             self.startsResidentModelsAutomatically = startsResidentModelsAutomatically

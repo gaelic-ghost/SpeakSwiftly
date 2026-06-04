@@ -13,6 +13,10 @@ This is a runtime playback-history feature, not a playback-driver rewind hack. E
 
 The preferred direction is a hybrid cache: keep a bounded in-memory replay buffer for fast near-term rewind and also write completed recent generations as file artifacts for full replay, queue insertion, and engine-reset resilience.
 
+Current implementation status: memory-backed capture, typed Swift replay APIs,
+JSONL/tool controls, bounded retention configuration, and docs have landed.
+Artifact-backed replay remains future work.
+
 ## Goals
 
 - Retain the last 3 to 5 live speech generations by default.
@@ -95,36 +99,35 @@ Preferred first durable building block:
 Place user-facing recent controls on `Playback`, because the operator action is playback-history control:
 
 ```swift
-let recent = await runtime.playback.recentGeneratedAudio(limit: 5)
+let recent = await runtime.playback.recentGeneratedAudio()
 
-try await runtime.playback.replayRecent(id: recent[0].id)
+let replay = await runtime.playback.replayRecent(id: recent.items[0].id)
+try await replay.completion()
 
-try await runtime.playback.replayRecentAll()
+let replayHandles = await runtime.playback.replayRecentAll()
 
-try await runtime.playback.clearRecent()
+await runtime.playback.clearRecentGeneratedAudio()
 ```
 
 Configuration sketch:
 
-```yaml
-recentGeneratedAudio:
-  enabled: true
-  limit: 5
-  memorySecondsPerItem: 30
-  artifactFormat: m4a
-  maxAgeHours: 24
+```swift
+let configuration = SpeakSwiftly.Configuration(
+    recentGeneratedAudioLimit: 5
+)
 ```
 
 ## Implementation Slices
 
-1. Add recent generated audio models and a bounded in-memory store.
-2. Add unit tests for store insert, completion, failure, eviction, and snapshot ordering.
-3. Add generated-audio stream capture/fanout helpers with tests for slow capture consumers.
-4. Wire live speech generation into recent capture without changing playback behavior.
-5. Reuse file-audio output for recent artifact writing and cleanup.
-6. Add playback queue support for replaying recent items from memory or artifact files.
-7. Expose public API and JSONL/tool contract controls for list/replay/replay all/clear.
-8. Add docs and E2E smoke coverage after the unit/integration surface is stable.
+1. [x] Add recent generated audio models and a bounded in-memory store.
+2. [x] Add unit tests for store insert, completion, failure, eviction, and snapshot ordering.
+3. [ ] Add generated-audio stream capture/fanout helpers with tests for slow capture consumers.
+4. [x] Wire live speech generation into recent capture without changing playback behavior.
+5. [ ] Reuse file-audio output for recent artifact writing and cleanup.
+6. [x] Add playback queue support for replaying recent items from memory.
+7. [x] Expose public API and JSONL/tool contract controls for list/replay/replay all/clear.
+8. [x] Add docs and unit/integration smoke coverage after the unit/integration surface is stable.
+9. [ ] Add artifact-backed replay once generated-file playback and file-handoff ergonomics are reviewed.
 
 ## Test Plan
 

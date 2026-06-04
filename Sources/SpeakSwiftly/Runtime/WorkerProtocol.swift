@@ -24,6 +24,14 @@ enum WorkerRequest: Equatable {
         profileName: String,
         requestContext: SpeakSwiftly.RequestContext?,
     )
+    case recentGeneratedAudio(id: String)
+    case recentGeneratedAudioChunks(id: String, recentAudioID: String)
+    case replayRecentAudioAll(
+        id: String,
+        replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+        requestContext: SpeakSwiftly.RequestContext?,
+    )
+    case clearRecentGeneratedAudio(id: String)
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
     case generatedBatch(id: String, batchID: String)
@@ -92,6 +100,10 @@ enum WorkerRequest: Equatable {
             case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch(id: let id, profileName: _, items: _),
                  .replayRecentAudio(id: let id, recentAudioID: _, text: _, profileName: _, requestContext: _),
+                 let .recentGeneratedAudio(id),
+                 let .recentGeneratedAudioChunks(id, _),
+                 let .replayRecentAudioAll(id, _, _),
+                 let .clearRecentGeneratedAudio(id),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
                  let .generatedBatch(id, _),
@@ -151,6 +163,14 @@ enum WorkerRequest: Equatable {
                 "generate_batch"
             case .replayRecentAudio:
                 "replay_recent_audio"
+            case .recentGeneratedAudio:
+                "list_recent_generated_audio"
+            case .recentGeneratedAudioChunks:
+                "get_recent_generated_audio_chunks"
+            case .replayRecentAudioAll:
+                "replay_recent_audio_all"
+            case .clearRecentGeneratedAudio:
+                "clear_recent_generated_audio"
             case .generatedFile:
                 "get_generated_file"
             case .generatedFiles:
@@ -328,6 +348,10 @@ enum WorkerRequest: Equatable {
                  .generatedFiles,
                  .generatedBatch,
                  .generatedBatches,
+                 .recentGeneratedAudio,
+                 .recentGeneratedAudioChunks,
+                 .replayRecentAudioAll,
+                 .clearRecentGeneratedAudio,
                  .expireGenerationJob,
                  .generationJob,
                  .generationJobs,
@@ -396,6 +420,10 @@ enum WorkerRequest: Equatable {
                  .generatedFiles,
                  .generatedBatch,
                  .generatedBatches,
+                 .recentGeneratedAudio,
+                 .recentGeneratedAudioChunks,
+                 .replayRecentAudioAll,
+                 .clearRecentGeneratedAudio,
                  .expireGenerationJob,
                  .generationJob,
                  .generationJobs,
@@ -451,6 +479,10 @@ enum WorkerRequest: Equatable {
                  .expireGenerationJob,
                  .generationJob,
                  .generationJobs,
+                 .recentGeneratedAudio,
+                 .recentGeneratedAudioChunks,
+                 .replayRecentAudioAll,
+                 .clearRecentGeneratedAudio,
                  .replayRecentAudio,
                  .createProfile,
                  .createClone,
@@ -501,12 +533,17 @@ enum WorkerRequest: Equatable {
                 requestContext
             case .replayRecentAudio(id: _, recentAudioID: _, text: _, profileName: _, requestContext: let requestContext):
                 requestContext
+            case .replayRecentAudioAll(id: _, replayMode: _, requestContext: let requestContext):
+                requestContext
             case .queueBatch:
                 nil
             case .generatedFile,
                  .generatedFiles,
                  .generatedBatch,
                  .generatedBatches,
+                 .recentGeneratedAudio,
+                 .recentGeneratedAudioChunks,
+                 .clearRecentGeneratedAudio,
                  .expireGenerationJob,
                  .generationJob,
                  .generationJobs,

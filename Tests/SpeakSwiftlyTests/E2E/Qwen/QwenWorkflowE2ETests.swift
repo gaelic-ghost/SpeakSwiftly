@@ -63,6 +63,84 @@ struct QwenE2ETests {
         }
     }
 
+    @Test func `recent generated audio lists replays all and clears`() async throws {
+        let sandbox = try E2ESandbox()
+        defer { sandbox.cleanup() }
+        let profileName = "recent-replay-profile"
+
+        let worker = try WorkerProcess(
+            profileRootURL: sandbox.profileRootURL,
+            silentPlayback: true,
+            configuration: SpeakSwiftly.Configuration(recentGeneratedAudioLimit: 5),
+        )
+        defer { Task { await worker.stop() } }
+
+        try await E2EHarness.awaitWorkerReady(worker)
+        try await E2EHarness.createVoiceDesignProfile(
+            on: worker,
+            id: "req-create-recent-replay-profile",
+            profileName: profileName,
+            text: E2EHarness.testingCloneSourceText,
+            vibe: .masc,
+            voiceDescription: E2EHarness.testingProfileVoiceDescription,
+        )
+        try await E2EHarness.runSilentSpeech(
+            on: worker,
+            id: "req-recent-first",
+            text: "First recent replay smoke test.",
+            profileName: profileName,
+        )
+        try await E2EHarness.runSilentSpeech(
+            on: worker,
+            id: "req-recent-second",
+            text: "Second recent replay smoke test.",
+            profileName: profileName,
+        )
+
+        try worker.sendJSON(#"{"id":"req-list-recent","op":"list_recent_generated_audio"}"#)
+        #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
+            guard $0["id"] as? String == "req-list-recent",
+                  let snapshot = $0["recent_generated_audio"] as? [String: Any],
+                  let items = snapshot["items"] as? [[String: Any]] else {
+                return false
+            }
+
+            return items.count >= 2
+        } != nil)
+
+        try worker.sendJSON(#"{"id":"req-replay-recent-all","op":"replay_recent_audio_all"}"#)
+        #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
+            guard $0["id"] as? String == "req-replay-recent-all",
+                  let requestIDs = $0["replay_request_ids"] as? [String] else {
+                return false
+            }
+
+            return requestIDs.count >= 2
+        } != nil)
+
+        try worker.sendJSON(#"{"id":"req-clear-recent","op":"clear_recent_generated_audio"}"#)
+        #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
+            guard $0["id"] as? String == "req-clear-recent",
+                  let snapshot = $0["recent_generated_audio"] as? [String: Any],
+                  let items = snapshot["items"] as? [[String: Any]] else {
+                return false
+            }
+
+            return items.isEmpty
+        } != nil)
+
+        try worker.sendJSON(#"{"id":"req-list-recent-empty","op":"list_recent_generated_audio"}"#)
+        #expect(try await worker.waitForJSONObject(timeout: E2EHarness.e2eTimeout) {
+            guard $0["id"] as? String == "req-list-recent-empty",
+                  let snapshot = $0["recent_generated_audio"] as? [String: Any],
+                  let items = snapshot["items"] as? [[String: Any]] else {
+                return false
+            }
+
+            return items.isEmpty
+        } != nil)
+    }
+
     @Test(.tags(.persistence))
     func `prepared conditioning persists and reloads across worker restart`() async throws {
         let sandbox = try E2ESandbox()

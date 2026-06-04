@@ -143,8 +143,12 @@ public actor RecentGeneratedAudioStore {
         limit: Int = 5,
         memorySecondsPerItem: Double = 30,
     ) {
-        self.limit = max(0, limit)
+        self.limit = min(8, max(0, limit))
         self.memorySecondsPerItem = max(0, memorySecondsPerItem)
+    }
+
+    public func isCaptureEnabled() -> Bool {
+        limit > 0
     }
 
     @discardableResult

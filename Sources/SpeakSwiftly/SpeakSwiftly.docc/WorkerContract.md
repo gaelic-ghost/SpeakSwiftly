@@ -94,10 +94,27 @@ Representative operations include:
 - `get_runtime_overview` for one service-health snapshot that includes resident state, queue state, playback telemetry, and storage paths.
 - `list_generation_queue`, `clear_generation_queue`, and `cancel_generation` for generation-queue inspection and control.
 - `list_playback_queue`, `clear_playback_queue`, and `cancel_playback` for playback-queue inspection and control.
+- `list_recent_generated_audio`, `get_recent_generated_audio_chunks`,
+  `replay_recent_audio`, `replay_recent_audio_all`, and
+  `clear_recent_generated_audio` for bounded in-memory recent-audio replay.
 
 The broad compatibility operations `clear_queue` and `cancel_request` still exist for hosts that intentionally want to affect any queued work, but new operators should prefer the queue-specific operations when the target queue is known.
 
 The JSONL retained-output reads `get_generated_file`, `list_generated_files`, `get_generated_batch`, and `list_generated_batches` are transport compatibility operations. Native Swift callers should use `runtime.artifact(id:)`, `runtime.artifacts()`, `runtime.artifacts.list()`, `runtime.jobs.job(id:)`, and `runtime.jobs.list()` instead.
+
+Recent generated-audio operations use these payload keys:
+
+- `recent_audio_id` selects one recent generated-audio item.
+- `replay_mode` accepts `enqueue_next`, `enqueue_after_current`, or
+  `interrupt_current`; recent replay currently rejects `interrupt_current`
+  clearly because replay is queue-based.
+- `request_context` is optional and is attached to replayed playback requests.
+
+`list_recent_generated_audio` returns `recent_generated_audio`.
+`get_recent_generated_audio_chunks` returns `recent_generated_audio_chunks`.
+`replay_recent_audio_all` returns `replay_request_ids` for the child playback
+requests it queued. `clear_recent_generated_audio` returns the now-empty
+`recent_generated_audio` snapshot.
 
 `list_voice_profiles` treats profile directories independently. Stray files, partial directories, and unreadable manifests are skipped so the operation can still return healthy profiles while a separate cleanup or coordination pass deals with damaged entries.
 

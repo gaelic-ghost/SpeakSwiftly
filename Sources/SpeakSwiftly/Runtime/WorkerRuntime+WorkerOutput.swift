@@ -37,6 +37,9 @@ extension SpeakSwiftly.Runtime {
                     status: payload.status,
                     speechBackend: payload.speechBackend,
                     defaultVoiceProfile: payload.defaultVoiceProfile,
+                    recentGeneratedAudio: payload.recentGeneratedAudio,
+                    recentGeneratedAudioChunks: payload.recentGeneratedAudioChunks,
+                    replayRequestIDs: payload.replayRequestIDs,
                     clearedCount: payload.clearedCount,
                     cancelledRequestID: payload.cancelledRequestID,
                 )
