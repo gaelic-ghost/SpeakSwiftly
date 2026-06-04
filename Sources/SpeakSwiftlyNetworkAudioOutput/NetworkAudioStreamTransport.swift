@@ -36,6 +36,7 @@ public actor NetworkAudioStreamListener {
     private let port: UInt16
     private let sharedToken: String
     private let maximumFrameByteCount: Int
+    private let connectionReadinessTimeout: Duration
     private let queue: DispatchQueue
     private var listener: NWListener?
     private var continuations = [UUID: AsyncStream<NetworkAudioInboundStream>.Continuation]()
@@ -46,12 +47,14 @@ public actor NetworkAudioStreamListener {
         port: UInt16,
         sharedToken: String,
         maximumFrameByteCount: Int = NetworkAudioLengthPrefixedFrameCodec.defaultMaximumFrameByteCount,
+        connectionReadinessTimeout: Duration = .seconds(15),
         queue: DispatchQueue = DispatchQueue(label: "SpeakSwiftly.NetworkAudioStreamListener"),
     ) {
         self.advertisement = advertisement
         self.port = port
         self.sharedToken = sharedToken
         self.maximumFrameByteCount = maximumFrameByteCount
+        self.connectionReadinessTimeout = connectionReadinessTimeout
         self.queue = queue
     }
 
@@ -122,9 +125,12 @@ public actor NetworkAudioStreamListener {
     }
 
     private func runConnection(_ connection: NWConnection) async {
-        connection.start(queue: queue)
         do {
-            try await connection.waitUntilReady()
+            try await connection.startAndWaitUntilReady(
+                on: queue,
+                timeout: connectionReadinessTimeout,
+                requestID: "unknown",
+            )
             let firstFrame = try await connection.receiveLengthPrefixedFrame(maximumFrameByteCount: maximumFrameByteCount)
             guard case let .handshake(handshake) = firstFrame else {
                 throw GeneratedAudioOutputError.transportFailed(
@@ -225,17 +231,20 @@ public struct NetworkAudioStreamSender: Sendable {
     private let endpoint: NetworkAudioEndpoint
     private let handshake: NetworkAudioStreamHandshake
     private let maximumFrameByteCount: Int
+    private let connectionReadinessTimeout: Duration
     private let queue: DispatchQueue
 
     public init(
         endpoint: NetworkAudioEndpoint,
         handshake: NetworkAudioStreamHandshake,
         maximumFrameByteCount: Int = NetworkAudioLengthPrefixedFrameCodec.defaultMaximumFrameByteCount,
+        connectionReadinessTimeout: Duration = .seconds(15),
         queue: DispatchQueue = DispatchQueue(label: "SpeakSwiftly.NetworkAudioStreamSender"),
     ) {
         self.endpoint = endpoint
         self.handshake = handshake
         self.maximumFrameByteCount = maximumFrameByteCount
+        self.connectionReadinessTimeout = connectionReadinessTimeout
         self.queue = queue
     }
 
@@ -243,9 +252,12 @@ public struct NetworkAudioStreamSender: Sendable {
         chunks: AsyncThrowingStream<GeneratedAudioChunk, any Error>,
     ) async throws {
         let connection = NWConnection(to: endpoint.nwEndpoint, using: .tcp)
-        connection.start(queue: queue)
         do {
-            try await connection.waitUntilReady()
+            try await connection.startAndWaitUntilReady(
+                on: queue,
+                timeout: connectionReadinessTimeout,
+                requestID: handshake.requestID,
+            )
             try await connection.sendFrame(.handshake(handshake), maximumFrameByteCount: maximumFrameByteCount)
             for try await chunk in chunks {
                 try Task.checkCancellation()
@@ -266,27 +278,47 @@ public struct NetworkAudioStreamSender: Sendable {
 }
 
 private extension NWConnection {
-    func waitUntilReady() async throws {
+    func startAndWaitUntilReady(
+        on queue: DispatchQueue,
+        timeout: Duration,
+        requestID: String,
+    ) async throws {
         try await withCheckedThrowingContinuation { continuation in
             let box = ReadyContinuationBox()
+            let timeoutTask = Task {
+                do {
+                    try await Task.sleep(for: timeout)
+                    box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
+                        requestID: requestID,
+                        message: "Network audio connection for request '\(requestID)' did not become ready within \(timeout). Likely cause: the LAN audio receiver could not be resolved, accepted, or reached from this host.",
+                    ))
+                    cancel()
+                } catch {
+                    // Cancellation means the connection reached a terminal readiness state first.
+                }
+            }
             stateUpdateHandler = { state in
                 switch state {
                     case .ready:
+                        timeoutTask.cancel()
                         box.resume(continuation)
                     case let .failed(error):
+                        timeoutTask.cancel()
                         box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
-                            requestID: "unknown",
-                            message: "Network audio connection failed before it became ready: \(error)",
+                            requestID: requestID,
+                            message: "Network audio connection for request '\(requestID)' failed before it became ready: \(error)",
                         ))
                     case .cancelled:
+                        timeoutTask.cancel()
                         box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
-                            requestID: "unknown",
-                            message: "Network audio connection was cancelled before it became ready.",
+                            requestID: requestID,
+                            message: "Network audio connection for request '\(requestID)' was cancelled before it became ready.",
                         ))
                     default:
                         break
                 }
             }
+            start(queue: queue)
         }
     }
 

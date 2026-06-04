@@ -172,6 +172,45 @@ import Testing
     #expect(receivedChunks.last?.isFinal == true)
 }
 
+@Test func `network audio sender readiness wait is bounded`() async throws {
+    let chunks = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-timeout",
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+    let sender = NetworkAudioStreamSender(
+        endpoint: NetworkAudioEndpoint(host: "203.0.113.1", port: 9),
+        handshake: NetworkAudioStreamHandshake(
+            requestID: "req-timeout",
+            senderName: "test-sender",
+            sharedToken: "secret",
+        ),
+        connectionReadinessTimeout: .milliseconds(50),
+    )
+    let started = ContinuousClock.now
+
+    do {
+        try await sender.send(chunks: chunks)
+        Issue.record("Expected the network audio sender to fail instead of hanging on an unreachable receiver.")
+    } catch let error as GeneratedAudioOutputError {
+        guard case let .transportFailed(requestID, message) = error else {
+            Issue.record("Expected a transport failure, got \(error).")
+            return
+        }
+
+        #expect(requestID == "req-timeout")
+        #expect(message.contains("req-timeout"))
+    }
+
+    #expect(started.duration(to: ContinuousClock.now) < .seconds(2))
+}
+
 @Test func `network audio listener rejects wrong shared token`() async throws {
     let listener = NetworkAudioStreamListener(
         advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
