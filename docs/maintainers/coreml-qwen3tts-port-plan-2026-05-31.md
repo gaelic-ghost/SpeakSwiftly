@@ -2085,6 +2085,56 @@ First prototype result:
   afterward. The successful run used the same wrapper with permissions that let
   Core ML create its cache.
 
+### 2026-06-04 External Core ML Artifact Inventory, Pass 1
+
+Added a metadata-only Hugging Face inventory probe:
+
+- `scripts/repo-maintenance/coreml-qwen3tts/inspect-coreml-qwen3tts-repos.py`
+
+Added a checked-in inventory fixture:
+
+- `docs/maintainers/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json`
+
+Added SwiftPM tests for the fixture:
+
+- `Tests/SpeakSwiftlyTests/Generation/CoreMLQwen/Qwen3TTSExternalCoreMLRepoInventoryTests.swift`
+
+The probe compares the older FluidInference Core ML artifact with the newer
+`aufklarer/Qwen3-TTS-CoreML` repo without downloading large model bundles. It
+uses Hugging Face model metadata plus small `config.json` downloads only.
+
+Inventory findings:
+
+- FluidInference resolved revision:
+  `7bb6c4e5c425ddecc0aa2339f125398623d2da36`.
+- `aufklarer/Qwen3-TTS-CoreML` resolved revision:
+  `66ca03b95a684d45e020b1d2d5c3ab34a48356f9`.
+- Both repos publish the same six compiled model names:
+  `TextProjector`, `CodeEmbedder`, `MultiCodeEmbedder`, `CodeDecoder`,
+  `MultiCodeDecoder`, and `SpeechDecoder`.
+- FluidInference still has the better conversion-inspection surface because it
+  publishes `.mlpackage` source packages and `cp_embeddings.npy`.
+- `aufklarer/Qwen3-TTS-CoreML` has the stronger next-probe signal because it
+  includes `vocab.json` and `merges.txt`, declares `W8A16` in config, names the
+  `Qwen/Qwen3-TTS-12Hz-0.6B-Base` source model, and points at the open
+  `speech-swift` `Qwen3TTSCoreML` module as a reference Swift integration.
+- FluidInference's `config.json` is present on Hugging Face but does not parse
+  as JSON through this probe. The script treats optional invalid config as
+  absent instead of failing the whole inventory.
+
+Decision:
+
+- Add `aufklarer/Qwen3-TTS-CoreML` to the evaluation matrix as a metadata probe
+  only.
+- Do not add a public `SpeechBackend`, do not add `speech-swift` as a package
+  dependency, and do not download the full Core ML repo in default validation.
+- The next concrete comparison slice should live at the talker/code-generator
+  boundary: download the minimum compiled subset needed to compare prompt
+  wrapping, token IDs, first codec-token generation, codebook order, and stage
+  timing against SpeakSwiftly's own Qwen fixture path.
+- Audible-quality comparison should wait until that talker path can produce a
+  matched waveform fixture.
+
 ## Open Decisions
 
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
@@ -2108,6 +2158,10 @@ First prototype result:
   https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base
 - FluidInference Qwen3-TTS Core ML model card:
   https://huggingface.co/FluidInference/qwen3-tts-coreml
+- aufklarer Qwen3-TTS Core ML model card:
+  https://huggingface.co/aufklarer/Qwen3-TTS-CoreML
+- speech-swift repository:
+  https://github.com/soniqo/speech-swift
 - Core ML Tools conversion guide:
   https://apple.github.io/coremltools/docs-guides/source/convert-to-ml-program.html
 - Core ML Tools typed execution guide:

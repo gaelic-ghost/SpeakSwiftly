@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-04T00:00:00Z",
+  "mode": "coreml_qwen3tts_external_repo_inventory",
+  "source": {
+    "inspection_method": "Hugging Face model_info plus small config.json download",
+    "repos": [
+      "FluidInference/qwen3-tts-coreml",
+      "aufklarer/Qwen3-TTS-CoreML"
+    ],
+    "requested_revision": null,
+    "no_large_artifacts_downloaded": true
+  },
+  "repositories": [
+    {
+      "repo_id": "FluidInference/qwen3-tts-coreml",
+      "resolved_revision": "7bb6c4e5c425ddecc0aa2339f125398623d2da36",
+      "last_modified": "2026-04-29T04:33:12Z",
+      "downloads": 39,
+      "likes": 2,
+      "used_storage_bytes": 9902959442,
+      "license": "apache-2.0",
+      "languages": [
+        "en",
+        "zh"
+      ],
+      "base_model": null,
+      "config": {
+        "model_type": null,
+        "architecture": null,
+        "model_id": null,
+        "models": [],
+        "quantization": null,
+        "max_seq_len": null,
+        "max_codec_tokens": null,
+        "sample_rate": null,
+        "hidden_size": null,
+        "requires_speaker_embedding": null
+      },
+      "artifact_inventory": {
+        "file_count": 56,
+        "compiled_model_names": [
+          "CodeDecoder.mlmodelc",
+          "CodeEmbedder.mlmodelc",
+          "MultiCodeDecoder.mlmodelc",
+          "MultiCodeEmbedder.mlmodelc",
+          "SpeechDecoder.mlmodelc",
+          "TextProjector.mlmodelc"
+        ],
+        "source_package_names": [
+          "CodeDecoder.mlpackage",
+          "CodeEmbedder.mlpackage",
+          "MultiCodeDecoder.mlpackage",
+          "MultiCodeEmbedder.mlpackage",
+          "SpeechDecoder.mlpackage",
+          "TextProjector.mlpackage"
+        ],
+        "has_vocab_json": false,
+        "has_merges_txt": false,
+        "has_cp_embeddings": true,
+        "has_speaker_embedding_official": true,
+        "has_speaker_embedding": false,
+        "has_tts_bos_embed": true,
+        "has_tts_eos_embed": true,
+        "has_tts_pad_embed": true,
+        "has_mlmodelc_model_mil": true,
+        "has_mlpackage_model_mlmodel": true
+      }
+    },
+    {
+      "repo_id": "aufklarer/Qwen3-TTS-CoreML",
+      "resolved_revision": "66ca03b95a684d45e020b1d2d5c3ab34a48356f9",
+      "last_modified": "2026-05-25T19:35:59Z",
+      "downloads": 260,
+      "likes": 0,
+      "used_storage_bytes": 7458669807,
+      "license": "apache-2.0",
+      "languages": [
+        "en",
+        "zh",
+        "ja",
+        "ko",
+        "fr",
+        "de",
+        "es"
+      ],
+      "base_model": "Qwen/Qwen3-TTS-0.6B",
+      "config": {
+        "model_type": "qwen3_tts_coreml",
+        "architecture": "6-model-ane",
+        "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+        "models": [
+          "TextProjector",
+          "CodeEmbedder",
+          "MultiCodeEmbedder",
+          "CodeDecoder",
+          "MultiCodeDecoder",
+          "SpeechDecoder"
+        ],
+        "quantization": "W8A16",
+        "max_seq_len": 256,
+        "max_codec_tokens": 125,
+        "sample_rate": 24000,
+        "hidden_size": 1024,
+        "requires_speaker_embedding": true
+      },
+      "artifact_inventory": {
+        "file_count": 39,
+        "compiled_model_names": [
+          "CodeDecoder.mlmodelc",
+          "CodeEmbedder.mlmodelc",
+          "MultiCodeDecoder.mlmodelc",
+          "MultiCodeEmbedder.mlmodelc",
+          "SpeechDecoder.mlmodelc",
+          "TextProjector.mlmodelc"
+        ],
+        "source_package_names": [],
+        "has_vocab_json": true,
+        "has_merges_txt": true,
+        "has_cp_embeddings": false,
+        "has_speaker_embedding_official": false,
+        "has_speaker_embedding": true,
+        "has_tts_bos_embed": true,
+        "has_tts_eos_embed": true,
+        "has_tts_pad_embed": true,
+        "has_mlmodelc_model_mil": true,
+        "has_mlpackage_model_mlmodel": false
+      }
+    }
+  ],
+  "comparison": {
+    "newer_candidate": "aufklarer/Qwen3-TTS-CoreML",
+    "older_reference": "FluidInference/qwen3-tts-coreml",
+    "shared_compiled_models": [
+      "CodeDecoder.mlmodelc",
+      "CodeEmbedder.mlmodelc",
+      "MultiCodeDecoder.mlmodelc",
+      "MultiCodeEmbedder.mlmodelc",
+      "SpeechDecoder.mlmodelc",
+      "TextProjector.mlmodelc"
+    ],
+    "aufklarer_only_signals": [
+      "Includes vocab.json and merges.txt, so text-tokenizer parity can be probed from repo-local assets.",
+      "Declares a six-model W8A16 ANE-oriented architecture in config.json.",
+      "Points at speech-swift Qwen3TTSCoreML as the reference Swift integration surface."
+    ],
+    "fluid_only_signals": [
+      "Publishes .mlpackage source packages as well as compiled .mlmodelc bundles.",
+      "Publishes cp_embeddings.npy and speaker_embedding_official.npy.",
+      "Model card documents LM prefill/decode and code-predictor prefill/decode stages explicitly."
+    ]
+  },
+  "decision": {
+    "matrix_status": "add_metadata_probe_only",
+    "reason": "aufklarer/Qwen3-TTS-CoreML is worth tracking because it uses the same six compiled model names as FluidInference, adds tokenizer assets, declares W8A16, and has an active Swift reference implementation. It is not ready for a runtime benchmark in SpeakSwiftly until the talker/code-generator boundary probe can consume its six-model layout without introducing a new runtime backend.",
+    "next_probe": "Use this inventory fixture to gate a later talker/code-generator probe that downloads only the minimum compiled model subset needed to compare prompt wrapping, token IDs, first codec-token generation, codebook order, and stage timing.",
+    "do_not_do_yet": [
+      "Do not add a public SpeechBackend.",
+      "Do not add speech-swift as a package dependency.",
+      "Do not download the full Core ML repository in default validation.",
+      "Do not compare audible quality until the talker path produces a matched waveform fixture."
+    ]
+  }
+}
