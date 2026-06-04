@@ -38,6 +38,19 @@ public enum GeneratedAudioOutputError: Error, Codable, Sendable, Equatable {
     case transportFailed(requestID: String, message: String)
 }
 
+extension GeneratedAudioOutputError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+            case let .invalidChunk(requestID, message):
+                "Generated audio chunk for request '\(requestID)' is invalid. \(message)"
+            case let .cancelled(requestID):
+                "Generated audio output for request '\(requestID)' was cancelled."
+            case let .transportFailed(requestID, message):
+                "Generated audio transport for request '\(requestID)' failed. \(message)"
+        }
+    }
+}
+
 public typealias GeneratedAudioChunkStream = AsyncThrowingStream<GeneratedAudioChunk, any Error>
 
 public enum GeneratedAudioChunkStreams {

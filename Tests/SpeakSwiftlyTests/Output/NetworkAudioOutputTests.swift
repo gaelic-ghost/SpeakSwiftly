@@ -206,9 +206,22 @@ import Testing
 
         #expect(requestID == "req-timeout")
         #expect(message.contains("req-timeout"))
+        #expect(message.contains("203.0.113.1:9"))
+        #expect(message.contains("Last observed Network.framework state:"))
     }
 
     #expect(started.duration(to: ContinuousClock.now) < .seconds(2))
+}
+
+@Test func `generated audio output errors have readable localized descriptions`() {
+    let error = GeneratedAudioOutputError.transportFailed(
+        requestID: "req-localized",
+        message: "Network audio connection to '192.0.2.10:51011' did not become ready.",
+    )
+
+    #expect(error.localizedDescription.contains("req-localized"))
+    #expect(error.localizedDescription.contains("192.0.2.10:51011"))
+    #expect(!error.localizedDescription.contains("error 2"))
 }
 
 @Test func `network audio listener rejects wrong shared token`() async throws {

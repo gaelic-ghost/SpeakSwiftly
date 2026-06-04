@@ -130,6 +130,7 @@ public actor NetworkAudioStreamListener {
                 on: queue,
                 timeout: connectionReadinessTimeout,
                 requestID: "unknown",
+                endpointDescription: "\(connection.endpoint)",
             )
             let firstFrame = try await connection.receiveLengthPrefixedFrame(maximumFrameByteCount: maximumFrameByteCount)
             guard case let .handshake(handshake) = firstFrame else {
@@ -257,6 +258,7 @@ public struct NetworkAudioStreamSender: Sendable {
                 on: queue,
                 timeout: connectionReadinessTimeout,
                 requestID: handshake.requestID,
+                endpointDescription: "\(endpoint.nwEndpoint)",
             )
             try await connection.sendFrame(.handshake(handshake), maximumFrameByteCount: maximumFrameByteCount)
             for try await chunk in chunks {
@@ -282,10 +284,12 @@ private extension NWConnection {
         on queue: DispatchQueue,
         timeout: Duration,
         requestID: String,
+        endpointDescription: String,
     ) async throws {
         try await withCheckedThrowingContinuation { continuation in
             let box = ReadyContinuationBox()
             let timeoutState = ReadinessTimeoutBox()
+            let readinessState = ConnectionReadinessStateBox()
             queue.asyncAfter(deadline: .now() + timeout.dispatchTimeInterval) {
                 guard timeoutState.fire() else {
                     return
@@ -293,11 +297,13 @@ private extension NWConnection {
 
                 box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
                     requestID: requestID,
-                    message: "Network audio connection for request '\(requestID)' did not become ready within \(timeout). Likely cause: the LAN audio receiver could not be resolved, accepted, or reached from this host.",
+                    message: "Network audio connection for request '\(requestID)' to '\(endpointDescription)' did not become ready within \(timeout). Last observed Network.framework state: \(readinessState.snapshot()). Likely cause: the LAN audio receiver could not be resolved, accepted, reached from this host, or permitted by local network privacy settings.",
                 ))
                 self.stateUpdateHandler = nil
             }
             stateUpdateHandler = { state in
+                readinessState.update(String(describing: state))
+
                 func finish(_ result: Result<Void, any Error>) {
                     timeoutState.cancel()
                     self.stateUpdateHandler = nil
@@ -315,12 +321,12 @@ private extension NWConnection {
                     case let .failed(error):
                         finish(.failure(GeneratedAudioOutputError.transportFailed(
                             requestID: requestID,
-                            message: "Network audio connection for request '\(requestID)' failed before it became ready: \(error)",
+                            message: "Network audio connection for request '\(requestID)' to '\(endpointDescription)' failed before it became ready: \(error)",
                         )))
                     case .cancelled:
                         finish(.failure(GeneratedAudioOutputError.transportFailed(
                             requestID: requestID,
-                            message: "Network audio connection for request '\(requestID)' was cancelled before it became ready.",
+                            message: "Network audio connection for request '\(requestID)' to '\(endpointDescription)' was cancelled before it became ready. Last observed Network.framework state: \(readinessState.snapshot()).",
                         )))
                     default:
                         break
@@ -416,6 +422,23 @@ private extension NetworkAudioStreamFrame {
             case let .audio(frame):
                 frame.chunk.requestID
         }
+    }
+}
+
+private final class ConnectionReadinessStateBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastObservedState = "setup"
+
+    func update(_ state: String) {
+        lock.lock()
+        lastObservedState = state
+        lock.unlock()
+    }
+
+    func snapshot() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastObservedState
     }
 }
 
