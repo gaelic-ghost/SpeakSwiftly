@@ -32,6 +32,45 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
     )
 }
 
+@discardableResult
+private func seedRecentGeneratedAudio(
+    in store: SpeakSwiftly.RecentGeneratedAudioStore,
+    id: String,
+    requestID: String,
+    text: String,
+) async throws -> SpeakSwiftly.RecentGeneratedAudioItem {
+    await store.begin(
+        SpeakSwiftly.RecentGeneratedAudioMetadata(
+            id: id,
+            requestID: requestID,
+            textPreview: text,
+            voiceProfileName: "default-femme",
+        ),
+    )
+    try await store.append(
+        SpeakSwiftly.GeneratedAudioChunk(
+            requestID: requestID,
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [0.1, 0.2],
+        ),
+        to: id,
+    )
+    try await store.append(
+        SpeakSwiftly.GeneratedAudioChunk(
+            requestID: requestID,
+            sequenceNumber: 1,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ),
+        to: id,
+    )
+    return try #require(await store.finish(id: id))
+}
+
 @Test func `inter job boop samples are short faded and audible`() {
     let sampleRate = 24000.0
     let samples = makeInterJobBoopSamples(sampleRate: sampleRate)
@@ -307,6 +346,294 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
         try await replay.completion()
     }
     #expect(playback.playCount == 0)
+}
+
+@Test func `replay recent all queues complete items in snapshot order ahead of waiting speech`() async throws {
+    let output = OutputRecorder()
+    let playbackGate = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackGate))
+    let recentStore = SpeakSwiftly.RecentGeneratedAudioStore(limit: 5)
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-oldest",
+        requestID: "recent-request-1",
+        text: "Oldest replay.",
+    )
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-newest",
+        requestID: "recent-request-2",
+        text: "Newest replay.",
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        recentGeneratedAudioStore: recentStore,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeID = await runtime.generate
+        .speech(text: "Hold active playback open.", voiceProfile: "default-femme")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == activeID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let waitingID = await runtime.generate
+        .speech(text: "This generated request should wait behind replays.", voiceProfile: "default-femme")
+        .id
+
+    let completeRecentIDs = await runtime.playback
+        .recentGeneratedAudio()
+        .items
+        .filter { $0.bufferState == .complete }
+        .map(\.id)
+    let handles = await runtime.playback.replayRecentAll()
+    #expect(handles.count == completeRecentIDs.count)
+    #expect(handles.map(\.voiceProfile) == Array(repeating: "default-femme", count: completeRecentIDs.count))
+
+    let snapshot = await runtime.playback.snapshot()
+    let queuedIDs = snapshot.queuedRequests.map(\.id)
+    #expect(Array(queuedIDs.prefix(handles.count)) == handles.map(\.id))
+    #expect(queuedIDs.dropFirst(handles.count).first == waitingID)
+
+    await playbackGate.open()
+}
+
+@Test func `replay recent all enqueue after current preserves snapshot order ahead of waiting speech`() async throws {
+    let output = OutputRecorder()
+    let playbackGate = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackGate))
+    let recentStore = SpeakSwiftly.RecentGeneratedAudioStore(limit: 5)
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-oldest",
+        requestID: "recent-request-1",
+        text: "Oldest replay.",
+    )
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-newest",
+        requestID: "recent-request-2",
+        text: "Newest replay.",
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        recentGeneratedAudioStore: recentStore,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeID = await runtime.generate
+        .speech(text: "Hold active playback open.", voiceProfile: "default-femme")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == activeID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let waitingID = await runtime.generate
+        .speech(text: "This generated request should wait behind replays.", voiceProfile: "default-femme")
+        .id
+
+    let completeRecentIDs = await runtime.playback
+        .recentGeneratedAudio()
+        .items
+        .filter { $0.bufferState == .complete }
+        .map(\.id)
+    let handles = await runtime.playback.replayRecentAll(mode: .enqueueAfterCurrent)
+    #expect(handles.count == completeRecentIDs.count)
+
+    let snapshot = await runtime.playback.snapshot()
+    let queuedIDs = snapshot.queuedRequests.map(\.id)
+    #expect(Array(queuedIDs.prefix(handles.count)) == handles.map(\.id))
+    #expect(queuedIDs.dropFirst(handles.count).first == waitingID)
+
+    await playbackGate.open()
+}
+
+@Test func `recent generated audio disabled by configuration leaves snapshot empty and direct replay fails`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        recentGeneratedAudioLimit: 0,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let requestID = await runtime.generate
+        .speech(text: "Do not retain this.", voiceProfile: "default-femme")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == requestID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+
+    let recentSnapshot = await runtime.playback.recentGeneratedAudio()
+    #expect(recentSnapshot.limit == 0)
+    #expect(recentSnapshot.items.isEmpty)
+
+    let replay = await runtime.playback.replayRecent(id: "any-recent-audio")
+    await #expect(throws: WorkerError.self) {
+        try await replay.completion()
+    }
+}
+
+@Test func `recent generated audio JSONL operations emit stable success shapes`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let recentStore = SpeakSwiftly.RecentGeneratedAudioStore(limit: 5)
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-jsonl",
+        requestID: "recent-request-jsonl",
+        text: "Replay through JSONL.",
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        recentGeneratedAudioStore: recentStore,
+        residentModelLoader: { _ in makeResidentModel() },
+        startsResidentModelsAutomatically: false,
+    )
+
+    await runtime.accept(line: #"{"id":"req-list-recent","op":"list_recent_generated_audio"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard $0["id"] as? String == "req-list-recent",
+                  let snapshot = $0["recent_generated_audio"] as? [String: Any],
+                  let items = snapshot["items"] as? [[String: Any]] else {
+                return false
+            }
+
+            return items.map { $0["id"] as? String } == ["recent-jsonl"]
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-recent-chunks","op":"get_recent_generated_audio_chunks","recent_audio_id":"recent-jsonl"}"#,
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard $0["id"] as? String == "req-recent-chunks",
+                  let chunks = $0["recent_generated_audio_chunks"] as? [[String: Any]] else {
+                return false
+            }
+
+            return chunks.map { $0["sequenceNumber"] as? Int } == [0, 1]
+        }
+    })
+
+    await runtime.accept(
+        line: #"{"id":"req-replay-all","op":"replay_recent_audio_all","replay_mode":"enqueue_next"}"#,
+    )
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard $0["id"] as? String == "req-replay-all",
+                  let requestIDs = $0["replay_request_ids"] as? [String] else {
+                return false
+            }
+
+            return requestIDs.count == 1
+        }
+    })
+
+    await runtime.accept(line: #"{"id":"req-clear-recent","op":"clear_recent_generated_audio"}"#)
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            guard $0["id"] as? String == "req-clear-recent",
+                  let snapshot = $0["recent_generated_audio"] as? [String: Any],
+                  let items = snapshot["items"] as? [[String: Any]] else {
+                return false
+            }
+
+            return items.isEmpty
+        }
+    })
 }
 
 @Test func `speak live background can fail after enqueue acknowledgement`() async throws {

@@ -23,6 +23,9 @@ public extension SpeakSwiftly {
         case runtimeSnapshot(RuntimeSnapshot)
         case runtimeUpdate(RuntimeUpdate)
         case defaultVoiceProfile(String)
+        case recentGeneratedAudio(RecentGeneratedAudioSnapshot)
+        case recentGeneratedAudioChunks([GeneratedAudioChunk])
+        case replayRequests([String])
         case queueCleared(count: Int)
         case requestCancelled(id: String)
         case empty
@@ -78,6 +81,12 @@ public extension SpeakSwiftly {
                 )
             } else if let defaultVoiceProfile = success.defaultVoiceProfile {
                 self = .defaultVoiceProfile(defaultVoiceProfile)
+            } else if let recentGeneratedAudio = success.recentGeneratedAudio {
+                self = .recentGeneratedAudio(recentGeneratedAudio)
+            } else if let recentGeneratedAudioChunks = success.recentGeneratedAudioChunks {
+                self = .recentGeneratedAudioChunks(recentGeneratedAudioChunks)
+            } else if let replayRequestIDs = success.replayRequestIDs {
+                self = .replayRequests(replayRequestIDs)
             } else if let clearedCount = success.clearedCount {
                 self = .queueCleared(count: clearedCount)
             } else if let cancelledRequestID = success.cancelledRequestID {
@@ -116,6 +125,9 @@ package extension SpeakSwiftly {
             case status
             case speechBackend = "speech_backend"
             case defaultVoiceProfile = "default_voice_profile"
+            case recentGeneratedAudio = "recent_generated_audio"
+            case recentGeneratedAudioChunks = "recent_generated_audio_chunks"
+            case replayRequestIDs = "replay_request_ids"
             case clearedCount = "cleared_count"
             case cancelledRequestID = "cancelled_request_id"
         }
@@ -144,6 +156,9 @@ package extension SpeakSwiftly {
         let status: WorkerStatusEvent?
         let speechBackend: SpeechBackend?
         let defaultVoiceProfile: String?
+        let recentGeneratedAudio: RecentGeneratedAudioSnapshot?
+        let recentGeneratedAudioChunks: [GeneratedAudioChunk]?
+        let replayRequestIDs: [String]?
         let clearedCount: Int?
         let cancelledRequestID: String?
 
@@ -181,6 +196,9 @@ package extension SpeakSwiftly {
             status: WorkerStatusEvent? = nil,
             speechBackend: SpeechBackend? = nil,
             defaultVoiceProfile: String? = nil,
+            recentGeneratedAudio: RecentGeneratedAudioSnapshot? = nil,
+            recentGeneratedAudioChunks: [GeneratedAudioChunk]? = nil,
+            replayRequestIDs: [String]? = nil,
             clearedCount: Int? = nil,
             cancelledRequestID: String? = nil,
         ) {
@@ -207,6 +225,9 @@ package extension SpeakSwiftly {
             self.status = status
             self.speechBackend = speechBackend
             self.defaultVoiceProfile = defaultVoiceProfile
+            self.recentGeneratedAudio = recentGeneratedAudio
+            self.recentGeneratedAudioChunks = recentGeneratedAudioChunks
+            self.replayRequestIDs = replayRequestIDs
             self.clearedCount = clearedCount
             self.cancelledRequestID = cancelledRequestID
         }

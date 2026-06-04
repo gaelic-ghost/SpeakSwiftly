@@ -38,6 +38,20 @@ enum ToolRequest: Equatable {
     case expireGenerationJob(id: String, jobID: String)
     case generationJob(id: String, jobID: String)
     case generationJobs(id: String)
+    case recentGeneratedAudio(id: String)
+    case recentGeneratedAudioChunks(id: String, recentAudioID: String)
+    case replayRecentAudio(
+        id: String,
+        recentAudioID: String,
+        replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+        requestContext: SpeakSwiftly.RequestContext?,
+    )
+    case replayRecentAudioAll(
+        id: String,
+        replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+        requestContext: SpeakSwiftly.RequestContext?,
+    )
+    case clearRecentGeneratedAudio(id: String)
     case createVoiceProfile(
         id: String,
         profileName: SpeakSwiftly.Name,
@@ -114,6 +128,11 @@ enum ToolRequest: Equatable {
                  let .expireGenerationJob(id, _),
                  let .generationJob(id, _),
                  let .generationJobs(id),
+                 let .recentGeneratedAudio(id),
+                 let .recentGeneratedAudioChunks(id, _),
+                 let .replayRecentAudio(id, _, _, _),
+                 let .replayRecentAudioAll(id, _, _),
+                 let .clearRecentGeneratedAudio(id),
                  let .createVoiceProfile(id, _, _, _, _, _, _),
                  let .upsertBuiltInVoiceProfile(id, _, _, _, _, _, _, _),
                  let .createVoiceClone(id, _, _, _, _, _),
@@ -193,6 +212,25 @@ enum ToolRequest: Equatable {
                 return await tool.generationJob(requestID: id, jobID: jobID)
             case let .generationJobs(id):
                 return await tool.generationJobs(requestID: id)
+            case let .recentGeneratedAudio(id):
+                return await tool.recentGeneratedAudio(requestID: id)
+            case let .recentGeneratedAudioChunks(id, recentAudioID):
+                return await tool.recentGeneratedAudioChunks(requestID: id, recentAudioID: recentAudioID)
+            case let .replayRecentAudio(id, recentAudioID, replayMode, requestContext):
+                return await tool.replayRecentAudio(
+                    requestID: id,
+                    recentAudioID: recentAudioID,
+                    mode: replayMode,
+                    requestContext: requestContext,
+                )
+            case let .replayRecentAudioAll(id, replayMode, requestContext):
+                return await tool.replayRecentAudioAll(
+                    requestID: id,
+                    mode: replayMode,
+                    requestContext: requestContext,
+                )
+            case let .clearRecentGeneratedAudio(id):
+                return await tool.clearRecentGeneratedAudio(requestID: id)
             case let .createVoiceProfile(id, profileName, text, vibe, voiceDescription, outputPath, cwd):
                 return await tool.createVoiceProfile(
                     requestID: id,

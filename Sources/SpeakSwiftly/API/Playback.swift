@@ -55,6 +55,17 @@ public extension SpeakSwiftly.Playback {
         )
     }
 
+    /// Queues all complete recent generated audio items for local playback in snapshot order.
+    func replayRecentAll(
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode = .enqueueNext,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
+    ) async -> [SpeakSwiftly.RequestHandle] {
+        await runtime.replayRecentGeneratedAudioAll(
+            mode: mode,
+            requestContext: requestContext,
+        )
+    }
+
     /// Clears the bounded in-memory recent generated audio cache.
     func clearRecentGeneratedAudio() async {
         await runtime.clearRecentGeneratedAudio()

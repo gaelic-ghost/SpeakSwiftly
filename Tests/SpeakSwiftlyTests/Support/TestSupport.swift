@@ -916,6 +916,8 @@ func makeRuntime(
     speechBackend: SpeakSwiftly.SpeechBackend = .qwen3_smol,
     qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy = .preparedConditioning,
     audioOutputDestination: SpeakSwiftly.AudioOutputDestination = .localPlayback,
+    recentGeneratedAudioLimit: Int = 5,
+    recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore? = nil,
     audioLoadRecorder: ResidentModelRecorder? = nil,
     loadedAudioSamples: MLXArray? = makeDefaultLoadedAudioSamples(),
     loadedCloneAudioSamples: [Float] = [],
@@ -994,6 +996,9 @@ func makeRuntime(
         systemProfileResourceStore: systemProfileResourceStore,
         generatedFileStore: generatedFileStore,
         generationJobStore: generationJobStore,
+        recentGeneratedAudioStore: recentGeneratedAudioStore
+            ?? SpeakSwiftly.RecentGeneratedAudioStore(limit: recentGeneratedAudioLimit),
+        recentGeneratedAudioLimit: recentGeneratedAudioLimit,
         normalizer: normalizer,
         playbackQueue: PlaybackQueue(driver: playbackQueue),
         startsResidentModelsAutomatically: startsResidentModelsAutomatically,

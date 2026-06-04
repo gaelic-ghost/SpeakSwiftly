@@ -101,6 +101,32 @@ extension ToolRequest {
             case "list_generation_jobs":
                 return .generationJobs(id: id)
 
+            case "list_recent_generated_audio":
+                return .recentGeneratedAudio(id: id)
+
+            case "get_recent_generated_audio_chunks":
+                let recentAudioID = try requireNonEmpty(raw.recentAudioID, field: "recent_audio_id", id: id)
+                return .recentGeneratedAudioChunks(id: id, recentAudioID: recentAudioID)
+
+            case "replay_recent_audio":
+                let recentAudioID = try requireNonEmpty(raw.recentAudioID, field: "recent_audio_id", id: id)
+                return .replayRecentAudio(
+                    id: id,
+                    recentAudioID: recentAudioID,
+                    replayMode: raw.replayMode ?? .enqueueNext,
+                    requestContext: raw.requestContext,
+                )
+
+            case "replay_recent_audio_all":
+                return .replayRecentAudioAll(
+                    id: id,
+                    replayMode: raw.replayMode ?? .enqueueNext,
+                    requestContext: raw.requestContext,
+                )
+
+            case "clear_recent_generated_audio":
+                return .clearRecentGeneratedAudio(id: id)
+
             case "create_voice_profile_from_description":
                 let profileName = try requireNonEmpty(raw.profileName, field: "profile_name", id: id)
                 let text = try requireNonEmpty(raw.text, field: "text", id: id)

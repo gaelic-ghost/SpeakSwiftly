@@ -455,6 +455,46 @@ import TextForSpeech
     #expect(expire == .expireGenerationJob(id: "req-expire-job", jobID: "job-file-1"))
 }
 
+@Test func `decodes recent generated audio requests`() throws {
+    let list = try ToolRequest.decode(
+        from: #"{"id":"req-recent-list","op":"list_recent_generated_audio"}"#,
+    )
+    #expect(list == .recentGeneratedAudio(id: "req-recent-list"))
+
+    let chunks = try ToolRequest.decode(
+        from: #"{"id":"req-recent-chunks","op":"get_recent_generated_audio_chunks","recent_audio_id":"recent-1"}"#,
+    )
+    #expect(chunks == .recentGeneratedAudioChunks(id: "req-recent-chunks", recentAudioID: "recent-1"))
+
+    let replay = try ToolRequest.decode(
+        from: #"{"id":"req-replay-one","op":"replay_recent_audio","recent_audio_id":"recent-1","replay_mode":"enqueue_after_current","request_context":{"reqPurpose":"speech","source":"tests"}}"#,
+    )
+    #expect(
+        replay == .replayRecentAudio(
+            id: "req-replay-one",
+            recentAudioID: "recent-1",
+            replayMode: .enqueueAfterCurrent,
+            requestContext: SpeakSwiftly.RequestContext(reqPurpose: .speech, source: "tests"),
+        ),
+    )
+
+    let replayAll = try ToolRequest.decode(
+        from: #"{"id":"req-replay-all","op":"replay_recent_audio_all","replay_mode":"enqueue_next"}"#,
+    )
+    #expect(
+        replayAll == .replayRecentAudioAll(
+            id: "req-replay-all",
+            replayMode: .enqueueNext,
+            requestContext: nil,
+        ),
+    )
+
+    let clear = try ToolRequest.decode(
+        from: #"{"id":"req-recent-clear","op":"clear_recent_generated_audio"}"#,
+    )
+    #expect(clear == .clearRecentGeneratedAudio(id: "req-recent-clear"))
+}
+
 @Test func `decodes remove profile request`() throws {
     let request = try ToolRequest.decode(from: #"{"id":"req-4","op":"delete_voice_profile","profile_name":"bright-guide"}"#)
     #expect(request == .removeProfile(id: "req-4", profileName: "bright-guide"))

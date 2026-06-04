@@ -60,6 +60,8 @@ struct RawWorkerRequest: Decodable {
         case textProfile = "text_profile"
         case textProfileID = "text_profile_id"
         case requestContext = "request_context"
+        case recentAudioID = "recent_audio_id"
+        case replayMode = "replay_mode"
         case textProfileStyle = "text_profile_style"
         case replacement
         case replacementID = "replacement_id"
@@ -237,6 +239,8 @@ struct RawWorkerRequest: Decodable {
     let textProfile: SpeakSwiftly.TextProfileID?
     let textProfileID: String?
     let requestContext: SpeakSwiftly.RequestContext?
+    let recentAudioID: String?
+    let replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode?
     let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
     let replacement: TextForSpeech.Replacement?
     let replacementID: String?
@@ -281,6 +285,8 @@ struct RawWorkerRequest: Decodable {
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
         )
+        recentAudioID = try container.decodeIfPresent(String.self, forKey: .recentAudioID)
+        replayMode = try container.decodeIfPresent(SpeakSwiftly.RecentGeneratedAudioReplayMode.self, forKey: .replayMode)
         textProfileStyle = try container.decodeIfPresent(
             TextForSpeech.BuiltInProfileStyle.self,
             forKey: .textProfileStyle,

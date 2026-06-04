@@ -93,6 +93,10 @@ extension SpeakSwiftly.Runtime {
             configuration: configuration
                 ?? persistedConfiguration,
         )
+        let configuredRecentGeneratedAudioLimit = resolvedRecentGeneratedAudioLimit(
+            configuration: configuration
+                ?? persistedConfiguration,
+        )
         let configuredSystemProfileResourceRoots = configuration?.systemProfileResourceRoots ?? []
         let dependencies = WorkerDependencies.live(
             allowsProfileModelCPUFallback: allowsProfileModelCPUFallback,
@@ -144,6 +148,10 @@ extension SpeakSwiftly.Runtime {
             systemProfileResourceStore: systemProfileResourceStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
+            recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore(
+                limit: configuredRecentGeneratedAudioLimit,
+            ),
+            recentGeneratedAudioLimit: configuredRecentGeneratedAudioLimit,
             normalizer: normalizer,
             playbackQueue: playbackQueue,
             startsResidentModelsAutomatically: startsResidentModelsAutomatically,
@@ -251,6 +259,12 @@ extension SpeakSwiftly.Runtime {
         configuration?.audioOutputDestination ?? .localPlayback
     }
 
+    static func resolvedRecentGeneratedAudioLimit(
+        configuration: SpeakSwiftly.Configuration?,
+    ) -> Int {
+        configuration?.recentGeneratedAudioLimit ?? 5
+    }
+
     func setDefaultVoiceProfileName(_ profileName: SpeakSwiftly.Name) throws {
         let resolvedProfileName = SpeakSwiftly.Configuration.normalizedDefaultVoiceProfile(profileName)
         defaultVoiceProfileName = resolvedProfileName
@@ -268,6 +282,7 @@ extension SpeakSwiftly.Runtime {
             defaultVoiceProfile: defaultVoiceProfileName,
             duckMediaVolume: duckMediaVolume,
             audioOutputDestination: audioOutputDestination,
+            recentGeneratedAudioLimit: recentGeneratedAudioLimit,
             textNormalizer: normalizerRef,
         )
     }

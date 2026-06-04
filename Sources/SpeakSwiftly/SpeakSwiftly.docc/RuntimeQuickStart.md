@@ -141,6 +141,60 @@ If a call omits `voiceProfile:`, SpeakSwiftly uses `runtime.defaultVoiceProfile`
 
 Both calls return a ``SpeakSwiftly/RequestHandle``. That handle is your typed anchor for the specific request you just queued, including later status lookups and update streams.
 
+## Replay Recent Live Audio
+
+Live speech is also captured in a bounded in-memory recent-audio cache. The
+default limit is five complete items, and startup configuration clamps
+`recentGeneratedAudioLimit` to `0...8`. Use `0` when a host should disable
+recent-audio capture entirely.
+
+```swift
+let runtime = await SpeakSwiftly.liftoff(
+    configuration: SpeakSwiftly.Configuration(
+        recentGeneratedAudioLimit: 5
+    )
+)
+```
+
+Use ``SpeakSwiftly/Playback/recentGeneratedAudio()`` to inspect recent live
+items, and ``SpeakSwiftly/Playback/recentGeneratedAudioChunks(for:)`` when a
+host needs the canonical chunk stream for one cached item:
+
+```swift
+let recent = await runtime.playback.recentGeneratedAudio()
+
+if let item = recent.items.first {
+    let chunks = await runtime.playback.recentGeneratedAudioChunks(for: item.id)
+    print(chunks.count)
+}
+```
+
+Use ``SpeakSwiftly/Playback/replayRecent(id:mode:requestContext:)`` to queue
+one complete recent item for local playback without regenerating speech:
+
+```swift
+if let item = recent.items.first(where: { $0.bufferState == .complete }) {
+    let replay = await runtime.playback.replayRecent(id: item.id)
+    try await replay.completion()
+}
+```
+
+Use ``SpeakSwiftly/Playback/replayRecentAll(mode:requestContext:)`` to queue
+all complete recent items in snapshot order. Replays enter ahead of generated
+speech that is still waiting to play; active playback continues.
+
+```swift
+let replayHandles = await runtime.playback.replayRecentAll()
+
+for handle in replayHandles {
+    try await handle.completion()
+}
+```
+
+Use ``SpeakSwiftly/Playback/clearRecentGeneratedAudio()`` to clear the
+evictable memory cache. Recent audio is not retained user storage; generated
+file artifacts remain the right surface for durable output.
+
 ## Observe Request Progress
 
 For the common submit-and-wait path, call ``SpeakSwiftly/RequestHandle/completion()``:

@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftlyCore
 import SpeakSwiftlyFileAudioOutput
 import TextForSpeech
 
@@ -139,6 +140,54 @@ public extension SpeakSwiftly.Tool {
     /// Lists retained generation jobs using a caller-provided request identifier.
     func generationJobs(requestID: String) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.generationJobs(id: requestID))
+    }
+
+    /// Lists recent generated audio using a caller-provided request identifier.
+    func recentGeneratedAudio(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.recentGeneratedAudio(id: requestID))
+    }
+
+    /// Retrieves in-memory chunks for one recent generated-audio item using a caller-provided request identifier.
+    func recentGeneratedAudioChunks(
+        requestID: String,
+        recentAudioID: String,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.recentGeneratedAudioChunks(id: requestID, recentAudioID: recentAudioID))
+    }
+
+    /// Queues one recent generated-audio item for local playback using a caller-provided request identifier.
+    func replayRecentAudio(
+        requestID: String,
+        recentAudioID: String,
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode = .enqueueNext,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.replayRecentGeneratedAudio(
+            recentAudioID: recentAudioID,
+            mode: mode,
+            requestContext: requestContext,
+            requestID: requestID,
+        )
+    }
+
+    /// Queues all complete recent generated-audio items for local playback using a caller-provided request identifier.
+    func replayRecentAudioAll(
+        requestID: String,
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode = .enqueueNext,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(
+            .replayRecentAudioAll(
+                id: requestID,
+                replayMode: mode,
+                requestContext: requestContext,
+            ),
+        )
+    }
+
+    /// Clears recent generated audio using a caller-provided request identifier.
+    func clearRecentGeneratedAudio(requestID: String) async -> SpeakSwiftly.RequestHandle {
+        await runtime.submit(.clearRecentGeneratedAudio(id: requestID))
     }
 
     /// Lists the generation queue using a caller-provided request identifier.
