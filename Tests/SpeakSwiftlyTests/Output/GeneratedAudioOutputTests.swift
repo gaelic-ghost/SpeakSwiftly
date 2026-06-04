@@ -46,6 +46,101 @@ import Testing
     #expect(chunks.last?.isFinal == true)
 }
 
+@Test func `chunk stream fanout broadcasts chunks to each branch`() async throws {
+    let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-fanout",
+            sequenceNumber: 0,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [0.1],
+        ))
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-fanout",
+            sequenceNumber: 1,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+
+    let branches = GeneratedAudioChunkStreams.fanOut(source, branchCount: 2)
+    let first = try await collectChunks(from: branches[0])
+    let second = try await collectChunks(from: branches[1])
+
+    #expect(first.map(\.sequenceNumber) == [0, 1])
+    #expect(second.map(\.sequenceNumber) == [0, 1])
+    #expect(first.last?.isFinal == true)
+    #expect(second.last?.isFinal == true)
+}
+
+@Test func `chunk stream fanout returns no streams for zero branches`() {
+    let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.finish()
+    }
+
+    let branches = GeneratedAudioChunkStreams.fanOut(source, branchCount: 0)
+
+    #expect(branches.isEmpty)
+}
+
+@Test func `chunk stream fanout propagates source failure to branches`() async {
+    struct ExpectedFailure: Error {}
+
+    let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        continuation.finish(throwing: ExpectedFailure())
+    }
+    let branches = GeneratedAudioChunkStreams.fanOut(source, branchCount: 2)
+
+    await #expect(throws: ExpectedFailure.self) {
+        _ = try await collectChunks(from: branches[0])
+    }
+    await #expect(throws: ExpectedFailure.self) {
+        _ = try await collectChunks(from: branches[1])
+    }
+}
+
+@Test func `chunk stream fanout lets a fast branch drain while slow branch keeps bounded newest chunks`() async throws {
+    let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
+        for sequenceNumber in 0..<8 {
+            continuation.yield(GeneratedAudioChunk(
+                requestID: "req-fanout-bounded",
+                sequenceNumber: sequenceNumber,
+                sampleRate: 24000,
+                channelCount: 1,
+                samples: [Float(sequenceNumber)],
+            ))
+        }
+        continuation.yield(GeneratedAudioChunk(
+            requestID: "req-fanout-bounded",
+            sequenceNumber: 8,
+            sampleRate: 24000,
+            channelCount: 1,
+            samples: [],
+            isFinal: true,
+        ))
+        continuation.finish()
+    }
+    let branches = GeneratedAudioChunkStreams.fanOut(
+        source,
+        bufferingPolicies: [
+            .unbounded,
+            .bufferingNewest(2),
+        ],
+    )
+
+    async let fastChunks = collectChunks(from: branches[0])
+    try await Task.sleep(for: .milliseconds(20))
+    let slowChunks = try await collectChunks(from: branches[1])
+    let drainedFastChunks = try await fastChunks
+
+    #expect(drainedFastChunks.map(\.sequenceNumber) == Array(0...8))
+    #expect(slowChunks.count <= 2)
+    #expect(slowChunks.last?.isFinal == true)
+}
+
 @Test func `local playback output consumes sample chunks and ignores final marker`() async throws {
     let source = AsyncThrowingStream<GeneratedAudioChunk, any Error> { continuation in
         continuation.yield(
@@ -76,6 +171,14 @@ import Testing
     }
 
     #expect(sampleChunks == [[0.4, 0.5]])
+}
+
+private func collectChunks(from stream: GeneratedAudioChunkStream) async throws -> [GeneratedAudioChunk] {
+    var chunks = [GeneratedAudioChunk]()
+    for try await chunk in stream {
+        chunks.append(chunk)
+    }
+    return chunks
 }
 
 @MainActor

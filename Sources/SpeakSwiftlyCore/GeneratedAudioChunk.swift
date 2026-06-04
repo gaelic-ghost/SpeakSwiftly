@@ -96,4 +96,125 @@ public enum GeneratedAudioChunkStreams {
             }
         }
     }
+
+    public static func fanOut(
+        _ source: GeneratedAudioChunkStream,
+        branchCount: Int,
+        bufferingPolicy: GeneratedAudioChunkStream.Continuation.BufferingPolicy = .bufferingNewest(16),
+    ) -> [GeneratedAudioChunkStream] {
+        fanOut(
+            source,
+            bufferingPolicies: Array(repeating: bufferingPolicy, count: max(0, branchCount)),
+        )
+    }
+
+    public static func fanOut(
+        _ source: GeneratedAudioChunkStream,
+        bufferingPolicies: [GeneratedAudioChunkStream.Continuation.BufferingPolicy],
+    ) -> [GeneratedAudioChunkStream] {
+        guard !bufferingPolicies.isEmpty else {
+            return []
+        }
+
+        let hub = GeneratedAudioChunkFanoutHub(expectedBranchCount: bufferingPolicies.count)
+        let streams = bufferingPolicies.enumerated().map { index, bufferingPolicy in
+            GeneratedAudioChunkStream(bufferingPolicy: bufferingPolicy) { continuation in
+                Task {
+                    await hub.register(continuation, at: index)
+                }
+                continuation.onTermination = { _ in
+                    Task {
+                        await hub.unregister(index)
+                    }
+                }
+            }
+        }
+
+        Task {
+            await hub.waitUntilReady()
+            do {
+                for try await chunk in source {
+                    await hub.yield(chunk)
+                }
+                await hub.finish()
+            } catch {
+                await hub.finish(throwing: error)
+            }
+        }
+
+        return streams
+    }
+}
+
+private actor GeneratedAudioChunkFanoutHub {
+    typealias Continuation = GeneratedAudioChunkStream.Continuation
+
+    private let expectedBranchCount: Int
+    private var continuations = [Int: Continuation]()
+    private var readinessWaiters = [CheckedContinuation<Void, Never>]()
+
+    init(expectedBranchCount: Int) {
+        self.expectedBranchCount = expectedBranchCount
+    }
+
+    func register(_ continuation: Continuation, at index: Int) {
+        continuations[index] = continuation
+        guard continuations.count >= expectedBranchCount else {
+            return
+        }
+
+        let waiters = readinessWaiters
+        readinessWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
+    func unregister(_ index: Int) {
+        continuations.removeValue(forKey: index)
+    }
+
+    func waitUntilReady() async {
+        guard continuations.count < expectedBranchCount else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            if continuations.count >= expectedBranchCount {
+                continuation.resume()
+            } else {
+                readinessWaiters.append(continuation)
+            }
+        }
+    }
+
+    func yield(_ chunk: GeneratedAudioChunk) {
+        for continuation in continuations.values {
+            continuation.yield(chunk)
+        }
+    }
+
+    func finish() {
+        for continuation in continuations.values {
+            continuation.finish()
+        }
+        continuations.removeAll()
+        resumeReadinessWaiters()
+    }
+
+    func finish(throwing error: any Error) {
+        for continuation in continuations.values {
+            continuation.finish(throwing: error)
+        }
+        continuations.removeAll()
+        resumeReadinessWaiters()
+    }
+
+    private func resumeReadinessWaiters() {
+        let waiters = readinessWaiters
+        readinessWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
 }
