@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "mode": "decoder_resident_catalog_closeout",
-  "status": "manual_listening_pending",
+  "status": "decoder_listening_acceptable_backend_gate_pending",
   "source_reports": {
     "fp16_catalog": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-fp16-prompts-001-002-12hz.json",
     "w8a8_catalog": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-resident-catalog-buckets-72-88-w8a8-linear-matmul-prompts-001-002-12hz.json",
@@ -63,6 +63,6 @@
     "candidate": "W8A8 linear + matmul remains the only current W8A8 decoder candidate.",
     "keep_fp16": "Convolution and upsampling activations stay fp16 unless decoder tuning changes the quality tradeoff.",
     "backend_gate": "Any backend-shaped use must keep models resident and explicitly warm each loaded bucket before serving user-facing audio.",
-    "public_backend": "Do not add a public Core ML SpeechBackend until the Qwen talker graph boundary is understood and manual decoder listening passes."
+    "public_backend": "Do not add a public Core ML SpeechBackend until the Qwen talker graph boundary is understood and end-to-end Core ML quality passes."
   }
 }

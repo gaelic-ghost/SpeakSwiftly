@@ -71,7 +71,7 @@ import Testing
     let report = try Qwen3TTSDecoderCloseoutComparisonReport.load()
 
     #expect(report.schemaVersion == 1)
-    #expect(report.status == "manual_listening_pending")
+    #expect(report.status == "decoder_listening_acceptable_backend_gate_pending")
     #expect(report.packages.map(\.bucket) == [72, 88])
     #expect(report.packages.allSatisfy { $0.w8a8LinearMatmulPackageSizeBytes < $0.fp16PackageSizeBytes })
     #expect(report.residentCatalogComparison.map(\.sampleId) == ["prompt-001", "prompt-002"])
