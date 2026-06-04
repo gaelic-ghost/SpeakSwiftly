@@ -285,35 +285,43 @@ private extension NWConnection {
     ) async throws {
         try await withCheckedThrowingContinuation { continuation in
             let box = ReadyContinuationBox()
-            let timeoutTask = Task {
-                do {
-                    try await Task.sleep(for: timeout)
-                    box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
-                        requestID: requestID,
-                        message: "Network audio connection for request '\(requestID)' did not become ready within \(timeout). Likely cause: the LAN audio receiver could not be resolved, accepted, or reached from this host.",
-                    ))
-                    cancel()
-                } catch {
-                    // Cancellation means the connection reached a terminal readiness state first.
+            let timeoutState = ReadinessTimeoutBox()
+            queue.asyncAfter(deadline: .now() + timeout.dispatchTimeInterval) {
+                guard timeoutState.fire() else {
+                    return
                 }
+
+                box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
+                    requestID: requestID,
+                    message: "Network audio connection for request '\(requestID)' did not become ready within \(timeout). Likely cause: the LAN audio receiver could not be resolved, accepted, or reached from this host.",
+                ))
+                self.stateUpdateHandler = nil
             }
             stateUpdateHandler = { state in
+                func finish(_ result: Result<Void, any Error>) {
+                    timeoutState.cancel()
+                    self.stateUpdateHandler = nil
+                    switch result {
+                        case .success:
+                            box.resume(continuation)
+                        case let .failure(error):
+                            box.resume(continuation, throwing: error)
+                    }
+                }
+
                 switch state {
                     case .ready:
-                        timeoutTask.cancel()
-                        box.resume(continuation)
+                        finish(.success(()))
                     case let .failed(error):
-                        timeoutTask.cancel()
-                        box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
+                        finish(.failure(GeneratedAudioOutputError.transportFailed(
                             requestID: requestID,
                             message: "Network audio connection for request '\(requestID)' failed before it became ready: \(error)",
-                        ))
+                        )))
                     case .cancelled:
-                        timeoutTask.cancel()
-                        box.resume(continuation, throwing: GeneratedAudioOutputError.transportFailed(
+                        finish(.failure(GeneratedAudioOutputError.transportFailed(
                             requestID: requestID,
                             message: "Network audio connection for request '\(requestID)' was cancelled before it became ready.",
-                        ))
+                        )))
                     default:
                         break
                 }
@@ -408,6 +416,46 @@ private extension NetworkAudioStreamFrame {
             case let .audio(frame):
                 frame.chunk.requestID
         }
+    }
+}
+
+private final class ReadinessTimeoutBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isCancelled = false
+
+    func cancel() {
+        lock.lock()
+        isCancelled = true
+        lock.unlock()
+    }
+
+    func fire() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isCancelled else {
+            return false
+        }
+
+        isCancelled = true
+        return true
+    }
+}
+
+private extension Duration {
+    var dispatchTimeInterval: DispatchTimeInterval {
+        let components = components
+        guard components.seconds > 0 || components.attoseconds > 0 else {
+            return .nanoseconds(0)
+        }
+
+        let maximumNanoseconds = Int64(Int.max)
+        let seconds = min(components.seconds, maximumNanoseconds / 1_000_000_000)
+        let attosecondNanoseconds = components.attoseconds / 1_000_000_000
+        let nanoseconds = min(
+            maximumNanoseconds,
+            max(1, seconds * 1_000_000_000 + attosecondNanoseconds),
+        )
+        return .nanoseconds(Int(nanoseconds))
     }
 }
 
