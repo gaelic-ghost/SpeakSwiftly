@@ -10,23 +10,45 @@ private final class MediaVolumeScriptSpy {
     var finalRestoreTargetWriteCount = 0
 
     private var volumes: [String: Int]
+    private var playingApps: Set<String>
+    private var volumeReadSequences: [String: [Int]]
 
-    init(volumes: [String: Int]) {
+    init(volumes: [String: Int], playingApps: Set<String>? = nil) {
         self.volumes = volumes
+        self.playingApps = playingApps ?? Set(volumes.keys)
+        volumeReadSequences = [:]
     }
 
     func volume(for appName: String) -> Int? {
         volumes[appName]
     }
 
+    func setVolume(_ volume: Int, for appName: String) {
+        volumes[appName] = volume
+    }
+
+    func setVolumeReadSequence(_ sequence: [Int], for appName: String) {
+        volumeReadSequences[appName] = sequence
+    }
+
     func run(_ source: String) throws -> Int {
-        let appName = if source.contains(#""Spotify""#) {
+        let appName = if source.contains(#""com.spotify.client""#) {
             "Spotify"
         } else {
             "Music"
         }
 
+        if source.contains("player state") {
+            return playingApps.contains(appName) ? 1 : 0
+        }
+
         if source.contains("get sound volume") {
+            if var sequence = volumeReadSequences[appName], !sequence.isEmpty {
+                let volume = sequence.removeFirst()
+                volumeReadSequences[appName] = sequence
+                volumes[appName] = volume
+                return volume
+            }
             return volumes[appName] ?? 100
         }
 
@@ -56,8 +78,20 @@ private final class MediaVolumeScriptSpy {
         bundleIdentifier: "com.spotify.client",
     )
 
-    #expect(MacOSMediaVolumeDucker.getVolumeScript(for: spotify) == #"tell application "Spotify" to get sound volume"#)
-    #expect(MacOSMediaVolumeDucker.setVolumeScript(for: spotify, volume: 35) == #"tell application "Spotify" to set sound volume to 35"#)
+    #expect(
+        MacOSMediaVolumeDucker.getVolumeScript(for: spotify)
+            == #"tell application id "com.spotify.client" to get sound volume"#,
+    )
+    #expect(
+        MacOSMediaVolumeDucker.setVolumeScript(for: spotify, volume: 35)
+            == #"tell application id "com.spotify.client" to set sound volume to 35"#,
+    )
+    #expect(
+        MacOSMediaVolumeDucker.isPlayingScript(for: spotify).contains(
+            #"tell application id "com.spotify.client""#,
+        ),
+    )
+    #expect(MacOSMediaVolumeDucker.isPlayingScript(for: spotify).contains("player state is playing"))
 }
 
 @MainActor
@@ -67,8 +101,14 @@ private final class MediaVolumeScriptSpy {
         bundleIdentifier: "com.apple.Music",
     )
 
-    #expect(MacOSMediaVolumeDucker.setVolumeScript(for: music, volume: -12) == #"tell application "Music" to set sound volume to 0"#)
-    #expect(MacOSMediaVolumeDucker.setVolumeScript(for: music, volume: 123) == #"tell application "Music" to set sound volume to 100"#)
+    #expect(
+        MacOSMediaVolumeDucker.setVolumeScript(for: music, volume: -12)
+            == #"tell application id "com.apple.Music" to set sound volume to 0"#,
+    )
+    #expect(
+        MacOSMediaVolumeDucker.setVolumeScript(for: music, volume: 123)
+            == #"tell application id "com.apple.Music" to set sound volume to 100"#,
+    )
 }
 
 @MainActor
@@ -113,6 +153,57 @@ private final class MediaVolumeScriptSpy {
 }
 
 @MainActor
+@Test func `macOS media volume ducker only lowers apps that are currently playing`() async {
+    let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100, "Music": 80], playingApps: ["Spotify"])
+    let ducker = MacOSMediaVolumeDucker(
+        duckMediaVolume: .aLittle,
+        scriptRunner: { try spy.run($0) },
+        automationPermissionRequester: { _, _ in .authorized },
+        runningAppChecker: { _ in true },
+    )
+
+    await ducker.duckRunningMediaApps()
+
+    #expect(spy.setCalls.map(\.appName) == ["Spotify", "Spotify", "Spotify", "Spotify", "Spotify"])
+    #expect(spy.volume(for: "Spotify") == 80)
+    #expect(spy.volume(for: "Music") == 80)
+}
+
+@MainActor
+@Test func `macOS media volume ducker waits for stable volume before ducking`() async {
+    let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100])
+    spy.setVolumeReadSequence([100, 95, 95], for: "Spotify")
+    let ducker = MacOSMediaVolumeDucker(
+        duckMediaVolume: .aLittle,
+        scriptRunner: { try spy.run($0) },
+        automationPermissionRequester: { _, _ in .authorized },
+        runningAppChecker: { $0.name == "Spotify" },
+    )
+
+    await ducker.duckRunningMediaApps()
+
+    #expect(spy.setCalls.map(\.volume) == [93, 89, 82, 78, 76])
+    #expect(spy.volume(for: "Spotify") == 76)
+}
+
+@MainActor
+@Test func `macOS media volume ducker skips ducking while volume keeps changing`() async {
+    let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100])
+    spy.setVolumeReadSequence([100, 95, 90, 85], for: "Spotify")
+    let ducker = MacOSMediaVolumeDucker(
+        duckMediaVolume: .aLittle,
+        scriptRunner: { try spy.run($0) },
+        automationPermissionRequester: { _, _ in .authorized },
+        runningAppChecker: { $0.name == "Spotify" },
+    )
+
+    await ducker.duckRunningMediaApps()
+
+    #expect(spy.setCalls.isEmpty)
+    #expect(spy.volume(for: "Spotify") == 85)
+}
+
+@MainActor
 @Test func `macOS media volume ducker verifies restore and retries when final volume does not stick`() async {
     let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100])
     let ducker = MacOSMediaVolumeDucker(
@@ -130,6 +221,46 @@ private final class MediaVolumeScriptSpy {
 
     #expect(spy.volume(for: "Spotify") == 100)
     #expect(spy.finalRestoreTargetWriteCount == 2)
+}
+
+@MainActor
+@Test func `macOS media volume ducker skips restore while volume keeps changing`() async {
+    let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100])
+    let ducker = MacOSMediaVolumeDucker(
+        duckMediaVolume: .aLittle,
+        scriptRunner: { try spy.run($0) },
+        automationPermissionRequester: { _, _ in .authorized },
+        runningAppChecker: { $0.name == "Spotify" },
+    )
+
+    await ducker.duckRunningMediaApps()
+    spy.resetSetCalls()
+    spy.setVolumeReadSequence([80, 70, 60, 50], for: "Spotify")
+
+    await ducker.restoreDuckedMediaApps()
+
+    #expect(spy.setCalls.isEmpty)
+    #expect(spy.volume(for: "Spotify") == 50)
+}
+
+@MainActor
+@Test func `macOS media volume ducker leaves user adjusted volume alone during restore`() async {
+    let spy = MediaVolumeScriptSpy(volumes: ["Spotify": 100])
+    let ducker = MacOSMediaVolumeDucker(
+        duckMediaVolume: .aLittle,
+        scriptRunner: { try spy.run($0) },
+        automationPermissionRequester: { _, _ in .authorized },
+        runningAppChecker: { $0.name == "Spotify" },
+    )
+
+    await ducker.duckRunningMediaApps()
+    spy.resetSetCalls()
+    spy.setVolume(65, for: "Spotify")
+
+    await ducker.restoreDuckedMediaApps()
+
+    #expect(spy.setCalls.isEmpty)
+    #expect(spy.volume(for: "Spotify") == 65)
 }
 
 @MainActor
