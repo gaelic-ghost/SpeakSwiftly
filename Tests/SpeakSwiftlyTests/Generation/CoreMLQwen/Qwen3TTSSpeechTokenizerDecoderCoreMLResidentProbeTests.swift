@@ -56,13 +56,15 @@ import Testing
     let manifest = try Qwen3TTSDecoderCloseoutListeningManifest.load()
 
     #expect(manifest.schemaVersion == 1)
-    #expect(manifest.status == "manual_listening_pending")
+    #expect(manifest.status == "airpods_listening_acceptable_followup_optional")
     #expect(manifest.listenInOrder.map(\.sampleId) == ["prompt-001", "prompt-002"])
     #expect(manifest.listenInOrder.map(\.bucket) == [72, 88])
     #expect(manifest.listenInOrder.allSatisfy { $0.validDurationSeconds > 0 })
     #expect(manifest.listenInOrder.allSatisfy { $0.baselineValidWav.hasPrefix(".local/coreml-qwen3tts/") })
     #expect(manifest.listenInOrder.allSatisfy { $0.candidateValidWav.hasPrefix(".local/coreml-qwen3tts/") })
     #expect(manifest.listenInOrder.allSatisfy { $0.audioInspectionReport.hasPrefix("docs/maintainers/") })
+    #expect(manifest.listenInOrder[0].airpodsListeningResult == "acceptable")
+    #expect(manifest.listenInOrder[1].airpodsListeningResult == "acceptable_with_muffled_quality")
 }
 
 @Test func `qwen3 tts decoder closeout compares fp16 and w8a8 residency`() throws {
@@ -292,6 +294,7 @@ private struct Qwen3TTSDecoderCloseoutListeningManifest: Decodable {
         let baselineValidWav: String
         let candidateValidWav: String
         let audioInspectionReport: String
+        let airpodsListeningResult: String
     }
 
     let schemaVersion: Int

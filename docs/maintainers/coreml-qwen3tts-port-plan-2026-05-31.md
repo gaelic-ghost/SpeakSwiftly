@@ -2069,13 +2069,14 @@ First prototype result:
 - Decoder closeout status: W8A8 `linear` + `matmul` remains the only current
   decoder W8A8 candidate; convolution and upsampling activations stay fp16; no
   public Core ML `SpeechBackend` should be added until the Qwen talker graph
-  boundary is understood; and decoder quality remains pending until Gale
-  completes manual listening.
-- The morning listening manifest is
+  boundary is understood. AirPods 4 listening found W8A8 acceptable for
+  continued performance work, but not fp16-equal: bucket 72 was very close with
+  a tiny fp16 fullness advantage, while bucket 88 sounded slightly muffled.
+- The listening manifest is
   `coreml-qwen3tts/decoder-closeout-listening-manifest-12hz.json`. It verifies
   the existing local valid-region WAV pairs for bucket 72 `prompt-001` and
-  bucket 88 `prompt-002`, and intentionally records
-  `manual_listening_pending` instead of accepting audio quality.
+  bucket 88 `prompt-002`, and records the AirPods listening pass as acceptable
+  for continued exploration with optional real-headphones or speakers follow-up.
 - This confirms the backend-relevant shape is feasible at the probe level:
   declare bucket packages, load them once, route by code length, trim valid
   output, and keep public runtime surfaces unchanged while gathering evidence.
