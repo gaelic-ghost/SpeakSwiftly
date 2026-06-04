@@ -31,6 +31,21 @@ public extension SpeakSwiftly.Playback {
         await runtime.playbackSnapshot()
     }
 
+    /// Returns recently generated audio that can be inspected or replayed by callers.
+    func recentGeneratedAudio() async -> SpeakSwiftly.RecentGeneratedAudioSnapshot {
+        await runtime.recentGeneratedAudioSnapshot()
+    }
+
+    /// Returns the retained in-memory chunks for one recently generated audio item.
+    func recentGeneratedAudioChunks(for id: String) async -> [SpeakSwiftly.GeneratedAudioChunk] {
+        await runtime.recentGeneratedAudioChunks(for: id)
+    }
+
+    /// Clears the bounded in-memory recent generated audio cache.
+    func clearRecentGeneratedAudio() async {
+        await runtime.clearRecentGeneratedAudio()
+    }
+
     /// Pauses live playback.
     func pause() async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.playback(id: UUID().uuidString, action: .pause))

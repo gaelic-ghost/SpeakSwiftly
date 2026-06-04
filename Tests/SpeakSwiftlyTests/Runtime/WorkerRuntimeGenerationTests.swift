@@ -55,6 +55,21 @@ import TextForSpeech
     #expect(chunks.allSatisfy { $0.sampleFormat == .float32PCM })
     #expect(playback.playCount == 0)
 
+    let recentSnapshot = await runtime.playback.recentGeneratedAudio()
+    let recentItem = try #require(recentSnapshot.items.first)
+    #expect(recentSnapshot.items.count == 1)
+    #expect(recentItem.requestID == generatedStream.handle.id)
+    #expect(recentItem.textPreview == "Hello from the generated stream path.")
+    #expect(recentItem.voiceProfileName == "default-femme")
+    #expect(recentItem.bufferState == .complete)
+    #expect(recentItem.sampleRate == 24000)
+    #expect(recentItem.channelCount == 1)
+    #expect(recentItem.bufferedChunkCount == 3)
+
+    let recentChunks = await runtime.playback.recentGeneratedAudioChunks(for: recentItem.id)
+    #expect(recentChunks.map(\.sequenceNumber) == [0, 1, 2])
+    #expect(recentChunks.map(\.samples) == [[0.1, 0.2], [0.2, 0.3], []])
+
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == generatedStream.handle.id

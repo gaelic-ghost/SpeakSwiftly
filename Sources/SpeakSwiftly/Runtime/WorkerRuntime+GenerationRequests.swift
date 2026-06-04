@@ -417,14 +417,22 @@ extension SpeakSwiftly.Runtime {
             sampleRate: residentModel.sampleRate,
             samples: sampleStream,
         )
+        let recentAudioID = await beginRecentGeneratedAudioCapture(
+            requestID: id,
+            text: speechState.normalizedText,
+            voiceProfileName: profileName,
+        )
 
         do {
             for try await chunk in chunkStream {
                 try Task.checkCancellation()
+                await recordRecentGeneratedAudioChunk(chunk, recentAudioID: recentAudioID)
                 try yieldGeneratedAudioChunk(chunk, for: id)
             }
+            await finishRecentGeneratedAudioCapture(recentAudioID: recentAudioID)
             finishGeneratedAudioStream(for: id)
         } catch {
+            await failRecentGeneratedAudioCapture(recentAudioID: recentAudioID, error: error)
             finishGeneratedAudioStream(for: id, throwing: error)
             if let workerError = error as? WorkerError {
                 throw workerError

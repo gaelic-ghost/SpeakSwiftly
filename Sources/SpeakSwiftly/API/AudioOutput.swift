@@ -10,6 +10,13 @@ public extension SpeakSwiftly {
     typealias GeneratedAudioChunkStreams = SpeakSwiftlyCore.GeneratedAudioChunkStreams
     typealias GeneratedAudioSampleFormat = SpeakSwiftlyCore.GeneratedAudioSampleFormat
     typealias GeneratedAudioOutputError = SpeakSwiftlyCore.GeneratedAudioOutputError
+    typealias RecentGeneratedAudioBufferState = SpeakSwiftlyCore.RecentGeneratedAudioBufferState
+    typealias RecentGeneratedAudioItem = SpeakSwiftlyCore.RecentGeneratedAudioItem
+    typealias RecentGeneratedAudioMetadata = SpeakSwiftlyCore.RecentGeneratedAudioMetadata
+    typealias RecentGeneratedAudioReplayMode = SpeakSwiftlyCore.RecentGeneratedAudioReplayMode
+    typealias RecentGeneratedAudioRetentionPolicy = SpeakSwiftlyCore.RecentGeneratedAudioRetentionPolicy
+    typealias RecentGeneratedAudioSnapshot = SpeakSwiftlyCore.RecentGeneratedAudioSnapshot
+    typealias RecentGeneratedAudioStore = SpeakSwiftlyCore.RecentGeneratedAudioStore
     typealias LocalPlaybackAudioOutput = SpeakSwiftlyPlayback.LocalPlaybackAudioOutput
     typealias HTTPGeneratedAudioFrame = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrame
     typealias HTTPGeneratedAudioFrameHeader = SpeakSwiftlyHTTPAudioOutput.HTTPGeneratedAudioFrameHeader

@@ -263,6 +263,7 @@ public extension SpeakSwiftly {
         let systemProfileResourceStore: ProfileStore?
         let generatedFileStore: GeneratedFileStore
         let generationJobStore: GenerationJobStore
+        let recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore
         let normalizerRef: SpeakSwiftly.Normalizer
         let playbackQueue: PlaybackQueue
         let startsResidentModelsAutomatically: Bool
@@ -302,6 +303,7 @@ public extension SpeakSwiftly {
             systemProfileResourceStore: ProfileStore? = nil,
             generatedFileStore: GeneratedFileStore,
             generationJobStore: GenerationJobStore,
+            recentGeneratedAudioStore: SpeakSwiftly.RecentGeneratedAudioStore = SpeakSwiftly.RecentGeneratedAudioStore(),
             normalizer: SpeakSwiftly.Normalizer,
             playbackQueue: PlaybackQueue,
             startsResidentModelsAutomatically: Bool = true,
@@ -316,6 +318,7 @@ public extension SpeakSwiftly {
             self.systemProfileResourceStore = systemProfileResourceStore
             self.generatedFileStore = generatedFileStore
             self.generationJobStore = generationJobStore
+            self.recentGeneratedAudioStore = recentGeneratedAudioStore
             normalizerRef = normalizer
             self.playbackQueue = playbackQueue
             self.startsResidentModelsAutomatically = startsResidentModelsAutomatically
