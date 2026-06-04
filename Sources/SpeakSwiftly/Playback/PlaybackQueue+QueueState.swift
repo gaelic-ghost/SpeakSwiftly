@@ -1,11 +1,35 @@
 extension PlaybackQueue {
-    func enqueue(_ request: LiveSpeechRequestState) {
+    func enqueue(
+        _ request: LiveSpeechRequestState,
+        replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode? = nil,
+    ) {
         let playbackState = LiveSpeechPlaybackState(
             request: request,
             execution: .make(requestID: request.id),
         )
         jobs[playbackState.id] = playbackState
-        queue.append(playbackState.id)
+        if let replayMode {
+            enqueueReplay(playbackState.id, mode: replayMode)
+        } else {
+            queue.append(playbackState.id)
+        }
+    }
+
+    private func enqueueReplay(
+        _ requestID: String,
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+    ) {
+        switch mode {
+            case .enqueueNext,
+                 .enqueueAfterCurrent,
+                 .interruptCurrent:
+                if let activeRequestID = activePlayback?.requestID,
+                   let activeIndex = queue.firstIndex(of: activeRequestID) {
+                    queue.insert(requestID, at: queue.index(after: activeIndex))
+                } else {
+                    queue.insert(requestID, at: queue.startIndex)
+                }
+        }
     }
 
     func setGenerationTask(_ task: Task<Void, Never>?, for requestID: String) {

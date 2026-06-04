@@ -10,6 +10,12 @@ extension SpeakSwiftly.Runtime {
 
         do {
             switch request {
+                case .replayRecentAudio:
+                    result = .failure(WorkerError(
+                        code: .internalError,
+                        message: "Replay request '\(request.id)' was routed through immediate control handling unexpectedly. This indicates a runtime bug in SpeakSwiftly.",
+                    ))
+
                 case let .generatedFile(id, artifactID):
                     result = try .success(
                         WorkerSuccessPayload(

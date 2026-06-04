@@ -1,4 +1,5 @@
 import Foundation
+import SpeakSwiftlyCore
 
 public extension SpeakSwiftly {
     // MARK: Playback Handle
@@ -39,6 +40,19 @@ public extension SpeakSwiftly.Playback {
     /// Returns the retained in-memory chunks for one recently generated audio item.
     func recentGeneratedAudioChunks(for id: String) async -> [SpeakSwiftly.GeneratedAudioChunk] {
         await runtime.recentGeneratedAudioChunks(for: id)
+    }
+
+    /// Queues one recently generated audio item for local playback without regenerating speech.
+    func replayRecent(
+        id: String,
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode = .enqueueNext,
+        requestContext: SpeakSwiftly.RequestContext? = nil,
+    ) async -> SpeakSwiftly.RequestHandle {
+        await runtime.replayRecentGeneratedAudio(
+            recentAudioID: id,
+            mode: mode,
+            requestContext: requestContext,
+        )
     }
 
     /// Clears the bounded in-memory recent generated audio cache.

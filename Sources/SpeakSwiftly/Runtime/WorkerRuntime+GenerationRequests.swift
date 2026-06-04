@@ -247,6 +247,7 @@ extension SpeakSwiftly.Runtime {
                      .generatedFiles,
                      .generatedBatch,
                      .generatedBatches,
+                     .replayRecentAudio,
                      .expireGenerationJob,
                      .generationJob,
                      .generationJobs,

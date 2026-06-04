@@ -40,21 +40,40 @@ final class LiveSpeechRequestState: @unchecked Sendable {
         residentStreamingCadenceProfile: SpeakSwiftly.Runtime.PlaybackConfiguration.ResidentStreamingCadenceProfile,
         residentStreamingInterval: Double,
     ) {
-        guard case let .queueSpeech(
+        let text: String
+        let profileName: String
+        let textProfileID: String?
+        let requestContext: SpeakSwiftly.RequestContext?
+        switch request {
+            case let .queueSpeech(
             id: _,
-            text: text,
-            profileName: profileName,
-            textProfileID: textProfileID,
+            text: requestText,
+            profileName: requestProfileName,
+            textProfileID: requestTextProfileID,
             jobType: jobType,
             audioFormat: _,
-            requestContext: requestContext,
+            requestContext: speechRequestContext,
             qwenPreModelTextChunking: _,
-        ) = request,
-            jobType == .live || jobType == .stream
-        else {
-            fatalError(
-                "SpeakSwiftly attempted to create speech request state for request '\(request.id)' (\(request.opName)), but that request is not a live playback or generated-audio stream request. This indicates a runtime queueing bug.",
-            )
+        ) where jobType == .live || jobType == .stream:
+                text = requestText
+                profileName = requestProfileName
+                textProfileID = requestTextProfileID
+                requestContext = speechRequestContext
+            case let .replayRecentAudio(
+            id: _,
+            recentAudioID: _,
+            text: requestText,
+            profileName: requestProfileName,
+            requestContext: replayRequestContext,
+        ):
+                text = requestText
+                profileName = requestProfileName
+                textProfileID = nil
+                requestContext = replayRequestContext
+            default:
+                fatalError(
+                    "SpeakSwiftly attempted to create speech request state for request '\(request.id)' (\(request.opName)), but that request is not a live playback, generated-audio stream, or recent-audio replay request. This indicates a runtime queueing bug.",
+                )
         }
 
         self.request = request

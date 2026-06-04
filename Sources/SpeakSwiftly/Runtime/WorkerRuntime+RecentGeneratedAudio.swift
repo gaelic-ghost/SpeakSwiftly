@@ -57,8 +57,148 @@ extension SpeakSwiftly.Runtime {
         await recentGeneratedAudioStore.chunks(for: id)
     }
 
+    func replayRecentGeneratedAudio(
+        recentAudioID: String,
+        mode: SpeakSwiftly.RecentGeneratedAudioReplayMode,
+        requestContext: SpeakSwiftly.RequestContext?,
+    ) async -> SpeakSwiftly.RequestHandle {
+        let requestID = UUID().uuidString
+        let item = await recentGeneratedAudioStore.item(id: recentAudioID)
+        let request = WorkerRequest.replayRecentAudio(
+            id: requestID,
+            recentAudioID: recentAudioID,
+            text: item?.textPreview ?? "Recent generated audio replay",
+            profileName: item?.voiceProfileName ?? defaultVoiceProfileName,
+            requestContext: requestContext,
+        )
+        ensureRequestBroker(for: request)
+        let handle = makeRequestHandle(for: request)
+
+        guard let item else {
+            await failRecentGeneratedAudioReplay(
+                request,
+                code: .requestNotFound,
+                message: "Replay request '\(requestID)' could not find recent generated audio item '\(recentAudioID)'. The item may have been cleared or evicted from the recent cache.",
+            )
+            return handle
+        }
+        guard item.bufferState == .complete else {
+            await failRecentGeneratedAudioReplay(
+                request,
+                code: .invalidRequest,
+                message: "Replay request '\(requestID)' cannot play recent generated audio item '\(recentAudioID)' because the item is '\(item.bufferState.rawValue)', not 'complete'.",
+            )
+            return handle
+        }
+        guard mode != .interruptCurrent else {
+            await failRecentGeneratedAudioReplay(
+                request,
+                code: .invalidRequest,
+                message: "Replay request '\(requestID)' asked to interrupt current playback, but recent generated audio replay currently supports enqueueing after current playback only.",
+            )
+            return handle
+        }
+
+        let chunks = await recentGeneratedAudioStore.chunks(for: recentAudioID)
+        let playableChunks = chunks.filter { !$0.isFinal && !$0.samples.isEmpty }
+        guard let sampleRate = item.sampleRate ?? playableChunks.first?.sampleRate,
+              !playableChunks.isEmpty else {
+            await failRecentGeneratedAudioReplay(
+                request,
+                code: .invalidRequest,
+                message: "Replay request '\(requestID)' cannot play recent generated audio item '\(recentAudioID)' because no in-memory PCM chunks are available. Regenerate the speech or replay from a retained artifact once artifact-backed replay is enabled.",
+            )
+            return handle
+        }
+
+        let speechRequest = makeRecentGeneratedAudioReplayState(
+            request: request,
+            item: item,
+        )
+        await playbackQueue.enqueue(speechRequest, replayMode: mode)
+        if let playbackState = await playbackQueue.playbackState(for: requestID) {
+            playbackState.execution.sampleRate = Double(sampleRate)
+            let playbackFeedTask = Task {
+                do {
+                    for chunk in playableChunks {
+                        try Task.checkCancellation()
+                        playbackState.execution.continuation.yield(chunk.samples)
+                    }
+                    playbackState.execution.continuation.finish()
+                } catch {
+                    playbackState.execution.continuation.finish(throwing: error)
+                }
+            }
+            await playbackQueue.setGenerationTask(playbackFeedTask, for: requestID)
+        }
+
+        let acknowledgement = SpeakSwiftly.RequestAcknowledgement(
+            id: requestID,
+            kind: request.requestKind,
+            generationJob: nil,
+        )
+        await yieldRequestEvent(.acknowledged(acknowledgement), for: requestID)
+        await emit(WorkerSuccessResponse(id: requestID))
+        await logRequestEvent(
+            "recent_generated_audio_replay_queued",
+            requestID: requestID,
+            op: request.opName,
+            profileName: item.voiceProfileName,
+            details: [
+                "recent_audio_id": .string(recentAudioID),
+                "chunk_count": .int(playableChunks.count),
+                "mode": .string(mode.rawValue),
+            ],
+        )
+        await publishPlaybackUpdate(eventFromSnapshot: { snapshot in
+            .queueChanged(
+                activeRequest: snapshot.activeRequest,
+                queuedRequests: snapshot.queuedRequests,
+            )
+        })
+        await playbackQueue.startNextIfPossible()
+        return handle
+    }
+
     func clearRecentGeneratedAudio() async {
         await recentGeneratedAudioStore.clear()
+    }
+
+    private func makeRecentGeneratedAudioReplayState(
+        request: WorkerRequest,
+        item: SpeakSwiftly.RecentGeneratedAudioItem,
+    ) -> LiveSpeechRequestState {
+        let textFeatures = SpeakSwiftly.DeepTrace.features(
+            originalText: item.textPreview,
+            normalizedText: item.textPreview,
+        )
+        let textSections = SpeakSwiftly.DeepTrace.sections(originalText: item.textPreview)
+        let cadenceProfile = PlaybackConfiguration.residentStreamingCadenceProfile(
+            speechBackend: speechBackend,
+        )
+        return LiveSpeechRequestState(
+            request: request,
+            normalizedText: item.textPreview,
+            normalizedLiveChunks: nil,
+            textFeatures: textFeatures,
+            textSections: textSections,
+            playbackTuningProfile: .standard,
+            residentStreamingCadenceProfile: cadenceProfile,
+            residentStreamingInterval: PlaybackConfiguration.residentStreamingInterval(
+                for: speechBackend,
+                cadenceProfile: cadenceProfile,
+            ),
+        )
+    }
+
+    private func failRecentGeneratedAudioReplay(
+        _ request: WorkerRequest,
+        code: WorkerErrorCode,
+        message: String,
+    ) async {
+        let error = WorkerError(code: code, message: message)
+        await failRequestStream(for: request.id, error: error)
+        await emitFailure(id: request.id, error: error)
     }
 
     private func recentGeneratedAudioTextPreview(for text: String) -> String {

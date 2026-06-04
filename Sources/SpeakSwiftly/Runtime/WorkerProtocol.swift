@@ -17,6 +17,13 @@ enum WorkerRequest: Equatable {
         profileName: String,
         items: [SpeakSwiftly.GenerationJobItem],
     )
+    case replayRecentAudio(
+        id: String,
+        recentAudioID: String,
+        text: String,
+        profileName: String,
+        requestContext: SpeakSwiftly.RequestContext?,
+    )
     case generatedFile(id: String, artifactID: String)
     case generatedFiles(id: String)
     case generatedBatch(id: String, batchID: String)
@@ -84,6 +91,7 @@ enum WorkerRequest: Equatable {
         switch self {
             case .queueSpeech(id: let id, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
                  .queueBatch(id: let id, profileName: _, items: _),
+                 .replayRecentAudio(id: let id, recentAudioID: _, text: _, profileName: _, requestContext: _),
                  let .generatedFile(id, _),
                  let .generatedFiles(id),
                  let .generatedBatch(id, _),
@@ -141,6 +149,8 @@ enum WorkerRequest: Equatable {
                 "generate_audio_file"
             case .queueBatch:
                 "generate_batch"
+            case .replayRecentAudio:
+                "replay_recent_audio"
             case .generatedFile:
                 "get_generated_file"
             case .generatedFiles:
@@ -291,7 +301,7 @@ enum WorkerRequest: Equatable {
 
     var acknowledgesEnqueueImmediately: Bool {
         switch self {
-            case .queueSpeech, .queueBatch, .switchSpeechBackend, .reloadModels, .unloadModels:
+            case .queueSpeech, .queueBatch, .replayRecentAudio, .switchSpeechBackend, .reloadModels, .unloadModels:
                 true
             default:
                 false
@@ -374,6 +384,7 @@ enum WorkerRequest: Equatable {
     var voiceProfile: String? {
         switch self {
             case .queueSpeech(id: _, text: _, profileName: let profileName, textProfileID: _, jobType: _, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
+                 .replayRecentAudio(id: _, recentAudioID: _, text: _, profileName: let profileName, requestContext: _),
                  .queueBatch(id: _, profileName: let profileName, items: _),
                  let .createProfile(_, profileName, _, _, _, _, _, _, _),
                  let .createClone(_, profileName, _, _, _, _),
@@ -440,6 +451,7 @@ enum WorkerRequest: Equatable {
                  .expireGenerationJob,
                  .generationJob,
                  .generationJobs,
+                 .replayRecentAudio,
                  .createProfile,
                  .createClone,
                  .listProfiles,
@@ -486,6 +498,8 @@ enum WorkerRequest: Equatable {
     var requestContext: SpeakSwiftly.RequestContext? {
         switch self {
             case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: _, audioFormat: _, requestContext: let requestContext, qwenPreModelTextChunking: _):
+                requestContext
+            case .replayRecentAudio(id: _, recentAudioID: _, text: _, profileName: _, requestContext: let requestContext):
                 requestContext
             case .queueBatch:
                 nil
@@ -563,6 +577,14 @@ enum WorkerRequest: Equatable {
                     id: id,
                     profileName: profileName == Self.runtimeDefaultVoiceProfilePlaceholder ? defaultVoiceProfileName : profileName,
                     items: items,
+                )
+            case let .replayRecentAudio(id, recentAudioID, text, profileName, requestContext):
+                .replayRecentAudio(
+                    id: id,
+                    recentAudioID: recentAudioID,
+                    text: text,
+                    profileName: profileName == Self.runtimeDefaultVoiceProfilePlaceholder ? defaultVoiceProfileName : profileName,
+                    requestContext: requestContext,
                 )
             default:
                 self

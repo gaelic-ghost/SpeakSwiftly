@@ -37,6 +37,21 @@ import Testing
     #expect(await waitUntil { playback.stopCount == 1 })
 }
 
+@Test func `playback queue inserts replay ahead of waiting generated speech`() async {
+    let playbackQueue = PlaybackQueue(driver: AnyPlaybackDriver.silent())
+
+    await playbackQueue.enqueue(makePlaybackRequest(id: "req-normal-1"))
+    await playbackQueue.enqueue(makePlaybackRequest(id: "req-normal-2"))
+    await playbackQueue.enqueue(
+        makeReplayPlaybackRequest(id: "req-replay"),
+        replayMode: .enqueueNext,
+    )
+
+    let queued = await playbackQueue.queuedRequestSummaries()
+    #expect(queued.map(\.id) == ["req-replay", "req-normal-1", "req-normal-2"])
+    #expect(queued.first?.kind == .replayRecentAudio)
+}
+
 private func makePlaybackRequest(id: String) -> LiveSpeechRequestState {
     let text = "Playback queue restore guard test."
     return LiveSpeechRequestState(
@@ -49,6 +64,26 @@ private func makePlaybackRequest(id: String) -> LiveSpeechRequestState {
             audioFormat: nil,
             requestContext: nil,
             qwenPreModelTextChunking: nil,
+        ),
+        normalizedText: text,
+        normalizedLiveChunks: nil,
+        textFeatures: SpeakSwiftly.DeepTrace.features(originalText: text, normalizedText: text),
+        textSections: SpeakSwiftly.DeepTrace.sections(originalText: text),
+        playbackTuningProfile: .standard,
+        residentStreamingCadenceProfile: .standard,
+        residentStreamingInterval: 0.5,
+    )
+}
+
+private func makeReplayPlaybackRequest(id: String) -> LiveSpeechRequestState {
+    let text = "Playback queue replay test."
+    return LiveSpeechRequestState(
+        request: .replayRecentAudio(
+            id: id,
+            recentAudioID: "recent-audio-1",
+            text: text,
+            profileName: "testing-profile",
+            requestContext: nil,
         ),
         normalizedText: text,
         normalizedLiveChunks: nil,

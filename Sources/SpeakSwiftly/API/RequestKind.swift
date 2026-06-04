@@ -50,6 +50,7 @@ public extension SpeakSwiftly {
         public static let getPlaybackState = Self(rawValue: "get_playback_state")
         public static let playbackPause = Self(rawValue: "playback_pause")
         public static let playbackResume = Self(rawValue: "playback_resume")
+        public static let replayRecentAudio = Self(rawValue: "replay_recent_audio")
         public static let setSpeechBackend = Self(rawValue: "set_speech_backend")
         public static let reloadModels = Self(rawValue: "reload_models")
         public static let unloadModels = Self(rawValue: "unload_models")

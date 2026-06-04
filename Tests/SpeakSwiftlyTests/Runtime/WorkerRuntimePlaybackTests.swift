@@ -281,6 +281,32 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
     #expect(recentChunks.map(\.sequenceNumber) == [0, 1, 2])
     #expect(recentChunks.map(\.samples) == [[0.1, 0.2], [0.2, 0.3], []])
     #expect(recentChunks.map(\.isFinal) == [false, false, true])
+
+    let replay = await runtime.playback.replayRecent(id: recentItem.id)
+    #expect(replay.kind == .replayRecentAudio)
+    let completion = try await replay.completion()
+    #expect(completion == .empty)
+    #expect(playback.playCount == 2)
+}
+
+@Test func `replay recent generated audio fails clearly when item is missing`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    let replay = await runtime.playback.replayRecent(id: "missing-recent-audio")
+    await #expect(throws: WorkerError.self) {
+        try await replay.completion()
+    }
+    #expect(playback.playCount == 0)
 }
 
 @Test func `speak live background can fail after enqueue acknowledgement`() async throws {
