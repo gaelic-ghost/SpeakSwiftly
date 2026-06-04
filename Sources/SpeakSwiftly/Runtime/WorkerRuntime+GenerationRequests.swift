@@ -344,13 +344,28 @@ extension SpeakSwiftly.Runtime {
             ),
             streamingInterval: playbackState.request.residentStreamingInterval,
         )
+        let chunkStream = SpeakSwiftly.GeneratedAudioChunkStreams.chunks(
+            requestID: id,
+            sampleRate: residentModel.sampleRate,
+            samples: sampleStream,
+        )
+        let recentAudioID = await beginRecentGeneratedAudioCapture(
+            requestID: id,
+            text: playbackState.request.normalizedText,
+            voiceProfileName: profileName,
+        )
+
         do {
             switch outputDestination {
                 case .localPlayback:
-                    for try await samples in sampleStream {
+                    for try await chunk in chunkStream {
                         try Task.checkCancellation()
-                        playbackState.execution.continuation.yield(samples)
+                        await recordRecentGeneratedAudioChunk(chunk, recentAudioID: recentAudioID)
+                        if !chunk.isFinal {
+                            playbackState.execution.continuation.yield(chunk.samples)
+                        }
                     }
+                    await finishRecentGeneratedAudioCapture(recentAudioID: recentAudioID)
                     playbackState.execution.continuation.finish()
                 case .httpResponseStream,
                      .networkStream,
@@ -366,6 +381,7 @@ extension SpeakSwiftly.Runtime {
                         )
             }
         } catch {
+            await failRecentGeneratedAudioCapture(recentAudioID: recentAudioID, error: error)
             playbackState.execution.continuation.finish(throwing: error)
             if let workerError = error as? WorkerError {
                 throw workerError

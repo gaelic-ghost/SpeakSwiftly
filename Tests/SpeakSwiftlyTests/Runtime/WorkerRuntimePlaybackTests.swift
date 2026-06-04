@@ -219,6 +219,70 @@ private func makeStreamOnlyResidentModel() -> AnySpeechModel {
     } == 1)
 }
 
+@Test func `speak live playback records recent generated audio chunks`() async throws {
+    let output = OutputRecorder()
+    let playback = PlaybackSpy()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        residentModelLoader: { _ in makeResidentModel(chunkCount: 2) },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let requestID = await runtime.generate
+        .speech(
+            text: "Replay this live speech later.",
+            voiceProfile: "default-femme",
+        )
+        .id
+
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == requestID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "playback_finished"
+        }
+    })
+    #expect(playback.playCount == 1)
+
+    let recentSnapshot = await runtime.playback.recentGeneratedAudio()
+    let recentItem = try #require(recentSnapshot.items.first)
+    #expect(recentSnapshot.items.count == 1)
+    #expect(recentItem.requestID == requestID)
+    #expect(recentItem.textPreview == "Replay this live speech later.")
+    #expect(recentItem.voiceProfileName == "default-femme")
+    #expect(recentItem.bufferState == .complete)
+    #expect(recentItem.sampleRate == 24000)
+    #expect(recentItem.channelCount == 1)
+    #expect(recentItem.bufferedChunkCount == 3)
+
+    let recentChunks = await runtime.playback.recentGeneratedAudioChunks(for: recentItem.id)
+    #expect(recentChunks.map(\.sequenceNumber) == [0, 1, 2])
+    #expect(recentChunks.map(\.samples) == [[0.1, 0.2], [0.2, 0.3], []])
+    #expect(recentChunks.map(\.isFinal) == [false, false, true])
+}
+
 @Test func `speak live background can fail after enqueue acknowledgement`() async throws {
     let output = OutputRecorder()
     let storeRoot = makeTempDirectoryURL()
