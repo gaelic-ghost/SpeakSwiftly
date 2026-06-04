@@ -184,7 +184,8 @@ extension SpeakSwiftly.Runtime {
     ) async -> [SpeakSwiftly.RequestHandle] {
         let snapshot = await recentGeneratedAudioStore.snapshot()
         let completeItems = snapshot.items.filter { $0.bufferState == .complete }
-        let replayItems = mode == .enqueueNext ? Array(completeItems.reversed()) : completeItems
+        let insertsAheadOfExistingQueue = mode == .enqueueNext || mode == .enqueueAfterCurrent
+        let replayItems = insertsAheadOfExistingQueue ? Array(completeItems.reversed()) : completeItems
 
         var handles = [SpeakSwiftly.RequestHandle]()
         handles.reserveCapacity(completeItems.count)
@@ -197,7 +198,7 @@ extension SpeakSwiftly.Runtime {
             handles.append(handle)
         }
 
-        if mode == .enqueueNext {
+        if insertsAheadOfExistingQueue {
             handles.reverse()
         }
         return handles

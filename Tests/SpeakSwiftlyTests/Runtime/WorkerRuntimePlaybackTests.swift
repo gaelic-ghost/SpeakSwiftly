@@ -427,6 +427,84 @@ private func seedRecentGeneratedAudio(
     await playbackGate.open()
 }
 
+@Test func `replay recent all enqueue after current preserves snapshot order ahead of waiting speech`() async throws {
+    let output = OutputRecorder()
+    let playbackGate = AsyncGate()
+    let playback = PlaybackSpy(behavior: .gate(playbackGate))
+    let recentStore = SpeakSwiftly.RecentGeneratedAudioStore(limit: 5)
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-oldest",
+        requestID: "recent-request-1",
+        text: "Oldest replay.",
+    )
+    try await seedRecentGeneratedAudio(
+        in: recentStore,
+        id: "recent-newest",
+        requestID: "recent-request-2",
+        text: "Newest replay.",
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: playback,
+        recentGeneratedAudioStore: recentStore,
+        residentModelLoader: { _ in makeResidentModel() },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let activeID = await runtime.generate
+        .speech(text: "Hold active playback open.", voiceProfile: "default-femme")
+        .id
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["id"] as? String == activeID
+                && $0["event"] as? String == "progress"
+                && $0["stage"] as? String == "preroll_ready"
+        }
+    })
+
+    let waitingID = await runtime.generate
+        .speech(text: "This generated request should wait behind replays.", voiceProfile: "default-femme")
+        .id
+
+    let completeRecentIDs = await runtime.playback
+        .recentGeneratedAudio()
+        .items
+        .filter { $0.bufferState == .complete }
+        .map(\.id)
+    let handles = await runtime.playback.replayRecentAll(mode: .enqueueAfterCurrent)
+    #expect(handles.count == completeRecentIDs.count)
+
+    let snapshot = await runtime.playback.snapshot()
+    let queuedIDs = snapshot.queuedRequests.map(\.id)
+    #expect(Array(queuedIDs.prefix(handles.count)) == handles.map(\.id))
+    #expect(queuedIDs.dropFirst(handles.count).first == waitingID)
+
+    await playbackGate.open()
+}
+
 @Test func `recent generated audio disabled by configuration leaves snapshot empty and direct replay fails`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
