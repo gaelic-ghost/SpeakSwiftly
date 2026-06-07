@@ -73,6 +73,13 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 - Do not change this repository's core architecture casually or silently. If the design starts needing a new queue, subsystem, storage model, or ownership boundary, stop and make that pivot explicit to Gale before implementing it, or as soon as the need becomes clear.
 - When future scope is already visible and the current model will not compose cleanly, prefer strengthening the core primitives on purpose over shipping narrow stopgaps that will soon block momentum.
 
+### Workflow Sync
+
+- Use `bootstrap-swift-package` only when a new Swift package repository still needs to be created from scratch.
+- Use `sync-swift-package-guidance` when this repository's package workflow guidance drifts and needs to be refreshed or merged forward.
+- Re-run `sync-swift-package-guidance` after substantial package-workflow or Apple Dev Skills plugin updates so the local guidance and repo-maintenance contract stay aligned.
+- Keep the repo-owned Codex local environment in `.codex/environments/swift-package.toml` portable and repo-relative so shared setup and action buttons work the same way across worktrees.
+
 ## Commands
 
 ### Setup
