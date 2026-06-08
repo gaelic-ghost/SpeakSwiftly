@@ -1,0 +1,21 @@
+# Copied from the Apple Dev Skills Swift package environment template and kept repo-relative for this package repo.
+version = 1
+name = "swift-package"
+
+[setup]
+script = "swift package resolve"
+
+[[actions]]
+name = "resolve"
+icon = "tool"
+command = "swift package resolve"
+
+[[actions]]
+name = "build"
+icon = "tool"
+command = "swift build"
+
+[[actions]]
+name = "test"
+icon = "tool"
+command = "swift test"

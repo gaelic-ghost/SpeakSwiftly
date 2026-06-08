@@ -79,9 +79,8 @@ Agent-facing maintainer guidance lives in [AGENTS.md](./AGENTS.md).
 ## Release Notes
 
 Use GitHub releases and repository tags for the authoritative release history.
-The active local release notes live in
-[docs/releases/v10-0-1-release-notes.md](./docs/releases/v10-0-1-release-notes.md),
-and older local release notes are consolidated in
+Checked-in release-note snapshots and older release context live under
+[docs/releases/](./docs/releases/), including
 [docs/releases/release-history.md](./docs/releases/release-history.md).
 
 ## License

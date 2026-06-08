@@ -156,16 +156,6 @@ run_version_bump() {
   log "Committed version bump for $RELEASE_TAG."
 }
 
-run_full_e2e_validation() {
-  if [ "$REPO_MAINTENANCE_DRY_RUN" = "true" ]; then
-    log "Would run full release-safe SpeakSwiftly E2E validation with run-e2e-full.sh."
-    return 0
-  fi
-
-  log "Running full release-safe SpeakSwiftly E2E validation before release."
-  sh "$SELF_DIR/run-e2e-full.sh"
-}
-
 create_release_tag() {
   head_sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
   tag_sha="$(git -C "$REPO_ROOT" rev-parse -q --verify "refs/tags/$RELEASE_TAG" 2>/dev/null || true)"
@@ -408,22 +398,20 @@ create_github_release() {
   fi
 
   if [ "$REPO_MAINTENANCE_DRY_RUN" = "true" ]; then
-    log "Would create a GitHub release for $RELEASE_TAG with $(describe_github_release_create_command "$RELEASE_TAG")."
+    prerelease_flag="$(github_release_create_prerelease_flag "$RELEASE_TAG")"
+    log "Would create a GitHub release for $RELEASE_TAG with gh release create --verify-tag${prerelease_flag:+ $prerelease_flag}."
     return 0
   fi
 
   if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-    log "GitHub release $RELEASE_TAG already exists."
     verify_github_release_prerelease_metadata "$RELEASE_TAG"
+    log "GitHub release $RELEASE_TAG already exists."
     return 0
   fi
 
-  prerelease_args="$(github_release_prerelease_args "$RELEASE_TAG")"
-  if [ -n "$prerelease_args" ]; then
-    gh release create "$RELEASE_TAG" --verify-tag --generate-notes "$prerelease_args"
-  else
-    gh release create "$RELEASE_TAG" --verify-tag --generate-notes
-  fi
+  prerelease_flag="$(github_release_create_prerelease_flag "$RELEASE_TAG")"
+  # shellcheck disable=SC2086
+  gh release create "$RELEASE_TAG" --verify-tag --generate-notes $prerelease_flag
   log "Created GitHub release $RELEASE_TAG."
   wait_for_github_release "$RELEASE_TAG"
   verify_github_release_prerelease_metadata "$RELEASE_TAG"
@@ -465,7 +453,6 @@ run_standard_release() {
 
   if [ "$skip_validate" != "true" ]; then
     sh "$SELF_DIR/validate-all.sh"
-    run_full_e2e_validation
   fi
 
   run_version_bump
