@@ -27,7 +27,7 @@ reason to jump straight to `xcodebuild`.
 
 ## Historical SwiftPM Snag
 
-The current `mlx-audio-swift` `0.100.0` fork release preserves the ordinary
+The current `mlx-audio-swift` `0.79.0` fork release preserves the ordinary
 SwiftPM lane for this repository. The notes below are retained because earlier
 pins could fail under plain SwiftPM with parser errors in `EnglishG2P.swift`,
 and we may need the same fallback again if a future toolchain regression
@@ -51,6 +51,7 @@ Use this fallback for:
 
 - release hardening
 - standalone-worker validation
+- Marvis overlap investigation
 - any validation pass blocked by the SwiftPM parser failure
 
 Build once:
@@ -80,20 +81,47 @@ For GitHub Actions, keep the manifest sanity check as:
 swift package dump-package
 ```
 
-GitHub Actions keeps the default Swift workflow intentionally light because
-ordinary changes run the thorough `swift build`, `swift test`, and
-repo-maintenance checks locally before commit. The remote Swift package smoke
-lane is:
+GitHub Actions currently keeps build-and-test coverage on the Xcode-backed
+package lane even though local ordinary package work starts with SwiftPM. The
+current macOS CI target set is:
+
+- `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
+- `SpeakSwiftlyTests/LibrarySurfaceTests`
+- `SpeakSwiftlyTests/ModelClientsTests`
+
+## iOS Compile-And-Smoke Lane
+
+The iOS lane is intentionally smaller than the macOS package lane. Its job is
+to prove that:
+
+- the package resolves for iOS
+- the shared library and playback-environment code compile for iOS Simulator
+- a small library-first smoke slice still runs under Simulator
+
+Build once:
 
 ```bash
-swift package dump-package
-swift build
+xcodebuild build-for-testing -quiet \
+  -scheme SpeakSwiftly-Package \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -derivedDataPath .local/derived-data/ios-smoke \
+  -clonedSourcePackagesDirPath .local/source-packages
 ```
 
-The separate `validate` workflow remains the remote repo-maintenance check for
-formatting, linting, toolkit shape, and resource layout. Use the Xcode-backed
-fallback lane locally, in release hardening, or in manually triggered
-investigations when SwiftPM stops being the best signal.
+Then run the current smoke slice:
+
+```bash
+xcodebuild test-without-building -quiet \
+  -xctestrun "$(find .local/derived-data/ios-smoke/Build/Products -name '*.xctestrun' -maxdepth 1 | head -n 1)" \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -only-testing:'SpeakSwiftlyTests/LibrarySurfaceTests' \
+  -only-testing:'SpeakSwiftlyTests/SupportResourcesTests' \
+  -only-testing:'SpeakSwiftlyTests/ProfileStoreTests'
+```
+
+Keep this lane library-first. The worker-driven e2e harness is macOS-only and
+should stay out of the iOS simulator smoke path unless we deliberately create an
+app-hosted iOS e2e story later.
 
 ## E2E and Real-Model Notes
 
@@ -179,19 +207,26 @@ xcodebuild test-without-building -quiet \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QueueControlE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QwenE2ETests'
 ```
 
 That lane excludes the opt-in `DeepTraceE2ETests` and `QwenBenchmarkE2ETests`
 families unless you deliberately inject their extra environment flags too.
 
-The package also has an opt-in Qwen benchmark suite behind:
+For the broader backend-comparison benchmark design that should eventually
+replace the Qwen-only benchmark as the main package benchmark lane, see:
+
+- [backend-benchmarking-plan-2026-04-20.md](backend-benchmarking-plan-2026-04-20.md)
+
+The package now also has an opt-in backend-wide benchmark suite behind:
 
 - `SPEAKSWIFTLY_E2E=1`
-- `SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1`
-- optional `SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS=<n>`
-- optional `SPEAKSWIFTLY_AUDIBLE_E2E=1`
+- `SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1`
+- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=<n>`
+- optional `SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1`
 
 Prefer the repo-maintenance wrapper instead of exporting those by hand:
 
@@ -199,21 +234,73 @@ Prefer the repo-maintenance wrapper instead of exporting those by hand:
 sh scripts/repo-maintenance/run-benchmark.sh
 sh scripts/repo-maintenance/run-benchmark.sh --audible --iterations 3
 sh scripts/repo-maintenance/run-benchmark.sh --qwen --iterations 5
+sh scripts/repo-maintenance/run-benchmark.sh --qwen-quantization --iterations 3
 ```
 
-For repeatable local Instruments captures, wrap one benchmark run with one
-template at a time:
+Use the Qwen quantization lane when the question is specifically about the
+0.6B 6-bit build versus the 0.6B 8-bit build. That lane writes
+`qwen-0-6b-quantization-benchmark-latest.json` under `.local/benchmarks` and
+keeps the workload to the same two queued live requests used by the backend
+benchmark suite.
+
+The benchmark harness also emits `OSSignposter` timeline markers under the
+`com.gaelic-ghost.SpeakSwiftly.benchmarks` subsystem. Use those markers when
+capturing the benchmark in Instruments. Categories follow
+`benchmark.<backend>.<playback-mode>`, such as
+`benchmark.qwen3_smol_6bit.silent`.
+
+Important signpost intervals:
+
+- `Benchmark Sample`
+- `Resident Preload`
+- `Benchmark Request`
+
+Important signpost events:
+
+- `Request Queued`
+- `Request Acknowledged`
+- `Request Started`
+- `First Token`
+- `Generation Info`
+- `First Audio Chunk`
+- `Buffering Audio`
+- `Preroll Ready`
+- `Playback Finished`
+- `Request Completed`
+
+For the Qwen 0.6B quantization deep dive, capture one Instruments template at a
+time. Start with Time Profiler for CPU hot spots, then Metal System Trace for
+GPU scheduling and unified-memory pressure, then Allocations or VM Tracker when
+memory growth is the question. Line the Instruments timeline up against the
+retained `.local/benchmarks` JSON by matching the same milestone names.
+
+Prefer the repo-maintenance wrapper for repeatable local trace captures:
 
 ```bash
-sh scripts/repo-maintenance/run-benchmark-trace.sh --backend qwen3_smol_8bit --iterations 1
-sh scripts/repo-maintenance/run-benchmark-trace.sh --metal-system-trace --backend qwen3_smol_8bit --iterations 1
-sh scripts/repo-maintenance/run-benchmark-trace.sh --allocations --backend qwen3_smol_8bit --iterations 1
-sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --backend qwen3_smol_8bit --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --metal-system-trace --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --allocations --iterations 1
+sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --iterations 1
 ```
 
-The trace wrapper stores `.trace` files under `.local/traces` and leaves
-benchmark JSON summaries under `.local/benchmarks`. Do not run more than one
-trace template at the same time.
+The trace wrapper stores `.trace` files under `.local/traces/qwen-quantization`
+and leaves benchmark JSON summaries under `.local/benchmarks`. Do not run more
+than one trace template at the same time.
+
+For the Marvis-specific resident-policy comparison lane, run the benchmark test
+directly so the filter stays narrow:
+
+```bash
+SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=1 swift test --filter 'BackendBenchmarkE2ETests/compare marvis resident policies with three queued voice switches'
+```
+
+That lane compares `dual_resident_serialized` against
+`single_resident_dynamic` with a three-request voice order that goes
+`femme` -> `masc` -> `femme` again.
+
+For Marvis profiling, throughput investigation, and trace work, prefer the dedicated runbook:
+
+- [marvis-overlap-profiling-runbook-2026-04-16.md](marvis-overlap-profiling-runbook-2026-04-16.md)
 
 ## Practical Rules
 

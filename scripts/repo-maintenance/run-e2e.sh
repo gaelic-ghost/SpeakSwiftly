@@ -14,9 +14,6 @@ playback_trace="false"
 deep_trace="false"
 benchmark="false"
 benchmark_iterations=""
-qwen_quant_benchmark="false"
-qwen_quant_benchmark_backends=""
-qwen_quant_benchmark_device_label=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -40,20 +37,8 @@ while [ "$#" -gt 0 ]; do
       benchmark="true"
       shift
       ;;
-    --qwen-quant-benchmark)
-      qwen_quant_benchmark="true"
-      shift
-      ;;
     --benchmark-iterations)
       benchmark_iterations="${2:-}"
-      shift 2
-      ;;
-    --qwen-quant-backends)
-      qwen_quant_benchmark_backends="${2:-}"
-      shift 2
-      ;;
-    --device-label)
-      qwen_quant_benchmark_device_label="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -65,6 +50,8 @@ Suite names:
   quick | GeneratedFileE2ETests
   generated-file | GeneratedFileE2ETests
   generated-batch | GeneratedBatchE2ETests
+  chatterbox | ChatterboxE2ETests
+  marvis | MarvisE2ETests
   qwen | QwenE2ETests
   qwen-backends | QwenE2ETests with backend-variant coverage enabled
   queue-control | QueueControlE2ETests
@@ -72,17 +59,15 @@ Suite names:
   trace | TraceCaptureE2ETests
   deep-trace | DeepTraceE2ETests
   qwen-benchmark | QwenBenchmarkE2ETests
-  qwen-quant-benchmark | QwenQuantizationBenchmarkE2ETests
+  backend-benchmark | BackendBenchmarkE2ETests
+  qwen-quantization-benchmark | BackendBenchmarkE2ETests narrow 0.6B 6-bit versus 8-bit comparison
 
 Flags:
   --audible
   --playback-trace
   --deep-trace
   --benchmark
-  --qwen-quant-benchmark
   --benchmark-iterations <count>
-  --qwen-quant-backends <comma-separated-backends>
-  --device-label <label>
 USAGE
       exit 0
       ;;
@@ -99,13 +84,15 @@ resolve_suite_name() {
     quick|QuickE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-file|GeneratedFileE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-batch|GeneratedBatchE2ETests) printf '%s\n' "GeneratedBatchE2ETests" ;;
+    chatterbox|ChatterboxE2ETests) printf '%s\n' "ChatterboxE2ETests" ;;
+    marvis|MarvisE2ETests) printf '%s\n' "MarvisE2ETests" ;;
     qwen|qwen-backends|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
     queue-control|QueueControlE2ETests) printf '%s\n' "QueueControlE2ETests" ;;
     qwen-longform|QwenLongFormE2ETests) printf '%s\n' "QwenLongFormE2ETests" ;;
     trace|TraceCaptureE2ETests) printf '%s\n' "TraceCaptureE2ETests" ;;
     deep-trace|DeepTraceE2ETests) printf '%s\n' "DeepTraceE2ETests" ;;
     qwen-benchmark|QwenBenchmarkE2ETests) printf '%s\n' "QwenBenchmarkE2ETests" ;;
-    qwen-quant-benchmark|QwenQuantizationBenchmarkE2ETests) printf '%s\n' "QwenQuantizationBenchmarkE2ETests" ;;
+    backend-benchmark|qwen-quantization-benchmark|BackendBenchmarkE2ETests) printf '%s\n' "BackendBenchmarkE2ETests" ;;
     *)
       return 1
       ;;
@@ -116,7 +103,7 @@ suite_name=$(resolve_suite_name "$suite_arg") \
   || die "Unsupported E2E suite '$suite_arg'. Use --help to see the supported top-level suite names."
 
 case "$suite_name" in
-  GeneratedFileE2ETests|GeneratedBatchE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|QwenQuantizationBenchmarkE2ETests)
+  GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
     ;;
   *)
     die "Refusing to run '$suite_name' because only one top-level E2E suite may run per invocation."
@@ -145,10 +132,6 @@ if [ "$benchmark" = "true" ] || [ "$suite_name" = "QwenBenchmarkE2ETests" ]; the
   export SPEAKSWIFTLY_QWEN_BENCHMARK_E2E=1
 fi
 
-if [ "$qwen_quant_benchmark" = "true" ] || [ "$suite_name" = "QwenQuantizationBenchmarkE2ETests" ]; then
-  export SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_E2E=1
-fi
-
 if [ "$suite_name" = "QwenLongFormE2ETests" ]; then
   export SPEAKSWIFTLY_QWEN_LONGFORM_E2E=1
 fi
@@ -159,14 +142,19 @@ fi
 
 if [ -n "$benchmark_iterations" ]; then
   export SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS="$benchmark_iterations"
+  export SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS="$benchmark_iterations"
 fi
 
-if [ -n "$qwen_quant_benchmark_backends" ]; then
-  export SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_BACKENDS="$qwen_quant_benchmark_backends"
+if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$suite_arg" != "qwen-quantization-benchmark" ]; then
+  export SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1
 fi
 
-if [ -n "$qwen_quant_benchmark_device_label" ]; then
-  export SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_DEVICE_LABEL="$qwen_quant_benchmark_device_label"
+if [ "$suite_arg" = "qwen-quantization-benchmark" ]; then
+  export SPEAKSWIFTLY_QWEN_QUANTIZATION_BENCHMARK_E2E=1
+fi
+
+if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$audible" = "true" ]; then
+  export SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE=1
 fi
 
 restore_status=0

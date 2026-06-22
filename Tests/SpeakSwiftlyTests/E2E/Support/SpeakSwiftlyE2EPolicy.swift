@@ -19,11 +19,9 @@ func speakSwiftlyDeepTraceE2ETestsEnabled() -> Bool {
 }
 
 func speakSwiftlyQwenBenchmarkE2ETestsEnabled() -> Bool {
-    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
-}
-
-func speakSwiftlyQwenQuantBenchmarkE2ETestsEnabled() -> Bool {
-    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_E2E"] == "1"
+    let environment = ProcessInfo.processInfo.environment
+    return environment["SPEAKSWIFTLY_QWEN_BENCHMARK_E2E"] == "1"
+        || environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E"] == "1"
 }
 
 func speakSwiftlyQwenLongFormE2ETestsEnabled() -> Bool {
@@ -36,7 +34,29 @@ func speakSwiftlyQwenBackendE2ETestsEnabled() -> Bool {
 
 func speakSwiftlyQwenBenchmarkIterations() -> Int {
     let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_BENCHMARK_ITERATIONS"] ?? ""
-    return max(1, Int(rawValue) ?? 1)
+    if let parsed = Int(rawValue) {
+        return max(1, parsed)
+    }
+
+    return speakSwiftlyBackendBenchmarkIterations()
+}
+
+func speakSwiftlyBackendBenchmarkE2ETestsEnabled() -> Bool {
+    speakSwiftlyBackendBenchmarkComparisonEnabled()
+        || speakSwiftlyQwenQuantizationBenchmarkE2ETestsEnabled()
+}
+
+func speakSwiftlyBackendBenchmarkComparisonEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E"] == "1"
+}
+
+func speakSwiftlyQwenQuantizationBenchmarkE2ETestsEnabled() -> Bool {
+    ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANTIZATION_BENCHMARK_E2E"] == "1"
+}
+
+func speakSwiftlyQwenQuantBenchmarkE2ETestsEnabled() -> Bool {
+    speakSwiftlyQwenQuantizationBenchmarkE2ETestsEnabled()
+        || ProcessInfo.processInfo.environment["SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_E2E"] == "1"
 }
 
 func speakSwiftlyQwenQuantBenchmarkBackends() -> [SpeakSwiftly.SpeechBackend] {
@@ -76,4 +96,14 @@ func speakSwiftlyQwenQuantBenchmarkDeviceLabel() -> String? {
     return label.isEmpty ? nil : label
 }
 
+func speakSwiftlyBackendBenchmarkIterations() -> Int {
+    let rawValue = ProcessInfo.processInfo.environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS"] ?? ""
+    return max(1, Int(rawValue) ?? 1)
+}
+
+func speakSwiftlyBackendBenchmarkAudibleEnabled() -> Bool {
+    let environment = ProcessInfo.processInfo.environment
+    return environment["SPEAKSWIFTLY_BACKEND_BENCHMARK_AUDIBLE"] == "1"
+        || environment["SPEAKSWIFTLY_AUDIBLE_E2E"] == "1"
+}
 #endif

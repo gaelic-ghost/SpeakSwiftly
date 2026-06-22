@@ -1,11 +1,13 @@
 #if os(macOS)
 import Foundation
+@preconcurrency import MLX
 import os
 @testable import SpeakSwiftly
 
 struct BenchmarkRuntimeSession {
     let runtime: SpeakSwiftly.Runtime
     let logRecorder: BenchmarkLogRecorder
+    let signposts: BenchmarkSignpostRecorder
 }
 
 enum BenchmarkPlaybackMode: String, Codable {
@@ -40,22 +42,6 @@ struct BenchmarkHost: Codable {
             }
         }
     }
-}
-
-struct BenchmarkResourceSnapshot: Codable {
-    let processResidentBytes: Int?
-    let processPhysFootprintBytes: Int?
-    let processCPUTimeMS: Double?
-    let mlxActiveMemoryBytes: Int?
-    let mlxCacheMemoryBytes: Int?
-    let mlxPeakMemoryBytes: Int?
-}
-
-struct BenchmarkWarningSummary: Codable {
-    let warningCount: Int
-    let playbackWarningCount: Int
-    let generationQualityWarningCount: Int
-    let reasons: [String: Int]
 }
 
 struct BenchmarkMetricSummary: Codable {
@@ -117,6 +103,7 @@ struct BenchmarkRequest: Codable {
     let generatedArtifactID: String?
     let lifecycle: BenchmarkRequestLifecycleMetrics
     let generation: BenchmarkRequestGenerationMetrics
+    let resources: BenchmarkRequestResourceMetrics
     let playback: BenchmarkPlaybackMetrics?
 }
 
@@ -124,6 +111,7 @@ struct BenchmarkRequestAggregate: Codable {
     let sampleCount: Int
     let lifecycle: BenchmarkLifecycleMetricAggregate
     let generation: BenchmarkGenerationMetricAggregate
+    let resources: BenchmarkResourceMetricAggregate
     let playback: BenchmarkPlaybackMetricAggregate
 
     static func make(from samples: [BenchmarkRequest]) -> Self {
@@ -131,6 +119,7 @@ struct BenchmarkRequestAggregate: Codable {
             sampleCount: samples.count,
             lifecycle: .make(from: samples.map(\.lifecycle)),
             generation: .make(from: samples.map(\.generation)),
+            resources: .make(from: samples.map(\.resources)),
             playback: .make(from: samples.compactMap(\.playback)),
         )
     }
@@ -184,6 +173,93 @@ struct BenchmarkGenerationMetricAggregate: Codable {
             generateTimeMS: .make(from: samples.compactMap(\.generateTimeMS)),
             tokensPerSecond: .make(from: samples.compactMap(\.tokensPerSecond)),
             peakMemoryUsageGB: .make(from: samples.compactMap(\.peakMemoryUsageGB)),
+        )
+    }
+}
+
+struct BenchmarkResourceSnapshot: Codable {
+    let label: String
+    let elapsedMS: Double
+    let processResidentBytes: Int?
+    let processPhysFootprintBytes: Int?
+    let processUserCPUTimeNS: Int?
+    let processSystemCPUTimeNS: Int?
+    let mlxActiveMemoryBytes: Int?
+    let mlxCacheMemoryBytes: Int?
+    let mlxPeakMemoryBytes: Int?
+    let mlxCacheLimitBytes: Int?
+    let mlxMemoryLimitBytes: Int?
+
+    var processCPUTimeNS: Int? {
+        guard
+            let processUserCPUTimeNS,
+            let processSystemCPUTimeNS
+        else {
+            return nil
+        }
+
+        return processUserCPUTimeNS + processSystemCPUTimeNS
+    }
+}
+
+struct BenchmarkWarningSummary: Codable {
+    let warningCount: Int
+    let playbackWarningCount: Int
+    let generationQualityWarningCount: Int
+    let reasons: [String: Int]
+}
+
+struct BenchmarkRequestResourceMetrics: Codable {
+    let snapshots: [BenchmarkResourceSnapshot]
+    let processCPUTimeDeltaMS: Double?
+    let maxProcessResidentBytes: Int?
+    let maxProcessPhysFootprintBytes: Int?
+    let maxMLXActiveMemoryBytes: Int?
+    let maxMLXCacheMemoryBytes: Int?
+    let maxMLXPeakMemoryBytes: Int?
+
+    static func make(from snapshots: [BenchmarkResourceSnapshot]) -> Self {
+        let sortedSnapshots = snapshots.sorted { $0.elapsedMS < $1.elapsedMS }
+        return Self(
+            snapshots: sortedSnapshots,
+            processCPUTimeDeltaMS: cpuTimeDeltaMS(from: sortedSnapshots),
+            maxProcessResidentBytes: sortedSnapshots.compactMap(\.processResidentBytes).max(),
+            maxProcessPhysFootprintBytes: sortedSnapshots.compactMap(\.processPhysFootprintBytes).max(),
+            maxMLXActiveMemoryBytes: sortedSnapshots.compactMap(\.mlxActiveMemoryBytes).max(),
+            maxMLXCacheMemoryBytes: sortedSnapshots.compactMap(\.mlxCacheMemoryBytes).max(),
+            maxMLXPeakMemoryBytes: sortedSnapshots.compactMap(\.mlxPeakMemoryBytes).max(),
+        )
+    }
+
+    private static func cpuTimeDeltaMS(from snapshots: [BenchmarkResourceSnapshot]) -> Double? {
+        guard
+            let first = snapshots.compactMap(\.processCPUTimeNS).first,
+            let last = snapshots.compactMap(\.processCPUTimeNS).last,
+            last >= first
+        else {
+            return nil
+        }
+
+        return Double(last - first) / 1_000_000
+    }
+}
+
+struct BenchmarkResourceMetricAggregate: Codable {
+    let processCPUTimeDeltaMS: BenchmarkMetricSummary
+    let maxProcessResidentBytes: BenchmarkMetricSummary
+    let maxProcessPhysFootprintBytes: BenchmarkMetricSummary
+    let maxMLXActiveMemoryBytes: BenchmarkMetricSummary
+    let maxMLXCacheMemoryBytes: BenchmarkMetricSummary
+    let maxMLXPeakMemoryBytes: BenchmarkMetricSummary
+
+    static func make(from samples: [BenchmarkRequestResourceMetrics]) -> Self {
+        Self(
+            processCPUTimeDeltaMS: .make(from: samples.compactMap(\.processCPUTimeDeltaMS)),
+            maxProcessResidentBytes: .make(from: samples.compactMap { $0.maxProcessResidentBytes.map(Double.init) }),
+            maxProcessPhysFootprintBytes: .make(from: samples.compactMap { $0.maxProcessPhysFootprintBytes.map(Double.init) }),
+            maxMLXActiveMemoryBytes: .make(from: samples.compactMap { $0.maxMLXActiveMemoryBytes.map(Double.init) }),
+            maxMLXCacheMemoryBytes: .make(from: samples.compactMap { $0.maxMLXCacheMemoryBytes.map(Double.init) }),
+            maxMLXPeakMemoryBytes: .make(from: samples.compactMap { $0.maxMLXPeakMemoryBytes.map(Double.init) }),
         )
     }
 }
@@ -433,12 +509,17 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
             }
 
             return BenchmarkResourceSnapshot(
+                label: "peak",
+                elapsedMS: 0,
                 processResidentBytes: processResidentBytes,
                 processPhysFootprintBytes: processPhysFootprintBytes,
-                processCPUTimeMS: processCPUTimeNS.map { Double($0) / 1_000_000 },
+                processUserCPUTimeNS: nil,
+                processSystemCPUTimeNS: processCPUTimeNS,
                 mlxActiveMemoryBytes: mlxActiveMemoryBytes,
                 mlxCacheMemoryBytes: mlxCacheMemoryBytes,
                 mlxPeakMemoryBytes: mlxPeakMemoryBytes,
+                mlxCacheLimitBytes: nil,
+                mlxMemoryLimitBytes: nil,
             )
         }
     }
@@ -446,7 +527,7 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
 
 enum BenchmarkHarness {
     static func effectivePlaybackMode() -> BenchmarkPlaybackMode {
-        speakSwiftlyAudibleE2ETestsEnabled() ? .audible : .silent
+        speakSwiftlyBackendBenchmarkAudibleEnabled() ? .audible : .silent
     }
 
     static func withBenchmarkRuntime<T>(
@@ -487,6 +568,10 @@ enum BenchmarkHarness {
 
         let liveDependencies = WorkerDependencies.live()
         let logRecorder = BenchmarkLogRecorder()
+        let signposts = BenchmarkSignpostRecorder(
+            backend: backend,
+            playbackMode: playbackMode,
+        )
         let dependencies = WorkerDependencies(
             fileManager: liveDependencies.fileManager,
             loadResidentModels: liveDependencies.loadResidentModels,
@@ -543,13 +628,22 @@ enum BenchmarkHarness {
             playbackQueue: playbackQueue,
         )
         await runtime.installPlaybackHooks()
-        return BenchmarkRuntimeSession(runtime: runtime, logRecorder: logRecorder)
+        return BenchmarkRuntimeSession(
+            runtime: runtime,
+            logRecorder: logRecorder,
+            signposts: signposts,
+        )
     }
 
-    static func awaitResidentReady(on runtime: SpeakSwiftly.Runtime) async throws -> Double {
+    static func awaitResidentReady(
+        on runtime: SpeakSwiftly.Runtime,
+        signposts: BenchmarkSignpostRecorder,
+    ) async throws -> Double {
         let clock = ContinuousClock()
         let startedAt = clock.now
         let updates = await runtime.updates()
+        let interval = signposts.beginResidentPreload()
+        defer { interval.end() }
 
         await runtime.start()
 
@@ -567,6 +661,18 @@ enum BenchmarkHarness {
         throw BenchmarkError("SpeakSwiftly benchmark runtime stopped emitting status updates before reporting resident_model_ready.")
     }
 
+    static func awaitResidentReady(
+        on runtime: SpeakSwiftly.Runtime,
+    ) async throws -> Double {
+        try await awaitResidentReady(
+            on: runtime,
+            signposts: BenchmarkSignpostRecorder(
+                backend: .qwen3_smol,
+                playbackMode: effectivePlaybackMode(),
+            ),
+        )
+    }
+
     static func awaitSuccess(
         from handle: SpeakSwiftly.RequestHandle,
     ) async throws -> SpeakSwiftly.RequestCompletion {
@@ -575,36 +681,44 @@ enum BenchmarkHarness {
 
     static func runRequestBenchmark(
         handle: SpeakSwiftly.RequestHandle,
+        signposts: BenchmarkSignpostRecorder,
         logRecorder: BenchmarkLogRecorder? = nil,
-        signposts: BenchmarkSignpostRecorder? = nil,
     ) async throws -> BenchmarkRequest {
         let clock = ContinuousClock()
         let submittedAt = clock.now
-        let signpostInterval = signposts?.beginRequest()
+        let requestInterval = signposts.beginRequest()
+        defer { requestInterval.end() }
+        let submittedSnapshot = resourceSnapshot(
+            label: "request_submitted",
+            submittedAt: submittedAt,
+            clock: clock,
+        )
 
         async let lifecycle = collectLifecycleMetrics(
             from: handle.events,
             submittedAt: submittedAt,
             clock: clock,
             signposts: signposts,
-            signpostID: signpostInterval?.id,
+            signpostID: requestInterval.id,
         )
         async let generation = collectGenerationMetrics(
             from: handle.synthesisUpdates,
             submittedAt: submittedAt,
             clock: clock,
             signposts: signposts,
-            signpostID: signpostInterval?.id,
+            signpostID: requestInterval.id,
         )
 
-        let (lifecycleMetrics, success) = try await lifecycle
-        let generationMetrics = try await generation
+        let (lifecycleMetrics, success, lifecycleSnapshots) = try await lifecycle
+        let (generationMetrics, generationSnapshots) = try await generation
+        let resourceMetrics = BenchmarkRequestResourceMetrics.make(
+            from: [submittedSnapshot] + lifecycleSnapshots + generationSnapshots,
+        )
         let playbackMetrics = try await awaitPlaybackMetrics(
             for: handle.id,
             operation: handle.kind.rawValue,
             logRecorder: logRecorder,
         )
-        signpostInterval?.end()
 
         return BenchmarkRequest(
             requestID: handle.id,
@@ -612,7 +726,20 @@ enum BenchmarkHarness {
             generatedArtifactID: generatedArtifactID(from: success),
             lifecycle: lifecycleMetrics,
             generation: generationMetrics,
+            resources: resourceMetrics,
             playback: playbackMetrics,
+        )
+    }
+
+    static func runRequestBenchmark(
+        handle: SpeakSwiftly.RequestHandle,
+        logRecorder: BenchmarkLogRecorder? = nil,
+        signposts: BenchmarkSignpostRecorder,
+    ) async throws -> BenchmarkRequest {
+        try await runRequestBenchmark(
+            handle: handle,
+            signposts: signposts,
+            logRecorder: logRecorder,
         )
     }
 
@@ -625,7 +752,7 @@ enum BenchmarkHarness {
     ) throws -> URL {
         var benchmarksRoot = try packageRootURL()
             .appendingPathComponent(".local/benchmarks", isDirectory: true)
-        if let subdirectory, !subdirectory.isEmpty {
+        if let subdirectory {
             benchmarksRoot = benchmarksRoot.appendingPathComponent(subdirectory, isDirectory: true)
         }
         try FileManager.default.createDirectory(at: benchmarksRoot, withIntermediateDirectories: true)
@@ -686,10 +813,11 @@ enum BenchmarkHarness {
         from events: AsyncThrowingStream<SpeakSwiftly.RequestEvent, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
-        signposts: BenchmarkSignpostRecorder?,
-        signpostID: OSSignpostID?,
-    ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.RequestCompletion) {
+        signposts: BenchmarkSignpostRecorder,
+        signpostID: OSSignpostID,
+    ) async throws -> (BenchmarkRequestLifecycleMetrics, SpeakSwiftly.RequestCompletion, [BenchmarkResourceSnapshot]) {
         var metrics = BenchmarkRequestLifecycleMetrics()
+        var resourceSnapshots = [BenchmarkResourceSnapshot]()
 
         for try await event in events {
             let elapsedMS = milliseconds(since: submittedAt, clock: clock)
@@ -699,30 +827,38 @@ enum BenchmarkHarness {
                     metrics.queuedAtMS = metrics.queuedAtMS ?? elapsedMS
                     metrics.queueReason = queued.reason.rawValue
                     metrics.queuePosition = queued.queuePosition
-                    if let signpostID { signposts?.emitQueued(id: signpostID) }
+                    signposts.emitQueued(id: signpostID)
+                    resourceSnapshots.append(resourceSnapshot(label: "queued", submittedAt: submittedAt, clock: clock))
                 case .acknowledged:
                     metrics.acknowledgedAtMS = metrics.acknowledgedAtMS ?? elapsedMS
-                    if let signpostID { signposts?.emitAcknowledged(id: signpostID) }
+                    signposts.emitAcknowledged(id: signpostID)
+                    resourceSnapshots.append(resourceSnapshot(label: "acknowledged", submittedAt: submittedAt, clock: clock))
                 case .started:
                     metrics.startedAtMS = metrics.startedAtMS ?? elapsedMS
-                    if let signpostID { signposts?.emitStarted(id: signpostID) }
+                    signposts.emitStarted(id: signpostID)
+                    resourceSnapshots.append(resourceSnapshot(label: "started", submittedAt: submittedAt, clock: clock))
                 case let .progress(progress):
                     switch progress.stage {
                         case .bufferingAudio:
                             metrics.bufferingAudioAtMS = metrics.bufferingAudioAtMS ?? elapsedMS
+                            signposts.emitBufferingAudio(id: signpostID)
+                            resourceSnapshots.append(resourceSnapshot(label: "buffering_audio", submittedAt: submittedAt, clock: clock))
                         case .prerollReady:
                             metrics.prerollReadyAtMS = metrics.prerollReadyAtMS ?? elapsedMS
-                            if let signpostID { signposts?.emitPrerollReady(id: signpostID) }
+                            signposts.emitPrerollReady(id: signpostID)
+                            resourceSnapshots.append(resourceSnapshot(label: "preroll_ready", submittedAt: submittedAt, clock: clock))
                         case .playbackFinished:
                             metrics.playbackFinishedAtMS = metrics.playbackFinishedAtMS ?? elapsedMS
-                            if let signpostID { signposts?.emitPlaybackFinished(id: signpostID) }
+                            signposts.emitPlaybackFinished(id: signpostID)
+                            resourceSnapshots.append(resourceSnapshot(label: "playback_finished", submittedAt: submittedAt, clock: clock))
                         default:
                             continue
                     }
                 case let .completed(completion):
                     metrics.completedAtMS = metrics.completedAtMS ?? elapsedMS
-                    if let signpostID { signposts?.emitCompleted(id: signpostID) }
-                    return (metrics, completion)
+                    signposts.emitCompleted(id: signpostID)
+                    resourceSnapshots.append(resourceSnapshot(label: "completed", submittedAt: submittedAt, clock: clock))
+                    return (metrics, completion, resourceSnapshots)
             }
         }
 
@@ -733,20 +869,22 @@ enum BenchmarkHarness {
         from events: AsyncThrowingStream<SpeakSwiftly.SynthesisUpdate, any Swift.Error>,
         submittedAt: ContinuousClock.Instant,
         clock: ContinuousClock,
-        signposts: BenchmarkSignpostRecorder?,
-        signpostID: OSSignpostID?,
-    ) async throws -> BenchmarkRequestGenerationMetrics {
+        signposts: BenchmarkSignpostRecorder,
+        signpostID: OSSignpostID,
+    ) async throws -> (BenchmarkRequestGenerationMetrics, [BenchmarkResourceSnapshot]) {
         var metrics = BenchmarkRequestGenerationMetrics()
+        var resourceSnapshots = [BenchmarkResourceSnapshot]()
 
         for try await update in events {
             let elapsedMS = milliseconds(since: submittedAt, clock: clock)
 
             switch update.event {
                 case .token:
-                    if metrics.firstTokenAtMS == nil, let signpostID {
-                        signposts?.emitFirstToken(id: signpostID)
+                    if metrics.firstTokenAtMS == nil {
+                        metrics.firstTokenAtMS = elapsedMS
+                        signposts.emitFirstToken(id: signpostID)
+                        resourceSnapshots.append(resourceSnapshot(label: "first_token", submittedAt: submittedAt, clock: clock))
                     }
-                    metrics.firstTokenAtMS = metrics.firstTokenAtMS ?? elapsedMS
                     metrics.observedTokenCount += 1
                 case let .info(info):
                     metrics.infoAtMS = metrics.infoAtMS ?? elapsedMS
@@ -756,17 +894,48 @@ enum BenchmarkHarness {
                     metrics.generateTimeMS = info.generateTime * 1000
                     metrics.tokensPerSecond = info.tokensPerSecond
                     metrics.peakMemoryUsageGB = info.peakMemoryUsage
+                    signposts.emitGenerationInfo(id: signpostID)
+                    resourceSnapshots.append(resourceSnapshot(label: "generation_info", submittedAt: submittedAt, clock: clock))
                 case let .audioChunk(sampleCount):
-                    if metrics.firstAudioChunkAtMS == nil, let signpostID {
-                        signposts?.emitFirstAudioChunk(id: signpostID)
+                    if metrics.firstAudioChunkAtMS == nil {
+                        metrics.firstAudioChunkAtMS = elapsedMS
+                        signposts.emitFirstAudioChunk(id: signpostID)
+                        resourceSnapshots.append(resourceSnapshot(label: "first_audio_chunk", submittedAt: submittedAt, clock: clock))
                     }
-                    metrics.firstAudioChunkAtMS = metrics.firstAudioChunkAtMS ?? elapsedMS
                     metrics.audioChunkCount += 1
                     metrics.totalAudioSampleCount += sampleCount
             }
         }
 
-        return metrics
+        return (metrics, resourceSnapshots)
+    }
+
+    private static func resourceSnapshot(
+        label: String,
+        submittedAt: ContinuousClock.Instant,
+        clock: ContinuousClock,
+    ) -> BenchmarkResourceSnapshot {
+        let mlxSnapshot = Memory.snapshot()
+        var usage = rusage_info_current()
+        let usageResult = withUnsafeMutablePointer(to: &usage) { pointer in
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rebound in
+                proc_pid_rusage(getpid(), RUSAGE_INFO_CURRENT, rebound)
+            }
+        }
+
+        return BenchmarkResourceSnapshot(
+            label: label,
+            elapsedMS: milliseconds(since: submittedAt, clock: clock),
+            processResidentBytes: usageResult == 0 ? Int(usage.ri_resident_size) : nil,
+            processPhysFootprintBytes: usageResult == 0 ? Int(usage.ri_phys_footprint) : nil,
+            processUserCPUTimeNS: usageResult == 0 ? Int(usage.ri_user_time) : nil,
+            processSystemCPUTimeNS: usageResult == 0 ? Int(usage.ri_system_time) : nil,
+            mlxActiveMemoryBytes: mlxSnapshot.activeMemory,
+            mlxCacheMemoryBytes: mlxSnapshot.cacheMemory,
+            mlxPeakMemoryBytes: mlxSnapshot.peakMemory,
+            mlxCacheLimitBytes: Memory.cacheLimit,
+            mlxMemoryLimitBytes: Memory.memoryLimit,
+        )
     }
 
     private static func awaitPlaybackMetrics(
