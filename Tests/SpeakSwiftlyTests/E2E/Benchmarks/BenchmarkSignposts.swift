@@ -18,6 +18,16 @@ struct BenchmarkSignpostRecorder {
         )
     }
 
+    init(
+        backend: SpeakSwiftly.SpeechBackend,
+        workload: String,
+    ) {
+        signposter = OSSignposter(
+            subsystem: Self.subsystem,
+            category: "benchmark.\(backend.rawValue).\(workload)",
+        )
+    }
+
     func beginSample() -> BenchmarkSignpostInterval {
         beginInterval("Benchmark Sample")
     }

@@ -202,6 +202,13 @@ struct BenchmarkResourceSnapshot: Codable {
     }
 }
 
+struct BenchmarkWarningSummary: Codable {
+    let warningCount: Int
+    let playbackWarningCount: Int
+    let generationQualityWarningCount: Int
+    let reasons: [String: Int]
+}
+
 struct BenchmarkRequestResourceMetrics: Codable {
     let snapshots: [BenchmarkResourceSnapshot]
     let processCPUTimeDeltaMS: Double?
@@ -353,6 +360,32 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
         }
     }
 
+    private static func int(_ value: Any?) -> Int? {
+        switch value {
+            case let int as Int:
+                int
+            case let double as Double:
+                Int(double)
+            case let number as NSNumber:
+                number.intValue
+            default:
+                nil
+        }
+    }
+
+    private static func max(_ lhs: Int?, _ rhs: Int?) -> Int? {
+        switch (lhs, rhs) {
+            case let (lhs?, rhs?):
+                Swift.max(lhs, rhs)
+            case let (lhs?, nil):
+                lhs
+            case let (nil, rhs?):
+                rhs
+            case (nil, nil):
+                nil
+        }
+    }
+
     func appendStderr(_ message: String) {
         let lines = message
             .split(separator: "\n", omittingEmptySubsequences: true)
@@ -412,6 +445,84 @@ final class BenchmarkLogRecorder: @unchecked Sendable {
             )
         }
     }
+
+    func warningSummary(for requestID: String) -> BenchmarkWarningSummary {
+        warningSummary(for: [requestID])
+    }
+
+    func warningSummary(for requestIDs: [String]) -> BenchmarkWarningSummary {
+        let requestIDSet = Set(requestIDs)
+        return lock.withLock {
+            var reasons = [String: Int]()
+            var warningCount = 0
+            var playbackWarningCount = 0
+            var generationQualityWarningCount = 0
+
+            for object in stderrObjects where requestIDSet.contains(object["request_id"] as? String ?? "") {
+                guard object["level"] as? String == "warning" else { continue }
+
+                warningCount += 1
+                let event = object["event"] as? String ?? "unknown"
+                if event.hasPrefix("playback_") {
+                    playbackWarningCount += 1
+                }
+                if event == "playback_generation_quality_warning" {
+                    generationQualityWarningCount += 1
+                }
+
+                let details = object["details"] as? [String: Any]
+                let reason = details?["reason"] as? String ?? event
+                reasons[reason, default: 0] += 1
+            }
+
+            return BenchmarkWarningSummary(
+                warningCount: warningCount,
+                playbackWarningCount: playbackWarningCount,
+                generationQualityWarningCount: generationQualityWarningCount,
+                reasons: reasons,
+            )
+        }
+    }
+
+    func peakResourceSnapshot() -> BenchmarkResourceSnapshot {
+        lock.withLock {
+            var processResidentBytes: Int?
+            var processPhysFootprintBytes: Int?
+            var processCPUTimeNS: Int?
+            var mlxActiveMemoryBytes: Int?
+            var mlxCacheMemoryBytes: Int?
+            var mlxPeakMemoryBytes: Int?
+
+            for object in stderrObjects {
+                guard let details = object["details"] as? [String: Any] else { continue }
+
+                processResidentBytes = Self.max(processResidentBytes, Self.int(details["process_resident_bytes"]))
+                processPhysFootprintBytes = Self.max(processPhysFootprintBytes, Self.int(details["process_phys_footprint_bytes"]))
+                let userCPUTimeNS = Self.int(details["process_user_cpu_time_ns"]) ?? 0
+                let systemCPUTimeNS = Self.int(details["process_system_cpu_time_ns"]) ?? 0
+                if userCPUTimeNS > 0 || systemCPUTimeNS > 0 {
+                    processCPUTimeNS = Self.max(processCPUTimeNS, userCPUTimeNS + systemCPUTimeNS)
+                }
+                mlxActiveMemoryBytes = Self.max(mlxActiveMemoryBytes, Self.int(details["mlx_active_memory_bytes"]))
+                mlxCacheMemoryBytes = Self.max(mlxCacheMemoryBytes, Self.int(details["mlx_cache_memory_bytes"]))
+                mlxPeakMemoryBytes = Self.max(mlxPeakMemoryBytes, Self.int(details["mlx_peak_memory_bytes"]))
+            }
+
+            return BenchmarkResourceSnapshot(
+                label: "peak",
+                elapsedMS: 0,
+                processResidentBytes: processResidentBytes,
+                processPhysFootprintBytes: processPhysFootprintBytes,
+                processUserCPUTimeNS: nil,
+                processSystemCPUTimeNS: processCPUTimeNS,
+                mlxActiveMemoryBytes: mlxActiveMemoryBytes,
+                mlxCacheMemoryBytes: mlxCacheMemoryBytes,
+                mlxPeakMemoryBytes: mlxPeakMemoryBytes,
+                mlxCacheLimitBytes: nil,
+                mlxMemoryLimitBytes: nil,
+            )
+        }
+    }
 }
 
 enum BenchmarkHarness {
@@ -423,7 +534,6 @@ enum BenchmarkHarness {
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
         qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy = .dualResidentSerialized,
         playbackMode: BenchmarkPlaybackMode = .silent,
         playbackTrace: Bool = false,
         operation: @escaping @Sendable (BenchmarkRuntimeSession) async throws -> T,
@@ -432,7 +542,6 @@ enum BenchmarkHarness {
             profileRootURL: profileRootURL,
             backend: backend,
             qwenConditioningStrategy: qwenConditioningStrategy,
-            marvisResidentPolicy: marvisResidentPolicy,
             playbackMode: playbackMode,
             playbackTrace: playbackTrace,
         )
@@ -451,7 +560,6 @@ enum BenchmarkHarness {
         profileRootURL: URL,
         backend: SpeakSwiftly.SpeechBackend,
         qwenConditioningStrategy: SpeakSwiftly.QwenConditioningStrategy,
-        marvisResidentPolicy: SpeakSwiftly.MarvisResidentPolicy,
         playbackMode: BenchmarkPlaybackMode,
         playbackTrace: Bool,
     ) async throws -> BenchmarkRuntimeSession {
@@ -484,6 +592,7 @@ enum BenchmarkHarness {
                 logRecorder.appendStderr(message)
                 fputs("SpeakSwiftly benchmark runtime stderr: \(message)\n", stderr)
             },
+            writeSystemLog: liveDependencies.writeSystemLog,
             now: liveDependencies.now,
             readRuntimeMemory: liveDependencies.readRuntimeMemory,
         )
@@ -512,7 +621,6 @@ enum BenchmarkHarness {
             dependencies: dependencies,
             speechBackend: backend,
             qwenConditioningStrategy: qwenConditioningStrategy,
-            marvisResidentPolicy: marvisResidentPolicy,
             profileStore: profileStore,
             generatedFileStore: generatedFileStore,
             generationJobStore: generationJobStore,
@@ -551,6 +659,18 @@ enum BenchmarkHarness {
         }
 
         throw BenchmarkError("SpeakSwiftly benchmark runtime stopped emitting status updates before reporting resident_model_ready.")
+    }
+
+    static func awaitResidentReady(
+        on runtime: SpeakSwiftly.Runtime,
+    ) async throws -> Double {
+        try await awaitResidentReady(
+            on: runtime,
+            signposts: BenchmarkSignpostRecorder(
+                backend: .qwen3_smol,
+                playbackMode: effectivePlaybackMode(),
+            ),
+        )
     }
 
     static func awaitSuccess(
@@ -611,14 +731,30 @@ enum BenchmarkHarness {
         )
     }
 
+    static func runRequestBenchmark(
+        handle: SpeakSwiftly.RequestHandle,
+        logRecorder: BenchmarkLogRecorder? = nil,
+        signposts: BenchmarkSignpostRecorder,
+    ) async throws -> BenchmarkRequest {
+        try await runRequestBenchmark(
+            handle: handle,
+            signposts: signposts,
+            logRecorder: logRecorder,
+        )
+    }
+
     static func writeSummary(
         _ summary: some Encodable,
         timestampedStem: String,
         latestFilename: String,
         generatedAt: Date,
+        subdirectory: String? = nil,
     ) throws -> URL {
-        let benchmarksRoot = try packageRootURL()
+        var benchmarksRoot = try packageRootURL()
             .appendingPathComponent(".local/benchmarks", isDirectory: true)
+        if let subdirectory {
+            benchmarksRoot = benchmarksRoot.appendingPathComponent(subdirectory, isDirectory: true)
+        }
         try FileManager.default.createDirectory(at: benchmarksRoot, withIntermediateDirectories: true)
 
         let formatter = ISO8601DateFormatter()
