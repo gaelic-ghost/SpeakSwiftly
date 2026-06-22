@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "mode": "coreml_benchmark",
+  "source": {
+    "model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage",
+    "fixture_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json",
+    "conversion_report_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json",
+    "conversion_source": {
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+      "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+      "requested_revision": null,
+      "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+      "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+      "coremltools_version": "9.0",
+      "torch_version": "2.7.0"
+    },
+    "conversion_target": {
+      "stage": "speech_tokenizer_decoder",
+      "wrapper_mode": "fixed_16q_static_mask",
+      "input_name": "audio_codes",
+      "input_shape": [
+        1,
+        8,
+        16
+      ],
+      "input_dtype": "int64",
+      "minimum_deployment_target": "macOS15",
+      "convert_to": "mlprogram",
+      "compute_precision": "float32",
+      "capture_mode": "export",
+      "export_decomposed": true,
+      "torch_output_shape": [
+        1,
+        15360
+      ],
+      "torch_output_min": -0.055284563452005386,
+      "torch_output_max": 0.055146411061286926,
+      "torch_output_mean": 1.583719495101832e-05,
+      "torch_output_rms": 0.032971180975437164,
+      "upstream_max_abs_diff": 0.0
+    },
+    "coremltools_version": "9.0"
+  },
+  "hardware": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "mac_ver": "26.5",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_brand": "Apple M4 Pro",
+    "physical_cpu_count": "14",
+    "logical_cpu_count": "14",
+    "memory_bytes": 25769803776
+  },
+  "benchmark": {
+    "input_name": "audio_codes",
+    "input_shape": [
+      1,
+      8,
+      16
+    ],
+    "input_dtype": "int32",
+    "warmup_runs": 3,
+    "measured_runs": 10,
+    "compute_units_order": [
+      "cpuOnly",
+      "cpuAndGPU",
+      "cpuAndNeuralEngine",
+      "all"
+    ],
+    "dispatch_note": "Core ML compute-unit selection is a load-time preference. This timing report does not prove actual Neural Engine dispatch; use Instruments or Core ML performance diagnostics for dispatch evidence.",
+    "results": [
+      {
+        "status": "succeeded",
+        "compute_units": "cpuOnly",
+        "load_duration_ms": 2031.2620830000014,
+        "warmup_runs": 3,
+        "measured_runs": 10,
+        "warmup": {
+          "min_ms": 32.196624999983214,
+          "median_ms": 32.913457999939055,
+          "mean_ms": 45.61398599999696,
+          "p95_ms": 71.73187500006861,
+          "max_ms": 71.73187500006861
+        },
+        "measured": {
+          "min_ms": 31.893540999931247,
+          "median_ms": 32.36947950000513,
+          "mean_ms": 32.345470799998566,
+          "p95_ms": 32.87470800000847,
+          "max_ms": 32.87470800000847
+        },
+        "output_shape": [
+          1,
+          15360
+        ],
+        "output_dtype": "float32",
+        "output_min": -0.05531299114227295,
+        "output_max": 0.055174488574266434,
+        "output_rms": 0.032989319413900375
+      },
+      {
+        "status": "succeeded",
+        "compute_units": "cpuAndGPU",
+        "load_duration_ms": 1191.7097079999621,
+        "warmup_runs": 3,
+        "measured_runs": 10,
+        "warmup": {
+          "min_ms": 23.557082999900558,
+          "median_ms": 34.71462499999234,
+          "mean_ms": 1015.6711246666342,
+          "p95_ms": 2988.74166600001,
+          "max_ms": 2988.74166600001
+        },
+        "measured": {
+          "min_ms": 23.36366600002293,
+          "median_ms": 23.713270499968075,
+          "mean_ms": 23.82085840002901,
+          "p95_ms": 24.465167000016663,
+          "max_ms": 24.465167000016663
+        },
+        "output_shape": [
+          1,
+          15360
+        ],
+        "output_dtype": "float32",
+        "output_min": -0.055312786251306534,
+        "output_max": 0.055174313485622406,
+        "output_rms": 0.032989297062158585,
+        "baseline_delta": {
+          "max_abs_diff": 3.725290298461914e-07,
+          "mean_abs_diff": 8.944016371970065e-08
+        }
+      },
+      {
+        "status": "succeeded",
+        "compute_units": "cpuAndNeuralEngine",
+        "load_duration_ms": 1961.5211660000114,
+        "warmup_runs": 3,
+        "measured_runs": 10,
+        "warmup": {
+          "min_ms": 32.165041999974164,
+          "median_ms": 32.52324999994016,
+          "mean_ms": 38.6736389999669,
+          "p95_ms": 51.332624999986365,
+          "max_ms": 51.332624999986365
+        },
+        "measured": {
+          "min_ms": 32.27245799996581,
+          "median_ms": 32.7014169999984,
+          "mean_ms": 32.67518769999924,
+          "p95_ms": 32.976167000015266,
+          "max_ms": 32.976167000015266
+        },
+        "output_shape": [
+          1,
+          15360
+        ],
+        "output_dtype": "float32",
+        "output_min": -0.05531300604343414,
+        "output_max": 0.05517449975013733,
+        "output_rms": 0.032989319413900375,
+        "baseline_delta": {
+          "max_abs_diff": 1.0058283805847168e-07,
+          "mean_abs_diff": 1.8345042818168622e-08
+        }
+      },
+      {
+        "status": "succeeded",
+        "compute_units": "all",
+        "load_duration_ms": 1074.690042000043,
+        "warmup_runs": 3,
+        "measured_runs": 10,
+        "warmup": {
+          "min_ms": 24.26987499995903,
+          "median_ms": 24.57583299997168,
+          "mean_ms": 40.866763666637475,
+          "p95_ms": 73.75458299998172,
+          "max_ms": 73.75458299998172
+        },
+        "measured": {
+          "min_ms": 23.76679199994669,
+          "median_ms": 23.896207999996477,
+          "mean_ms": 23.95595409999487,
+          "p95_ms": 24.39295800002128,
+          "max_ms": 24.39295800002128
+        },
+        "output_shape": [
+          1,
+          15360
+        ],
+        "output_dtype": "float32",
+        "output_min": -0.055312786251306534,
+        "output_max": 0.055174313485622406,
+        "output_rms": 0.032989297062158585,
+        "baseline_delta": {
+          "max_abs_diff": 3.725290298461914e-07,
+          "mean_abs_diff": 8.944016371970065e-08
+        }
+      }
+    ]
+  }
+}

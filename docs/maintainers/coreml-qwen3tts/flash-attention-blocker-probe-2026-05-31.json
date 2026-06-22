@@ -1,0 +1,197 @@
+{
+  "classification": {
+    "metal_flash_sdpa_causal_correctness": "lower_precision_causal_path_matches_noncausal_reference",
+    "mpsops_agx_crash": "reproduced_on_tiny_noncausal_shape_before_larger_qwen_like_cases",
+    "recommendation": "pause_flashattention_dependency_adoption"
+  },
+  "created_at_utc": "2026-05-31T16:04:23Z",
+  "host": {
+    "machine": "arm64",
+    "processor": "arm",
+    "python": "3.14.3",
+    "release": "25.5.0",
+    "system": "Darwin"
+  },
+  "purpose": "bounded_flashattention_blocker_probe_for_qwen3tts",
+  "qwen3_tts_attention_target": {
+    "causal": true,
+    "decode_pattern": "autoregressive",
+    "head_dim": 128,
+    "key_value_heads": 8,
+    "query_heads": 16
+  },
+  "results": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "--python",
+        "3.12",
+        "--with",
+        "torch",
+        "--with",
+        "numpy",
+        "--with",
+        "mps-flash-attn",
+        "python",
+        "-c",
+        "<inline probe>"
+      ],
+      "name": "mpsops_metalasm_kernel_creation",
+      "returncode": 133,
+      "status": "failed",
+      "stderr": "FlashAttention/AttentionDescriptor+PipelineCache.swift:121: Fatal error: 'try!' expression unexpectedly raised an error: Error Domain=AGXMetalG16X Code=2 \"Compilation failed due to an interrupted connection: XPC_ERROR_CONNECTION_INTERRUPTED. This error occurred after multiple retries.\" UserInfo={NSLocalizedDescription=Compilation failed due to an interrupted connection: XPC_ERROR_CONNECTION_INTERRUPTED. This error occurred after multiple retries.}\n",
+      "stdout": "",
+      "stdout_json": null
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "--with",
+        "torch",
+        "--with",
+        "numpy",
+        "--with",
+        "<local-metal-flash-sdpa-checkout>",
+        "python",
+        "-c",
+        "<inline probe>"
+      ],
+      "name": "metal_flash_sdpa_causal_parity",
+      "returncode": 0,
+      "status": "passed",
+      "stderr": "",
+      "stdout": "",
+      "stdout_json": {
+        "cases": [
+          {
+            "causal_argument": true,
+            "direct_vs_causal_reference": {
+              "max_abs_diff": 6.556510925292969e-07,
+              "mean_abs_diff": 3.0816920570941875e-08
+            },
+            "direct_vs_noncausal_reference": {
+              "max_abs_diff": 3.7600584030151367,
+              "mean_abs_diff": 0.1104227751493454
+            },
+            "dtype": "float32",
+            "name": "square_fp32_causal",
+            "patched_sdpa_dispatch_count": 1,
+            "patched_sdpa_vs_direct": {
+              "max_abs_diff": 0.0,
+              "mean_abs_diff": 0.0
+            },
+            "shape": [
+              1,
+              8,
+              256,
+              64
+            ]
+          },
+          {
+            "causal_argument": true,
+            "direct_vs_causal_reference": {
+              "max_abs_diff": 3.760894775390625,
+              "mean_abs_diff": 0.11042316257953644
+            },
+            "direct_vs_noncausal_reference": {
+              "max_abs_diff": 0.00023216009140014648,
+              "mean_abs_diff": 1.4304900105344132e-05
+            },
+            "dtype": "float16",
+            "name": "square_fp16_causal",
+            "patched_sdpa_dispatch_count": 1,
+            "patched_sdpa_vs_direct": {
+              "max_abs_diff": 0.0,
+              "mean_abs_diff": 0.0
+            },
+            "shape": [
+              1,
+              8,
+              256,
+              64
+            ]
+          },
+          {
+            "causal_argument": true,
+            "direct_vs_causal_reference": {
+              "max_abs_diff": 3.762451171875,
+              "mean_abs_diff": 0.11042246222496033
+            },
+            "direct_vs_noncausal_reference": {
+              "max_abs_diff": 0.0018272995948791504,
+              "mean_abs_diff": 0.00011389477003831416
+            },
+            "dtype": "bfloat16",
+            "name": "square_bf16_causal",
+            "patched_sdpa_dispatch_count": 1,
+            "patched_sdpa_vs_direct": {
+              "max_abs_diff": 0.0,
+              "mean_abs_diff": 0.0
+            },
+            "shape": [
+              1,
+              8,
+              256,
+              64
+            ]
+          },
+          {
+            "causal_argument": true,
+            "direct_vs_causal_reference": {
+              "max_abs_diff": 3.76446533203125,
+              "mean_abs_diff": 0.10907579958438873
+            },
+            "direct_vs_noncausal_reference": {
+              "max_abs_diff": 0.0002434253692626953,
+              "mean_abs_diff": 1.4350248420669232e-05
+            },
+            "dtype": "float16",
+            "name": "qwen_like_fp16_causal_expanded_kv",
+            "patched_sdpa_dispatch_count": 1,
+            "patched_sdpa_vs_direct": {
+              "max_abs_diff": 0.0,
+              "mean_abs_diff": 0.0
+            },
+            "shape": [
+              1,
+              16,
+              256,
+              128
+            ]
+          },
+          {
+            "causal_argument": false,
+            "direct_vs_causal_reference": {
+              "max_abs_diff": 3.76446533203125,
+              "mean_abs_diff": 0.10907579958438873
+            },
+            "direct_vs_noncausal_reference": {
+              "max_abs_diff": 0.0002434253692626953,
+              "mean_abs_diff": 1.4350248420669232e-05
+            },
+            "dtype": "float16",
+            "name": "qwen_like_fp16_noncausal_expanded_kv",
+            "patched_sdpa_dispatch_count": 1,
+            "patched_sdpa_vs_direct": {
+              "max_abs_diff": 0.0,
+              "mean_abs_diff": 0.0
+            },
+            "shape": [
+              1,
+              16,
+              256,
+              128
+            ]
+          }
+        ],
+        "mps_available": true,
+        "package": "metal-flash-sdpa",
+        "package_version": "0.1.1",
+        "torch_version": "2.12.0"
+      }
+    }
+  ],
+  "schema_version": 1
+}

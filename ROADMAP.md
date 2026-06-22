@@ -32,6 +32,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 30: Generation Quality Telemetry And Guards](#milestone-30-generation-quality-telemetry-and-guards)
 - [Milestone 31: macOS Retrench And Mobile Split](#milestone-31-macos-retrench-and-mobile-split)
 - [Milestone 32: Qwen-Only Output Modularization](#milestone-32-qwen-only-output-modularization)
+- [Milestone 33: First-Party Core ML Qwen3-TTS Port](#milestone-33-first-party-core-ml-qwen3-tts-port)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -44,6 +45,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 30: Generation Quality Telemetry And Guards - In Progress
 - Milestone 31: macOS Retrench And Mobile Split - In Progress
 - Milestone 32: Qwen-Only Output Modularization - In Progress
+- Milestone 33: First-Party Core ML Qwen3-TTS Port - Research
 
 ## Active Milestones
 
@@ -318,6 +320,51 @@ In Progress
 - [ ] Removed backend names fail clearly from persisted config and worker requests.
 - [ ] Unit and integration tests cover module boundaries without requiring two real Macs for default validation.
 - [ ] The prerelease notes clearly call out breaking changes, migration notes, verification performed, and follow-up server adoption work.
+## Milestone 33: First-Party Core ML Qwen3-TTS Port
+
+### Status
+
+Research
+
+### Scope
+
+- [ ] Evaluate a first-party Core ML Qwen3-TTS conversion instead of adopting the current FluidInference artifact as-is.
+- [ ] Preserve the existing runtime ownership model while deciding whether Core ML deserves a real backend slot beside the MLX-backed Qwen, Marvis, and Chatterbox paths.
+- [ ] Own the conversion split points, tokenizer boundary, fixed-shape cache policy, precision choices, and stage-specific compute-unit assignments explicitly enough that performance claims are measurable.
+- [ ] Keep the first implementation as a standalone probe until tokenizer parity, tensor parity, performance, memory, and audio quality evidence justify runtime integration.
+
+### Tickets
+
+- [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
+- [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
+- [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
+- [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
+- [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
+- [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
+- [ ] Use Instruments and Core ML performance reports to verify actual CPU, GPU, and Neural Engine dispatch instead of inferring dispatch from configuration alone.
+- [ ] Build a calibration-data lane for Core ML compression, starting with decoder-only audio-code calibration from open speech datasets and widening later to full-stack prompts, code histories, and reference-conditioning cases.
+- [ ] Probe W8A8 quantization for stages where Core ML Tools and Instruments show a realistic path to M4 Neural Engine execution.
+- [ ] Evaluate Swift/Metal FlashAttention as a separate custom-GPU-kernel lane for autoregressive Qwen attention if Core ML or MLX dispatch overhead becomes the limiting factor.
+- [ ] Evaluate whether autoregressive work can be batched, bucketed, prefetched, or otherwise shaped to avoid tiny per-token prediction overhead.
+- [ ] Compare the first-party Core ML probe against the existing SpeakSwiftly Qwen MLX benchmark lane using matched input text, voice strategy, output duration, real-time factor, memory, startup time, and audible quality notes.
+- [ ] Decide whether the result should become a hidden experimental backend, stay probe-only, feed `SpeakSwiftlyMobile`, or be dropped with evidence.
+
+### Stage Notes
+
+- The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
+- A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
+- The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
+- The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
+- The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
+- Follow-up FlashAttention triage found that `mpsops/mps-flash-attention` moves past the original runtime source parser problem by using MetalASM and `makeLibrary(data:)`, but local pipeline creation still crashes inside the AGX compiler service. The ccv-backed `metal-flash-sdpa` path runs non-causal attention accurately, but local causal tests fail by multi-point differences, so neither path is ready for Qwen autoregressive attention.
+- A bounded blocker probe now records the FlashAttention decision in structured JSON. `mps-flash-attn` reproduces the AGX compiler crash on a tiny non-causal `[1, 1, 16, 32]` shape, and `metal-flash-sdpa` lower-precision causal output matches the non-causal reference instead of the causal reference. Pause dependency adoption unless those upstream paths fix AGX pipeline creation and lower-precision causal masking.
+- Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
+
+### Exit Criteria
+
+- [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
+- [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
+- [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 
 ## Backlog Candidates
 

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T00:00:00Z",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229"
+  },
+  "model_config": {
+    "model_type": "qwen3_tts_tokenizer_12hz",
+    "input_sample_rate": 24000,
+    "output_sample_rate": 24000,
+    "encode_downsample_rate": 1920,
+    "decode_upsample_rate": 1920,
+    "encoder_valid_num_quantizers": 16
+  },
+  "feature_extractor": {
+    "feature_extractor_type": "EncodecFeatureExtractor",
+    "sampling_rate": 24000,
+    "padding_value": 0.0,
+    "return_attention_mask": true
+  },
+  "encoder_config": {
+    "model_type": null,
+    "num_quantizers": 32,
+    "codebook_size": 2048,
+    "sampling_rate": 24000
+  },
+  "decoder_config": {
+    "hidden_size": 512,
+    "num_hidden_layers": 8,
+    "num_attention_heads": 16,
+    "num_key_value_heads": 16,
+    "latent_dim": 1024,
+    "decoder_dim": 1536,
+    "upsample_rates": [
+      8,
+      5,
+      4,
+      3
+    ],
+    "upsampling_ratios": [
+      2,
+      2
+    ]
+  },
+  "coreml_boundary_implications": [
+    "12 Hz encode/decode uses 24000 Hz audio and 1920 samples per code step.",
+    "Core ML decode should accept padded int64 codes shaped batch x codes_length x num_quantizers.",
+    "Padding uses -1 before decode, then upstream clamps codes to zero and trims by valid CB0 length.",
+    "The first Core ML speech-tokenizer probe should split encoder and decoder instead of using one graph."
+  ]
+}
