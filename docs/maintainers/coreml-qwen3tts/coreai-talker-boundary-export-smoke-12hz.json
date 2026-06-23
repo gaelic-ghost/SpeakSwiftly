@@ -2,7 +2,7 @@
   "schema_version": 1,
   "created_at_utc": "2026-06-23T00:00:00Z",
   "mode": "coreai_talker_boundary_export_smoke",
-  "status": "blocked_missing_runtime_dependencies",
+  "status": "converted_to_coreai_ir",
   "purpose": "Try the smallest local Core AI / coreai-torch export smoke for the Qwen3-TTS talker first-codec-token boundary without downloading Qwen weights.",
   "source": {
     "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
@@ -18,14 +18,14 @@
       {
         "module": "torch",
         "package": "torch",
-        "found": false,
-        "version": null
+        "found": true,
+        "version": "2.11.0"
       },
       {
         "module": "coreai_torch",
         "package": "coreai-torch",
-        "found": false,
-        "version": null
+        "found": true,
+        "version": "0.4.0"
       }
     ]
   },
@@ -101,9 +101,67 @@
       "first-codebook logits projection"
     ]
   },
-  "missing_dependencies": [
-    "torch",
-    "coreai-torch"
-  ],
-  "next_action": "Install torch and coreai-torch in an explicit opt-in environment, then rerun export-smoke. Do not add either package as a project dependency yet."
+  "missing_dependencies": [],
+  "dependency_versions": {
+    "torch": "2.11.0",
+    "coreai-torch": "0.4.0"
+  },
+  "exported_graph": {
+    "call_targets": [
+      "aten.pow.Tensor_Scalar",
+      "aten.mean.dim",
+      "aten.add.Tensor",
+      "aten.rsqrt.default",
+      "aten.mul.Tensor",
+      "aten.mul.Tensor",
+      "aten.permute.default",
+      "aten.view.default",
+      "aten.mm.default",
+      "aten.view.default",
+      "aten.view.default",
+      "aten.permute.default",
+      "aten.slice.Tensor",
+      "aten.slice.Tensor",
+      "aten.neg.default",
+      "aten.unsqueeze.default",
+      "aten.unsqueeze.default",
+      "aten.cat.default",
+      "aten.view.default",
+      "aten.arange.start_step",
+      "aten.arange.start_step",
+      "aten.lt.Scalar",
+      "aten._to_copy.default",
+      "aten.mul.Tensor",
+      "aten.add.Tensor",
+      "aten.sub.Tensor",
+      "aten._to_copy.default",
+      "aten.mul.Tensor",
+      "aten.sub.Tensor",
+      "aten.where.self",
+      "aten.view.default",
+      "aten.view.default",
+      "aten.mul.Tensor",
+      "aten.cos.default",
+      "aten.mul.Tensor",
+      "aten.sin.default",
+      "aten.mul.Tensor",
+      "aten.add.Tensor",
+      "aten.scaled_dot_product_attention.default",
+      "aten.permute.default",
+      "aten.view.default",
+      "aten.select.int",
+      "aten.permute.default",
+      "aten.mm.default"
+    ],
+    "call_target_count": 44,
+    "contains_scaled_dot_product_attention": true,
+    "contains_rsqrt": true,
+    "contains_cos": true,
+    "contains_sin": true
+  },
+  "coreai_program": {
+    "python_type": "coreai.authoring.asset.AIProgram",
+    "repr_prefix": "<coreai._compiler._mlir_libs._mlir.ir.Module object at <address>>"
+  },
+  "next_action": "Review the exported call targets and Core AI program summary before trying the real Qwen3-TTS talker boundary."
 }

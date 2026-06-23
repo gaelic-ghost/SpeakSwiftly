@@ -11,6 +11,7 @@ import importlib.metadata
 import importlib.util
 import json
 import platform
+import re
 import subprocess
 import traceback
 from datetime import datetime, timezone
@@ -266,9 +267,10 @@ def exported_graph_targets(exported_program: Any) -> list[str]:
 
 
 def coreai_program_summary(program: Any) -> dict[str, Any]:
+  stable_repr = re.sub(r" at 0x[0-9a-fA-F]+", " at <address>", repr(program)[:500])
   summary = {
     "python_type": f"{type(program).__module__}.{type(program).__name__}",
-    "repr_prefix": repr(program)[:500],
+    "repr_prefix": stable_repr,
   }
   functions = getattr(program, "functions", None)
   if isinstance(functions, dict):

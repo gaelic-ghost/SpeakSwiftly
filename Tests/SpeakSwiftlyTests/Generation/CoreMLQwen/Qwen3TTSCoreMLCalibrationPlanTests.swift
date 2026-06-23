@@ -90,22 +90,28 @@ import Testing
     #expect(fixture.guardrails.contains("Do not add a public SpeechBackend for this slice."))
 }
 
-@Test func `qwen3 tts core ai export smoke records local blocker and beta tooling`() throws {
+@Test func `qwen3 tts core ai export smoke records toy conversion and beta tooling`() throws {
     let fixture = try Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture.load()
 
     #expect(fixture.schemaVersion == 1)
     #expect(fixture.mode == "coreai_talker_boundary_export_smoke")
-    #expect(fixture.status == "blocked_missing_runtime_dependencies")
+    #expect(fixture.status == "converted_to_coreai_ir")
     #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
     #expect(fixture.dependencies.packages.map(\.package) == ["torch", "coreai-torch"])
-    #expect(fixture.dependencies.packages.allSatisfy { !$0.found })
+    #expect(fixture.dependencies.packages.allSatisfy { $0.found })
     #expect(fixture.localTooling.summary.coreaiBuildFound)
     #expect(fixture.localTooling.summary.xctraceFound)
     #expect(fixture.localTooling.summary.coreAiTemplateFound)
     #expect(fixture.targetSubgraph.name == "toy_qwen_talker_first_codec_token_boundary")
     #expect(fixture.targetSubgraph.features.contains("causal scaled_dot_product_attention"))
-    #expect(fixture.missingDependencies == ["torch", "coreai-torch"])
-    #expect(fixture.nextAction.contains("Do not add either package as a project dependency yet."))
+    #expect(fixture.missingDependencies.isEmpty)
+    #expect(fixture.exportedGraph.containsScaledDotProductAttention)
+    #expect(fixture.exportedGraph.containsRsqrt)
+    #expect(fixture.exportedGraph.containsCos)
+    #expect(fixture.exportedGraph.containsSin)
+    #expect(fixture.exportedGraph.callTargetCount > 0)
+    #expect(fixture.coreaiProgram.pythonType == "coreai.authoring.asset.AIProgram")
+    #expect(fixture.nextAction.contains("before trying the real Qwen3-TTS talker boundary"))
 }
 
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
@@ -304,6 +310,18 @@ private struct Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture: Decodable {
         let features: [String]
     }
 
+    struct ExportedGraph: Decodable {
+        let callTargetCount: Int
+        let containsScaledDotProductAttention: Bool
+        let containsRsqrt: Bool
+        let containsCos: Bool
+        let containsSin: Bool
+    }
+
+    struct CoreAIProgram: Decodable {
+        let pythonType: String
+    }
+
     let schemaVersion: Int
     let mode: String
     let status: String
@@ -312,6 +330,8 @@ private struct Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture: Decodable {
     let localTooling: LocalTooling
     let targetSubgraph: TargetSubgraph
     let missingDependencies: [String]
+    let exportedGraph: ExportedGraph
+    let coreaiProgram: CoreAIProgram
     let nextAction: String
 
     static func load() throws -> Self {

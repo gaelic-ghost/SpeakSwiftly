@@ -186,18 +186,25 @@ uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-bou
   --report docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json
 ```
 
-The next opt-in command is the same script with `--mode export-smoke
---allow-runtime-imports`. That mode should remain blocked until this preflight
-target is reviewed and the local Python/Core AI dependency shape is chosen.
+The opt-in command is the same script with `--mode export-smoke
+--allow-runtime-imports`. Keep that mode explicit because it imports Python ML
+packages, but do not add those packages as project dependencies unless the route
+graduates beyond a probe.
 
 The current local export-smoke report is
 `docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json`.
 It confirms Xcode beta's Core AI developer tools are visible when
 `DEVELOPER_DIR` points at the beta Xcode install: `coreai-build` resolves and
-`xctrace` lists the `Core AI` Instruments template. The Python smoke itself is
-blocked before conversion because this branch has not installed `torch` or
-`coreai-torch`; keep that as an explicit opt-in environment step rather than
-adding either package as a project dependency.
+`xctrace` lists the `Core AI` Instruments template. A first opt-in run with
+`torch` 2.11.0 and `coreai-torch` 0.4.0 converted the tiny Qwen-shaped talker
+boundary to Core AI IR. The exported graph preserved visible calls for
+`scaled_dot_product_attention`, `rsqrt`, `cos`, and `sin`.
+
+This is only a toy-boundary proof that the route is locally runnable. It does
+not prove real Qwen3-TTS conversion, first-token parity, compile latency,
+runtime quality, or audio quality. The next slice should try the real
+talker/code-predictor boundary, or write down the exact fixture needed before
+that conversion is meaningful.
 
 ## Compute-Unit Questions
 
