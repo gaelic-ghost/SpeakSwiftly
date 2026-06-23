@@ -67,6 +67,28 @@ import Testing
     #expect(fixture.nextCommand.contains("probe-decoder-alignment-tuning.py"))
 }
 
+@Test func `qwen3 tts core ai talker boundary plan starts with first codec token`() throws {
+    let fixture = try Qwen3TTSCoreAITalkerBoundaryPlanFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_talker_boundary_preflight")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.targetSubgraph.name == "qwen3_tts_talker_first_codec_token_boundary")
+    #expect(fixture.targetSubgraph.requiredBoundaries.contains("attention or SDPA remains compiler-visible"))
+    #expect(fixture.targetSubgraph.requiredBoundaries.contains("KV cache input and output shapes are named and stable"))
+    #expect(fixture.targetSubgraph.excludedFromFirstProbe.contains("speech-tokenizer audio decode"))
+    #expect(fixture.runtimeRoutes.map(\.route) == [
+        "coreai_torch",
+        "hand_rolled_core_ml",
+        "executorch_mlx",
+        "executorch_core_ml",
+    ])
+    #expect(fixture.firstSlice.status == "preflight_only")
+    #expect(fixture.firstSlice.nextCommand.contains("--mode export-smoke"))
+    #expect(fixture.firstSlice.acceptanceCriteria.contains("reports every preserved composite op boundary"))
+    #expect(fixture.guardrails.contains("Do not add a public SpeechBackend for this slice."))
+}
+
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
     struct Source: Decodable {
         let modelId: String
@@ -192,6 +214,43 @@ private struct Qwen3TTSDecoderAlignmentPlanFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/decoder-alignment-plan-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAITalkerBoundaryPlanFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct TargetSubgraph: Decodable {
+        let name: String
+        let requiredBoundaries: [String]
+        let excludedFromFirstProbe: [String]
+    }
+
+    struct RuntimeRoute: Decodable {
+        let route: String
+    }
+
+    struct FirstSlice: Decodable {
+        let status: String
+        let nextCommand: String
+        let acceptanceCriteria: [String]
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let source: Source
+    let targetSubgraph: TargetSubgraph
+    let runtimeRoutes: [RuntimeRoute]
+    let firstSlice: FirstSlice
+    let guardrails: [String]
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
             as: Self.self,
         )
     }
