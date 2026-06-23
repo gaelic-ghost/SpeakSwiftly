@@ -133,7 +133,8 @@ Local preflight on 2026-06-23:
 - Candidate weight file: `quantized.safetensors`, about 2.0 GB.
 - Local Python packages checked with system `python3`: `mlx`, `mlx_lm`,
   `transformers`, `huggingface_hub`, and `torch` were not installed.
-- Downloaded non-weight candidate files only into `/private/tmp` for inspection.
+- Downloaded non-weight candidate files only into a system temporary directory
+  for inspection.
 - Did not download `quantized.safetensors`.
 
 Config/tokenizer findings:
@@ -159,6 +160,42 @@ Preflight decision:
   decode.
 - The next useful proof is source/runtime inventory for Higgs' loader path, not
   a weight-only download.
+
+## Local MLX Metadata Probe
+
+Temporary environment:
+
+- Location: system temporary directory outside the repository
+- Package cache: system temporary directory outside the repository
+- Installed source: `mlx-audio` from
+  `Blaizzy/mlx-audio@412cf7cd381c2a3f6a8189af04a95af24cb415b6`
+- Installed versions: `mlx-audio 0.4.4`, `mlx 0.31.2`, `mlx-lm 0.31.3`,
+  `transformers 5.12.1`, `huggingface-hub 1.20.1`
+- No model weights downloaded for this probe.
+
+Executable checks that passed:
+
+- `mlx_audio.tts.utils.get_model_and_args("higgs_multimodal_qwen3", ...)`
+  resolves to `model_type == "higgs_audio_v3"` and exposes
+  `mlx_audio.tts.models.higgs_audio_v3.Model`.
+- The downloaded candidate `config.json` parses through
+  `HiggsAudioV3Config.from_dict(...)` as eight codebooks, 1026-token audio
+  codebooks, BOC/EOC ids 1024/1025, 24 kHz output, hidden size 2560, 36 layers,
+  32 attention heads, 8 KV heads, vocab size 151,936, and rope theta 1,000,000.
+- The candidate `tokenizer.json` loads through `tokenizers` and
+  `PreTrainedTokenizerFast`; the prompt builder finds required Higgs v3 special
+  tokens. Observed ids: `<|tts|>` 151667, `<|audio|>` 151670, `<|text|>` 151672,
+  and `<|ref_audio|>` 151679.
+- Delay-pattern round trip passed for synthetic eight-codebook rows.
+- Prompt assembly placed one placeholder per delayed reference-audio row.
+- A tiny synthetic Higgs v3 MLX model ran one forward pass, produced audio-logit
+  shape `[1, 4, 10]`, and completed one delayed sampler step.
+
+Probe warning:
+
+- `transformers` reported that PyTorch was not installed. That is acceptable for
+  this metadata-level proof because only tokenizers/config utilities and MLX
+  execution were used.
 
 ## Runtime Source Inventory
 
@@ -222,10 +259,9 @@ Related CUDA/server runtime references:
 
 Practical conclusion:
 
-- The first executable MLX proof should use `mlx-audio`'s Python Higgs v3 path
-  before any Swift port work. That reduces the immediate question to local
-  environment setup, model file compatibility, memory, latency, and audio
-  quality.
+- The first metadata-level MLX proof succeeded. The next proof is a heavier
+  weight-loading and one-sentence generation run through `mlx-audio`'s Python
+  Higgs v3 path.
 - A Swift port is no longer pure architecture discovery. It has a concrete MLX
   Python reference implementation to mirror if the Python probe succeeds.
 - Streaming remains a separate question: the `mlx-audio` implementation yields
