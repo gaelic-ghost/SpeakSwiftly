@@ -27,6 +27,9 @@ DEFAULT_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-1
 DEFAULT_EXPORT_SMOKE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
 DEFAULT_REAL_BOUNDARY_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json"
 DEFAULT_REAL_CAPTURE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json"
+DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
+  "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json"
+)
 DEFAULT_TEXT_TOKEN_FIXTURE = "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
 DEFAULT_QWEN_SOURCE = ".local/coreai-qwen3tts/Qwen3-TTS-source"
 COREAI_RUNTIME_WITH_REQUIREMENTS = [
@@ -359,7 +362,7 @@ def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
     "fixture_capture_contract": {
       "default_status": "design_only_no_model_download",
       "runtime_capture_requires": [
-        "--allow-model-download",
+        "--allow-model-load",
         "Qwen3-TTS source checkout",
         "live-service headroom wrapper for real-model runs",
       ],
@@ -879,6 +882,239 @@ def run_coreai_export_smoke(args: argparse.Namespace) -> dict[str, Any]:
   return report
 
 
+def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, Any]:
+  if not args.allow_model_load:
+    raise RuntimeError(
+      "Real code-predictor export loads the cached Qwen model. Rerun with --allow-model-load "
+      "through run-with-live-service-headroom.sh."
+    )
+
+  dependencies = dependency_report()
+  report: dict[str, Any] = {
+    "schema_version": 1,
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
+    "mode": "coreai_real_code_predictor_export_smoke",
+    "status": "running",
+    "purpose": (
+      "Try torch.export plus coreai-torch on the real Qwen3-TTS code-predictor "
+      "prefill boundary using embeddings captured from a tiny non-audible generation."
+    ),
+    "source": {
+      "model_id": args.model_id,
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": args.upstream_commit,
+      "qwen_source": relative_package_path(resolve_package_path(args.qwen_source)),
+      "text_token_fixture": relative_package_path(resolve_package_path(args.text_token_fixture)),
+      "prior_capture": DEFAULT_REAL_CAPTURE_REPORT,
+    },
+    "dependencies": dependencies,
+    "local_tooling": beta_tooling_report(args),
+    "parameters": {
+      "language": args.language,
+      "device": args.device,
+      "torch_dtype": args.torch_dtype,
+      "max_new_tokens": args.max_new_tokens,
+      "do_sample": args.do_sample,
+      "subtalker_dosample": args.subtalker_dosample,
+      "seed": args.seed,
+    },
+  }
+
+  try:
+    import sys
+    import torch
+    import coreai_torch
+    from coreai_torch import TorchConverter
+    from huggingface_hub import snapshot_download
+
+    qwen_source = resolve_package_path(args.qwen_source)
+    if not (qwen_source / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py").is_file():
+      raise RuntimeError(f"Qwen3-TTS source checkout is missing at '{qwen_source}'.")
+    sys.path.insert(0, str(qwen_source))
+
+    from qwen_tts.core.models import Qwen3TTSConfig, Qwen3TTSForConditionalGeneration
+
+    torch.manual_seed(args.seed)
+    fixture = load_json_fixture(resolve_package_path(args.text_token_fixture))
+    target_ids = text_prompt_ids(fixture, args.prompt_kind)
+    input_ids = [torch.tensor([target_ids], dtype=torch.long, device=args.device)]
+
+    snapshot_path = snapshot_download(args.model_id, local_files_only=True)
+    dtype = getattr(torch, args.torch_dtype)
+    config = Qwen3TTSConfig.from_pretrained(snapshot_path)
+    model = Qwen3TTSForConditionalGeneration.from_pretrained(
+      snapshot_path,
+      config=config,
+      local_files_only=True,
+      dtype=dtype,
+    )
+    model.eval()
+    model.to(args.device)
+
+    captured: dict[str, Any] = {}
+    original_code_predictor_generate = model.talker.code_predictor.generate
+
+    def recording_code_predictor_generate(*cp_args: Any, **cp_kwargs: Any) -> Any:
+      if "inputs_embeds" not in captured:
+        captured["inputs_embeds"] = cp_kwargs["inputs_embeds"].detach().clone()
+      return original_code_predictor_generate(*cp_args, **cp_kwargs)
+
+    model.talker.code_predictor.generate = recording_code_predictor_generate
+    with torch.inference_mode():
+      model.generate(
+        input_ids=input_ids,
+        languages=[args.language],
+        speakers=[None],
+        max_new_tokens=args.max_new_tokens,
+        do_sample=args.do_sample,
+        top_k=args.top_k,
+        top_p=args.top_p,
+        temperature=args.temperature,
+        repetition_penalty=args.repetition_penalty,
+        subtalker_dosample=args.subtalker_dosample,
+        subtalker_top_k=args.subtalker_top_k,
+        subtalker_top_p=args.subtalker_top_p,
+        subtalker_temperature=args.subtalker_temperature,
+      )
+
+    if "inputs_embeds" not in captured:
+      raise RuntimeError("Generation did not reach the code-predictor boundary.")
+
+    code_predictor_inputs = captured["inputs_embeds"].to(args.device)
+
+    class RealCodePredictorPrefillBoundary(torch.nn.Module):
+      def __init__(self, code_predictor: torch.nn.Module) -> None:
+        super().__init__()
+        self.code_predictor = code_predictor
+
+      def forward(self, inputs_embeds):
+        outputs = self.code_predictor(
+          input_ids=None,
+          inputs_embeds=inputs_embeds,
+          attention_mask=None,
+          use_cache=False,
+          output_attentions=False,
+          output_hidden_states=False,
+        )
+        return outputs.logits
+
+    boundary = RealCodePredictorPrefillBoundary(model.talker.code_predictor).eval()
+    with torch.inference_mode():
+      reference_logits = boundary(code_predictor_inputs)
+
+    export_attempts = []
+    exported = None
+    for strict in [True, False]:
+      try:
+        exported = torch.export.export(boundary, args=(code_predictor_inputs,), strict=strict)
+        export_attempts.append({"strict": strict, "status": "exported"})
+        break
+      except Exception as error:
+        export_attempts.append(
+          {
+            "strict": strict,
+            "status": "failed",
+            "error": {
+              "type": type(error).__name__,
+              "message": str(error),
+              "traceback": traceback.format_exc().splitlines()[-12:],
+            },
+          }
+        )
+
+    if exported is None:
+      report.update(
+        {
+          "status": "torch_export_failed",
+          "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
+          "captured_input": tensor_summary(code_predictor_inputs, include_hash=True),
+          "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+          "torch_export_attempts": export_attempts,
+          "next_action": (
+            "Flatten or rewrite the code-predictor boundary before comparing CoreAI; "
+            "the real module did not survive torch.export."
+          ),
+        }
+      )
+      return report
+
+    decomposed = exported.run_decompositions(coreai_torch.get_decomp_table())
+    exported_module = decomposed.module()
+    with torch.inference_mode():
+      exported_logits = exported_module(code_predictor_inputs)
+    max_abs_diff = float((reference_logits.float() - exported_logits.float()).abs().max().item())
+    targets = exported_graph_targets(decomposed)
+
+    try:
+      converter = TorchConverter().add_exported_program(decomposed)
+      coreai_program = converter.to_coreai()
+      if args.optimize_coreai_program:
+        coreai_program.optimize()
+      report.update(
+        {
+          "status": "converted_real_code_predictor_to_coreai_ir",
+          "coreai_program": coreai_program_summary(coreai_program),
+          "next_action": (
+            "Inspect Core AI graph boundaries and then attempt a main-talker decode export "
+            "with explicit cache tensors."
+          ),
+        }
+      )
+    except Exception as error:
+      report.update(
+        {
+          "status": "coreai_conversion_failed_after_torch_export",
+          "coreai_conversion_error": {
+            "type": type(error).__name__,
+            "message": str(error),
+            "traceback": traceback.format_exc().splitlines()[-12:],
+          },
+          "next_action": (
+            "Use the torch.export graph and failure point to decide whether CoreAI needs "
+            "custom lowering before the main-talker cache boundary."
+          ),
+        }
+      )
+
+    report.update(
+      {
+        "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
+        "captured_input": tensor_summary(code_predictor_inputs, include_hash=True),
+        "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+        "torch_export_attempts": export_attempts,
+        "exported_program_parity": {
+          "max_abs_diff": max_abs_diff,
+          "matches_reference_within_1e_4": max_abs_diff <= 1e-4,
+          "exported_logits": tensor_summary(exported_logits, include_hash=True, topk=8),
+        },
+        "exported_graph": {
+          "call_targets": targets,
+          "call_target_count": len(targets),
+          "contains_scaled_dot_product_attention": any(
+            "scaled_dot_product_attention" in target for target in targets
+          ),
+          "contains_rsqrt": any("rsqrt" in target for target in targets),
+          "contains_cos": any("cos" in target for target in targets),
+          "contains_sin": any("sin" in target for target in targets),
+        },
+        "dependency_versions": package_versions(dependencies["packages"]),
+      }
+    )
+  except Exception as error:
+    report.update(
+      {
+        "status": "real_code_predictor_export_smoke_failed",
+        "error": {
+          "type": type(error).__name__,
+          "message": str(error),
+          "traceback": traceback.format_exc().splitlines()[-16:],
+        },
+        "next_action": "Fix the real code-predictor export blocker before widening to the main talker.",
+      }
+    )
+  return report
+
+
 def write_report(path: Path, report: dict[str, Any]) -> None:
   path.parent.mkdir(parents=True, exist_ok=True)
   sanitized = sanitize_local_paths(report)
@@ -889,7 +1125,13 @@ def parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
     "--mode",
-    choices=["preflight", "export-smoke", "real-boundary-plan", "real-boundary-capture"],
+    choices=[
+      "preflight",
+      "export-smoke",
+      "real-boundary-plan",
+      "real-boundary-capture",
+      "real-code-predictor-export-smoke",
+    ],
     default="preflight",
   )
   parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
@@ -945,6 +1187,10 @@ def main() -> None:
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_CAPTURE_REPORT)
     report = run_real_boundary_capture(args)
+  elif args.mode == "real-code-predictor-export-smoke":
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT)
+    report = run_real_code_predictor_export_smoke(args)
   else:
     report = build_report(args)
   write_report(resolve_package_path(args.report), report)

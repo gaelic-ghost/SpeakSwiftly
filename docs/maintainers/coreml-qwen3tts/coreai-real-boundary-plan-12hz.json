@@ -44,7 +44,7 @@
   "fixture_capture_contract": {
     "default_status": "design_only_no_model_download",
     "runtime_capture_requires": [
-      "--allow-model-download",
+      "--allow-model-load",
       "Qwen3-TTS source checkout",
       "live-service headroom wrapper for real-model runs"
     ],

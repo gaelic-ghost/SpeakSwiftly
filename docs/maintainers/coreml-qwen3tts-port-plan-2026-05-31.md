@@ -250,6 +250,26 @@ explicit, use the live-service headroom wrapper, require `--allow-model-load`,
 and commit only compact metadata such as tensor names, shapes, deterministic
 hashes, and top candidate token IDs. Large tensors stay under `.local/`.
 
+The first real export report is
+`docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json`.
+It captures the first code-predictor embeddings from the same non-audible
+generation path, then exports the real code-predictor prefill boundary. Strict
+`torch.export` succeeds, the exported program reproduces the PyTorch logits with
+max absolute difference `0.0`, and `coreai-torch` emits Core AI IR. The captured
+input shape is `[1, 2, 1024]` with SHA-256
+`28c0a98f004e851b6c6a97442a7828d69b227ea462ddf64d70db9d8ee562f652`; the
+reference logits shape is `[1, 2, 2048]` with SHA-256
+`e66ed386c2eb6f1b6d14001d8d820059e99ad701ae58b9df4a803ada86173d08`.
+
+This is a stronger Core AI signal than the toy boundary: it proves that at
+least one real Qwen3-TTS autoregressive submodel can move from live PyTorch
+inputs through `torch.export` into Core AI IR while preserving exact
+exported-program parity. It still does not prove the main-talker cache boundary,
+Core AI runtime latency, ANE/GPU placement, end-to-end audio quality, or public
+backend suitability. The next hard probe should flatten the main-talker decode
+step into explicit cache tensors and test Core AI conversion against the
+captured first-codebook logits.
+
 ## Compute-Unit Questions
 
 For each converted stage, measure at least these configurations where the model

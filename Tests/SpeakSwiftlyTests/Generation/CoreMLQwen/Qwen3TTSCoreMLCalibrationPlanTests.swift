@@ -130,7 +130,7 @@ import Testing
     #expect(fixture.targetBoundary.identifiedNotIncluded.contains("code-predictor continuation inputs for codebooks 1 through 15"))
     #expect(fixture.targetBoundary.excluded.contains("speech-tokenizer audio decode"))
     #expect(fixture.fixtureCaptureContract.defaultStatus == "design_only_no_model_download")
-    #expect(fixture.fixtureCaptureContract.runtimeCaptureRequires.contains("--allow-model-download"))
+    #expect(fixture.fixtureCaptureContract.runtimeCaptureRequires.contains("--allow-model-load"))
     #expect(fixture.fixtureCaptureContract.captureOutputs.contains("first-codebook logits shape and deterministic hash"))
     #expect(fixture.coreaiExportContract.route == "coreai_torch")
     #expect(fixture.coreaiExportContract.successCriteria.contains("first-codebook logits can be compared against the PyTorch fixture"))
@@ -166,6 +166,32 @@ import Testing
     #expect(fixture.finalGeneration.talkerCodes.shape == [2, 16])
     #expect(fixture.finalGeneration.firstCodebookPrefix == [1221, 1342])
     #expect(fixture.nextAction.contains("CoreAI export wrapper"))
+}
+
+@Test func `qwen3 tts core ai real code predictor export records conversion evidence`() throws {
+    let fixture = try Qwen3TTSCoreAIRealCodePredictorExportFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_real_code_predictor_export_smoke")
+    #expect(fixture.status == "converted_real_code_predictor_to_coreai_ir")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.capturedInput.shape == [1, 2, 1024])
+    #expect(fixture.capturedInput.sha256 == "28c0a98f004e851b6c6a97442a7828d69b227ea462ddf64d70db9d8ee562f652")
+    #expect(fixture.referenceLogits.shape == [1, 2, 2048])
+    #expect(fixture.referenceLogits.sha256 == "e66ed386c2eb6f1b6d14001d8d820059e99ad701ae58b9df4a803ada86173d08")
+    #expect(fixture.referenceLogits.topk?.first?.index == 3100)
+    #expect(fixture.torchExportAttempts.first?.strict == true)
+    #expect(fixture.torchExportAttempts.first?.status == "exported")
+    #expect(fixture.exportedProgramParity.maxAbsDiff == 0.0)
+    #expect(fixture.exportedProgramParity.matchesReferenceWithin1E4)
+    #expect(fixture.exportedProgramParity.exportedLogits.sha256 == fixture.referenceLogits.sha256)
+    #expect(fixture.exportedGraph.containsScaledDotProductAttention)
+    #expect(fixture.exportedGraph.containsRsqrt)
+    #expect(fixture.exportedGraph.containsCos)
+    #expect(fixture.exportedGraph.containsSin)
+    #expect(fixture.exportedGraph.callTargetCount > 500)
+    #expect(fixture.coreaiProgram.pythonType == "coreai.authoring.asset.AIProgram")
+    #expect(fixture.nextAction.contains("main-talker decode export"))
 }
 
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
@@ -527,6 +553,64 @@ private struct Qwen3TTSCoreAIRealBoundaryCaptureFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAIRealCodePredictorExportFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct Tensor: Decodable {
+        struct TopK: Decodable {
+            let index: Int
+        }
+
+        let shape: [Int]
+        let sha256: String?
+        let topk: [TopK]?
+    }
+
+    struct TorchExportAttempt: Decodable {
+        let strict: Bool
+        let status: String
+    }
+
+    struct ExportedProgramParity: Decodable {
+        let maxAbsDiff: Double
+        let matchesReferenceWithin1E4: Bool
+        let exportedLogits: Tensor
+    }
+
+    struct ExportedGraph: Decodable {
+        let callTargetCount: Int
+        let containsScaledDotProductAttention: Bool
+        let containsRsqrt: Bool
+        let containsCos: Bool
+        let containsSin: Bool
+    }
+
+    struct CoreAIProgram: Decodable {
+        let pythonType: String
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let source: Source
+    let capturedInput: Tensor
+    let referenceLogits: Tensor
+    let torchExportAttempts: [TorchExportAttempt]
+    let exportedProgramParity: ExportedProgramParity
+    let exportedGraph: ExportedGraph
+    let coreaiProgram: CoreAIProgram
+    let nextAction: String
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json",
             as: Self.self,
         )
     }
