@@ -197,6 +197,51 @@ Probe warning:
   this metadata-level proof because only tokenizers/config utilities and MLX
   execution were used.
 
+## Local MLX Weight-Load Probe
+
+The 4-bit candidate weight was downloaded into temporary storage for a local
+load probe. It was not copied into the repository.
+
+Candidate artifact finding:
+
+- Hugging Face dry-run reported one safetensors file:
+  `quantized.safetensors`, about 2.0 GB.
+- The candidate `model.safetensors.index.json` maps all weights to
+  `model.safetensors`, not `quantized.safetensors`.
+- For the local temp probe only, `model.safetensors` was symlinked to
+  `quantized.safetensors` so `mlx-audio` could attempt the load path.
+
+Live-service safety:
+
+- The running SpeakSwiftly service was asked to unload resident models before
+  the 4B-class load probe.
+- After the probe, the service was asked to reload resident models and reported
+  `resident_model_ready` on `qwen3_big_8bit`.
+
+Load results:
+
+- `mlx_audio.tts.load(local_path, lazy=True, strict=False)` failed before weight
+  loading because local-path loading used `config.json`'s
+  `higgs_multimodal_qwen3` model type directly and did not apply the
+  `MODEL_REMAPPING` entry.
+- `mlx_audio.tts.load(local_path, lazy=True, strict=False,
+  model_type="higgs_audio_v3")` reached the Higgs v3 post-load hook.
+- The post-load hook failed while constructing the Higgs audio codec because the
+  safetensors file did not contain expected codec/vocoder tensors, beginning
+  with
+  `tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.conv_t1.bias`.
+
+Practical conclusion:
+
+- `Reza2kn/Higgs-Audio-v3-TTS-4bit-MLX` is not a self-contained generation
+  artifact for the inspected `mlx-audio` runtime.
+- The 4-bit artifact can still be useful for transformer-body port work, but it
+  needs either the original codec/vocoder tensors, an `audio_tokenizer/`
+  directory in the expected layout, or a loader change that obtains the codec
+  from the upstream/base model separately.
+- Do not spend time trying one-sentence generation from this candidate alone
+  until the codec/vocoder source is resolved.
+
 ## Runtime Source Inventory
 
 The strongest MLX lead is `Blaizzy/mlx-audio` at commit
@@ -260,8 +305,8 @@ Related CUDA/server runtime references:
 Practical conclusion:
 
 - The first metadata-level MLX proof succeeded. The next proof is a heavier
-  weight-loading and one-sentence generation run through `mlx-audio`'s Python
-  Higgs v3 path.
+  loader-composition proof that pairs the 4-bit transformer body with the
+  codec/vocoder assets expected by `mlx-audio`.
 - A Swift port is no longer pure architecture discovery. It has a concrete MLX
   Python reference implementation to mirror if the Python probe succeeds.
 - Streaming remains a separate question: the `mlx-audio` implementation yields
@@ -298,12 +343,13 @@ Recommended MLX probe:
    dependencies outside the repository.
 2. Run the `mlx-audio` Higgs v3 loader against the upstream model metadata
    without committing any downloaded artifacts.
-3. If the loader reaches weight resolution cleanly, download the minimum model
-   files into the Hugging Face cache and generate one short sentence to a temp
-   WAV file.
-4. Record time to first audio, total generation time, peak process memory, MLX
+3. Resolve codec/vocoder assets for the 4-bit candidate by inspecting the
+   upstream/base model layout and the `mlx-audio` Higgs codec loader.
+4. If the composed loader reaches model-ready state cleanly, generate one short
+   sentence to a temp WAV file.
+5. Record time to first audio, total generation time, peak process memory, MLX
    memory, sample rate, and audible notes.
-5. If Python MLX succeeds, start a Swift port plan from the concrete
+6. If Python MLX succeeds, start a Swift port plan from the concrete
    `mlx_audio/tts/models/higgs_audio_v3` config, prompt, generation, and model
    files.
 
@@ -398,11 +444,11 @@ The first slice should be read-only plus one smallest possible local probe:
    loading conventions or require custom Python.
 3. Set up a temporary Python `mlx-audio` environment and run its Higgs v3 loader
    as the first executable proof.
-4. If it looks loadable, run one disk-space check before downloading weights.
-5. Download the minimum required model files to the Hugging Face cache, not the
-   repository.
-6. Generate one short English sentence to a local temp WAV file.
-7. Compare against the current Qwen3 0.6B and 1.7B benchmark shape before any
+4. Resolve the codec/vocoder asset gap discovered by the local 4-bit load
+   probe.
+5. Only after the composed loader reaches model-ready state, generate one short
+   English sentence to a local temp WAV file.
+6. Compare against the current Qwen3 0.6B and 1.7B benchmark shape before any
    runtime integration.
 
 Only start a Core AI Higgs branch after the MLX probe proves the model is worth
