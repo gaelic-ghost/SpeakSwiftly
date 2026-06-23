@@ -293,6 +293,41 @@ questions before any latency or quality claims: either fix or route around the
 BF16 lowering issue, or map the cloned KV cache into Core AI mutable state /
 explicit cache inputs and re-run parity.
 
+## Runtime Route Comparison After Core AI Probes
+
+As of the 2026-06-23 Core AI probe pass, Core AI is the strongest next
+Apple-native route to keep testing, but it is not a backend integration decision
+yet.
+
+| Route | Current evidence | What it is best for next | Do not use it for yet |
+| --- | --- | --- | --- |
+| Core AI through `coreai-torch` | Toy boundary converts; real code predictor converts to Core AI IR; real main-talker frozen-cache decode exports with exact parity; float32 main-talker converts to Core AI IR | BF16 lowering triage, mutable-state/cache modeling, Core AI Debugger/Instruments profiling | Public `SpeechBackend`, end-to-end quality claims, or resident-latency claims |
+| Hand-rolled Core ML Tools | Decoder buckets have fp16 and scoped W8A8 parity, dispatch, resident-catalog, and listening evidence | Keep decoder as the stable measured baseline and compare package size/residency against Core AI outputs | Talker/code-predictor integration until graph boundaries are understood |
+| ExecuTorch MLX delegate | Official tree exposes an experimental MLX backend with C++ runtime, FlatBuffer bytecode, LLM KV-cache and attention infrastructure | A comparison lane if Core AI mutable state or BF16 lowering becomes the bottleneck | First Apple-native route while Core AI is already producing matched local Qwen exports |
+| ExecuTorch Core ML backend | Official Apple runtime packaging includes Core ML and MPS backends for iOS/macOS Swift/Objective-C/C++ apps | Packaging/runtime comparison if Core AI graph export works but app integration looks worse than ExecuTorch | Replacing the hand-rolled Core ML decoder evidence without a placement/residency comparison |
+| Foundation Models / Core AI app intelligence | Apple positions Foundation Models for Apple Intelligence capabilities, guided generation, and tool calling | Prompt orchestration, app-level features, or product intelligence outside acoustic generation | Qwen3-TTS acoustic generation unless Apple exposes relevant speech/audio generation primitives |
+
+The practical recommendation is to stay on the Core AI branch for one more
+serious technical slice, not pivot immediately to ExecuTorch. The next slice
+should answer whether the BF16 main-talker conversion failure is a local
+lowering issue that can be removed with explicit dtype control, and whether the
+frozen KV cache can become Core AI mutable state or explicit runtime inputs.
+If either of those blocks, ExecuTorch MLX becomes the next comparison because
+its LLM-specific cache and attention infrastructure maps directly onto the
+remaining Qwen problem. ExecuTorch Core ML remains a packaging/backend
+comparison, not the first route to resolve Qwen graph shape.
+
+Authoritative docs checked for this comparison:
+
+- CoreAI-Torch conversion workflows:
+  <https://apple.github.io/coreai-torch/main/guides/conversion-workflows.html>
+- ExecuTorch iOS/macOS integration and Apple backends:
+  <https://docs.pytorch.org/executorch/stable/using-executorch-ios.html>
+- ExecuTorch MLX delegate README:
+  <https://github.com/pytorch/executorch/blob/main/backends/mlx/README.md>
+- ExecuTorch Core ML backend README:
+  <https://github.com/pytorch/executorch/blob/main/backends/apple/coreml/README.md>
+
 ## Compute-Unit Questions
 
 For each converted stage, measure at least these configurations where the model
