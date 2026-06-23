@@ -330,6 +330,7 @@ Research
 
 - [ ] Evaluate a first-party Core ML Qwen3-TTS conversion instead of adopting the current FluidInference artifact as-is.
 - [ ] Preserve the existing runtime ownership model while deciding whether Core ML deserves a real backend slot beside the MLX-backed Qwen, Marvis, and Chatterbox paths.
+- [ ] Evaluate Apple's Core AI and `coreai-torch` path as a possible successor or complement to the hand-rolled Core ML conversion, especially for Qwen talker/code-predictor graph boundaries.
 - [ ] Own the conversion split points, tokenizer boundary, fixed-shape cache policy, precision choices, and stage-specific compute-unit assignments explicitly enough that performance claims are measurable.
 - [ ] Keep the first implementation as a standalone probe until tokenizer parity, tensor parity, performance, memory, and audio quality evidence justify runtime integration.
 
@@ -338,6 +339,8 @@ Research
 - [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
 - [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
+- [ ] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [ ] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
 - [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
 - [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
@@ -365,6 +368,8 @@ Research
 - The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
 - A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
+- Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
+- Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
 - The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
 - The first Core ML quantization preflight confirms Core ML Tools 9 exposes both int8 weight quantization and experimental activation quantization APIs. Bucketed decoder reports now cover the first representative LibriTTS-R calibration shapes, so the next representative W8A8 pass can use real speech-tokenizer codes instead of only the 8-step synthetic fixture.
 - A synthetic quantization smoke showed weight-only int8 can shrink the decoder package from about 436 MB to about 110 MB, while naive global W8A8 activation quantization fails by inserting a quantize op on an `int32` audio-code path. A scoped fp16-base W8A8 smoke now succeeds by activation-quantizing only compute-heavy float ops: `conv`, `linear`, `matmul`, and `conv_transpose`.
@@ -397,6 +402,7 @@ Research
 ### Exit Criteria
 
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
+- [ ] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 
@@ -410,6 +416,7 @@ Research
 
 - [ ] Evaluate a first-party Core ML Qwen3-TTS conversion instead of adopting the current FluidInference artifact as-is.
 - [ ] Preserve the existing runtime ownership model while deciding whether Core ML deserves a real backend slot beside the MLX-backed Qwen path.
+- [ ] Evaluate Apple's Core AI and `coreai-torch` path as a possible successor or complement to the hand-rolled Core ML conversion, especially for Qwen talker/code-predictor graph boundaries.
 - [ ] Own the conversion split points, tokenizer boundary, fixed-shape cache policy, precision choices, and stage-specific compute-unit assignments explicitly enough that performance claims are measurable.
 - [ ] Keep the first implementation as a standalone probe until tokenizer parity, tensor parity, performance, memory, and audio quality evidence justify runtime integration.
 
@@ -418,6 +425,8 @@ Research
 - [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
 - [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
+- [ ] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [ ] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
 - [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
 - [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
@@ -431,11 +440,14 @@ Research
 - The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
 - A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
+- Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
+- Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
 - Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
 
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
+- [ ] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 

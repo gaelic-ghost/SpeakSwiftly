@@ -14,6 +14,19 @@ This is a backend-extension investigation. It only becomes a package runtime
 backend if the probe proves it can meet a real SpeakSwiftly use case better than
 the existing MLX Qwen path or with a valuable Apple-platform deployment tradeoff.
 
+As of 2026-06-23, Apple's newer Core AI stack and `coreai-torch` package are
+also part of this investigation. Core AI may become the better Apple-native
+runtime path if it can preserve and lower the Qwen talker/code-predictor graph
+more cleanly than the hand-rolled Core ML Tools path. Treat that as an evidence
+question, not a rename: the current Core ML decoder residency and quality data
+remain useful until a Core AI probe produces matched Qwen3-TTS outputs.
+
+Foundation Models is not a Qwen3-TTS acoustic-generation replacement. It may
+matter later for app-level intelligence, guided prompt orchestration, tool
+calling, evaluations, or product features, but it does not replace first-party
+Qwen3-TTS speech generation unless Apple exposes relevant speech or audio
+generation primitives.
+
 ## Starting Hypothesis
 
 A first-party port might outperform the current external Core ML artifact if it
@@ -37,6 +50,9 @@ Near-term use cases it unlocks:
   GPU, or mixed execution better than the public conversion
 - a possible future engine for mobile work if a Core ML path is materially more
   deployable than the MLX worker path
+- a runtime-choice decision between hand-rolled Core ML, Core AI through
+  `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before any public
+  backend surface is added
 
 Existing pain or uncertainty it removes:
 
@@ -68,6 +84,10 @@ Why that is insufficient:
 - Record exact model source, commit, Core ML Tools version, deployment target,
   input shapes, output shapes, precision, and compute-unit setting for every
   converted stage.
+- For Core AI probes, record the `coreai-torch` version, PyTorch version,
+  `torch.export` shape assumptions, preserved composite ops, custom lowerings,
+  externalized submodules, generated Core AI IR shape, and any runtime compile
+  or dispatch evidence.
 - Treat tokenizer parity as a first-class requirement. A Core ML backend that
   needs hidden Python tokenization is not ready for runtime integration.
 - Treat audible quality as evidence, but pair it with timing, token, codec-frame,
@@ -123,6 +143,38 @@ parity, precision failures, and device-placement decisions easier to isolate.
 
 If a stage is dominated by small scalar work, cache mutation, or sampling, keep
 it Swift-side until measurement proves Core ML helps.
+
+## Runtime Choice Matrix
+
+Use this matrix before widening the branch into another runtime dependency.
+
+| Route | Best first use | What would make it win | Main risk | Current status |
+| --- | --- | --- | --- | --- |
+| Hand-rolled Core ML Tools | Decoder residency, bucket routing, ANE/Core ML dispatch proof | Gives explicit stage control, stable parity, and better Apple-platform deployment than MLX | Talker/code-predictor graph may fragment into too many tiny calls or unsupported cache shapes | Decoder probe is mature; public backend remains gated |
+| Core AI through `coreai-torch` | Talker/code-predictor export and Core AI IR feasibility | Preserves attention, RoPE, RMSNorm, cache, and codebook boundaries more cleanly than Core ML Tools, with compiler-visible composite ops | New stack may still require custom lowerings or Metal kernels before Qwen3-TTS works end to end | New candidate lane; start with design plus tiny export probe |
+| ExecuTorch MLX delegate | Apple-Silicon GPU comparison for autoregressive Qwen stages | Runs Qwen-like PyTorch graphs with less bespoke Swift/Metal/Core ML glue and useful LLM runtime infrastructure | Delegate is experimental and may add runtime/package complexity without better quality or latency | Exploration candidate after Core AI export feasibility is understood |
+| ExecuTorch Core ML delegate | Runtime/package comparison against hand-rolled Core ML | Provides a maintained edge runtime and Core ML partitioning path with iOS/macOS packaging | May obscure the exact stage placement and residency controls this branch is trying to measure | Comparison candidate, not the first implementation route |
+| Existing MLX Qwen path | Baseline production-quality reference | Remains simpler, better quality, or faster than Apple-native alternatives | Does not answer mobile/Core AI/Core ML deployment questions by itself | Current baseline for quality and latency comparison |
+
+## Core AI / CoreAI-Torch First Slice
+
+Start with a small design-and-export slice before any runtime integration:
+
+1. Add a short decision memo or subsection recording current Core AI,
+   `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML evidence and the
+   acceptance criteria for each route.
+2. Identify the smallest Qwen3-TTS talker/code-predictor subgraph that exercises
+   the hard parts: attention or SDPA, RoPE, RMSNorm, KV/cache input-output shape,
+   codebook ordering, and the first codec-token output.
+3. Attempt a local `torch.export` plus `coreai-torch` conversion for that
+   subgraph only, with fixed shapes and tiny fixture inputs.
+4. Record whether conversion preserves useful composite boundaries, requires
+   custom lowerings, needs inline Metal kernels, or loses too much semantic
+   structure to be a better route than the existing Core ML Tools probes.
+
+Do not begin with the full Qwen3-TTS model, full audible generation, or a public
+`SpeechBackend`. The first useful answer is whether Core AI can represent the
+talker boundary more cleanly than the current Core ML route.
 
 ## Compute-Unit Questions
 
@@ -2137,8 +2189,35 @@ Decision:
 - Audible-quality comparison should wait until that talker path can produce a
   matched waveform fixture.
 
+### 2026-06-23 Core AI Runtime Route Added
+
+Apple's current machine-learning guidance frames Core AI as the preferred
+on-device generative-model stack and positions Core ML more as the traditional
+model-integration path. The branch should therefore evaluate Core AI as a real
+runtime route, not merely continue assuming Core ML Tools is the only
+Apple-native conversion path.
+
+`coreai-torch` is the first concrete Core AI route to test because it starts
+from PyTorch `ExportedProgram`, supports composite op preservation for model
+building blocks such as attention, RoPE, RMSNorm, and SDPA, and has extension
+points for custom lowerings and inline Metal kernels. That makes it most
+relevant to the Qwen talker/code-predictor boundary, not to replacing the
+already-useful decoder residency evidence.
+
+The next concrete slice is a read-first decision memo plus a tiny
+talker/code-predictor export probe. Success means the probe produces inspectable
+Core AI IR with useful preserved boundaries and a clear path to parity checks.
+Failure means the route should be compared against ExecuTorch MLX and
+ExecuTorch Core ML before any larger dependency adoption.
+
 ## Open Decisions
 
+- Should this branch continue as "Core ML" research, broaden to an
+  Apple-native Qwen runtime branch, or split Core AI into a dedicated follow-up
+  branch after the first `coreai-torch` export feasibility probe?
+- What is the minimum `coreai-torch` success signal: successful export only,
+  preserved composite op boundaries, first-token parity, or a timed Core AI
+  runtime pass?
 - Which upstream checkpoint should be the first target: 0.6B Base, 1.7B Base, or
   a smaller tokenizer-only path first?
 - Should the first full model probe graduate from the maintained script path
@@ -2164,6 +2243,24 @@ Decision:
   https://huggingface.co/aufklarer/Qwen3-TTS-CoreML
 - speech-swift repository:
   https://github.com/soniqo/speech-swift
+- Apple AI and Machine Learning overview:
+  https://developer.apple.com/machine-learning/
+- Core AI documentation:
+  https://developer.apple.com/documentation/coreai
+- coreai-torch documentation:
+  https://apple.github.io/coreai-torch/main/
+- coreai-torch repository:
+  https://github.com/apple/coreai-torch
+- coreai-torch conversion workflows:
+  https://apple.github.io/coreai-torch/main/guides/conversion-workflows.html
+- coreai-torch externalization guide:
+  https://apple.github.io/coreai-torch/main/guides/externalization.html
+- ExecuTorch iOS and macOS integration documentation:
+  https://docs.pytorch.org/executorch/stable/using-executorch-ios.html
+- ExecuTorch MLX delegate:
+  https://github.com/pytorch/executorch/blob/main/backends/mlx/README.md
+- ExecuTorch Core ML delegate:
+  https://github.com/pytorch/executorch/blob/main/backends/apple/coreml/README.md
 - Core ML Tools conversion guide:
   https://apple.github.io/coremltools/docs-guides/source/convert-to-ml-program.html
 - Core ML Tools typed execution guide:
