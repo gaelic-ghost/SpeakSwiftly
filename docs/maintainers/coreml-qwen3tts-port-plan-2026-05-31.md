@@ -225,10 +225,30 @@ logits. It identifies code-predictor continuation inputs for codebooks 1 through
 15 but keeps them out of the first Core AI conversion so first-token parity can
 be checked before the scope widens.
 
-The fixture is still design-only. A runtime capture must stay explicit,
-use the live-service headroom wrapper, require `--allow-model-download`, and
-commit only compact metadata such as tensor names, shapes, deterministic hashes,
-and top candidate token IDs. Large tensors stay under `.local/coreml-qwen3tts`.
+The runtime capture report is
+`docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json`. It was
+captured from the cached `Qwen/Qwen3-TTS-12Hz-0.6B-Base` snapshot with the
+live-service headroom wrapper, CPU `bfloat16`, deterministic decoding, and no
+speech-tokenizer decode or audible playback. `coreai-torch` 0.4.0 currently
+selects a Torch 2.8 through 2.11 range, so the probe uses Torch and Torchaudio
+2.11.0 rather than the older Torch 2.7-era Qwen script pin.
+
+The capture records one prefill call, two decode calls, and two code-predictor
+generate calls. The first decode step starts from previous first-codebook token
+1221, produces first-codebook logits with shape `[1, 3072]` and SHA-256
+`ed7457868ab0c6c0fafc41e2a0667401a9fe7e1246492de94b8958a8839a8eb2`, and ranks
+token 1342 first. The output main-talker cache has sequence length 10 across 28
+layers. The paired code-predictor call receives `[1, 2, 1024]` embeddings and
+returns 15 continuation codebooks, yielding a captured two-frame talker code
+prefix of `[1221, 1342]` for codebook 0.
+
+The next meaningful Core AI slice is no longer planning-only. Build a real
+export wrapper around captured Qwen tensors, starting with the code-predictor
+or post-code-predictor main-talker decode boundary, and compare exported Core AI
+logits or codebook outputs against this PyTorch capture. Keep runtime capture
+explicit, use the live-service headroom wrapper, require `--allow-model-load`,
+and commit only compact metadata such as tensor names, shapes, deterministic
+hashes, and top candidate token IDs. Large tensors stay under `.local/`.
 
 ## Compute-Unit Questions
 

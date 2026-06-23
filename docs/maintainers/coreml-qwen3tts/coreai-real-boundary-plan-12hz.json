@@ -77,6 +77,10 @@
       "the route requires custom Metal kernels before a PyTorch parity fixture exists"
     ]
   },
+  "next_runtime_capture": {
+    "status": "ready_for_opt_in_real_model_probe",
+    "command": "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh -- uv run --python 3.12 --with 'torch==2.11.0' --with 'torchaudio==2.11.0' --with 'transformers==4.57.3' --with 'accelerate==1.12.0' --with 'numpy>=2.0.0' --with 'numba>=0.61.0' --with 'soundfile>=0.13.0' --with 'librosa>=0.11.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coreai-torch==0.4.0' scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode real-boundary-capture --allow-model-load --report docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json"
+  },
   "decision_after_slice": [
     "Continue CoreAI if first-token parity and boundary visibility are intact.",
     "Compare ExecuTorch MLX if CoreAI conversion works but runtime instrumentation or packaging looks poor.",

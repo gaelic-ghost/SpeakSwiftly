@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.metadata
 import importlib.util
+import inspect
 import json
 import platform
 import re
@@ -24,6 +26,23 @@ DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
 DEFAULT_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
 DEFAULT_EXPORT_SMOKE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
 DEFAULT_REAL_BOUNDARY_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json"
+DEFAULT_REAL_CAPTURE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json"
+DEFAULT_TEXT_TOKEN_FIXTURE = "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
+DEFAULT_QWEN_SOURCE = ".local/coreai-qwen3tts/Qwen3-TTS-source"
+COREAI_RUNTIME_WITH_REQUIREMENTS = [
+  "torch==2.11.0",
+  "torchaudio==2.11.0",
+  "transformers==4.57.3",
+  "accelerate==1.12.0",
+  "numpy>=2.0.0",
+  "numba>=0.61.0",
+  "soundfile>=0.13.0",
+  "librosa>=0.11.0",
+  "sox>=1.5.0",
+  "onnxruntime>=1.23.0",
+  "einops>=0.8.0",
+  "coreai-torch==0.4.0",
+]
 LOCAL_PATH_REPLACEMENTS = [
   (str(Path.home()), "<local-home-path>"),
 ]
@@ -51,6 +70,11 @@ def relative_package_path(path: Path) -> str:
     return str(path.resolve().relative_to(package_root()))
   except ValueError:
     return str(path)
+
+
+def runtime_command_prefix() -> str:
+  with_args = " ".join(f"--with '{requirement}'" for requirement in COREAI_RUNTIME_WITH_REQUIREMENTS)
+  return f"uv run --python 3.12 {with_args}"
 
 
 def sanitize_local_paths(value: Any) -> Any:
@@ -110,15 +134,27 @@ def module_status(module_name: str, package_name: str | None = None) -> dict[str
 
 
 def dependency_report() -> dict[str, Any]:
+  package_names = {
+    "torch": "torch",
+    "torchaudio": "torchaudio",
+    "transformers": "transformers",
+    "accelerate": "accelerate",
+    "numpy": "numpy",
+    "numba": "numba",
+    "soundfile": "soundfile",
+    "librosa": "librosa",
+    "sox": "sox",
+    "onnxruntime": "onnxruntime",
+    "einops": "einops",
+    "coreai_torch": "coreai-torch",
+  }
   return {
     "python": {
       "version": platform.python_version(),
       "implementation": platform.python_implementation(),
     },
-    "packages": [
-      module_status("torch"),
-      module_status("coreai_torch", package_name="coreai-torch"),
-    ],
+    "packages": [module_status(module, package_name=package) for module, package in package_names.items()],
+    "uv_with_requirements": COREAI_RUNTIME_WITH_REQUIREMENTS,
   }
 
 
@@ -267,6 +303,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
+  real_capture_report_path = relative_package_path(resolve_package_path(Path(DEFAULT_REAL_CAPTURE_REPORT)))
   return {
     "schema_version": 1,
     "created_at_utc": args.created_at_utc or current_utc_timestamp(),
@@ -361,6 +398,15 @@ def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
         "the route requires custom Metal kernels before a PyTorch parity fixture exists",
       ],
     },
+    "next_runtime_capture": {
+      "status": "ready_for_opt_in_real_model_probe",
+      "command": (
+        "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh -- "
+        f"{runtime_command_prefix()} "
+        "scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py "
+        f"--mode real-boundary-capture --allow-model-load --report {real_capture_report_path}"
+      ),
+    },
     "decision_after_slice": [
       "Continue CoreAI if first-token parity and boundary visibility are intact.",
       "Compare ExecuTorch MLX if CoreAI conversion works but runtime instrumentation or packaging looks poor.",
@@ -368,6 +414,305 @@ def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
       "Fall back to hand-rolled Core ML stages if CoreAI cannot preserve the real talker boundary.",
     ],
   }
+
+
+def tensor_summary(tensor: Any, *, include_hash: bool = True, topk: int | None = None) -> dict[str, Any]:
+  import torch
+
+  if tensor is None:
+    return {"present": False}
+  with torch.no_grad():
+    detached = tensor.detach().cpu()
+    summary: dict[str, Any] = {
+      "present": True,
+      "shape": list(detached.shape),
+      "dtype": str(tensor.dtype).replace("torch.", ""),
+      "device": str(tensor.device),
+      "numel": int(detached.numel()),
+    }
+    if detached.is_floating_point():
+      finite = torch.isfinite(detached)
+      summary["finite"] = bool(finite.all().item()) if detached.numel() else True
+      if detached.numel():
+        summary["min"] = float(detached[finite].min().item()) if finite.any() else None
+        summary["max"] = float(detached[finite].max().item()) if finite.any() else None
+        summary["mean"] = float(detached[finite].float().mean().item()) if finite.any() else None
+    elif detached.numel():
+      summary["min"] = int(detached.min().item())
+      summary["max"] = int(detached.max().item())
+    if include_hash:
+      hash_tensor = detached.contiguous()
+      if hash_tensor.is_floating_point():
+        hash_tensor = hash_tensor.float()
+      else:
+        hash_tensor = hash_tensor.to(torch.int64)
+      summary["sha256"] = hashlib.sha256(hash_tensor.numpy().tobytes()).hexdigest()
+    if topk is not None and detached.numel():
+      flat = detached.reshape(-1).float()
+      values, indices = torch.topk(flat, k=min(topk, flat.numel()))
+      summary["topk"] = [
+        {"index": int(index.item()), "value": float(value.item())}
+        for value, index in zip(values, indices)
+      ]
+    return summary
+
+
+def cache_summary(cache: Any) -> dict[str, Any]:
+  if cache is None:
+    return {"present": False}
+  summary: dict[str, Any] = {
+    "present": True,
+    "python_type": f"{type(cache).__module__}.{type(cache).__name__}",
+  }
+  get_seq_length = getattr(cache, "get_seq_length", None)
+  if callable(get_seq_length):
+    try:
+      summary["sequence_length"] = int(get_seq_length())
+    except Exception as error:
+      summary["sequence_length_error"] = f"{type(error).__name__}: {error}"
+  layers = getattr(cache, "layers", None)
+  if layers is not None:
+    summary["layer_count"] = len(layers)
+    layer_summaries = []
+    for index, layer in enumerate(layers[:2]):
+      keys = getattr(layer, "keys", None)
+      values = getattr(layer, "values", None)
+      layer_summaries.append(
+        {
+          "index": index,
+          "python_type": f"{type(layer).__module__}.{type(layer).__name__}",
+          "keys": tensor_summary(keys, include_hash=False) if keys is not None else {"present": False},
+          "values": tensor_summary(values, include_hash=False) if values is not None else {"present": False},
+        }
+      )
+    summary["first_layers"] = layer_summaries
+  return summary
+
+
+def load_json_fixture(path: Path) -> dict[str, Any]:
+  try:
+    return json.loads(path.read_text(encoding="utf-8"))
+  except Exception as error:
+    raise RuntimeError(f"Unable to read JSON fixture '{path}'.") from error
+
+
+def text_prompt_ids(fixture: dict[str, Any], kind: str) -> list[int]:
+  for prompt in fixture.get("prompts", []):
+    if prompt.get("kind") == kind:
+      return prompt["input_ids"]
+  raise RuntimeError(f"Text token fixture does not contain a prompt with kind '{kind}'.")
+
+
+def run_real_boundary_capture(args: argparse.Namespace) -> dict[str, Any]:
+  if not args.allow_model_load:
+    raise RuntimeError(
+      "Real-boundary capture loads the cached Qwen model. Rerun with --allow-model-load "
+      "through run-with-live-service-headroom.sh."
+    )
+
+  dependencies = dependency_report()
+  report: dict[str, Any] = {
+    "schema_version": 1,
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
+    "mode": "coreai_real_talker_boundary_capture",
+    "status": "running",
+    "purpose": (
+      "Load the real cached Qwen3-TTS Base model, run a tiny non-audible generation, "
+      "and capture the first main-talker decode-step boundary for Core AI export triage."
+    ),
+    "source": {
+      "model_id": args.model_id,
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": args.upstream_commit,
+      "qwen_source": relative_package_path(resolve_package_path(args.qwen_source)),
+      "text_token_fixture": relative_package_path(resolve_package_path(args.text_token_fixture)),
+    },
+    "dependencies": dependencies,
+    "parameters": {
+      "language": args.language,
+      "device": args.device,
+      "torch_dtype": args.torch_dtype,
+      "max_new_tokens": args.max_new_tokens,
+      "do_sample": args.do_sample,
+      "subtalker_dosample": args.subtalker_dosample,
+      "top_k": args.top_k,
+      "top_p": args.top_p,
+      "temperature": args.temperature,
+      "subtalker_top_k": args.subtalker_top_k,
+      "subtalker_top_p": args.subtalker_top_p,
+      "subtalker_temperature": args.subtalker_temperature,
+      "repetition_penalty": args.repetition_penalty,
+    },
+  }
+
+  try:
+    import sys
+    import torch
+    from huggingface_hub import snapshot_download
+
+    qwen_source = resolve_package_path(args.qwen_source)
+    if not (qwen_source / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py").is_file():
+      raise RuntimeError(f"Qwen3-TTS source checkout is missing at '{qwen_source}'.")
+    sys.path.insert(0, str(qwen_source))
+
+    from qwen_tts.core.models import Qwen3TTSConfig, Qwen3TTSForConditionalGeneration
+
+    torch.manual_seed(args.seed)
+    fixture = load_json_fixture(resolve_package_path(args.text_token_fixture))
+    target_ids = text_prompt_ids(fixture, args.prompt_kind)
+    input_ids = [torch.tensor([target_ids], dtype=torch.long)]
+
+    snapshot_path = snapshot_download(args.model_id, local_files_only=True)
+    dtype = getattr(torch, args.torch_dtype)
+    config = Qwen3TTSConfig.from_pretrained(snapshot_path)
+    model = Qwen3TTSForConditionalGeneration.from_pretrained(
+      snapshot_path,
+      config=config,
+      local_files_only=True,
+      dtype=dtype,
+    )
+    model.eval()
+    model.to(args.device)
+    input_ids = [item.to(args.device) for item in input_ids]
+
+    captures: dict[str, Any] = {
+      "talker_forward_calls": [],
+      "code_predictor_generate_calls": [],
+    }
+    original_talker_forward = model.talker.forward
+    original_code_predictor_generate = model.talker.code_predictor.generate
+
+    def recording_code_predictor_generate(*cp_args: Any, **cp_kwargs: Any) -> Any:
+      call_index = len(captures["code_predictor_generate_calls"])
+      call_record = {
+        "call_index": call_index,
+        "inputs_embeds": tensor_summary(cp_kwargs.get("inputs_embeds"), include_hash=call_index == 0),
+        "max_new_tokens": cp_kwargs.get("max_new_tokens"),
+        "do_sample": cp_kwargs.get("do_sample"),
+        "top_k": cp_kwargs.get("top_k"),
+        "top_p": cp_kwargs.get("top_p"),
+        "temperature": cp_kwargs.get("temperature"),
+      }
+      result = original_code_predictor_generate(*cp_args, **cp_kwargs)
+      call_record["sequences"] = tensor_summary(result.sequences, include_hash=True)
+      captures["code_predictor_generate_calls"].append(call_record)
+      return result
+
+    def recording_talker_forward(*forward_args: Any, **forward_kwargs: Any) -> Any:
+      call_index = len(captures["talker_forward_calls"])
+      stage = "prefill"
+      inputs_embeds = forward_kwargs.get("inputs_embeds")
+      if inputs_embeds is None or inputs_embeds.shape[1] <= 1:
+        stage = "decode"
+      call_record = {
+        "call_index": call_index,
+        "stage": stage,
+        "input_ids": tensor_summary(forward_kwargs.get("input_ids"), include_hash=stage == "decode"),
+        "inputs_embeds": tensor_summary(inputs_embeds, include_hash=stage == "decode"),
+        "attention_mask": tensor_summary(forward_kwargs.get("attention_mask"), include_hash=False),
+        "cache_position": tensor_summary(forward_kwargs.get("cache_position"), include_hash=False),
+        "past_key_values": cache_summary(forward_kwargs.get("past_key_values")),
+        "past_hidden": tensor_summary(forward_kwargs.get("past_hidden"), include_hash=stage == "decode"),
+        "trailing_text_hidden": tensor_summary(forward_kwargs.get("trailing_text_hidden"), include_hash=False),
+        "generation_step": (
+          int(forward_kwargs["generation_step"])
+          if forward_kwargs.get("generation_step") is not None
+          and not hasattr(forward_kwargs.get("generation_step"), "item")
+          else (
+            int(forward_kwargs["generation_step"].item())
+            if forward_kwargs.get("generation_step") is not None
+            else None
+          )
+        ),
+      }
+      result = original_talker_forward(*forward_args, **forward_kwargs)
+      call_record["logits"] = tensor_summary(result.logits[:, -1, :], include_hash=True, topk=8)
+      call_record["output_past_key_values"] = cache_summary(result.past_key_values)
+      call_record["output_past_hidden"] = tensor_summary(result.past_hidden, include_hash=stage == "decode")
+      codec_ids = None
+      if result.hidden_states is not None and len(result.hidden_states) > 1:
+        codec_ids = result.hidden_states[-1]
+      call_record["codec_ids"] = tensor_summary(codec_ids, include_hash=codec_ids is not None)
+      captures["talker_forward_calls"].append(call_record)
+      return result
+
+    recording_talker_forward.__signature__ = inspect.signature(original_talker_forward)  # type: ignore[attr-defined]
+    model.talker.code_predictor.generate = recording_code_predictor_generate
+    model.talker.forward = recording_talker_forward
+
+    with torch.inference_mode():
+      talker_codes_list, talker_hidden_states_list = model.generate(
+        input_ids=input_ids,
+        languages=[args.language],
+        speakers=[None],
+        max_new_tokens=args.max_new_tokens,
+        do_sample=args.do_sample,
+        top_k=args.top_k,
+        top_p=args.top_p,
+        temperature=args.temperature,
+        repetition_penalty=args.repetition_penalty,
+        subtalker_dosample=args.subtalker_dosample,
+        subtalker_top_k=args.subtalker_top_k,
+        subtalker_top_p=args.subtalker_top_p,
+        subtalker_temperature=args.subtalker_temperature,
+      )
+
+    decode_calls = [call for call in captures["talker_forward_calls"] if call["stage"] == "decode"]
+    prefill_calls = [call for call in captures["talker_forward_calls"] if call["stage"] == "prefill"]
+    final_codes = talker_codes_list[0] if talker_codes_list else None
+    final_hidden = talker_hidden_states_list[0] if talker_hidden_states_list else None
+    report.update(
+      {
+        "status": "captured_real_boundary",
+        "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
+        "prompt": {
+          "kind": args.prompt_kind,
+          "token_count": len(target_ids),
+          "input_ids_sha256": hashlib.sha256(
+            torch.tensor(target_ids, dtype=torch.int64).numpy().tobytes()
+          ).hexdigest(),
+        },
+        "capture": {
+          "talker_forward_call_count": len(captures["talker_forward_calls"]),
+          "prefill_call_count": len(prefill_calls),
+          "decode_call_count": len(decode_calls),
+          "code_predictor_generate_call_count": len(captures["code_predictor_generate_calls"]),
+          "first_prefill_call": prefill_calls[0] if prefill_calls else None,
+          "first_decode_call": decode_calls[0] if decode_calls else None,
+          "first_code_predictor_generate_call": (
+            captures["code_predictor_generate_calls"][0]
+            if captures["code_predictor_generate_calls"]
+            else None
+          ),
+        },
+        "final_generation": {
+          "talker_codes": tensor_summary(final_codes, include_hash=True),
+          "talker_hidden_states": tensor_summary(final_hidden, include_hash=False),
+          "first_codebook_prefix": (
+            [int(item) for item in final_codes[: min(8, final_codes.shape[0]), 0].detach().cpu().tolist()]
+            if final_codes is not None and final_codes.numel()
+            else []
+          ),
+        },
+        "next_action": (
+          "Build a real-boundary CoreAI export wrapper around the captured first decode-step "
+          "inputs, then compare exported logits against this PyTorch capture."
+        ),
+      }
+    )
+  except Exception as error:
+    report.update(
+      {
+        "status": "real_boundary_capture_failed",
+        "error": {
+          "type": type(error).__name__,
+          "message": str(error),
+          "traceback": traceback.format_exc().splitlines()[-16:],
+        },
+        "next_action": "Fix the real capture blocker before attempting CoreAI export.",
+      }
+    )
+  return report
 
 
 def package_versions(packages: list[dict[str, Any]]) -> dict[str, Any]:
@@ -544,7 +889,7 @@ def parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
     "--mode",
-    choices=["preflight", "export-smoke", "real-boundary-plan"],
+    choices=["preflight", "export-smoke", "real-boundary-plan", "real-boundary-capture"],
     default="preflight",
   )
   parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
@@ -553,6 +898,23 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--report", type=Path, default=Path(DEFAULT_REPORT))
   parser.add_argument("--developer-dir", type=Path)
   parser.add_argument("--allow-runtime-imports", action="store_true")
+  parser.add_argument("--allow-model-load", action="store_true")
+  parser.add_argument("--qwen-source", type=Path, default=Path(DEFAULT_QWEN_SOURCE))
+  parser.add_argument("--text-token-fixture", type=Path, default=Path(DEFAULT_TEXT_TOKEN_FIXTURE))
+  parser.add_argument("--prompt-kind", default="target")
+  parser.add_argument("--language", default="english")
+  parser.add_argument("--device", default="cpu")
+  parser.add_argument("--torch-dtype", default="bfloat16", choices=["float16", "bfloat16", "float32"])
+  parser.add_argument("--max-new-tokens", type=int, default=3)
+  parser.add_argument("--do-sample", action=argparse.BooleanOptionalAction, default=False)
+  parser.add_argument("--top-k", type=int, default=50)
+  parser.add_argument("--top-p", type=float, default=1.0)
+  parser.add_argument("--temperature", type=float, default=0.9)
+  parser.add_argument("--repetition-penalty", type=float, default=1.05)
+  parser.add_argument("--subtalker-dosample", action=argparse.BooleanOptionalAction, default=False)
+  parser.add_argument("--subtalker-top-k", type=int, default=50)
+  parser.add_argument("--subtalker-top-p", type=float, default=1.0)
+  parser.add_argument("--subtalker-temperature", type=float, default=0.9)
   parser.add_argument("--optimize-coreai-program", action="store_true")
   parser.add_argument("--sequence-length", type=int, default=4)
   parser.add_argument("--hidden-size", type=int, default=32)
@@ -579,6 +941,10 @@ def main() -> None:
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_BOUNDARY_REPORT)
     report = build_real_boundary_plan(args)
+  elif args.mode == "real-boundary-capture":
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_CAPTURE_REPORT)
+    report = run_real_boundary_capture(args)
   else:
     report = build_report(args)
   write_report(resolve_package_path(args.report), report)

@@ -138,6 +138,36 @@ import Testing
     #expect(fixture.decisionAfterSlice.contains("Continue CoreAI if first-token parity and boundary visibility are intact."))
 }
 
+@Test func `qwen3 tts core ai real boundary capture records pyTorch decode evidence`() throws {
+    let fixture = try Qwen3TTSCoreAIRealBoundaryCaptureFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_real_talker_boundary_capture")
+    #expect(fixture.status == "captured_real_boundary")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.dependencies.packages.allSatisfy { $0.found })
+    #expect(fixture.parameters.device == "cpu")
+    #expect(fixture.parameters.torchDtype == "bfloat16")
+    #expect(fixture.prompt.kind == "target")
+    #expect(fixture.prompt.tokenCount == 23)
+    #expect(fixture.capture.talkerForwardCallCount == 3)
+    #expect(fixture.capture.prefillCallCount == 1)
+    #expect(fixture.capture.decodeCallCount == 2)
+    #expect(fixture.capture.codePredictorGenerateCallCount == 2)
+    #expect(fixture.capture.firstDecodeCall.inputIds.shape == [1, 1])
+    #expect(fixture.capture.firstDecodeCall.inputIds.min == 1221.0)
+    #expect(fixture.capture.firstDecodeCall.logits.shape == [1, 3072])
+    #expect(fixture.capture.firstDecodeCall.logits.sha256 == "ed7457868ab0c6c0fafc41e2a0667401a9fe7e1246492de94b8958a8839a8eb2")
+    #expect(fixture.capture.firstDecodeCall.logits.topk?.first?.index == 1342)
+    #expect(fixture.capture.firstDecodeCall.outputPastKeyValues.sequenceLength == 10)
+    #expect(fixture.capture.firstDecodeCall.outputPastKeyValues.layerCount == 28)
+    #expect(fixture.capture.firstCodePredictorGenerateCall.inputsEmbeds.shape == [1, 2, 1024])
+    #expect(fixture.capture.firstCodePredictorGenerateCall.sequences.shape == [1, 15])
+    #expect(fixture.finalGeneration.talkerCodes.shape == [2, 16])
+    #expect(fixture.finalGeneration.firstCodebookPrefix == [1221, 1342])
+    #expect(fixture.nextAction.contains("CoreAI export wrapper"))
+}
+
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
     struct Source: Decodable {
         let modelId: String
@@ -414,6 +444,89 @@ private struct Qwen3TTSCoreAIRealBoundaryPlanFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAIRealBoundaryCaptureFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct Dependencies: Decodable {
+        struct Package: Decodable {
+            let found: Bool
+        }
+
+        let packages: [Package]
+    }
+
+    struct Parameters: Decodable {
+        let device: String
+        let torchDtype: String
+    }
+
+    struct Prompt: Decodable {
+        let kind: String
+        let tokenCount: Int
+    }
+
+    struct Tensor: Decodable {
+        struct TopK: Decodable {
+            let index: Int
+        }
+
+        let shape: [Int]
+        let min: Double?
+        let sha256: String?
+        let topk: [TopK]?
+    }
+
+    struct Cache: Decodable {
+        let sequenceLength: Int?
+        let layerCount: Int?
+    }
+
+    struct Capture: Decodable {
+        struct DecodeCall: Decodable {
+            let inputIds: Tensor
+            let logits: Tensor
+            let outputPastKeyValues: Cache
+        }
+
+        struct CodePredictorGenerateCall: Decodable {
+            let inputsEmbeds: Tensor
+            let sequences: Tensor
+        }
+
+        let talkerForwardCallCount: Int
+        let prefillCallCount: Int
+        let decodeCallCount: Int
+        let codePredictorGenerateCallCount: Int
+        let firstDecodeCall: DecodeCall
+        let firstCodePredictorGenerateCall: CodePredictorGenerateCall
+    }
+
+    struct FinalGeneration: Decodable {
+        let talkerCodes: Tensor
+        let firstCodebookPrefix: [Int]
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let source: Source
+    let dependencies: Dependencies
+    let parameters: Parameters
+    let prompt: Prompt
+    let capture: Capture
+    let finalGeneration: FinalGeneration
+    let nextAction: String
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json",
             as: Self.self,
         )
     }
