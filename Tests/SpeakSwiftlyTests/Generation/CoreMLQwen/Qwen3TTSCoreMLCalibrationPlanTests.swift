@@ -200,7 +200,7 @@ import Testing
 
     #expect(bf16Fixture.schemaVersion == 1)
     #expect(bf16Fixture.mode == "coreai_real_main_talker_export_smoke")
-    #expect(bf16Fixture.status == "coreai_conversion_failed_after_main_talker_torch_export")
+    #expect(bf16Fixture.status == "converted_real_main_talker_frozen_cache_to_coreai_ir")
     #expect(bf16Fixture.parameters.torchDtype == "bfloat16")
     #expect(bf16Fixture.capturedInput.shape == [1, 1, 1024])
     #expect(bf16Fixture.capturedPositionIds.shape == [3, 1, 1])
@@ -212,7 +212,9 @@ import Testing
     #expect(bf16Fixture.torchExportAttempts.first?.strict == true)
     #expect(bf16Fixture.torchExportAttempts.first?.status == "exported")
     #expect(bf16Fixture.exportedProgramParity?.maxAbsDiff == 0.0)
-    #expect(bf16Fixture.coreaiConversionError?.message.contains("dtype f32 vs bf16") == true)
+    #expect(bf16Fixture.coreaiConversionError == nil)
+    #expect(bf16Fixture.maskPolicy?.mode == "omitted_zero_decode_mask")
+    #expect(bf16Fixture.coreaiProgram?.pythonType == "coreai.authoring.asset.AIProgram")
 
     #expect(fp32Fixture.status == "converted_real_main_talker_frozen_cache_to_coreai_ir")
     #expect(fp32Fixture.parameters.torchDtype == "float32")
@@ -691,6 +693,10 @@ private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
         let message: String
     }
 
+    struct MaskPolicy: Decodable {
+        let mode: String
+    }
+
     let schemaVersion: Int
     let mode: String
     let status: String
@@ -705,6 +711,7 @@ private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
     let exportedGraph: ExportedGraph?
     let coreaiProgram: CoreAIProgram?
     let coreaiConversionError: ConversionError?
+    let maskPolicy: MaskPolicy?
     let nextAction: String
 
     static func loadBF16() throws -> Self {

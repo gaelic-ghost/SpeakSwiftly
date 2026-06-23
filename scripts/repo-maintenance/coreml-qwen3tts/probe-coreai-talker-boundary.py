@@ -736,6 +736,40 @@ def exported_graph_targets(exported_program: Any) -> list[str]:
   return targets
 
 
+def exported_graph_suspicious_nodes(exported_program: Any, *, limit: int = 40) -> list[dict[str, Any]]:
+  graph = exported_program.graph_module.graph
+  suspicious_fragments = [
+    "full",
+    "scaled_dot_product_attention",
+    "_to_copy",
+    "where",
+    "zeros",
+    "ones",
+  ]
+  nodes = []
+  for index, node in enumerate(graph.nodes):
+    target = str(node.target)
+    if not any(fragment in target for fragment in suspicious_fragments):
+      continue
+    fake_value = node.meta.get("val")
+    node_summary: dict[str, Any] = {
+      "index": index,
+      "name": node.name,
+      "op": node.op,
+      "target": target,
+      "args": repr(node.args)[:500],
+      "kwargs": repr(node.kwargs)[:500],
+    }
+    if hasattr(fake_value, "shape"):
+      node_summary["shape"] = [int(dimension) for dimension in fake_value.shape]
+    if hasattr(fake_value, "dtype"):
+      node_summary["dtype"] = str(fake_value.dtype).replace("torch.", "")
+    nodes.append(node_summary)
+    if len(nodes) >= limit:
+      break
+  return nodes
+
+
 def coreai_program_summary(program: Any) -> dict[str, Any]:
   stable_repr = re.sub(r" at 0x[0-9a-fA-F]+", " at <address>", repr(program)[:500])
   summary = {
@@ -1287,16 +1321,7 @@ def run_real_main_talker_export_smoke(args: argparse.Namespace) -> dict[str, Any
       def forward(self, inputs_embeds, position_ids):
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
-        past_length = self.past_key_0.shape[-2]
-        decode_length = inputs_embeds.shape[1]
-        causal_mask = torch.zeros(
-          inputs_embeds.shape[0],
-          1,
-          decode_length,
-          past_length + decode_length,
-          dtype=inputs_embeds.dtype,
-          device=inputs_embeds.device,
-        )
+        causal_mask = None
         text_position_ids = position_ids[0]
 
         for layer_index, decoder_layer in enumerate(self.layers):
@@ -1418,6 +1443,7 @@ def run_real_main_talker_export_smoke(args: argparse.Namespace) -> dict[str, Any
       exported_logits = exported_module(inputs_embeds, position_ids)
     exported_max_abs_diff = float((reference_logits.float() - exported_logits.float()).abs().max().item())
     targets = exported_graph_targets(decomposed)
+    suspicious_nodes = exported_graph_suspicious_nodes(decomposed)
 
     try:
       converter = TorchConverter().add_exported_program(decomposed)
@@ -1460,6 +1486,13 @@ def run_real_main_talker_export_smoke(args: argparse.Namespace) -> dict[str, Any
           "first_key": tensor_summary(captured["cache_pairs"][0][0], include_hash=False),
           "first_value": tensor_summary(captured["cache_pairs"][0][1], include_hash=False),
         },
+        "mask_policy": {
+          "mode": "omitted_zero_decode_mask",
+          "reason": (
+            "The captured first decode step has a one-token query and all past tokens visible, "
+            "so a zero additive attention mask is equivalent to no mask for parity."
+          ),
+        },
         "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
         "frozen_cache_replay": {
           "max_abs_diff": replay_max_abs_diff,
@@ -1474,6 +1507,7 @@ def run_real_main_talker_export_smoke(args: argparse.Namespace) -> dict[str, Any
         },
         "exported_graph": {
           "call_targets": targets,
+          "suspicious_nodes": suspicious_nodes,
           "call_target_count": len(targets),
           "contains_matmul": any("matmul" in target for target in targets),
           "contains_softmax": any("softmax" in target for target in targets),

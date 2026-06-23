@@ -278,20 +278,20 @@ They capture the real first decode-step inputs, clone the 28-layer KV cache,
 replay the main-talker decode math with explicit frozen cache tensors, and
 compare the replay and exported program against the captured first-codebook
 logits. The BF16 replay and strict `torch.export` both match the PyTorch logits
-exactly, but `coreai-torch` conversion currently fails with `dtype f32 vs bf16`.
-The same probe in float32 reaches Core AI IR with exact replay and
-exported-program parity.
+exactly. Initial `coreai-torch` conversion failed with `dtype f32 vs bf16`
+because the exported graph contained a redundant zero additive attention mask;
+omitting that all-zero decode mask preserves exact parity and lets BF16 convert
+to Core AI IR. The same probe in float32 also reaches Core AI IR with exact
+replay and exported-program parity.
 
 That makes the Core AI route materially more plausible than it was at the
 start of the branch, but the route is still not backend-ready. The real
 code-predictor boundary converts to Core AI IR, and the real main-talker decode
-graph exports with exact parity; however, the production-relevant BF16 Core AI
-conversion needs a lowering or dtype fix, and the current main-talker probe uses
-frozen cache buffers rather than mutable Core AI state or explicit runtime cache
-inputs. The next implementation slice should focus on one of those two
-questions before any latency or quality claims: either fix or route around the
-BF16 lowering issue, or map the cloned KV cache into Core AI mutable state /
-explicit cache inputs and re-run parity.
+graph exports and converts with exact parity; however, the current main-talker
+probe uses frozen cache buffers rather than mutable Core AI state or explicit
+runtime cache inputs. The next implementation slice should map the cloned KV
+cache into Core AI mutable state or explicit cache inputs and re-run parity
+before any latency or quality claims.
 
 ## Runtime Route Comparison After Core AI Probes
 
@@ -301,21 +301,19 @@ yet.
 
 | Route | Current evidence | What it is best for next | Do not use it for yet |
 | --- | --- | --- | --- |
-| Core AI through `coreai-torch` | Toy boundary converts; real code predictor converts to Core AI IR; real main-talker frozen-cache decode exports with exact parity; float32 main-talker converts to Core AI IR | BF16 lowering triage, mutable-state/cache modeling, Core AI Debugger/Instruments profiling | Public `SpeechBackend`, end-to-end quality claims, or resident-latency claims |
+| Core AI through `coreai-torch` | Toy boundary converts; real code predictor converts to Core AI IR; real main-talker frozen-cache decode exports and converts with exact BF16 and float32 parity | Mutable-state/cache modeling, Core AI Debugger/Instruments profiling | Public `SpeechBackend`, end-to-end quality claims, or resident-latency claims |
 | Hand-rolled Core ML Tools | Decoder buckets have fp16 and scoped W8A8 parity, dispatch, resident-catalog, and listening evidence | Keep decoder as the stable measured baseline and compare package size/residency against Core AI outputs | Talker/code-predictor integration until graph boundaries are understood |
-| ExecuTorch MLX delegate | Official tree exposes an experimental MLX backend with C++ runtime, FlatBuffer bytecode, LLM KV-cache and attention infrastructure | A comparison lane if Core AI mutable state or BF16 lowering becomes the bottleneck | First Apple-native route while Core AI is already producing matched local Qwen exports |
+| ExecuTorch MLX delegate | Official tree exposes an experimental MLX backend with C++ runtime, FlatBuffer bytecode, LLM KV-cache and attention infrastructure | A comparison lane if Core AI mutable state becomes the bottleneck | First Apple-native route while Core AI is already producing matched local Qwen exports |
 | ExecuTorch Core ML backend | Official Apple runtime packaging includes Core ML and MPS backends for iOS/macOS Swift/Objective-C/C++ apps | Packaging/runtime comparison if Core AI graph export works but app integration looks worse than ExecuTorch | Replacing the hand-rolled Core ML decoder evidence without a placement/residency comparison |
 | Foundation Models / Core AI app intelligence | Apple positions Foundation Models for Apple Intelligence capabilities, guided generation, and tool calling | Prompt orchestration, app-level features, or product intelligence outside acoustic generation | Qwen3-TTS acoustic generation unless Apple exposes relevant speech/audio generation primitives |
 
 The practical recommendation is to stay on the Core AI branch for one more
 serious technical slice, not pivot immediately to ExecuTorch. The next slice
-should answer whether the BF16 main-talker conversion failure is a local
-lowering issue that can be removed with explicit dtype control, and whether the
-frozen KV cache can become Core AI mutable state or explicit runtime inputs.
-If either of those blocks, ExecuTorch MLX becomes the next comparison because
-its LLM-specific cache and attention infrastructure maps directly onto the
-remaining Qwen problem. ExecuTorch Core ML remains a packaging/backend
-comparison, not the first route to resolve Qwen graph shape.
+should answer whether the frozen KV cache can become Core AI mutable state or
+explicit runtime inputs. If that blocks, ExecuTorch MLX becomes the next
+comparison because its LLM-specific cache and attention infrastructure maps
+directly onto the remaining Qwen problem. ExecuTorch Core ML remains a
+packaging/backend comparison, not the first route to resolve Qwen graph shape.
 
 Authoritative docs checked for this comparison:
 
