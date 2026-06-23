@@ -57,7 +57,7 @@
   ],
   "first_slice": {
     "status": "preflight_only",
-    "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode export-smoke --allow-runtime-imports --report docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
+    "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode export-smoke --allow-runtime-imports --report docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
     "acceptance_criteria": [
       "records torch, coreai-torch, and Python versions",
       "uses fixed tiny tensors or a tiny saved upstream fixture",

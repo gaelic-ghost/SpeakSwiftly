@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-23T00:00:00Z",
+  "mode": "coreai_talker_boundary_export_smoke",
+  "status": "blocked_missing_runtime_dependencies",
+  "purpose": "Try the smallest local Core AI / coreai-torch export smoke for the Qwen3-TTS talker first-codec-token boundary without downloading Qwen weights.",
+  "source": {
+    "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "preflight_fixture": "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
+  },
+  "dependencies": {
+    "python": {
+      "version": "3.12.12",
+      "implementation": "CPython"
+    },
+    "packages": [
+      {
+        "module": "torch",
+        "package": "torch",
+        "found": false,
+        "version": null
+      },
+      {
+        "module": "coreai_torch",
+        "package": "coreai-torch",
+        "found": false,
+        "version": null
+      }
+    ]
+  },
+  "local_tooling": {
+    "developer_dir_source": "argument",
+    "developer_dir_is_set": true,
+    "summary": {
+      "coreai_build_found": true,
+      "xctrace_found": true,
+      "core_ai_template_found": true
+    },
+    "coreai_build": {
+      "command": [
+        "xcrun",
+        "--find",
+        "coreai-build"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5194.15.R5dQdn/Metal.xctoolchain/usr/bin/coreai-build",
+      "stderr": ""
+    },
+    "xctrace": {
+      "command": [
+        "xcrun",
+        "--find",
+        "xctrace"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "<local-home-path>/Applications/Betas/Xcode-beta.app/Contents/Developer/usr/bin/xctrace",
+      "stderr": ""
+    },
+    "xctrace_core_ai_template": {
+      "command": [
+        "xcrun",
+        "xctrace",
+        "list",
+        "templates"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "== Standard Templates ==\nActivity Monitor\nAllocations\nAnimation Hitches\nApp Launch\nAudio System Trace\nCPU Counters\nCPU Profiler\nCore AI\nCore ML\nData Persistence\nFile Activity\nFoundation Models\nGame Memory\nGame Performance\nGame Performance Overview\nLeaks\nLogging\nMetal System Trace\nNetwork\nPower Profiler\nProcessor Trace\nRealityKit Trace\nSwift Concurrency\nSwiftUI\nSystem Trace\nTime Profiler",
+      "stderr": ""
+    }
+  },
+  "target_subgraph": {
+    "name": "toy_qwen_talker_first_codec_token_boundary",
+    "input_shapes": {
+      "input_embeds": [
+        1,
+        4,
+        32
+      ],
+      "key_cache": [
+        1,
+        4,
+        4,
+        8
+      ],
+      "value_cache": [
+        1,
+        4,
+        4,
+        8
+      ]
+    },
+    "features": [
+      "RMSNorm-style normalization",
+      "RoPE-style pair rotation",
+      "causal scaled_dot_product_attention",
+      "KV-cache-shaped inputs",
+      "first-codebook logits projection"
+    ]
+  },
+  "missing_dependencies": [
+    "torch",
+    "coreai-torch"
+  ],
+  "next_action": "Install torch and coreai-torch in an explicit opt-in environment, then rerun export-smoke. Do not add either package as a project dependency yet."
+}

@@ -190,6 +190,15 @@ The next opt-in command is the same script with `--mode export-smoke
 --allow-runtime-imports`. That mode should remain blocked until this preflight
 target is reviewed and the local Python/Core AI dependency shape is chosen.
 
+The current local export-smoke report is
+`docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json`.
+It confirms Xcode beta's Core AI developer tools are visible when
+`DEVELOPER_DIR` points at the beta Xcode install: `coreai-build` resolves and
+`xctrace` lists the `Core AI` Instruments template. The Python smoke itself is
+blocked before conversion because this branch has not installed `torch` or
+`coreai-torch`; keep that as an explicit opt-in environment step rather than
+adding either package as a project dependency.
+
 ## Compute-Unit Questions
 
 For each converted stage, measure at least these configurations where the model

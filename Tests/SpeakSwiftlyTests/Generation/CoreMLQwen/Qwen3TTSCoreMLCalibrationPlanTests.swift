@@ -85,8 +85,27 @@ import Testing
     ])
     #expect(fixture.firstSlice.status == "preflight_only")
     #expect(fixture.firstSlice.nextCommand.contains("--mode export-smoke"))
+    #expect(fixture.firstSlice.nextCommand.contains("coreai-talker-boundary-export-smoke-12hz.json"))
     #expect(fixture.firstSlice.acceptanceCriteria.contains("reports every preserved composite op boundary"))
     #expect(fixture.guardrails.contains("Do not add a public SpeechBackend for this slice."))
+}
+
+@Test func `qwen3 tts core ai export smoke records local blocker and beta tooling`() throws {
+    let fixture = try Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_talker_boundary_export_smoke")
+    #expect(fixture.status == "blocked_missing_runtime_dependencies")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.dependencies.packages.map(\.package) == ["torch", "coreai-torch"])
+    #expect(fixture.dependencies.packages.allSatisfy { !$0.found })
+    #expect(fixture.localTooling.summary.coreaiBuildFound)
+    #expect(fixture.localTooling.summary.xctraceFound)
+    #expect(fixture.localTooling.summary.coreAiTemplateFound)
+    #expect(fixture.targetSubgraph.name == "toy_qwen_talker_first_codec_token_boundary")
+    #expect(fixture.targetSubgraph.features.contains("causal scaled_dot_product_attention"))
+    #expect(fixture.missingDependencies == ["torch", "coreai-torch"])
+    #expect(fixture.nextAction.contains("Do not add either package as a project dependency yet."))
 }
 
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
@@ -251,6 +270,53 @@ private struct Qwen3TTSCoreAITalkerBoundaryPlanFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct Dependencies: Decodable {
+        struct Package: Decodable {
+            let package: String
+            let found: Bool
+        }
+
+        let packages: [Package]
+    }
+
+    struct LocalTooling: Decodable {
+        struct Summary: Decodable {
+            let coreaiBuildFound: Bool
+            let xctraceFound: Bool
+            let coreAiTemplateFound: Bool
+        }
+
+        let summary: Summary
+    }
+
+    struct TargetSubgraph: Decodable {
+        let name: String
+        let features: [String]
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let source: Source
+    let dependencies: Dependencies
+    let localTooling: LocalTooling
+    let targetSubgraph: TargetSubgraph
+    let missingDependencies: [String]
+    let nextAction: String
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
             as: Self.self,
         )
     }
