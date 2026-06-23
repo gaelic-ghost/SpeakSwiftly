@@ -87,6 +87,9 @@ import Testing
     #expect(fixture.firstSlice.nextCommand.contains("--mode export-smoke"))
     #expect(fixture.firstSlice.nextCommand.contains("coreai-talker-boundary-export-smoke-12hz.json"))
     #expect(fixture.firstSlice.acceptanceCriteria.contains("reports every preserved composite op boundary"))
+    #expect(fixture.secondSlice.status == "planned_after_toy_conversion")
+    #expect(fixture.secondSlice.nextCommand.contains("--mode real-boundary-plan"))
+    #expect(fixture.secondSlice.acceptanceCriteria.contains("separates the main talker decode step from code-predictor continuation"))
     #expect(fixture.guardrails.contains("Do not add a public SpeechBackend for this slice."))
 }
 
@@ -112,6 +115,27 @@ import Testing
     #expect(fixture.exportedGraph.callTargetCount > 0)
     #expect(fixture.coreaiProgram.pythonType == "coreai.authoring.asset.AIProgram")
     #expect(fixture.nextAction.contains("before trying the real Qwen3-TTS talker boundary"))
+}
+
+@Test func `qwen3 tts core ai real boundary plan targets main talker decode step`() throws {
+    let fixture = try Qwen3TTSCoreAIRealBoundaryPlanFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_real_talker_boundary_plan")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.priorEvidence.textTokenFixture == "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json")
+    #expect(fixture.priorEvidence.toyCoreaiExport == "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json")
+    #expect(fixture.targetBoundary.name == "qwen3_tts_main_talker_decode_step_after_prefill")
+    #expect(fixture.targetBoundary.included.contains("prefilled main-talker KV cache"))
+    #expect(fixture.targetBoundary.identifiedNotIncluded.contains("code-predictor continuation inputs for codebooks 1 through 15"))
+    #expect(fixture.targetBoundary.excluded.contains("speech-tokenizer audio decode"))
+    #expect(fixture.fixtureCaptureContract.defaultStatus == "design_only_no_model_download")
+    #expect(fixture.fixtureCaptureContract.runtimeCaptureRequires.contains("--allow-model-download"))
+    #expect(fixture.fixtureCaptureContract.captureOutputs.contains("first-codebook logits shape and deterministic hash"))
+    #expect(fixture.coreaiExportContract.route == "coreai_torch")
+    #expect(fixture.coreaiExportContract.successCriteria.contains("first-codebook logits can be compared against the PyTorch fixture"))
+    #expect(fixture.coreaiExportContract.stopConditions.contains("capture requires full audible generation or reference-audio conditioning"))
+    #expect(fixture.decisionAfterSlice.contains("Continue CoreAI if first-token parity and boundary visibility are intact."))
 }
 
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
@@ -265,12 +289,19 @@ private struct Qwen3TTSCoreAITalkerBoundaryPlanFixture: Decodable {
         let acceptanceCriteria: [String]
     }
 
+    struct SecondSlice: Decodable {
+        let status: String
+        let nextCommand: String
+        let acceptanceCriteria: [String]
+    }
+
     let schemaVersion: Int
     let mode: String
     let source: Source
     let targetSubgraph: TargetSubgraph
     let runtimeRoutes: [RuntimeRoute]
     let firstSlice: FirstSlice
+    let secondSlice: SecondSlice
     let guardrails: [String]
 
     static func load() throws -> Self {
@@ -337,6 +368,52 @@ private struct Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAIRealBoundaryPlanFixture: Decodable {
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct PriorEvidence: Decodable {
+        let textTokenFixture: String
+        let toyCoreaiExport: String
+    }
+
+    struct TargetBoundary: Decodable {
+        let name: String
+        let included: [String]
+        let identifiedNotIncluded: [String]
+        let excluded: [String]
+    }
+
+    struct FixtureCaptureContract: Decodable {
+        let defaultStatus: String
+        let runtimeCaptureRequires: [String]
+        let captureOutputs: [String]
+    }
+
+    struct CoreAIExportContract: Decodable {
+        let route: String
+        let successCriteria: [String]
+        let stopConditions: [String]
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let source: Source
+    let priorEvidence: PriorEvidence
+    let targetBoundary: TargetBoundary
+    let fixtureCaptureContract: FixtureCaptureContract
+    let coreaiExportContract: CoreAIExportContract
+    let decisionAfterSlice: [String]
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
             as: Self.self,
         )
     }

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-23T00:00:00Z",
+  "mode": "coreai_real_talker_boundary_plan",
+  "purpose": "Define the first real Qwen3-TTS talker/code-predictor boundary to try through torch.export and coreai-torch after the toy Core AI conversion.",
+  "source": {
+    "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e"
+  },
+  "prior_evidence": {
+    "text_token_fixture": "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json",
+    "talker_code_summary": "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
+    "external_coreml_inventory": "docs/maintainers/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json",
+    "toy_coreai_export": "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
+  },
+  "target_boundary": {
+    "name": "qwen3_tts_main_talker_decode_step_after_prefill",
+    "model_path": "0.6B Base fixed-voice path with no reference audio and no audible output",
+    "why_this_boundary": "The toy Core AI smoke proved the route can lower a Qwen-shaped attention block. The next useful real boundary is one main-talker decode step after upstream PyTorch has built prompt embeddings and prefilled the cache.",
+    "included": [
+      "main talker decode step only",
+      "previous first-codebook token id",
+      "prefilled main-talker KV cache",
+      "cache position or generation step",
+      "RoPE, RMSNorm, attention or SDPA, and output logits",
+      "first-codebook logits for parity"
+    ],
+    "identified_not_included": [
+      "code-predictor continuation inputs for codebooks 1 through 15",
+      "sampling and repetition-penalty policy",
+      "speech-tokenizer decoder input assembly"
+    ],
+    "excluded": [
+      "text tokenizer implementation",
+      "full prompt assembly inside Core AI",
+      "reference-audio conditioning",
+      "full autoregressive generation loop",
+      "speech-tokenizer audio decode",
+      "audible playback or quality scoring",
+      "public SpeechBackend integration"
+    ]
+  },
+  "fixture_capture_contract": {
+    "default_status": "design_only_no_model_download",
+    "runtime_capture_requires": [
+      "--allow-model-download",
+      "Qwen3-TTS source checkout",
+      "live-service headroom wrapper for real-model runs"
+    ],
+    "capture_outputs": [
+      "prompt-wrapped text token ids",
+      "prefill input embedding shape",
+      "main-talker KV-cache tensor names and shapes",
+      "decode-step tensor input names and dtypes",
+      "first-codebook logits shape and deterministic hash",
+      "top candidate token ids before sampling",
+      "code-predictor boundary input names and shapes"
+    ],
+    "committed_output": "Commit only compact metadata, tensor names, shapes, hashes, and top-k token ids. Keep large tensors under .local/coreml-qwen3tts."
+  },
+  "coreai_export_contract": {
+    "route": "coreai_torch",
+    "first_command_shape": "Use an explicit uv environment with torch and coreai-torch, then export only the captured main-talker decode-step module.",
+    "success_criteria": [
+      "torch.export captures the boundary without running full generation",
+      "coreai-torch emits a Core AI program",
+      "attention or SDPA remains visible in the exported graph",
+      "RoPE and RMSNorm remain visible enough for parity triage",
+      "KV-cache inputs and outputs keep stable names and shapes",
+      "first-codebook logits can be compared against the PyTorch fixture"
+    ],
+    "stop_conditions": [
+      "capture requires full audible generation or reference-audio conditioning",
+      "torch.export cannot isolate the decode step from generation side effects",
+      "Core AI conversion hides or drops the boundaries needed for first-token parity",
+      "the route requires custom Metal kernels before a PyTorch parity fixture exists"
+    ]
+  },
+  "decision_after_slice": [
+    "Continue CoreAI if first-token parity and boundary visibility are intact.",
+    "Compare ExecuTorch MLX if CoreAI conversion works but runtime instrumentation or packaging looks poor.",
+    "Compare ExecuTorch Core ML if CoreAI loses placement/residency control but export boundaries are clear.",
+    "Fall back to hand-rolled Core ML stages if CoreAI cannot preserve the real talker boundary."
+  ]
+}

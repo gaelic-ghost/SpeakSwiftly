@@ -72,6 +72,16 @@
       "the route requires custom Metal kernels before a first-token parity probe exists"
     ]
   },
+  "second_slice": {
+    "status": "planned_after_toy_conversion",
+    "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode real-boundary-plan --report docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
+    "acceptance_criteria": [
+      "names the first real Qwen graph boundary to export after the toy smoke",
+      "records which existing fixtures feed the boundary",
+      "keeps model downloads and runtime imports opt-in",
+      "separates the main talker decode step from code-predictor continuation"
+    ]
+  },
   "guardrails": [
     "Do not add a public SpeechBackend for this slice.",
     "Do not run real-model audible generation for this slice.",

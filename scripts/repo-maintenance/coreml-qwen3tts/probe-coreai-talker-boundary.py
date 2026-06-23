@@ -23,6 +23,7 @@ DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
 DEFAULT_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
 DEFAULT_EXPORT_SMOKE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
+DEFAULT_REAL_BOUNDARY_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json"
 LOCAL_PATH_REPLACEMENTS = [
   (str(Path.home()), "<local-home-path>"),
 ]
@@ -151,6 +152,7 @@ def beta_tooling_report(args: argparse.Namespace) -> dict[str, Any]:
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
   export_smoke_report_path = relative_package_path(resolve_package_path(Path(DEFAULT_EXPORT_SMOKE_REPORT)))
+  real_boundary_report_path = relative_package_path(resolve_package_path(Path(DEFAULT_REAL_BOUNDARY_REPORT)))
   next_command = (
     "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py "
     "--mode export-smoke --allow-runtime-imports "
@@ -242,11 +244,128 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "the route requires custom Metal kernels before a first-token parity probe exists",
       ],
     },
+    "second_slice": {
+      "status": "planned_after_toy_conversion",
+      "next_command": (
+        "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py "
+        f"--mode real-boundary-plan --report {real_boundary_report_path}"
+      ),
+      "acceptance_criteria": [
+        "names the first real Qwen graph boundary to export after the toy smoke",
+        "records which existing fixtures feed the boundary",
+        "keeps model downloads and runtime imports opt-in",
+        "separates the main talker decode step from code-predictor continuation",
+      ],
+    },
     "guardrails": [
       "Do not add a public SpeechBackend for this slice.",
       "Do not run real-model audible generation for this slice.",
       "Do not download full Qwen3-TTS weights without an explicit opt-in flag.",
       "Keep Core ML decoder residency evidence as the baseline until Core AI produces matched outputs.",
+    ],
+  }
+
+
+def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
+  return {
+    "schema_version": 1,
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
+    "mode": "coreai_real_talker_boundary_plan",
+    "purpose": (
+      "Define the first real Qwen3-TTS talker/code-predictor boundary to try "
+      "through torch.export and coreai-torch after the toy Core AI conversion."
+    ),
+    "source": {
+      "model_id": args.model_id,
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": args.upstream_commit,
+    },
+    "prior_evidence": {
+      "text_token_fixture": "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json",
+      "talker_code_summary": "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
+      "external_coreml_inventory": (
+        "docs/maintainers/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json"
+      ),
+      "toy_coreai_export": DEFAULT_EXPORT_SMOKE_REPORT,
+    },
+    "target_boundary": {
+      "name": "qwen3_tts_main_talker_decode_step_after_prefill",
+      "model_path": "0.6B Base fixed-voice path with no reference audio and no audible output",
+      "why_this_boundary": (
+        "The toy Core AI smoke proved the route can lower a Qwen-shaped attention block. "
+        "The next useful real boundary is one main-talker decode step after upstream "
+        "PyTorch has built prompt embeddings and prefilled the cache."
+      ),
+      "included": [
+        "main talker decode step only",
+        "previous first-codebook token id",
+        "prefilled main-talker KV cache",
+        "cache position or generation step",
+        "RoPE, RMSNorm, attention or SDPA, and output logits",
+        "first-codebook logits for parity",
+      ],
+      "identified_not_included": [
+        "code-predictor continuation inputs for codebooks 1 through 15",
+        "sampling and repetition-penalty policy",
+        "speech-tokenizer decoder input assembly",
+      ],
+      "excluded": [
+        "text tokenizer implementation",
+        "full prompt assembly inside Core AI",
+        "reference-audio conditioning",
+        "full autoregressive generation loop",
+        "speech-tokenizer audio decode",
+        "audible playback or quality scoring",
+        "public SpeechBackend integration",
+      ],
+    },
+    "fixture_capture_contract": {
+      "default_status": "design_only_no_model_download",
+      "runtime_capture_requires": [
+        "--allow-model-download",
+        "Qwen3-TTS source checkout",
+        "live-service headroom wrapper for real-model runs",
+      ],
+      "capture_outputs": [
+        "prompt-wrapped text token ids",
+        "prefill input embedding shape",
+        "main-talker KV-cache tensor names and shapes",
+        "decode-step tensor input names and dtypes",
+        "first-codebook logits shape and deterministic hash",
+        "top candidate token ids before sampling",
+        "code-predictor boundary input names and shapes",
+      ],
+      "committed_output": (
+        "Commit only compact metadata, tensor names, shapes, hashes, and top-k token ids. "
+        "Keep large tensors under .local/coreml-qwen3tts."
+      ),
+    },
+    "coreai_export_contract": {
+      "route": "coreai_torch",
+      "first_command_shape": (
+        "Use an explicit uv environment with torch and coreai-torch, then export only "
+        "the captured main-talker decode-step module."
+      ),
+      "success_criteria": [
+        "torch.export captures the boundary without running full generation",
+        "coreai-torch emits a Core AI program",
+        "attention or SDPA remains visible in the exported graph",
+        "RoPE and RMSNorm remain visible enough for parity triage",
+        "KV-cache inputs and outputs keep stable names and shapes",
+        "first-codebook logits can be compared against the PyTorch fixture",
+      ],
+      "stop_conditions": [
+        "capture requires full audible generation or reference-audio conditioning",
+        "torch.export cannot isolate the decode step from generation side effects",
+        "Core AI conversion hides or drops the boundaries needed for first-token parity",
+        "the route requires custom Metal kernels before a PyTorch parity fixture exists",
+      ],
+    },
+    "decision_after_slice": [
+      "Continue CoreAI if first-token parity and boundary visibility are intact.",
+      "Compare ExecuTorch MLX if CoreAI conversion works but runtime instrumentation or packaging looks poor.",
+      "Compare ExecuTorch Core ML if CoreAI loses placement/residency control but export boundaries are clear.",
+      "Fall back to hand-rolled Core ML stages if CoreAI cannot preserve the real talker boundary.",
     ],
   }
 
@@ -423,7 +542,11 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
 
 def parse_args() -> argparse.Namespace:
   parser = argparse.ArgumentParser(description=__doc__)
-  parser.add_argument("--mode", choices=["preflight", "export-smoke"], default="preflight")
+  parser.add_argument(
+    "--mode",
+    choices=["preflight", "export-smoke", "real-boundary-plan"],
+    default="preflight",
+  )
   parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
   parser.add_argument("--upstream-commit", default=DEFAULT_UPSTREAM_COMMIT)
   parser.add_argument("--created-at-utc")
@@ -452,6 +575,10 @@ def main() -> None:
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_EXPORT_SMOKE_REPORT)
     report = run_coreai_export_smoke(args)
+  elif args.mode == "real-boundary-plan":
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_BOUNDARY_REPORT)
+    report = build_real_boundary_plan(args)
   else:
     report = build_report(args)
   write_report(resolve_package_path(args.report), report)
