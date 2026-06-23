@@ -30,6 +30,9 @@ DEFAULT_REAL_CAPTURE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boun
 DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
   "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json"
 )
+DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT = (
+  "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
+)
 DEFAULT_TEXT_TOKEN_FIXTURE = "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
 DEFAULT_QWEN_SOURCE = ".local/coreai-qwen3tts/Qwen3-TTS-source"
 COREAI_RUNTIME_WITH_REQUIREMENTS = [
@@ -1115,6 +1118,388 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
   return report
 
 
+def run_real_main_talker_export_smoke(args: argparse.Namespace) -> dict[str, Any]:
+  if not args.allow_model_load:
+    raise RuntimeError(
+      "Real main-talker export loads the cached Qwen model. Rerun with --allow-model-load "
+      "through run-with-live-service-headroom.sh."
+    )
+
+  dependencies = dependency_report()
+  report: dict[str, Any] = {
+    "schema_version": 1,
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
+    "mode": "coreai_real_main_talker_export_smoke",
+    "status": "running",
+    "purpose": (
+      "Capture the real first main-talker decode call, replay it through an explicit "
+      "frozen-KV-cache wrapper, and try torch.export plus coreai-torch conversion."
+    ),
+    "source": {
+      "model_id": args.model_id,
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": args.upstream_commit,
+      "qwen_source": relative_package_path(resolve_package_path(args.qwen_source)),
+      "text_token_fixture": relative_package_path(resolve_package_path(args.text_token_fixture)),
+      "prior_capture": DEFAULT_REAL_CAPTURE_REPORT,
+      "prior_code_predictor_export": DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT,
+    },
+    "dependencies": dependencies,
+    "local_tooling": beta_tooling_report(args),
+    "parameters": {
+      "language": args.language,
+      "device": args.device,
+      "torch_dtype": args.torch_dtype,
+      "max_new_tokens": args.max_new_tokens,
+      "do_sample": args.do_sample,
+      "subtalker_dosample": args.subtalker_dosample,
+      "seed": args.seed,
+    },
+  }
+
+  try:
+    import sys
+    import torch
+    import coreai_torch
+    from coreai_torch import TorchConverter
+    from huggingface_hub import snapshot_download
+
+    qwen_source = resolve_package_path(args.qwen_source)
+    if not (qwen_source / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py").is_file():
+      raise RuntimeError(f"Qwen3-TTS source checkout is missing at '{qwen_source}'.")
+    sys.path.insert(0, str(qwen_source))
+
+    from qwen_tts.core.models import Qwen3TTSConfig, Qwen3TTSForConditionalGeneration
+    from qwen_tts.core.models.modeling_qwen3_tts import (
+      ALL_ATTENTION_FUNCTIONS,
+      apply_multimodal_rotary_pos_emb,
+      eager_attention_forward,
+    )
+
+    torch.manual_seed(args.seed)
+    fixture = load_json_fixture(resolve_package_path(args.text_token_fixture))
+    target_ids = text_prompt_ids(fixture, args.prompt_kind)
+    input_ids = [torch.tensor([target_ids], dtype=torch.long, device=args.device)]
+
+    snapshot_path = snapshot_download(args.model_id, local_files_only=True)
+    dtype = getattr(torch, args.torch_dtype)
+    config = Qwen3TTSConfig.from_pretrained(snapshot_path)
+    model = Qwen3TTSForConditionalGeneration.from_pretrained(
+      snapshot_path,
+      config=config,
+      local_files_only=True,
+      dtype=dtype,
+    )
+    model.eval()
+    model.to(args.device)
+
+    captured: dict[str, Any] = {}
+    original_main_talker_forward = model.talker.model.forward
+
+    def recording_main_talker_forward(*forward_args: Any, **forward_kwargs: Any) -> Any:
+      past_key_values = forward_kwargs.get("past_key_values")
+      inputs_embeds = forward_kwargs.get("inputs_embeds")
+      sequence_length = None
+      if past_key_values is not None and hasattr(past_key_values, "get_seq_length"):
+        sequence_length = int(past_key_values.get_seq_length())
+      should_capture = (
+        "inputs_embeds" not in captured
+        and inputs_embeds is not None
+        and inputs_embeds.shape[1] == 1
+        and sequence_length is not None
+        and sequence_length > 0
+      )
+      if should_capture:
+        cache_pairs = []
+        for layer in past_key_values.layers:
+          cache_pairs.append(
+            (
+              layer.keys.detach().clone(),
+              layer.values.detach().clone(),
+            )
+          )
+        captured.update(
+          {
+            "inputs_embeds": inputs_embeds.detach().clone(),
+            "attention_mask": (
+              forward_kwargs["attention_mask"].detach().clone()
+              if forward_kwargs.get("attention_mask") is not None
+              else None
+            ),
+            "position_ids": (
+              forward_kwargs["position_ids"].detach().clone()
+              if forward_kwargs.get("position_ids") is not None
+              else None
+            ),
+            "cache_position": (
+              forward_kwargs["cache_position"].detach().clone()
+              if forward_kwargs.get("cache_position") is not None
+              else None
+            ),
+            "cache_pairs": cache_pairs,
+          }
+        )
+      outputs = original_main_talker_forward(*forward_args, **forward_kwargs)
+      if should_capture:
+        reference_logits = model.talker.codec_head(outputs.last_hidden_state)[:, -1, :]
+        captured["reference_logits"] = reference_logits.detach().clone()
+      return outputs
+
+    model.talker.model.forward = recording_main_talker_forward
+    with torch.inference_mode():
+      model.generate(
+        input_ids=input_ids,
+        languages=[args.language],
+        speakers=[None],
+        max_new_tokens=args.max_new_tokens,
+        do_sample=args.do_sample,
+        top_k=args.top_k,
+        top_p=args.top_p,
+        temperature=args.temperature,
+        repetition_penalty=args.repetition_penalty,
+        subtalker_dosample=args.subtalker_dosample,
+        subtalker_top_k=args.subtalker_top_k,
+        subtalker_top_p=args.subtalker_top_p,
+        subtalker_temperature=args.subtalker_temperature,
+      )
+
+    required = ["inputs_embeds", "position_ids", "cache_pairs", "reference_logits"]
+    missing = [key for key in required if key not in captured or captured[key] is None]
+    if missing:
+      raise RuntimeError(f"Generation did not capture required main-talker decode fields: {missing}.")
+
+    class FrozenCacheMainTalkerDecodeBoundary(torch.nn.Module):
+      def __init__(
+        self,
+        talker_model: torch.nn.Module,
+        codec_head: torch.nn.Module,
+        cache_pairs: list[tuple[torch.Tensor, torch.Tensor]],
+      ) -> None:
+        super().__init__()
+        self.layers = talker_model.layers
+        self.norm = talker_model.norm
+        self.rotary_emb = talker_model.rotary_emb
+        self.codec_head = codec_head
+        for index, (key, value) in enumerate(cache_pairs):
+          self.register_buffer(f"past_key_{index}", key)
+          self.register_buffer(f"past_value_{index}", value)
+
+      def forward(self, inputs_embeds, position_ids):
+        hidden_states = inputs_embeds
+        position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        past_length = self.past_key_0.shape[-2]
+        decode_length = inputs_embeds.shape[1]
+        causal_mask = torch.zeros(
+          inputs_embeds.shape[0],
+          1,
+          decode_length,
+          past_length + decode_length,
+          dtype=inputs_embeds.dtype,
+          device=inputs_embeds.device,
+        )
+        text_position_ids = position_ids[0]
+
+        for layer_index, decoder_layer in enumerate(self.layers):
+          residual = hidden_states
+          hidden_states = decoder_layer.input_layernorm(hidden_states)
+
+          attention = decoder_layer.self_attn
+          input_shape = hidden_states.shape[:-1]
+          hidden_shape = (*input_shape, -1, attention.head_dim)
+          query_states = attention.q_norm(attention.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+          key_states = attention.k_norm(attention.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
+          value_states = attention.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+
+          cos, sin = position_embeddings
+          query_states, key_states = apply_multimodal_rotary_pos_emb(
+            query_states,
+            key_states,
+            cos,
+            sin,
+            attention.rope_scaling["mrope_section"],
+            attention.rope_scaling["interleaved"],
+          )
+
+          past_key = getattr(self, f"past_key_{layer_index}")
+          past_value = getattr(self, f"past_value_{layer_index}")
+          key_states = torch.cat((past_key, key_states), dim=2)
+          value_states = torch.cat((past_value, value_states), dim=2)
+
+          attention_interface = eager_attention_forward
+          if attention.config._attn_implementation != "eager":
+            attention_interface = ALL_ATTENTION_FUNCTIONS[attention.config._attn_implementation]
+          attn_output, _ = attention_interface(
+            attention,
+            query_states,
+            key_states,
+            value_states,
+            causal_mask,
+            dropout=0.0,
+            scaling=attention.scaling,
+            sliding_window=attention.sliding_window,
+          )
+          attn_output = attn_output.transpose(1, 2).contiguous()
+          attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+          attn_output = attention.o_proj(attn_output)
+          hidden_states = residual + attn_output
+
+          residual = hidden_states
+          hidden_states = decoder_layer.post_attention_layernorm(hidden_states)
+          hidden_states = decoder_layer.mlp(hidden_states)
+          hidden_states = residual + hidden_states
+
+        hidden_states = self.norm(hidden_states)
+        _ = text_position_ids
+        return self.codec_head(hidden_states)[:, -1, :]
+
+    inputs_embeds = captured["inputs_embeds"].to(args.device)
+    position_ids = captured["position_ids"].to(args.device)
+    reference_logits = captured["reference_logits"].to(args.device)
+    boundary = FrozenCacheMainTalkerDecodeBoundary(
+      model.talker.model,
+      model.talker.codec_head,
+      captured["cache_pairs"],
+    ).eval()
+
+    with torch.inference_mode():
+      replay_logits = boundary(inputs_embeds, position_ids)
+    replay_max_abs_diff = float((reference_logits.float() - replay_logits.float()).abs().max().item())
+
+    export_attempts = []
+    exported = None
+    if replay_max_abs_diff <= args.parity_tolerance:
+      for strict in [True, False]:
+        try:
+          exported = torch.export.export(boundary, args=(inputs_embeds, position_ids), strict=strict)
+          export_attempts.append({"strict": strict, "status": "exported"})
+          break
+        except Exception as error:
+          export_attempts.append(
+            {
+              "strict": strict,
+              "status": "failed",
+              "error": {
+                "type": type(error).__name__,
+                "message": str(error),
+                "traceback": traceback.format_exc().splitlines()[-12:],
+              },
+            }
+          )
+
+    if exported is None:
+      report.update(
+        {
+          "status": "torch_export_skipped_or_failed",
+          "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
+          "captured_input": tensor_summary(inputs_embeds, include_hash=True),
+          "captured_position_ids": tensor_summary(position_ids, include_hash=True),
+          "captured_cache": {
+            "layer_count": len(captured["cache_pairs"]),
+            "first_key": tensor_summary(captured["cache_pairs"][0][0], include_hash=False),
+            "first_value": tensor_summary(captured["cache_pairs"][0][1], include_hash=False),
+          },
+          "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+          "frozen_cache_replay": {
+            "max_abs_diff": replay_max_abs_diff,
+            "matches_reference_within_tolerance": replay_max_abs_diff <= args.parity_tolerance,
+            "logits": tensor_summary(replay_logits, include_hash=True, topk=8),
+          },
+          "torch_export_attempts": export_attempts,
+          "next_action": (
+            "Fix frozen-cache replay parity before judging CoreAI conversion for the main talker."
+          ),
+        }
+      )
+      return report
+
+    decomposed = exported.run_decompositions(coreai_torch.get_decomp_table())
+    exported_module = decomposed.module()
+    with torch.inference_mode():
+      exported_logits = exported_module(inputs_embeds, position_ids)
+    exported_max_abs_diff = float((reference_logits.float() - exported_logits.float()).abs().max().item())
+    targets = exported_graph_targets(decomposed)
+
+    try:
+      converter = TorchConverter().add_exported_program(decomposed)
+      coreai_program = converter.to_coreai()
+      if args.optimize_coreai_program:
+        coreai_program.optimize()
+      report.update(
+        {
+          "status": "converted_real_main_talker_frozen_cache_to_coreai_ir",
+          "coreai_program": coreai_program_summary(coreai_program),
+          "next_action": (
+            "Replace frozen cache buffers with mutable Core AI state or explicit cache inputs, "
+            "then profile Core AI runtime placement and latency."
+          ),
+        }
+      )
+    except Exception as error:
+      report.update(
+        {
+          "status": "coreai_conversion_failed_after_main_talker_torch_export",
+          "coreai_conversion_error": {
+            "type": type(error).__name__,
+            "message": str(error),
+            "traceback": traceback.format_exc().splitlines()[-12:],
+          },
+          "next_action": (
+            "Use the main-talker torch.export graph and failure point to decide whether CoreAI "
+            "needs custom lowering or whether ExecuTorch/Core ML should be compared first."
+          ),
+        }
+      )
+
+    report.update(
+      {
+        "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
+        "captured_input": tensor_summary(inputs_embeds, include_hash=True),
+        "captured_position_ids": tensor_summary(position_ids, include_hash=True),
+        "captured_cache": {
+          "layer_count": len(captured["cache_pairs"]),
+          "first_key": tensor_summary(captured["cache_pairs"][0][0], include_hash=False),
+          "first_value": tensor_summary(captured["cache_pairs"][0][1], include_hash=False),
+        },
+        "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+        "frozen_cache_replay": {
+          "max_abs_diff": replay_max_abs_diff,
+          "matches_reference_within_tolerance": replay_max_abs_diff <= args.parity_tolerance,
+          "logits": tensor_summary(replay_logits, include_hash=True, topk=8),
+        },
+        "torch_export_attempts": export_attempts,
+        "exported_program_parity": {
+          "max_abs_diff": exported_max_abs_diff,
+          "matches_reference_within_tolerance": exported_max_abs_diff <= args.parity_tolerance,
+          "exported_logits": tensor_summary(exported_logits, include_hash=True, topk=8),
+        },
+        "exported_graph": {
+          "call_targets": targets,
+          "call_target_count": len(targets),
+          "contains_matmul": any("matmul" in target for target in targets),
+          "contains_softmax": any("softmax" in target for target in targets),
+          "contains_rsqrt": any("rsqrt" in target for target in targets),
+          "contains_cos": any("cos" in target for target in targets),
+          "contains_sin": any("sin" in target for target in targets),
+          "contains_cat": any("cat" in target for target in targets),
+        },
+        "dependency_versions": package_versions(dependencies["packages"]),
+      }
+    )
+  except Exception as error:
+    report.update(
+      {
+        "status": "real_main_talker_export_smoke_failed",
+        "error": {
+          "type": type(error).__name__,
+          "message": str(error),
+          "traceback": traceback.format_exc().splitlines()[-16:],
+        },
+        "next_action": "Fix the real main-talker export blocker before claiming CoreAI can handle Qwen decode.",
+      }
+    )
+  return report
+
+
 def write_report(path: Path, report: dict[str, Any]) -> None:
   path.parent.mkdir(parents=True, exist_ok=True)
   sanitized = sanitize_local_paths(report)
@@ -1131,6 +1516,7 @@ def parse_args() -> argparse.Namespace:
       "real-boundary-plan",
       "real-boundary-capture",
       "real-code-predictor-export-smoke",
+      "real-main-talker-export-smoke",
     ],
     default="preflight",
   )
@@ -1157,6 +1543,7 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--subtalker-top-k", type=int, default=50)
   parser.add_argument("--subtalker-top-p", type=float, default=1.0)
   parser.add_argument("--subtalker-temperature", type=float, default=0.9)
+  parser.add_argument("--parity-tolerance", type=float, default=1e-4)
   parser.add_argument("--optimize-coreai-program", action="store_true")
   parser.add_argument("--sequence-length", type=int, default=4)
   parser.add_argument("--hidden-size", type=int, default=32)
@@ -1191,6 +1578,10 @@ def main() -> None:
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT)
     report = run_real_code_predictor_export_smoke(args)
+  elif args.mode == "real-main-talker-export-smoke":
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT)
+    report = run_real_main_talker_export_smoke(args)
   else:
     report = build_report(args)
   write_report(resolve_package_path(args.report), report)

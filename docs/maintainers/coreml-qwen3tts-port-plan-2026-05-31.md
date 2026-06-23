@@ -270,6 +270,29 @@ backend suitability. The next hard probe should flatten the main-talker decode
 step into explicit cache tensors and test Core AI conversion against the
 captured first-codebook logits.
 
+The main-talker frozen-cache export reports are
+`docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json`
+and
+`docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-fp32-12hz.json`.
+They capture the real first decode-step inputs, clone the 28-layer KV cache,
+replay the main-talker decode math with explicit frozen cache tensors, and
+compare the replay and exported program against the captured first-codebook
+logits. The BF16 replay and strict `torch.export` both match the PyTorch logits
+exactly, but `coreai-torch` conversion currently fails with `dtype f32 vs bf16`.
+The same probe in float32 reaches Core AI IR with exact replay and
+exported-program parity.
+
+That makes the Core AI route materially more plausible than it was at the
+start of the branch, but the route is still not backend-ready. The real
+code-predictor boundary converts to Core AI IR, and the real main-talker decode
+graph exports with exact parity; however, the production-relevant BF16 Core AI
+conversion needs a lowering or dtype fix, and the current main-talker probe uses
+frozen cache buffers rather than mutable Core AI state or explicit runtime cache
+inputs. The next implementation slice should focus on one of those two
+questions before any latency or quality claims: either fix or route around the
+BF16 lowering issue, or map the cloned KV cache into Core AI mutable state /
+explicit cache inputs and re-run parity.
+
 ## Compute-Unit Questions
 
 For each converted stage, measure at least these configurations where the model

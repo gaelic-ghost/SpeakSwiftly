@@ -194,6 +194,38 @@ import Testing
     #expect(fixture.nextAction.contains("main-talker decode export"))
 }
 
+@Test func `qwen3 tts core ai real main talker export records dtype boundary`() throws {
+    let bf16Fixture = try Qwen3TTSCoreAIRealMainTalkerExportFixture.loadBF16()
+    let fp32Fixture = try Qwen3TTSCoreAIRealMainTalkerExportFixture.loadFP32()
+
+    #expect(bf16Fixture.schemaVersion == 1)
+    #expect(bf16Fixture.mode == "coreai_real_main_talker_export_smoke")
+    #expect(bf16Fixture.status == "coreai_conversion_failed_after_main_talker_torch_export")
+    #expect(bf16Fixture.parameters.torchDtype == "bfloat16")
+    #expect(bf16Fixture.capturedInput.shape == [1, 1, 1024])
+    #expect(bf16Fixture.capturedPositionIds.shape == [3, 1, 1])
+    #expect(bf16Fixture.capturedCache.layerCount == 28)
+    #expect(bf16Fixture.capturedCache.firstKey.shape == [1, 8, 9, 128])
+    #expect(bf16Fixture.referenceLogits.sha256 == "ed7457868ab0c6c0fafc41e2a0667401a9fe7e1246492de94b8958a8839a8eb2")
+    #expect(bf16Fixture.frozenCacheReplay.maxAbsDiff == 0.0)
+    #expect(bf16Fixture.frozenCacheReplay.matchesReferenceWithinTolerance)
+    #expect(bf16Fixture.torchExportAttempts.first?.strict == true)
+    #expect(bf16Fixture.torchExportAttempts.first?.status == "exported")
+    #expect(bf16Fixture.exportedProgramParity?.maxAbsDiff == 0.0)
+    #expect(bf16Fixture.coreaiConversionError?.message.contains("dtype f32 vs bf16") == true)
+
+    #expect(fp32Fixture.status == "converted_real_main_talker_frozen_cache_to_coreai_ir")
+    #expect(fp32Fixture.parameters.torchDtype == "float32")
+    #expect(fp32Fixture.referenceLogits.sha256 == "e93b9457796e60dfa43af960016545f25217dcb3c4d79f9f82e92fd43f1b005c")
+    #expect(fp32Fixture.frozenCacheReplay.maxAbsDiff == 0.0)
+    #expect(fp32Fixture.exportedProgramParity?.maxAbsDiff == 0.0)
+    #expect(fp32Fixture.exportedGraph?.containsRsqrt == true)
+    #expect(fp32Fixture.exportedGraph?.containsCos == true)
+    #expect(fp32Fixture.exportedGraph?.containsSin == true)
+    #expect(fp32Fixture.coreaiProgram?.pythonType == "coreai.authoring.asset.AIProgram")
+    #expect(fp32Fixture.nextAction.contains("mutable Core AI state"))
+}
+
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
     struct Source: Decodable {
         let modelId: String
@@ -611,6 +643,80 @@ private struct Qwen3TTSCoreAIRealCodePredictorExportFixture: Decodable {
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
+    struct Parameters: Decodable {
+        let torchDtype: String
+    }
+
+    struct Tensor: Decodable {
+        let shape: [Int]
+        let sha256: String?
+    }
+
+    struct CapturedCache: Decodable {
+        let layerCount: Int
+        let firstKey: Tensor
+    }
+
+    struct Replay: Decodable {
+        let maxAbsDiff: Double
+        let matchesReferenceWithinTolerance: Bool
+    }
+
+    struct TorchExportAttempt: Decodable {
+        let strict: Bool
+        let status: String
+    }
+
+    struct ExportedProgramParity: Decodable {
+        let maxAbsDiff: Double
+    }
+
+    struct ExportedGraph: Decodable {
+        let containsRsqrt: Bool
+        let containsCos: Bool
+        let containsSin: Bool
+    }
+
+    struct CoreAIProgram: Decodable {
+        let pythonType: String
+    }
+
+    struct ConversionError: Decodable {
+        let message: String
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let parameters: Parameters
+    let capturedInput: Tensor
+    let capturedPositionIds: Tensor
+    let capturedCache: CapturedCache
+    let referenceLogits: Tensor
+    let frozenCacheReplay: Replay
+    let torchExportAttempts: [TorchExportAttempt]
+    let exportedProgramParity: ExportedProgramParity?
+    let exportedGraph: ExportedGraph?
+    let coreaiProgram: CoreAIProgram?
+    let coreaiConversionError: ConversionError?
+    let nextAction: String
+
+    static func loadBF16() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json",
+            as: Self.self,
+        )
+    }
+
+    static func loadFP32() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-fp32-12hz.json",
             as: Self.self,
         )
     }
