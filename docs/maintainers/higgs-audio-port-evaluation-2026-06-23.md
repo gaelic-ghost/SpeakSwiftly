@@ -1,7 +1,7 @@
 # Higgs Audio V3 Port Evaluation
 
 Date: 2026-06-23
-Branch: `research/higgs-demodokos-audio-ports`
+Branch: `research/higgs-audio-mlx-port`
 
 ## Purpose
 
@@ -124,6 +124,114 @@ Practical conclusion:
   Swift MLX stack. The first local probe should stop at metadata/config loading
   before any 2 GB weight download.
 
+## Local MLX Preflight
+
+Local preflight on 2026-06-23:
+
+- Free space before weight download: about 23 GB available on the data volume.
+- Non-weight candidate files: 14 files totaling about 11.7 MB.
+- Candidate weight file: `quantized.safetensors`, about 2.0 GB.
+- Local Python packages checked with system `python3`: `mlx`, `mlx_lm`,
+  `transformers`, `huggingface_hub`, and `torch` were not installed.
+- Downloaded non-weight candidate files only into `/private/tmp` for inspection.
+- Did not download `quantized.safetensors`.
+
+Config/tokenizer findings:
+
+- `config.json` names `higgs_multimodal_qwen3` and
+  `HiggsMultimodalQwen3ForConditionalGeneration`.
+- Text config matches the 4B Qwen3-style body: hidden size 2560, 36 layers,
+  32 attention heads, 8 KV heads, 151,936 text vocab entries, and 32,768 max
+  position embeddings.
+- The public config does not expose `audio_tokenizer`, `codebook_size`, or
+  `num_codebooks` values.
+- `tokenizer.json` uses a BPE model, NFC normalizer, sequence pre-tokenizer, and
+  ByteLevel post-processor.
+- The tokenizer has 84 added tokens. The first special tokens include
+  `<|endoftext|>`, `<|im_start|>`, and `<|im_end|>`.
+
+Preflight decision:
+
+- Do not download the 2.0 GB weights yet.
+- The immediate blocker is not disk. The blocker is runtime shape: the candidate
+  still needs either SGLang-Omni integration or a custom Swift/MLX loader for
+  `higgs_multimodal_qwen3`, multi-codebook delayed generation, and waveform
+  decode.
+- The next useful proof is source/runtime inventory for Higgs' loader path, not
+  a weight-only download.
+
+## Runtime Source Inventory
+
+The strongest MLX lead is `Blaizzy/mlx-audio` at commit
+`412cf7cd381c2a3f6a8189af04a95af24cb415b6`. It contains a concrete
+`mlx_audio/tts/models/higgs_audio_v3/` implementation, not only a model-name
+remapping.
+
+Files inspected:
+
+- `mlx_audio/tts/models/higgs_audio_v3/README.md`
+- `mlx_audio/tts/models/higgs_audio_v3/config.py`
+- `mlx_audio/tts/models/higgs_audio_v3/generation.py`
+- `mlx_audio/tts/models/higgs_audio_v3/model.py`
+- `mlx_audio/tts/models/higgs_audio_v3/prompt.py`
+- `mlx_audio/tts/tests/test_higgs_audio_v3.py`
+- `mlx_audio/tts/utils.py`
+
+MLX implementation signals:
+
+- `MODEL_REMAPPING` maps `higgs_multimodal_qwen3` to `higgs_audio_v3`.
+- The Higgs v3 config parser extracts Qwen3 text config and audio encoder
+  config values from the upstream `config.json`.
+- The model wraps `mlx_lm.models.qwen3.Qwen3Model`, adds one fused
+  multi-codebook audio embedding table, and reuses that table as an audio
+  logits head.
+- The loader creates a `PreTrainedTokenizerFast` from `tokenizer.json` and
+  loads the Higgs audio codec from either an `audio_tokenizer/` directory or the
+  Higgs checkpoint.
+- Weight sanitization maps upstream keys from `tied.embedding.text_embedding`,
+  `body.layers`, `body.norm`, and
+  `tied.embedding.modality_embeddings.0.embedding` into the MLX model shape.
+  It intentionally skips the upstream modality projection and tied head keys.
+- Prompt assembly uses Higgs special tokens for `<|tts|>`, `<|ref_audio|>`,
+  `<|text|>`, and `<|audio|>`, with `-100` placeholders for delayed reference
+  audio-code rows.
+- The sampler implements independent per-codebook sampling, delay-pattern
+  ramp-in, end-of-code wind-down, top-k, and top-p.
+- The generation loop builds prompt embeddings, prefills a Qwen3 cache, samples
+  delayed audio rows, embeds each sampled row for the next autoregressive step,
+  reverses the delay pattern, decodes through the Higgs codec, and yields a
+  `GenerationResult`.
+- The README exposes both plain TTS and zero-shot voice cloning APIs, including
+  reusable preencoded reference audio codes.
+
+The `mlx-audio` tests cover the exact pieces a Swift port would need to mirror:
+source-config parsing, loader remapping, delay-pattern round trip, sampler
+ramp-in/wind-down, prompt placeholder placement, upstream weight-key
+sanitization, fused embedding/head shape, tiny forward shape, reference-audio
+encoding, and preencoded reference-code reuse.
+
+Related CUDA/server runtime references:
+
+- `sgl-project/sglang-omni` at commit
+  `86e73bdbece7875255434e9730876c3892fec125` has a Higgs TTS pipeline with
+  preprocessing, audio encoder, autoregressive TTS engine, and vocoder stages.
+- `vllm-project/vllm-omni` at commit
+  `d35cdd2dabb6bc8f5321a2c0c972d4ef1497e42e` has a Higgs Audio v3
+  two-stage pipeline: Stage 0 text to 8-codebook codec rows, Stage 1 codec rows
+  to 24 kHz PCM, with sync and async-chunk handoff modes.
+
+Practical conclusion:
+
+- The first executable MLX proof should use `mlx-audio`'s Python Higgs v3 path
+  before any Swift port work. That reduces the immediate question to local
+  environment setup, model file compatibility, memory, latency, and audio
+  quality.
+- A Swift port is no longer pure architecture discovery. It has a concrete MLX
+  Python reference implementation to mirror if the Python probe succeeds.
+- Streaming remains a separate question: the `mlx-audio` implementation yields
+  one final `GenerationResult`, while the vLLM-Omni server path has explicit
+  async chunking and overlap/holdback logic.
+
 ## MLX Path
 
 Higgs should start as an MLX probe because SpeakSwiftly already depends on
@@ -150,14 +258,18 @@ What is not known yet:
 
 Recommended MLX probe:
 
-1. Inspect the third-party MLX artifact file layout without downloading weights.
-2. Confirm whether it contains standard MLX weights/config or still depends on
-   Transformers custom Python model code.
-3. Build a standalone Swift probe target or script that attempts model config
-   loading only.
-4. If config loading is clean, run one short sentence through silent file output.
-5. Record time to first audio, total generation time, peak process memory, MLX
-   memory, sample rate, emitted chunk cadence, and audible notes.
+1. Set up a temporary Python environment with `mlx-audio` and its MLX
+   dependencies outside the repository.
+2. Run the `mlx-audio` Higgs v3 loader against the upstream model metadata
+   without committing any downloaded artifacts.
+3. If the loader reaches weight resolution cleanly, download the minimum model
+   files into the Hugging Face cache and generate one short sentence to a temp
+   WAV file.
+4. Record time to first audio, total generation time, peak process memory, MLX
+   memory, sample rate, and audible notes.
+5. If Python MLX succeeds, start a Swift port plan from the concrete
+   `mlx_audio/tts/models/higgs_audio_v3` config, prompt, generation, and model
+   files.
 
 ## Core AI Path
 
@@ -248,11 +360,13 @@ The first slice should be read-only plus one smallest possible local probe:
 1. Inspect `Reza2kn/Higgs-Audio-v3-TTS-4bit-MLX` metadata and small config files.
 2. Check whether its architecture and tokenizer files match standard MLX
    loading conventions or require custom Python.
-3. If it looks loadable, run one disk-space check before downloading weights.
-4. Download the minimum required model files to the Hugging Face cache, not the
+3. Set up a temporary Python `mlx-audio` environment and run its Higgs v3 loader
+   as the first executable proof.
+4. If it looks loadable, run one disk-space check before downloading weights.
+5. Download the minimum required model files to the Hugging Face cache, not the
    repository.
-5. Generate one short English sentence to a local temp WAV file.
-6. Compare against the current Qwen3 0.6B and 1.7B benchmark shape before any
+6. Generate one short English sentence to a local temp WAV file.
+7. Compare against the current Qwen3 0.6B and 1.7B benchmark shape before any
    runtime integration.
 
 Only start a Core AI Higgs branch after the MLX probe proves the model is worth
@@ -268,6 +382,12 @@ keeping in the candidate set.
   https://github.com/ml-explore/mlx-swift
 - MLX documentation:
   https://ml-explore.github.io/mlx/build/html/index.html
+- MLX Audio:
+  https://github.com/Blaizzy/mlx-audio
+- SGLang-Omni:
+  https://github.com/sgl-project/sglang-omni
+- vLLM-Omni:
+  https://github.com/vllm-project/vllm-omni
 - Core AI local docs:
   `/documentation/CoreAI`
 - Core AI integration local docs:
