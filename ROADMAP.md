@@ -339,7 +339,7 @@ Research
 - [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
 - [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
-- [ ] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [x] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
 - [x] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
 - [ ] Resolve the Core AI BF16 main-talker lowering and mutable-cache/state boundary before any backend integration or latency comparison.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
@@ -404,7 +404,7 @@ Research
 ### Exit Criteria
 
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
-- [ ] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
+- [x] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 
@@ -427,7 +427,7 @@ Research
 - [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
 - [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
-- [ ] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [x] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
 - [x] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
 - [ ] Resolve the Core AI BF16 main-talker lowering and mutable-cache/state boundary before any backend integration or latency comparison.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
@@ -451,7 +451,7 @@ Research
 ### Exit Criteria
 
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
-- [ ] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
+- [x] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 
