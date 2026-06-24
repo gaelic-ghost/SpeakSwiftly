@@ -512,6 +512,8 @@ Planned
 - [ ] Update validation lanes so first-party Apple pipeline probes have clear
   build, parity, profiling, and real-model E2E gates separate from legacy
   MLX-backed coverage.
+- [x] Record the official Higgs Audio v3 source map and runtime constants before
+  choosing a Swift or Apple-runtime graph boundary.
 
 ### Stage Notes
 
@@ -525,6 +527,12 @@ Planned
 - The Higgs Audio v3 plan in
   `docs/maintainers/higgs-audio-port-evaluation-2026-06-23.md` is the current
   first concrete expression of this direction.
+- The official-source Higgs follow-up in
+  `docs/maintainers/higgs-audio-v3/official-pipeline-inventory-2026-06-24.md`
+  and
+  `docs/maintainers/higgs-audio-v3/parity-fixture-plan-2026-06-24.md` records
+  tokenizer, prompt, decoder, sampler, codec/vocoder, waveform, and output
+  container constants before any implementation port.
 
 ### Exit Criteria
 
