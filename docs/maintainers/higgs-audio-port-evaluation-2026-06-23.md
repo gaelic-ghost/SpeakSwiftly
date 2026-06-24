@@ -337,6 +337,39 @@ What is not known yet:
   shape SpeakSwiftly expects.
 - Whether 4-bit quality is acceptable for Gale's local speech use.
 
+### Swift Dependency Surface Check
+
+`SpeakSwiftly` now pins `gaelic-ghost/mlx-audio-swift` to
+`0.101.0-gaelic.1`, which resolves to commit
+`3f6b0553188a921f635df54b5e20442001037336`.
+
+Useful surfaces in the resolved Swift package:
+
+- `MLXAudioTTS/Models/Qwen3/` already has a Qwen3 decoder stack with cache
+  support, RoPE config, tied-embedding handling, and a `SpeechGenerationModel`
+  shape.
+- `MLXAudioTTS/Models/MossTTS/` already has public delay/de-delay helpers for
+  multi-codebook audio token rows and a tokenizer-adapter pattern for
+  audio-placeholder prompts.
+- `MLXAudioTTS/Models/Qwen3TTS/` already has a Qwen3-family speech generation
+  model and speech-tokenizer implementation.
+- `MLXAudioCodecs/` includes several codec implementations, including
+  FishS1DAC, Mimi, SNAC, DACVAE, Encodec, Vocos, and Descript.
+
+Not present in the resolved Swift package:
+
+- No `Higgs` or `higgs_multimodal_qwen3` model implementation.
+- No direct Swift equivalent of the Python `mlx_audio/tts/models/higgs_audio_v3`
+  config, prompt builder, fused multi-codebook embedding/head, sampler, or
+  Higgs codec loader.
+
+Practical conclusion:
+
+- The dependency bump does not make Higgs a drop-in backend.
+- It does reduce the port surface: the likely Swift port can borrow existing
+  Qwen3 cache/backbone patterns, MOSS delay-pattern helpers, tokenizer-adapter
+  shape, and codec-loading conventions instead of starting from a blank package.
+
 Recommended MLX probe:
 
 1. Set up a temporary Python environment with `mlx-audio` and its MLX
@@ -466,6 +499,8 @@ keeping in the candidate set.
   https://ml-explore.github.io/mlx/build/html/index.html
 - MLX Audio:
   https://github.com/Blaizzy/mlx-audio
+- MLX Audio Swift fork:
+  https://github.com/gaelic-ghost/mlx-audio-swift
 - SGLang-Omni:
   https://github.com/sgl-project/sglang-omni
 - vLLM-Omni:
