@@ -249,14 +249,25 @@ def coreai_compression_api_report(allow_runtime_imports: bool) -> dict[str, Any]
       "coreai_torch_version": getattr(coreai_torch, "__version__", importlib.metadata.version("coreai-torch")),
     }
     try:
+      import torch
       from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
       from coreai_opt.quantization import Quantizer, QuantizerConfig
 
+      toy_linear_for_quantization = torch.nn.Linear(2, 2)
+      toy_linear_for_palettization = torch.nn.Linear(2, 2)
+      quantizer = Quantizer(toy_linear_for_quantization, QuantizerConfig.presets.w8())
+      palettizer = KMeansPalettizer(toy_linear_for_palettization, KMeansPalettizerConfig.presets.w8())
       api["quantization"] = {
         "has_quantizer": inspect.isclass(Quantizer),
         "has_quantizer_config": inspect.isclass(QuantizerConfig),
         "has_w8_preset": hasattr(getattr(QuantizerConfig, "presets", object()), "w8"),
         "has_w4_preset": hasattr(getattr(QuantizerConfig, "presets", object()), "w4"),
+        "w8_preset_type": f"{type(QuantizerConfig.presets.w8()).__module__}.{type(QuantizerConfig.presets.w8()).__name__}",
+        "lifecycle_methods": [
+          method
+          for method in ["prepare", "step", "finalize", "calibration_mode", "training_mode"]
+          if callable(getattr(quantizer, method, None))
+        ],
       }
       api["palettization"] = {
         "has_kmeans_palettizer": inspect.isclass(KMeansPalettizer),
@@ -264,6 +275,12 @@ def coreai_compression_api_report(allow_runtime_imports: bool) -> dict[str, Any]
         "has_w8_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w8"),
         "has_w6_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w6"),
         "has_w4_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w4"),
+        "w8_preset_type": f"{type(KMeansPalettizerConfig.presets.w8()).__module__}.{type(KMeansPalettizerConfig.presets.w8()).__name__}",
+        "lifecycle_methods": [
+          method
+          for method in ["prepare", "finalize", "calibration_mode", "training_mode"]
+          if callable(getattr(palettizer, method, None))
+        ],
       }
     except Exception as error:
       api["api_import_error"] = {

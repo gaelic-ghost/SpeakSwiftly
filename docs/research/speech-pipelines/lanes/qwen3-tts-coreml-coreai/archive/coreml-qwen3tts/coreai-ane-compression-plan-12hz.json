@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "mode": "coreai_ane_compression_plan",
-  "created_at_utc": "2026-06-24T16:30:00Z",
+  "created_at_utc": "2026-06-24T16:45:00Z",
   "status": "validated_tooling_preflight",
   "source": {
     "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
@@ -159,14 +159,29 @@
         "has_quantizer": true,
         "has_quantizer_config": true,
         "has_w8_preset": true,
-        "has_w4_preset": true
+        "has_w4_preset": true,
+        "w8_preset_type": "coreai_opt.quantization.config.quantization_config.QuantizerConfig",
+        "lifecycle_methods": [
+          "prepare",
+          "step",
+          "finalize",
+          "calibration_mode",
+          "training_mode"
+        ]
       },
       "palettization": {
         "has_kmeans_palettizer": true,
         "has_kmeans_palettizer_config": true,
         "has_w8_preset": true,
         "has_w6_preset": true,
-        "has_w4_preset": true
+        "has_w4_preset": true,
+        "w8_preset_type": "coreai_opt.palettization.config.palettization_config.KMeansPalettizerConfig",
+        "lifecycle_methods": [
+          "prepare",
+          "finalize",
+          "calibration_mode",
+          "training_mode"
+        ]
       }
     }
   },
