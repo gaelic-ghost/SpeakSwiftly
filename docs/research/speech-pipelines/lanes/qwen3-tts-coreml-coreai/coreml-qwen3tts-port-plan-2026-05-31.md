@@ -368,12 +368,14 @@ Eager-mode W8 with the same explicit axis reached `coreai-torch` conversion and
 emitted Core AI IR, but the compressed logits were not usable: prepared and
 finalized compressed logits both had max absolute drift `12.8125` versus the
 uncompressed PyTorch reference, and the exported compressed logits collapsed to
-zeros while still matching the finalized compressed graph exactly.
+zeros while still matching the finalized compressed graph exactly. A follow-up
+linear-only W8 scope produced the same `12.8125` max absolute drift, so the
+first scoped retry does not rescue the code-predictor W8 route.
 
 Decision from this slice: do not compile or profile the current W8 code-predictor
 graph for ANE. Conversion plumbing works, but the compressed model is not a
 valid candidate until W8 parity is fixed. The next compression work should either
-scope W8 to safer submodules/op names, try a different granularity/axis policy,
+try a different granularity/axis policy, inspect why eager W8 collapses logits,
 or compare palettization before returning to W8A8 activation quantization.
 
 Important guardrail: `--preferred-compute neural-engine` is only a compile

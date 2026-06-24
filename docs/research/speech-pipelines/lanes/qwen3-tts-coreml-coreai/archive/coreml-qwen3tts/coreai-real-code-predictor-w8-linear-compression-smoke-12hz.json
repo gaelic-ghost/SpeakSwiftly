@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "created_at_utc": "2026-06-24T17:50:00Z",
-  "mode": "coreai_real_code_predictor_w8_compression_smoke",
+  "created_at_utc": "2026-06-24T18:05:00Z",
+  "mode": "coreai_real_code_predictor_w8_linear_compression_smoke",
   "status": "converted_real_code_predictor_w8_to_coreai_ir_with_compression_drift",
   "purpose": "Try torch.export plus coreai-torch on the real Qwen3-TTS code-predictor prefill boundary using embeddings captured from a tiny non-audible generation.",
   "source": {
@@ -165,7 +165,7 @@
     "subtalker_dosample": false,
     "seed": 13,
     "compression_preset": "coreai-opt-w8-weight-only",
-    "compression_scope": "all",
+    "compression_scope": "linear",
     "compression_weight_axis": 0,
     "compression_execution_mode": "eager"
   },
@@ -246,8 +246,8 @@
     "status": "prepared_and_finalized",
     "package": "coreai-opt",
     "execution_mode": "eager",
-    "scope": "all",
-    "quantizer_config": "QuantizerConfig(global_config=ModuleQuantizerConfig(op_state_spec={'weight': QuantizationSpec(...)}))",
+    "scope": "linear",
+    "quantizer_config": "QuantizerConfig(module_type_configs={torch.nn.Linear: ModuleQuantizerConfig(...)})",
     "weight_spec": {
       "dtype": "int8",
       "granularity": "PerChannelGranularity",

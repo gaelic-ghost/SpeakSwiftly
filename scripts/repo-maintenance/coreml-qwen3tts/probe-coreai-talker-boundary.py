@@ -33,6 +33,9 @@ DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
 DEFAULT_REAL_CODE_PREDICTOR_W8_COMPRESSION_REPORT = (
   "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-w8-compression-smoke-12hz.json"
 )
+DEFAULT_REAL_CODE_PREDICTOR_W8_LINEAR_COMPRESSION_REPORT = (
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-w8-linear-compression-smoke-12hz.json"
+)
 DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT = (
   "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
 )
@@ -1260,7 +1263,11 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
     "schema_version": 1,
     "created_at_utc": args.created_at_utc or current_utc_timestamp(),
     "mode": (
-      "coreai_real_code_predictor_w8_compression_smoke"
+      (
+        "coreai_real_code_predictor_w8_linear_compression_smoke"
+        if args.compression_scope == "linear"
+        else "coreai_real_code_predictor_w8_compression_smoke"
+      )
       if compression_requested
       else "coreai_real_code_predictor_export_smoke"
     ),
@@ -1288,6 +1295,7 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
       "subtalker_dosample": args.subtalker_dosample,
       "seed": args.seed,
       "compression_preset": args.compression_preset,
+      "compression_scope": args.compression_scope,
       "compression_weight_axis": args.compression_weight_axis,
       "compression_execution_mode": args.compression_execution_mode,
     },
@@ -1396,10 +1404,19 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
           raise RuntimeError(f"Unsupported compression preset '{args.compression_preset}'.")
         weight_spec = QuantizationSpec(granularity=PerChannelGranularity(axis=args.compression_weight_axis))
         execution_mode = getattr(ExecutionMode, args.compression_execution_mode.upper())
-        quantizer_config = QuantizerConfig(
-          global_config=ModuleQuantizerConfig(op_state_spec={"weight": weight_spec}),
-          execution_mode=execution_mode,
-        )
+        module_config = ModuleQuantizerConfig(op_state_spec={"weight": weight_spec})
+        if args.compression_scope == "all":
+          quantizer_config = QuantizerConfig(
+            global_config=module_config,
+            execution_mode=execution_mode,
+          )
+        elif args.compression_scope == "linear":
+          quantizer_config = QuantizerConfig(
+            module_type_configs={torch.nn.Linear: module_config},
+            execution_mode=execution_mode,
+          )
+        else:
+          raise RuntimeError(f"Unsupported compression scope '{args.compression_scope}'.")
         quantizer = Quantizer(boundary, quantizer_config)
         prepared_boundary = quantizer.prepare((code_predictor_inputs,)).eval()
         with torch.no_grad():
@@ -1422,7 +1439,12 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
           "status": "prepared_and_finalized",
           "package": "coreai-opt",
           "execution_mode": args.compression_execution_mode,
-          "quantizer_config": "QuantizerConfig(global_config=ModuleQuantizerConfig(op_state_spec={'weight': QuantizationSpec(...)}))",
+          "scope": args.compression_scope,
+          "quantizer_config": (
+            "QuantizerConfig(module_type_configs={torch.nn.Linear: ModuleQuantizerConfig(...)})"
+            if args.compression_scope == "linear"
+            else "QuantizerConfig(global_config=ModuleQuantizerConfig(...))"
+          ),
           "weight_spec": {
             "dtype": "int8",
             "granularity": "PerChannelGranularity",
@@ -1459,6 +1481,7 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
               "status": "failed",
               "package": "coreai-opt",
               "execution_mode": args.compression_execution_mode,
+              "scope": args.compression_scope,
               "weight_spec": {
                 "dtype": "int8",
                 "granularity": "PerChannelGranularity",
@@ -2002,6 +2025,7 @@ def parse_args() -> argparse.Namespace:
       "real-boundary-capture",
       "real-code-predictor-export-smoke",
       "real-code-predictor-w8-compression-smoke",
+      "real-code-predictor-w8-linear-compression-smoke",
       "real-main-talker-export-smoke",
       "coreai-compression-preflight",
     ],
@@ -2036,6 +2060,11 @@ def parse_args() -> argparse.Namespace:
     "--compression-preset",
     choices=["none", "coreai-opt-w8-weight-only"],
     default="none",
+  )
+  parser.add_argument(
+    "--compression-scope",
+    choices=["all", "linear"],
+    default="all",
   )
   parser.add_argument("--compression-weight-axis", type=int, default=0)
   parser.add_argument(
@@ -2081,6 +2110,12 @@ def main() -> None:
     args.compression_preset = "coreai-opt-w8-weight-only"
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_W8_COMPRESSION_REPORT)
+    report = run_real_code_predictor_export_smoke(args)
+  elif args.mode == "real-code-predictor-w8-linear-compression-smoke":
+    args.compression_preset = "coreai-opt-w8-weight-only"
+    args.compression_scope = "linear"
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_W8_LINEAR_COMPRESSION_REPORT)
     report = run_real_code_predictor_export_smoke(args)
   elif args.mode == "real-main-talker-export-smoke":
     if args.report == Path(DEFAULT_REPORT):
