@@ -2,7 +2,8 @@
 
 ## Vision
 
-- Build a small, reliable Swift worker executable that keeps MLX and Apple-runtime concerns isolated behind a simple process boundary.
+- Build a small, reliable Swift worker executable that owns Apple-tuned local
+  speech pipelines behind a simple process boundary.
 
 ## Product Principles
 
@@ -10,7 +11,11 @@
 - Prefer one boring process boundary over multiple internal coordinators or bridges.
 - Make every operator-facing error and progress message readable and specific.
 - Keep the resident backend path fast, predictable, and easy to reason about.
-- Let `mlx-audio-swift` own model loading and generation whenever its existing API surface already fits.
+- Prefer first-party Swift, Core AI, Accelerate, CoreMedia, CoreAudio, and
+  AVFoundation pipelines for new model families instead of expanding dependency
+  ownership around `mlx-audio-swift`.
+- Treat `mlx-audio-swift` as a current dependency to shrink and eventually
+  retire, not as the default home for future generation engines.
 - Keep voice profiles immutable once created; require explicit removal instead of silent overwrite.
 - Keep playback, generation, normalization, and runtime ownership boundaries visible in both code and docs.
 
@@ -33,6 +38,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 31: macOS Retrench And Mobile Split](#milestone-31-macos-retrench-and-mobile-split)
 - [Milestone 32: Qwen-Only Output Modularization](#milestone-32-qwen-only-output-modularization)
 - [Milestone 33: First-Party Core ML Qwen3-TTS Port](#milestone-33-first-party-core-ml-qwen3-tts-port)
+- [Milestone 34: First-Party Apple Speech Pipeline Ownership](#milestone-34-first-party-apple-speech-pipeline-ownership)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -46,6 +52,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 31: macOS Retrench And Mobile Split - In Progress
 - Milestone 32: Qwen-Only Output Modularization - In Progress
 - Milestone 33: First-Party Core ML Qwen3-TTS Port - Research
+- Milestone 34: First-Party Apple Speech Pipeline Ownership - Planned
 
 ## Active Milestones
 
@@ -365,6 +372,80 @@ Research
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
+
+## Milestone 34: First-Party Apple Speech Pipeline Ownership
+
+### Status
+
+Planned
+
+### Scope
+
+- [ ] Move the package's long-term generation strategy away from dependency-led
+  model support and toward first-party Swift-owned, Apple-tuned speech
+  pipelines.
+- [ ] Treat `mlx-audio-swift` as a current compatibility dependency to shrink
+  and eventually remove, not as the default implementation home for new
+  backends.
+- [ ] Build reusable Apple-platform pipeline primitives around Core AI,
+  Accelerate, CoreMedia, CoreAudio, and AVFoundation where they give the
+  package clearer ownership, better profiling, or better local-device behavior.
+- [ ] Keep each model family behind explicit, evidence-backed backend surfaces
+  instead of inheriting broad community runtime abstractions.
+
+### Tickets
+
+- [ ] Inventory current `mlx-audio-swift` usage by concern: model loading,
+  tokenization, generation loop, audio codec/decode, streaming chunk shape,
+  Metal resource handling, and test/bootstrap support.
+- [ ] Classify each dependency use as keep-for-now, replace with Swift-owned
+  code, replace with Apple framework functionality, or remove with the backend
+  that owns it.
+- [ ] Define the first shared Apple-native pipeline primitives that can serve
+  Qwen3-TTS, Higgs Audio v3, and future local speech models without becoming a
+  generic framework too early.
+- [ ] Keep tokenizer and prompt assembly ownership explicit so official model
+  pipelines can be matched without depending on community loader behavior.
+- [ ] Keep autoregressive prefill/decode, KV-cache state, sampler policy, and
+  codebook ordering testable independently from audio playback.
+- [ ] Use Core AI for model graph candidates only after a small official-source
+  parity fixture exists for that stage.
+- [ ] Use Accelerate for small local numeric kernels when Swift-side ownership is
+  clearer than forcing the work into a model graph.
+- [ ] Use CoreMedia/CoreAudio/AVFoundation for timestamped buffers, PCM
+  interoperability, file output, and playback integration where those Apple
+  abstractions fit better than package-local ad hoc structures.
+- [ ] Add a migration plan for removing `mlx-audio-swift` from `Package.swift`
+  once Qwen3 or its successor has a first-party replacement path with matching
+  quality and validation coverage.
+- [ ] Update validation lanes so first-party Apple pipeline probes have clear
+  build, parity, profiling, and real-model E2E gates separate from legacy
+  MLX-backed coverage.
+
+### Stage Notes
+
+- This is a durable package direction, not a local implementation detail.
+- Existing MLX-backed Qwen support remains useful while the package earns its
+  first-party replacements; do not break current resident generation just to
+  remove a dependency faster.
+- Community ports such as `mlx-audio` and `mlx-audio-swift` may still be useful
+  as comparison evidence, but official model sources and Apple profiling
+  results should drive implementation decisions.
+- The Higgs Audio v3 plan in
+  `docs/maintainers/higgs-audio-port-evaluation-2026-06-23.md` is the current
+  first concrete expression of this direction.
+
+### Exit Criteria
+
+- [ ] The repository has a documented dependency-exit map for
+  `mlx-audio-swift`.
+- [ ] At least one speech model path has a runnable first-party Apple pipeline
+  probe with checked-in parity/profiling evidence.
+- [ ] The package can explain which Apple frameworks own which parts of speech
+  generation and playback without relying on community runtime architecture as
+  the default answer.
+- [ ] Removing `mlx-audio-swift` is either scheduled behind concrete remaining
+  blockers or completed with replacement validation.
 
 ## Backlog Candidates
 

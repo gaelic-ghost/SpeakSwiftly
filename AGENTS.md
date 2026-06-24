@@ -32,6 +32,14 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 - Prefer `swift package` subcommands for dependency, target, and manifest-adjacent changes before hand-editing `Package.swift`.
 - Keep package graph updates cohesive across `Package.swift`, `Package.resolved`, and related source or test targets.
 - Use `xcodebuild` only when Apple-platform configuration details, test plans, SDK behavior, or Metal-toolchain behavior matter in a way plain SwiftPM cannot validate well.
+- Treat `mlx-audio-swift` as a current compatibility dependency to shrink and
+  eventually remove, not as the default implementation home for new model
+  families.
+- For new speech model research and backend work, prefer first-party
+  Swift-owned Apple-platform pipelines using Core AI, Accelerate, CoreMedia,
+  CoreAudio, and AVFoundation where those frameworks fit the stage.
+- Treat community ports such as `mlx-audio` and `mlx-audio-swift` as comparison
+  evidence unless Gale explicitly asks to adopt or port them directly.
 - Treat the local `../speak-to-user` checkout as a clean base checkout only. It must stay on `main`, and it must stay clean.
 - Never change the local branch of the base `../speak-to-user` checkout for feature work, experiments, release bumps, or submodule updates.
 - For any monorepo change, create a new branch in a new `git worktree` and do the work there instead of touching the base `../speak-to-user` checkout.
