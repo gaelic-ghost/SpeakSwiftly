@@ -315,10 +315,60 @@ comparison because its LLM-specific cache and attention infrastructure maps
 directly onto the remaining Qwen problem. ExecuTorch Core ML remains a
 packaging/backend comparison, not the first route to resolve Qwen graph shape.
 
+## Core AI ANE and Compression Route
+
+As of 2026-06-24, the Core AI compression route is clearer than the initial
+`coreai-torch` question. `coreai-torch` is the bridge from PyTorch
+`ExportedProgram` to Core AI IR. Compression is a separate PyTorch-side
+workflow: Apple's `coreai-opt` package documents quantization, palettization,
+pruning, mixed-precision recipes, activation quantization, and Core AI
+integration before conversion.
+
+That means Core AI ANE work should not assume that the Core ML Tools W8A8
+decoder recipe transfers directly. The next route is:
+
+1. Start from a PyTorch boundary wrapper that already has parity.
+2. Apply `coreai-opt` compression to the PyTorch model or selected submodules.
+3. Validate compressed PyTorch parity before conversion.
+4. Convert with `coreai-torch` to a `.aimodel`.
+5. Compile with `coreai-build compile --preferred-compute neural-engine`.
+6. Inspect with `coreai-build inspect --json` for storage, operation, and
+   compute evidence.
+7. Profile with Core AI Runtime or Instruments before claiming ANE benefit.
+
+Local Xcode 27 beta tooling supports this probe shape. `coreai-build` exposes
+`compile`, `package`, `inspect`, and `metadata`. The `compile` subcommand
+accepts `--preferred-compute gpu`, `--preferred-compute neural-engine`, or
+`--preferred-compute none`; `inspect` can emit JSON with IO, metadata, storage,
+compute, and operation distribution. A separate `coreai-inspect` or
+`coreai-perf` binary was not found through `xcrun`; use `coreai-build inspect`
+and the Core AI Runtime/debugging surface instead.
+
+The first compression probe should target the code predictor, not the main
+talker. The code predictor already has exact exported-program parity and Core AI
+IR conversion, while the main talker still has the mutable-cache/state blocker.
+Begin with weight-only W8 on code-predictor linear layers because it is
+data-free and fast enough to prove the plumbing. Then try W8A8 activation
+quantization on linear/matmul-heavy code-predictor or main-talker projections
+only after the W8 path converts, compiles, and inspects cleanly. Palettization
+is a size and memory-pressure candidate, not an assumed hot-latency win.
+
+Pinned plan artifact:
+
+- `docs/maintainers/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json`
+
+Important guardrail: `--preferred-compute neural-engine` is only a compile
+preference. It is not dispatch proof. Treat Core AI `inspect` output and
+Instruments/Core AI Runtime profiling as the evidence gates, just as the Core
+ML decoder lane required Instruments rows before claiming Neural Engine
+execution.
+
 Authoritative docs checked for this comparison:
 
 - CoreAI-Torch conversion workflows:
   <https://apple.github.io/coreai-torch/main/guides/conversion-workflows.html>
+- Core AI Optimization:
+  <https://apple.github.io/coreai-optimization/>
 - ExecuTorch iOS/macOS integration and Apple backends:
   <https://docs.pytorch.org/executorch/stable/using-executorch-ios.html>
 - ExecuTorch MLX delegate README:
@@ -2401,6 +2451,10 @@ ExecuTorch Core ML before any larger dependency adoption.
   https://apple.github.io/coreai-torch/main/
 - coreai-torch repository:
   https://github.com/apple/coreai-torch
+- coreai-optimization documentation:
+  https://apple.github.io/coreai-optimization/
+- coreai-optimization repository:
+  https://github.com/apple/coreai-optimization
 - coreai-torch conversion workflows:
   https://apple.github.io/coreai-torch/main/guides/conversion-workflows.html
 - coreai-torch externalization guide:

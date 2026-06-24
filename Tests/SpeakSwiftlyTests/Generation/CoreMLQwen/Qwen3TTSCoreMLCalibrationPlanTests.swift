@@ -228,6 +228,39 @@ import Testing
     #expect(fp32Fixture.nextAction.contains("mutable Core AI state"))
 }
 
+@Test func `qwen3 tts core ai ane compression plan separates conversion from optimization`() throws {
+    let fixture = try Qwen3TTSCoreAIANECompressionPlanFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_ane_compression_plan")
+    #expect(fixture.status == "design_only_no_model_probe")
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.found)
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.subcommands == [
+        "compile",
+        "package",
+        "inspect",
+        "metadata",
+    ])
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.compilePreferredComputeValues.contains("neural-engine"))
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectJson)
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectCompute)
+    #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectStorage)
+    #expect(fixture.localTooling.ambientCoreaiOptPythonPackage.found == false)
+    #expect(fixture.localTooling.coreaiTorch.observedVersion == "0.4.0")
+    #expect(fixture.localTooling.coreaiTorch.compressionSupportObservedInInstalledPackage.palettizedWeightModule)
+    #expect(fixture.route.name == "coreai_opt_to_coreai_torch_to_coreai_build")
+    #expect(fixture.route.whyCoreaiTorchAloneIsNotEnough.contains("coreai-torch converts"))
+    #expect(fixture.compressionOptions.map(\.name).contains("w8_weight_only"))
+    #expect(fixture.compressionOptions.map(\.name).contains("w8a8_activation_quantization"))
+    #expect(fixture.compressionOptions.map(\.name).contains("palettization"))
+    #expect(fixture.firstProbe.name == "code_predictor_w8_weight_only_compile_inspect")
+    #expect(fixture.firstProbe.status == "next_concrete_slice")
+    #expect(fixture.firstProbe.acceptanceCriteria.contains("coreai-build compile accepts the saved .aimodel with --preferred-compute neural-engine"))
+    #expect(fixture.firstProbe.nonGoals.contains("claiming ANE benefit from compile preference alone"))
+    #expect(fixture.risks.contains("Core AI may compile with neural-engine preference while still dispatching some operations elsewhere."))
+    #expect(fixture.nextCommand.contains("--compression-preflight coreai-opt-w8"))
+}
+
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
     struct Source: Decodable {
         let modelId: String
@@ -724,6 +757,69 @@ private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
     static func loadFP32() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
             "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-fp32-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
+private struct Qwen3TTSCoreAIANECompressionPlanFixture: Decodable {
+    struct LocalTooling: Decodable {
+        struct CoreAIBuild: Decodable {
+            let found: Bool
+            let subcommands: [String]
+            let compilePreferredComputeValues: [String]
+            let inspectJson: Bool
+            let inspectCompute: Bool
+            let inspectStorage: Bool
+        }
+
+        struct PackageStatus: Decodable {
+            let found: Bool
+        }
+
+        struct CoreAITorch: Decodable {
+            struct CompressionSupport: Decodable {
+                let palettizedWeightModule: Bool
+            }
+
+            let observedVersion: String
+            let compressionSupportObservedInInstalledPackage: CompressionSupport
+        }
+
+        let xcodeBetaCoreaiBuild: CoreAIBuild
+        let ambientCoreaiOptPythonPackage: PackageStatus
+        let coreaiTorch: CoreAITorch
+    }
+
+    struct Route: Decodable {
+        let name: String
+        let whyCoreaiTorchAloneIsNotEnough: String
+    }
+
+    struct CompressionOption: Decodable {
+        let name: String
+    }
+
+    struct FirstProbe: Decodable {
+        let name: String
+        let status: String
+        let acceptanceCriteria: [String]
+        let nonGoals: [String]
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let localTooling: LocalTooling
+    let route: Route
+    let compressionOptions: [CompressionOption]
+    let firstProbe: FirstProbe
+    let risks: [String]
+    let nextCommand: String
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/maintainers/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json",
             as: Self.self,
         )
     }
