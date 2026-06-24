@@ -194,6 +194,29 @@ import Testing
     #expect(fixture.nextAction.contains("main-talker decode export"))
 }
 
+@Test func `qwen3 tts core ai code predictor w8 records conversion drift`() throws {
+    let fixture = try Qwen3TTSCoreAIRealCodePredictorW8CompressionFixture.load()
+
+    #expect(fixture.schemaVersion == 1)
+    #expect(fixture.mode == "coreai_real_code_predictor_w8_compression_smoke")
+    #expect(fixture.status == "converted_real_code_predictor_w8_to_coreai_ir_with_compression_drift")
+    #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+    #expect(fixture.parameters.compressionPreset == "coreai-opt-w8-weight-only")
+    #expect(fixture.parameters.compressionExecutionMode == "eager")
+    #expect(fixture.compression.status == "prepared_and_finalized")
+    #expect(fixture.compression.weightSpec.axis == 0)
+    #expect(fixture.compression.preparedParity.maxAbsDiffVsReference == 12.8125)
+    #expect(!fixture.compression.preparedParity.matchesReferenceWithinCompressionTolerance)
+    #expect(fixture.compression.finalizedParity.maxAbsDiffVsReference == 12.8125)
+    #expect(!fixture.compression.finalizedParity.matchesReferenceWithinCompressionTolerance)
+    #expect(fixture.exportedProgramParity.maxAbsDiff == 0.0)
+    #expect(fixture.exportedProgramParity.reference == "finalized_compressed_logits")
+    #expect(fixture.exportedProgramParity.exportedLogits.sha256 == "4fe7b59af6de3b665b67788cc2f99892ab827efae3a467342b3bb4e3bc8e5bfe")
+    #expect(fixture.exportedGraph.containsScaledDotProductAttention)
+    #expect(fixture.coreaiProgram.pythonType == "coreai.authoring.asset.AIProgram")
+    #expect(fixture.nextAction.contains("Do not compile or profile this W8 graph"))
+}
+
 @Test func `qwen3 tts core ai real main talker export records dtype boundary`() throws {
     let bf16Fixture = try Qwen3TTSCoreAIRealMainTalkerExportFixture.loadBF16()
     let fp32Fixture = try Qwen3TTSCoreAIRealMainTalkerExportFixture.loadFP32()
@@ -683,6 +706,69 @@ private struct Qwen3TTSCoreAIRealCodePredictorExportFixture: Decodable {
     }
 }
 
+private struct Qwen3TTSCoreAIRealCodePredictorW8CompressionFixture: Decodable {
+    struct Parameters: Decodable {
+        let compressionPreset: String
+        let compressionExecutionMode: String
+    }
+
+    struct Source: Decodable {
+        let modelId: String
+    }
+
+    struct Tensor: Decodable {
+        let sha256: String?
+    }
+
+    struct Compression: Decodable {
+        struct WeightSpec: Decodable {
+            let axis: Int
+        }
+
+        struct Parity: Decodable {
+            let maxAbsDiffVsReference: Double
+            let matchesReferenceWithinCompressionTolerance: Bool
+        }
+
+        let status: String
+        let weightSpec: WeightSpec
+        let preparedParity: Parity
+        let finalizedParity: Parity
+    }
+
+    struct ExportedProgramParity: Decodable {
+        let maxAbsDiff: Double
+        let reference: String
+        let exportedLogits: Tensor
+    }
+
+    struct ExportedGraph: Decodable {
+        let containsScaledDotProductAttention: Bool
+    }
+
+    struct CoreAIProgram: Decodable {
+        let pythonType: String
+    }
+
+    let schemaVersion: Int
+    let mode: String
+    let status: String
+    let source: Source
+    let parameters: Parameters
+    let compression: Compression
+    let exportedProgramParity: ExportedProgramParity
+    let exportedGraph: ExportedGraph
+    let coreaiProgram: CoreAIProgram
+    let nextAction: String
+
+    static func load() throws -> Self {
+        try loadQwen3TTSCoreMLPlanFixture(
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-w8-compression-smoke-12hz.json",
+            as: Self.self,
+        )
+    }
+}
+
 private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
     struct Parameters: Decodable {
         let torchDtype: String
@@ -819,7 +905,7 @@ private struct Qwen3TTSCoreAIANECompressionPlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json",
             as: Self.self,
         )
     }

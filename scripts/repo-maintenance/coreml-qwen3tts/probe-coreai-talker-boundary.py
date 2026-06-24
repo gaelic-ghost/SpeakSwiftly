@@ -30,6 +30,9 @@ DEFAULT_REAL_CAPTURE_REPORT = "docs/research/speech-pipelines/lanes/qwen3-tts-co
 DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
   "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json"
 )
+DEFAULT_REAL_CODE_PREDICTOR_W8_COMPRESSION_REPORT = (
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-w8-compression-smoke-12hz.json"
+)
 DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT = (
   "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
 )
@@ -1251,11 +1254,16 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
       "through run-with-live-service-headroom.sh."
     )
 
-  dependencies = dependency_report()
+  compression_requested = args.compression_preset != "none"
+  dependencies = compression_dependency_report() if compression_requested else dependency_report()
   report: dict[str, Any] = {
     "schema_version": 1,
     "created_at_utc": args.created_at_utc or current_utc_timestamp(),
-    "mode": "coreai_real_code_predictor_export_smoke",
+    "mode": (
+      "coreai_real_code_predictor_w8_compression_smoke"
+      if compression_requested
+      else "coreai_real_code_predictor_export_smoke"
+    ),
     "status": "running",
     "purpose": (
       "Try torch.export plus coreai-torch on the real Qwen3-TTS code-predictor "
@@ -1279,6 +1287,9 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
       "do_sample": args.do_sample,
       "subtalker_dosample": args.subtalker_dosample,
       "seed": args.seed,
+      "compression_preset": args.compression_preset,
+      "compression_weight_axis": args.compression_weight_axis,
+      "compression_execution_mode": args.compression_execution_mode,
     },
   }
 
@@ -1288,6 +1299,9 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
     import coreai_torch
     from coreai_torch import TorchConverter
     from huggingface_hub import snapshot_download
+    if compression_requested:
+      from coreai_opt.quantization import ExecutionMode, ModuleQuantizerConfig, Quantizer, QuantizerConfig
+      from coreai_opt.quantization.spec import PerChannelGranularity, QuantizationSpec
 
     qwen_source = resolve_package_path(args.qwen_source)
     if not (qwen_source / "qwen_tts" / "core" / "models" / "modeling_qwen3_tts.py").is_file():
@@ -1342,7 +1356,13 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
     if "inputs_embeds" not in captured:
       raise RuntimeError("Generation did not reach the code-predictor boundary.")
 
-    code_predictor_inputs = captured["inputs_embeds"].to(args.device)
+    captured_inputs = captured["inputs_embeds"].detach().cpu()
+    code_predictor_inputs = torch.empty(
+      captured_inputs.shape,
+      dtype=captured_inputs.dtype,
+      device=args.device,
+    )
+    code_predictor_inputs.copy_(captured_inputs.to(args.device))
 
     class RealCodePredictorPrefillBoundary(torch.nn.Module):
       def __init__(self, code_predictor: torch.nn.Module) -> None:
@@ -1361,14 +1381,105 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
         return outputs.logits
 
     boundary = RealCodePredictorPrefillBoundary(model.talker.code_predictor).eval()
-    with torch.inference_mode():
+    with torch.no_grad():
       reference_logits = boundary(code_predictor_inputs)
+
+    export_boundary = boundary
+    export_reference_logits = reference_logits
+    compression_report: dict[str, Any] = {
+      "preset": args.compression_preset,
+      "status": "not_requested",
+    }
+    if compression_requested:
+      try:
+        if args.compression_preset != "coreai-opt-w8-weight-only":
+          raise RuntimeError(f"Unsupported compression preset '{args.compression_preset}'.")
+        weight_spec = QuantizationSpec(granularity=PerChannelGranularity(axis=args.compression_weight_axis))
+        execution_mode = getattr(ExecutionMode, args.compression_execution_mode.upper())
+        quantizer_config = QuantizerConfig(
+          global_config=ModuleQuantizerConfig(op_state_spec={"weight": weight_spec}),
+          execution_mode=execution_mode,
+        )
+        quantizer = Quantizer(boundary, quantizer_config)
+        prepared_boundary = quantizer.prepare((code_predictor_inputs,)).eval()
+        with torch.no_grad():
+          prepared_logits = prepared_boundary(code_predictor_inputs)
+        prepared_max_abs_diff = float((reference_logits.float() - prepared_logits.float()).abs().max().item())
+
+        finalized_boundary = quantizer.finalize(prepared_boundary)
+        finalize_returned_model = finalized_boundary is not None
+        if finalized_boundary is None:
+          finalized_boundary = prepared_boundary
+        finalized_boundary = finalized_boundary.eval()
+        with torch.no_grad():
+          finalized_logits = finalized_boundary(code_predictor_inputs)
+        finalized_max_abs_diff = float((reference_logits.float() - finalized_logits.float()).abs().max().item())
+
+        export_boundary = finalized_boundary
+        export_reference_logits = finalized_logits
+        compression_report = {
+          "preset": args.compression_preset,
+          "status": "prepared_and_finalized",
+          "package": "coreai-opt",
+          "execution_mode": args.compression_execution_mode,
+          "quantizer_config": "QuantizerConfig(global_config=ModuleQuantizerConfig(op_state_spec={'weight': QuantizationSpec(...)}))",
+          "weight_spec": {
+            "dtype": "int8",
+            "granularity": "PerChannelGranularity",
+            "axis": args.compression_weight_axis,
+          },
+          "finalize_returned_model": finalize_returned_model,
+          "prepared_parity": {
+            "max_abs_diff_vs_reference": prepared_max_abs_diff,
+            "matches_reference_within_compression_tolerance": (
+              prepared_max_abs_diff <= args.compression_parity_tolerance
+            ),
+            "logits": tensor_summary(prepared_logits, include_hash=True, topk=8),
+          },
+          "finalized_parity": {
+            "max_abs_diff_vs_reference": finalized_max_abs_diff,
+            "matches_reference_within_compression_tolerance": (
+              finalized_max_abs_diff <= args.compression_parity_tolerance
+            ),
+            "logits": tensor_summary(finalized_logits, include_hash=True, topk=8),
+          },
+          "next_gate": (
+            "Convert the finalized CoreAI-targeted graph only if exported-program parity "
+            "matches the finalized logits."
+          ),
+        }
+      except Exception as error:
+        report.update(
+          {
+            "status": "coreai_w8_compression_failed",
+            "captured_input": tensor_summary(code_predictor_inputs, include_hash=True),
+            "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+            "compression": {
+              "preset": args.compression_preset,
+              "status": "failed",
+              "package": "coreai-opt",
+              "execution_mode": args.compression_execution_mode,
+              "weight_spec": {
+                "dtype": "int8",
+                "granularity": "PerChannelGranularity",
+                "axis": args.compression_weight_axis,
+              },
+              "error": {
+                "type": type(error).__name__,
+                "message": str(error),
+                "traceback": traceback.format_exc().splitlines()[-16:],
+              },
+            },
+            "next_action": "Fix or route around the coreai-opt W8 compression blocker before CoreAI conversion.",
+          }
+        )
+        return report
 
     export_attempts = []
     exported = None
     for strict in [True, False]:
       try:
-        exported = torch.export.export(boundary, args=(code_predictor_inputs,), strict=strict)
+        exported = torch.export.export(export_boundary, args=(code_predictor_inputs,), strict=strict)
         export_attempts.append({"strict": strict, "status": "exported"})
         break
       except Exception as error:
@@ -1391,6 +1502,7 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
           "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
           "captured_input": tensor_summary(code_predictor_inputs, include_hash=True),
           "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+          "compression": compression_report,
           "torch_export_attempts": export_attempts,
           "next_action": (
             "Flatten or rewrite the code-predictor boundary before comparing CoreAI; "
@@ -1402,9 +1514,9 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
 
     decomposed = exported.run_decompositions(coreai_torch.get_decomp_table())
     exported_module = decomposed.module()
-    with torch.inference_mode():
+    with torch.no_grad():
       exported_logits = exported_module(code_predictor_inputs)
-    max_abs_diff = float((reference_logits.float() - exported_logits.float()).abs().max().item())
+    max_abs_diff = float((export_reference_logits.float() - exported_logits.float()).abs().max().item())
     targets = exported_graph_targets(decomposed)
 
     try:
@@ -1412,14 +1524,26 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
       coreai_program = converter.to_coreai()
       if args.optimize_coreai_program:
         coreai_program.optimize()
+      converted_status = "converted_real_code_predictor_to_coreai_ir"
+      converted_next_action = (
+        "Inspect Core AI graph boundaries and then attempt a main-talker decode export "
+        "with explicit cache tensors."
+      )
+      if compression_requested:
+        converted_status = "converted_real_code_predictor_w8_to_coreai_ir"
+        finalized_parity = compression_report.get("finalized_parity", {})
+        if not finalized_parity.get("matches_reference_within_compression_tolerance", False):
+          converted_status = "converted_real_code_predictor_w8_to_coreai_ir_with_compression_drift"
+          converted_next_action = (
+            "Do not compile or profile this W8 graph for ANE latency until the compression "
+            "drift is fixed; conversion succeeded but the compressed logits do not preserve "
+            "the PyTorch reference."
+          )
       report.update(
         {
-          "status": "converted_real_code_predictor_to_coreai_ir",
+          "status": converted_status,
           "coreai_program": coreai_program_summary(coreai_program),
-          "next_action": (
-            "Inspect Core AI graph boundaries and then attempt a main-talker decode export "
-            "with explicit cache tensors."
-          ),
+          "next_action": converted_next_action,
         }
       )
     except Exception as error:
@@ -1443,11 +1567,13 @@ def run_real_code_predictor_export_smoke(args: argparse.Namespace) -> dict[str, 
         "resolved_model_snapshot": sanitize_local_paths(snapshot_path),
         "captured_input": tensor_summary(code_predictor_inputs, include_hash=True),
         "reference_logits": tensor_summary(reference_logits, include_hash=True, topk=8),
+        "compression": compression_report,
         "torch_export_attempts": export_attempts,
         "exported_program_parity": {
           "max_abs_diff": max_abs_diff,
           "matches_reference_within_1e_4": max_abs_diff <= 1e-4,
           "exported_logits": tensor_summary(exported_logits, include_hash=True, topk=8),
+          "reference": "finalized_compressed_logits" if compression_requested else "reference_logits",
         },
         "exported_graph": {
           "call_targets": targets,
@@ -1875,6 +2001,7 @@ def parse_args() -> argparse.Namespace:
       "real-boundary-plan",
       "real-boundary-capture",
       "real-code-predictor-export-smoke",
+      "real-code-predictor-w8-compression-smoke",
       "real-main-talker-export-smoke",
       "coreai-compression-preflight",
     ],
@@ -1904,6 +2031,18 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--subtalker-top-p", type=float, default=1.0)
   parser.add_argument("--subtalker-temperature", type=float, default=0.9)
   parser.add_argument("--parity-tolerance", type=float, default=1e-4)
+  parser.add_argument("--compression-parity-tolerance", type=float, default=5e-2)
+  parser.add_argument(
+    "--compression-preset",
+    choices=["none", "coreai-opt-w8-weight-only"],
+    default="none",
+  )
+  parser.add_argument("--compression-weight-axis", type=int, default=0)
+  parser.add_argument(
+    "--compression-execution-mode",
+    choices=["graph", "eager"],
+    default="graph",
+  )
   parser.add_argument("--optimize-coreai-program", action="store_true")
   parser.add_argument("--sequence-length", type=int, default=4)
   parser.add_argument("--hidden-size", type=int, default=32)
@@ -1937,6 +2076,11 @@ def main() -> None:
   elif args.mode == "real-code-predictor-export-smoke":
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT)
+    report = run_real_code_predictor_export_smoke(args)
+  elif args.mode == "real-code-predictor-w8-compression-smoke":
+    args.compression_preset = "coreai-opt-w8-weight-only"
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_REAL_CODE_PREDICTOR_W8_COMPRESSION_REPORT)
     report = run_real_code_predictor_export_smoke(args)
   elif args.mode == "real-main-talker-export-smoke":
     if args.report == Path(DEFAULT_REPORT):

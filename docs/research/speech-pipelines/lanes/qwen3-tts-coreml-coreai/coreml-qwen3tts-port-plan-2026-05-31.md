@@ -355,7 +355,26 @@ is a size and memory-pressure candidate, not an assumed hot-latency win.
 
 Pinned plan artifact:
 
-- `docs/maintainers/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json`
+- `archive/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json`
+- `archive/coreml-qwen3tts/coreai-real-code-predictor-w8-compression-smoke-12hz.json`
+
+The first real W8 compression probe has now been run against the Qwen3-TTS
+code-predictor boundary. The initial graph-mode attempt used the default W8
+preset and failed because `coreai-opt` could not infer a per-channel axis for
+some weight fake-quantize modules. Adding explicit
+`PerChannelGranularity(axis=0)` moved the graph-mode probe past that blocker,
+but the prepared graph then failed inside PyTorch functorch/vmap plumbing.
+Eager-mode W8 with the same explicit axis reached `coreai-torch` conversion and
+emitted Core AI IR, but the compressed logits were not usable: prepared and
+finalized compressed logits both had max absolute drift `12.8125` versus the
+uncompressed PyTorch reference, and the exported compressed logits collapsed to
+zeros while still matching the finalized compressed graph exactly.
+
+Decision from this slice: do not compile or profile the current W8 code-predictor
+graph for ANE. Conversion plumbing works, but the compressed model is not a
+valid candidate until W8 parity is fixed. The next compression work should either
+scope W8 to safer submodules/op names, try a different granularity/axis policy,
+or compare palettization before returning to W8A8 activation quantization.
 
 Important guardrail: `--preferred-compute neural-engine` is only a compile
 preference. It is not dispatch proof. Treat Core AI `inspect` output and
