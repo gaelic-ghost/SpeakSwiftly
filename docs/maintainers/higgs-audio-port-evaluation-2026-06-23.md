@@ -6,8 +6,9 @@ Branch: `research/higgs-audio-mlx-port`
 ## Purpose
 
 Evaluate whether Higgs Audio v3 TTS should become a candidate SpeakSwiftly
-generation backend through MLX first, then Core AI if the MLX probe proves the
-model is worth deeper Apple-platform port work.
+generation backend through a first-party Apple-platform port of the official
+Boson/Hugging Face model and pipeline. Community MLX ports are useful evidence,
+but they are no longer the implementation path to trust or inherit.
 
 This is a backend-extension research note. It does not add a runtime backend,
 does not download model weights into the repository, and does not change the
@@ -17,27 +18,33 @@ current Qwen3 resident backend defaults.
 
 Higgs Audio v3 is a credible future SpeakSwiftly research lane. It is a
 Qwen3-derived multimodal autoregressive TTS model with clear architecture
-metadata, controllable speech tags, multilingual scope, and at least one
-third-party MLX-labeled 4-bit conversion already visible on Hugging Face.
+metadata, controllable speech tags, multilingual scope, and an official Boson
+model card that documents the intended architecture and usage shape.
 
-The next useful step is MLX, not Core AI. The MLX path can answer the first
-practical question: whether a local Apple-silicon runtime can load and generate
-acceptable speech from the existing 4-bit candidate without first building a
-full conversion pipeline.
+The next useful step is no longer to depend on `mlx-audio` or
+`mlx-audio-swift`. The primary plan is to inspect the official Boson/Hugging
+Face assets and pipeline surface, then design a Swift-native runtime that uses
+Core AI where model graph execution fits, Accelerate where small numeric
+support kernels are better kept in-process, and CoreMedia/CoreAudio/AVFoundation
+for audio buffers, timing, file output, and playback integration.
 
-Core AI is the relevant newer Apple custom-model deployment path for a later
-first-party port. Local Xcode 27 beta documentation and tools describe Core AI
-as a framework for `.aimodel` and `.aimodelc` assets, with specialization,
-caching, PyTorch-extension conversion, `coreai-build`, Xcode model inspection,
-the Core AI Debugger, a debug gauge, and an Instruments template for CPU, GPU,
-and Neural Engine profiling.
+Core AI is the relevant Apple custom-model deployment path for the first-party
+port. Local Xcode 27 beta documentation and tools describe Core AI as a
+framework for `.aimodel` and `.aimodelc` assets, with specialization, caching,
+PyTorch-extension conversion, `coreai-build`, Xcode model inspection, the Core
+AI Debugger, a debug gauge, and an Instruments template for CPU, GPU, and Neural
+Engine profiling.
 
 ## Candidate Ranking
 
-1. Higgs Audio v3 through MLX: best near-term research path.
-2. Higgs Audio v3 through Core AI: plausible later first-party port path.
-3. Higgs Audio v3 through Core ML: keep only as a legacy/reference comparison
-   unless Core AI tooling proves blocked for this model.
+1. Higgs Audio v3 through a first-party Swift/Core AI pipeline: primary path.
+2. Higgs Audio v3 through Swift plus Accelerate and Apple audio frameworks:
+   support path for tokenizer, sampler, codec glue, post-processing, buffers,
+   playback, and file output around Core AI graph execution.
+3. Higgs Audio v3 through Core ML: legacy/reference comparison only if Core AI
+   tooling proves blocked for a required graph.
+4. Higgs Audio v3 through community MLX ports: evidence and comparison only,
+   not a trusted implementation dependency.
 
 ## Model Inventory
 
@@ -242,6 +249,61 @@ Practical conclusion:
 - Do not spend time trying one-sentence generation from this candidate alone
   until the codec/vocoder source is resolved.
 
+## Revised First-Party Apple Port Direction
+
+Decision on 2026-06-24:
+
+- Do not treat `mlx-audio` or `mlx-audio-swift` as trusted porting work.
+- Treat community MLX implementations as reference material only: useful for
+  identifying likely tensor names, graph boundaries, sampler behavior, and
+  failure modes, but not as an implementation to inherit.
+- Port from the official Boson/Hugging Face model and official runtime surface
+  first.
+- Prefer Swift-owned orchestration over Python-owned runtime behavior.
+
+Target runtime shape:
+
+- Core AI owns the heavy model graph candidates that can be compiled,
+  specialized, cached, debugged, and profiled with Apple tooling.
+- Swift owns prompt construction, input validation, request lifecycle, sampling
+  policy, graph boundary orchestration, streaming policy, and SpeakSwiftly
+  backend integration.
+- Accelerate owns small local numeric work only when it is simpler and more
+  transparent than forcing that work into a model graph, such as vector
+  post-processing, softmax/top-k helpers if needed, fades, resampling-adjacent
+  utilities, or validation probes.
+- CoreMedia owns timestamped sample buffers and format descriptions when the
+  port reaches streamed audio chunks.
+- CoreAudio owns low-level audio format, PCM buffer, and device-facing
+  interoperability where SpeakSwiftly needs direct audio control.
+- AVFoundation owns higher-level file output, asset inspection, and playback
+  integration where it is already the right Apple abstraction.
+
+First-party component map to recover from official sources:
+
+- Official config and tokenizer files from `bosonai/higgs-audio-v3-tts-4b`.
+- Official Hugging Face or Boson pipeline code path for
+  `HiggsMultimodalQwen3ForConditionalGeneration`.
+- Text/chat template and Higgs control-token semantics.
+- Prompt/reference-audio assembly rules.
+- Qwen3-derived decoder graph, including cache shape and prefill/decode
+  boundaries.
+- Fused multi-codebook audio embedding and output head.
+- Eight-codebook delayed audio-token sampler and stop/wind-down semantics.
+- Higgs audio tokenizer, codec, vocoder, or equivalent waveform decoder source.
+- Reference-audio encode path for voice cloning.
+- Waveform decode, post-processing, and sample-rate expectations.
+
+Practical consequence:
+
+- The first successful proof should be a tiny official-pipeline parity harness,
+  not a community-port generation demo.
+- The Core AI exploration should begin as graph-boundary discovery from the
+  official model, then move one narrow function at a time into `.aimodel`.
+- Swift-side tests should compare tokenizer IDs, prompt embeddings or prompt
+  token layout, delayed code rows, and short waveform metadata against official
+  reference outputs before any SpeakSwiftly backend is exposed.
+
 ## Runtime Source Inventory
 
 The strongest MLX lead is `Blaizzy/mlx-audio` at commit
@@ -313,29 +375,32 @@ Practical conclusion:
   one final `GenerationResult`, while the vLLM-Omni server path has explicit
   async chunking and overlap/holdback logic.
 
-## MLX Path
+## Community MLX Reference Path
 
-Higgs should start as an MLX probe because SpeakSwiftly already depends on
-`mlx-swift`, `mlx-audio-swift`, and the MLX-backed Qwen3 TTS path.
+Community MLX ports are reference material only. They can help identify tensor
+layout, graph boundaries, expected sampler behavior, and possible failure
+modes, but they should not define the trusted implementation surface.
 
-Why it fits SpeakSwiftly's current shape:
+Why this evidence is still useful:
 
-- `SpeechBackend` already maps public backend identifiers to resident model
-  repositories.
-- `ModelFactory.loadResidentModels(for:)` already has the right high-level hook
-  for resident MLX models.
-- The existing benchmark and E2E lanes can compare latency, memory, chunking,
-  and audio quality against Qwen3 once a Higgs generation adapter exists.
+- It shows one plausible decomposition of Higgs into config parsing, Qwen3
+  decoder execution, fused multi-codebook audio embeddings, delay-pattern
+  sampling, prompt/reference handling, and codec decode.
+- It gives concrete names and shapes to compare against the official Boson/HF
+  assets.
+- It provides negative evidence: the inspected 4-bit artifact was not
+  self-contained for waveform generation through the inspected Python MLX
+  loader.
 
-What is not known yet:
+What not to do:
 
-- Whether the third-party MLX-labeled Higgs artifact is loadable by the current
-  Swift MLX/MLXLM stack without Python-only custom code.
-- Whether the model's custom `higgs_multimodal_qwen3` architecture is implemented
-  in a form that can be reused or ported cleanly in Swift.
-- Whether Higgs' 8-codebook / 25 fps audio-token path can stream chunks in the
-  shape SpeakSwiftly expects.
-- Whether 4-bit quality is acceptable for Gale's local speech use.
+- Do not start the Apple port by porting `mlx-audio` source file-for-file.
+- Do not add a Higgs case to `mlx-audio-swift` as the first implementation
+  strategy.
+- Do not treat successful community MLX loading as proof that the official
+  Boson/HF pipeline has been understood.
+- Do not spend more time on the 4-bit MLX artifact until the official codec and
+  waveform decode path is mapped.
 
 ### Swift Dependency Surface Check
 
@@ -366,29 +431,23 @@ Not present in the resolved Swift package:
 Practical conclusion:
 
 - The dependency bump does not make Higgs a drop-in backend.
-- It does reduce the port surface: the likely Swift port can borrow existing
-  Qwen3 cache/backbone patterns, MOSS delay-pattern helpers, tokenizer-adapter
-  shape, and codec-loading conventions instead of starting from a blank package.
+- The resolved Swift package is useful as comparative Apple/MLX code, especially
+  for Qwen3-like cache handling and multi-codebook helper patterns.
+- The trusted path remains a first-party Swift/Core AI port from official
+  Boson/HF sources.
 
-Recommended MLX probe:
+Optional community-reference probe:
 
-1. Set up a temporary Python environment with `mlx-audio` and its MLX
-   dependencies outside the repository.
-2. Run the `mlx-audio` Higgs v3 loader against the upstream model metadata
-   without committing any downloaded artifacts.
-3. Resolve codec/vocoder assets for the 4-bit candidate by inspecting the
-   upstream/base model layout and the `mlx-audio` Higgs codec loader.
-4. If the composed loader reaches model-ready state cleanly, generate one short
-   sentence to a temp WAV file.
-5. Record time to first audio, total generation time, peak process memory, MLX
-   memory, sample rate, and audible notes.
-6. If Python MLX succeeds, start a Swift port plan from the concrete
-   `mlx_audio/tts/models/higgs_audio_v3` config, prompt, generation, and model
-   files.
+1. Use community MLX only to cross-check tensor names and sampler behavior after
+   the official Boson/HF source path has been mapped.
+2. Keep all downloaded community artifacts outside the repository.
+3. Record mismatches as questions against the official pipeline instead of
+   changing the Swift design to match the community port.
 
 ## Core AI Path
 
-Core AI is now the Apple custom-model path to evaluate after MLX.
+Core AI is now the primary Apple custom-model path to evaluate for the
+first-party Higgs port.
 
 Local Xcode 27 beta evidence:
 
@@ -419,15 +478,19 @@ What remains unknown:
 - Whether Neural Engine specialization helps the actual Higgs stages, rather
   than only looking promising from the framework surface.
 
-Recommended Core AI probe, after MLX earns it:
+Recommended Core AI probe:
 
-1. Locate or build the smallest PyTorch/Higgs forward path for one fixed prompt.
-2. Identify explicit graph boundaries for tokenizer, prompt assembly, decoder,
-   codebook handling, and waveform decode.
-3. Convert one narrow function to `.aimodel`.
-4. Use Core AI Debugger for structure and numeric comparison.
-5. Use `coreai-build` for ahead-of-time compilation experiments.
-6. Use the Core AI instrument to verify actual CPU, GPU, and Neural Engine
+1. Locate the official Boson/HF runtime source for one fixed prompt and one
+   reference-free TTS request.
+2. Identify explicit graph boundaries for tokenizer, prompt assembly, decoder
+   prefill, decoder step, codebook handling, codec/vocoder decode, and waveform
+   post-processing.
+3. Build a Swift-owned parity fixture from official output metadata before
+   converting any graph.
+4. Convert one narrow function to `.aimodel`.
+5. Use Core AI Debugger for structure and numeric comparison.
+6. Use `coreai-build` for ahead-of-time compilation experiments.
+7. Use the Core AI instrument to verify actual CPU, GPU, and Neural Engine
    dispatch.
 
 ## SpeakSwiftly Integration Shape If Higgs Advances
@@ -438,7 +501,8 @@ repo swap.
 Likely backend names:
 
 - `higgs_audio_v3_experimental`
-- `higgs_audio_v3_4bit_mlx_experimental`
+- `higgs_audio_v3_coreai_experimental`
+- `higgs_audio_v3_apple_experimental`
 
 Likely source layout if a probe earns integration:
 
@@ -457,35 +521,43 @@ SpeakSwiftly's stable profile model.
 
 - Higgs' non-commercial license may block production or revenue-generating
   SpeakSwiftly uses without a commercial license.
-- Higgs' custom Transformers architecture may require a real Swift/MLX model
-  implementation, not just weight conversion.
+- Higgs' custom Transformers architecture may require a real first-party Swift
+  runtime and Core AI graph decomposition, not just weight conversion.
 - A 4.65B model may be too heavy for always-resident local speech on 24 GB
-  machines unless the 4-bit path is both high quality and memory stable.
+  machines unless a compressed or staged runtime is both high quality and memory
+  stable.
 - Core AI is beta-surface work in the Xcode 27 toolchain and may change before
   stable release.
-- Core AI could still lose to MLX because of conversion effort, graph split
-  overhead, unsupported operations, or poor dispatch for the actual model stages.
+- Core AI could still lose to a simpler GPU runtime because of conversion
+  effort, graph split overhead, unsupported operations, or poor dispatch for the
+  actual model stages.
+- Official Hugging Face pipeline metadata may not be enough to reproduce Boson's
+  serving behavior without additional upstream source inspection.
+- The codec/vocoder path is the highest-risk missing map item. A port that only
+  reproduces text-to-codebook generation is not a useful SpeakSwiftly backend.
 
 ## Recommended Next Slice
 
-Start with the MLX candidate.
+Start with the official Boson/Hugging Face pipeline.
 
 The first slice should be read-only plus one smallest possible local probe:
 
-1. Inspect `Reza2kn/Higgs-Audio-v3-TTS-4bit-MLX` metadata and small config files.
-2. Check whether its architecture and tokenizer files match standard MLX
-   loading conventions or require custom Python.
-3. Set up a temporary Python `mlx-audio` environment and run its Higgs v3 loader
-   as the first executable proof.
-4. Resolve the codec/vocoder asset gap discovered by the local 4-bit load
-   probe.
-5. Only after the composed loader reaches model-ready state, generate one short
-   English sentence to a local temp WAV file.
-6. Compare against the current Qwen3 0.6B and 1.7B benchmark shape before any
-   runtime integration.
-
-Only start a Core AI Higgs branch after the MLX probe proves the model is worth
-keeping in the candidate set.
+1. Inventory official Boson/HF model files, config, tokenizer, chat template,
+   prompt docs, and any official source package or serving code that owns
+   `HiggsMultimodalQwen3ForConditionalGeneration`.
+2. Identify the official reference path for plain text-to-speech without voice
+   cloning first.
+3. Map the minimum component boundaries: tokenizer, prompt builder, decoder
+   prefill, decoder step, eight-codebook sampler, codec/vocoder decode, waveform
+   post-processing, and output container.
+4. Build a small local parity fixture outside the repository or under reviewed
+   maintainer docs: input text, token IDs, config summary, expected codebook
+   shape, sample rate, and output metadata.
+5. Decide which boundary is the first Core AI conversion candidate and which
+   pieces should stay in Swift, Accelerate, CoreMedia, CoreAudio, or
+   AVFoundation.
+6. Only after that map exists, decide whether a community MLX artifact is useful
+   as a comparison or compression input.
 
 ## Sources
 
@@ -493,6 +565,8 @@ keeping in the candidate set.
   https://huggingface.co/bosonai/higgs-audio-v3-tts-4b
 - Higgs Audio v3 4-bit MLX candidate:
   https://huggingface.co/Reza2kn/Higgs-Audio-v3-TTS-4bit-MLX
+- Hugging Face Transformers:
+  https://github.com/huggingface/transformers
 - MLX Swift:
   https://github.com/ml-explore/mlx-swift
 - MLX documentation:
