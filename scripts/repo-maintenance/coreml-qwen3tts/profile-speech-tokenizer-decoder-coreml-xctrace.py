@@ -23,6 +23,12 @@ from typing import Any
 
 
 DEFAULT_BENCHMARK_SCRIPT = "scripts/repo-maintenance/coreml-qwen3tts/benchmark-speech-tokenizer-decoder-coreml.py"
+DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage"
+DEFAULT_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+DEFAULT_TALKER_CODE_FIXTURE_PATH = ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
+DEFAULT_CONVERSION_REPORT_PATH = (
+  "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
+)
 DEFAULT_TRACE_DIR = ".local/coreml-qwen3tts/traces"
 
 
@@ -182,6 +188,16 @@ def trace_compute_unit(args: argparse.Namespace, compute_unit: str) -> dict[str,
     uv_path,
     "run",
     str(args.benchmark_script),
+    "--model-package",
+    str(args.model_package),
+    "--fixture",
+    str(args.fixture),
+    "--talker-code-fixture",
+    str(args.talker_code_fixture),
+    "--conversion-report",
+    str(args.conversion_report),
+    "--sample-source",
+    args.sample_source,
     "--warmup-runs",
     str(args.warmup_runs),
     "--measured-runs",
@@ -191,6 +207,8 @@ def trace_compute_unit(args: argparse.Namespace, compute_unit: str) -> dict[str,
     "--output",
     str(benchmark_output),
   ]
+  if args.sample_id is not None:
+    command.extend(["--sample-id", args.sample_id])
 
   started = time.perf_counter()
   result = run_command(command, package_root())
@@ -242,6 +260,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     "mode": "coreml_xctrace_profile",
     "source": {
       "benchmark_script": str(args.benchmark_script),
+      "model_package": str(args.model_package),
+      "fixture_path": str(args.fixture),
+      "talker_code_fixture_path": str(args.talker_code_fixture),
+      "conversion_report_path": str(args.conversion_report),
+      "sample_source": args.sample_source,
+      "sample_id": args.sample_id,
       "template": "Core ML",
       "xcode": xcode_report(),
       "xctrace_templates": ["Core ML"],
@@ -267,6 +291,12 @@ def parse_args() -> argparse.Namespace:
     description="Capture Instruments Core ML traces for the converted Qwen3-TTS decoder package."
   )
   parser.add_argument("--benchmark-script", type=Path, default=Path(DEFAULT_BENCHMARK_SCRIPT))
+  parser.add_argument("--model-package", type=Path, default=Path(DEFAULT_MODEL_PACKAGE))
+  parser.add_argument("--fixture", type=Path, default=Path(DEFAULT_FIXTURE_PATH))
+  parser.add_argument("--talker-code-fixture", type=Path, default=Path(DEFAULT_TALKER_CODE_FIXTURE_PATH))
+  parser.add_argument("--conversion-report", type=Path, default=Path(DEFAULT_CONVERSION_REPORT_PATH))
+  parser.add_argument("--sample-source", default="synthetic", choices=["synthetic", "talker"])
+  parser.add_argument("--sample-id", default=None)
   parser.add_argument("--trace-dir", type=Path, default=Path(DEFAULT_TRACE_DIR))
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--run-id", default=None)

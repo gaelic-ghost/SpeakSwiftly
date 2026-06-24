@@ -31,10 +31,18 @@ DEFAULT_CONFIG = "clean"
 DEFAULT_SPLIT = "train.clean.100"
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-Tokenizer-12Hz"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
-DEFAULT_SAMPLE_COUNT = 3
+DEFAULT_SAMPLE_COUNT = 24
 DEFAULT_OFFSET = 0
 DEFAULT_EXPECTED_SAMPLE_RATE = 24_000
 CODE_STEP_SAMPLES = 1_920
+STRATIFICATION_TARGETS = [
+  "short_utterances",
+  "medium_utterances",
+  "long_utterances",
+  "speaker_diversity",
+  "silence_and_energy_variety",
+  "decoder_bucket_boundaries",
+]
 
 
 def current_utc_timestamp() -> str:
@@ -92,6 +100,31 @@ def get_dataset_rows(dataset: str, config: str, split: str, offset: int, length:
 
   payload = response.json()
   return payload.get("rows", [])
+
+
+def get_selected_dataset_rows(args: argparse.Namespace) -> list[dict[str, Any]]:
+  if not args.row_offsets:
+    return get_dataset_rows(args.dataset, args.config, args.split, args.offset, args.sample_count)
+
+  rows: list[dict[str, Any]] = []
+  for offset in args.row_offsets:
+    offset_rows = get_dataset_rows(args.dataset, args.config, args.split, offset, 1)
+    if len(offset_rows) != 1:
+      raise RuntimeError(
+        f"Dataset Viewer returned {len(offset_rows)} rows for explicit row offset {offset}."
+      )
+    rows.append(offset_rows[0])
+  return rows
+
+
+def selected_sample_count(args: argparse.Namespace) -> int:
+  return len(args.row_offsets) if args.row_offsets else args.sample_count
+
+
+def row_offsets_command_argument(args: argparse.Namespace) -> str:
+  if not args.row_offsets:
+    return ""
+  return "--row-offsets " + " ".join(str(offset) for offset in args.row_offsets) + " "
 
 
 def sanitized_sample_metadata(row: dict[str, Any]) -> dict[str, Any]:
@@ -263,7 +296,8 @@ def build_preflight_report(
       "dataset_split": args.split,
       "dataset_hub_url": f"https://hf.co/datasets/{args.dataset}",
       "row_offset": args.offset,
-      "requested_sample_count": args.sample_count,
+      "row_offsets": args.row_offsets,
+      "requested_sample_count": selected_sample_count(args),
       "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
       "upstream_commit": args.upstream_commit,
       "model_id": args.model_id,
@@ -281,12 +315,14 @@ def build_preflight_report(
       }
       for row in rows
     ],
+    "stratification_targets": STRATIFICATION_TARGETS,
     "next_command": (
       "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' "
       "--with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' "
       "--with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' "
       "scripts/repo-maintenance/coreml-qwen3tts/generate-calibration-code-fixture.py "
       "--no-preflight-only --allow-model-download --allow-audio-download "
+      f"{row_offsets_command_argument(args)}"
       "--qwen-source /path/to/Qwen3-TTS --output .local/coreml-qwen3tts/qwen3tts-calibration-code-fixture.json"
     ),
   }
@@ -344,7 +380,8 @@ def build_runtime_fixture(
       "dataset_split": args.split,
       "dataset_hub_url": f"https://hf.co/datasets/{args.dataset}",
       "row_offset": args.offset,
-      "requested_sample_count": args.sample_count,
+      "row_offsets": args.row_offsets,
+      "requested_sample_count": selected_sample_count(args),
       "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
       "upstream_commit": args.upstream_commit,
       "model_id": args.model_id,
@@ -357,6 +394,10 @@ def build_runtime_fixture(
       "current_graph": "12 Hz speech-tokenizer decoder only",
       "current_input": "audio_codes shaped batch x code_steps x 16 codebooks",
       "code_step_samples": CODE_STEP_SAMPLES,
+      "target_sample_matrix": {
+        "libritts_r_encoded_sample_count": DEFAULT_SAMPLE_COUNT,
+        "stratification_targets": STRATIFICATION_TARGETS,
+      },
       "not_yet_covered": [
         "text tokenizer",
         "main Qwen3-TTS autoregressive talker",
@@ -371,10 +412,11 @@ def build_runtime_fixture(
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-  rows = get_dataset_rows(args.dataset, args.config, args.split, args.offset, args.sample_count)
-  if len(rows) != args.sample_count:
+  rows = get_selected_dataset_rows(args)
+  requested_count = selected_sample_count(args)
+  if len(rows) != requested_count:
     raise RuntimeError(
-      f"Dataset Viewer returned {len(rows)} rows for requested sample count {args.sample_count}."
+      f"Dataset Viewer returned {len(rows)} rows for requested sample count {requested_count}."
     )
 
   inventory = repo_file_inventory(args.model_id, args.revision)
@@ -396,6 +438,13 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument("--split", default=DEFAULT_SPLIT)
   parser.add_argument("--offset", type=int, default=DEFAULT_OFFSET)
   parser.add_argument("--sample-count", type=int, default=DEFAULT_SAMPLE_COUNT)
+  parser.add_argument(
+    "--row-offsets",
+    type=int,
+    nargs="+",
+    default=None,
+    help="Explicit Dataset Viewer row offsets to fetch one at a time for speaker/length diversity.",
+  )
   parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
   parser.add_argument("--revision", default=None)
   parser.add_argument("--upstream-commit", default=DEFAULT_UPSTREAM_COMMIT)

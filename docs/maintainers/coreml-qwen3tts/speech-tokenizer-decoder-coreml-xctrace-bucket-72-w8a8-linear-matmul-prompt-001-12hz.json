@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-01T00:58:37Z",
+  "mode": "coreml_xctrace_profile",
+  "source": {
+    "benchmark_script": "scripts/repo-maintenance/coreml-qwen3tts/benchmark-speech-tokenizer-decoder-coreml.py",
+    "model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-72-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage",
+    "fixture_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json",
+    "talker_code_fixture_path": ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json",
+    "conversion_report_path": ".local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-72-fp16.json",
+    "sample_source": "talker",
+    "sample_id": "prompt-001",
+    "template": "Core ML",
+    "xcode": {
+      "xcodebuild_version": [
+        "Xcode 26.5",
+        "Build version 17F42"
+      ]
+    },
+    "xctrace_templates": [
+      "Core ML"
+    ],
+    "trace_dir": ".local/coreml-qwen3tts/traces"
+  },
+  "hardware": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "mac_ver": "26.5",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_brand": "Apple M4 Pro",
+    "physical_cpu_count": "14",
+    "logical_cpu_count": "14",
+    "memory_bytes": 25769803776
+  },
+  "profile": {
+    "warmup_runs": 1,
+    "measured_runs": 5,
+    "compute_units_order": [
+      "cpuOnly",
+      "cpuAndNeuralEngine",
+      "all"
+    ],
+    "dispatch_evidence_note": "ANE and MPS row counts come from exported Instruments trace tables. Rows indicate recorded activity in those subsystems during the launched benchmark, not a complete per-op placement map.",
+    "results": [
+      {
+        "status": "succeeded",
+        "compute_units": "cpuOnly",
+        "elapsed_ms": 10669.85299999942,
+        "trace_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean.trace",
+        "benchmark_output": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-benchmark.json",
+        "benchmark_result": {
+          "status": "succeeded",
+          "compute_units": "cpuOnly",
+          "load_duration_ms": 1608.0240419978509,
+          "warmup_runs": 1,
+          "measured_runs": 5,
+          "warmup": {
+            "min_ms": 183.06779200065648,
+            "median_ms": 183.06779200065648,
+            "mean_ms": 183.06779200065648,
+            "p95_ms": 183.06779200065648,
+            "max_ms": 183.06779200065648
+          },
+          "measured": {
+            "min_ms": 136.06916699791327,
+            "median_ms": 139.02199999574805,
+            "mean_ms": 138.2119083980797,
+            "p95_ms": 139.932250000129,
+            "max_ms": 139.932250000129
+          },
+          "output_shape": [
+            1,
+            138240
+          ],
+          "output_dtype": "float32",
+          "output_min": -0.4072265625,
+          "output_max": 0.4501953125,
+          "output_rms": 0.047577425837516785
+        },
+        "trace_tables": [
+          {
+            "schema": "coreml-os-signpost",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-coreml-os-signpost.xml"
+          },
+          {
+            "schema": "ane-hw-intervals-internal",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-ane-hw-intervals-internal.xml"
+          },
+          {
+            "schema": "mps-hw-intervals",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-mps-hw-intervals.xml"
+          },
+          {
+            "schema": "metal-gpu-intervals",
+            "status": "succeeded",
+            "row_count": 919,
+            "duration": {
+              "count": 652,
+              "total_ms": 52.23551,
+              "min_ms": 0.009,
+              "median_ms": 0.0273335,
+              "mean_ms": 0.08011581288343558,
+              "max_ms": 1.0575,
+              "p95_ms": 0.396917
+            },
+            "labels": [
+              "M4 Pro"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-metal-gpu-intervals.xml"
+          },
+          {
+            "schema": "metal-application-command-buffer-submissions",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuOnly-20260601-w8a8-linear-matmul-bucket72-clean-metal-application-command-buffer-submissions.xml"
+          }
+        ]
+      },
+      {
+        "status": "succeeded",
+        "compute_units": "cpuAndNeuralEngine",
+        "elapsed_ms": 74634.44012500258,
+        "trace_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean.trace",
+        "benchmark_output": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-benchmark.json",
+        "benchmark_result": {
+          "status": "succeeded",
+          "compute_units": "cpuAndNeuralEngine",
+          "load_duration_ms": 54314.11966700398,
+          "warmup_runs": 1,
+          "measured_runs": 5,
+          "warmup": {
+            "min_ms": 166.07804200612009,
+            "median_ms": 166.07804200612009,
+            "mean_ms": 166.07804200612009,
+            "p95_ms": 166.07804200612009,
+            "max_ms": 166.07804200612009
+          },
+          "measured": {
+            "min_ms": 105.13224999886006,
+            "median_ms": 105.56579200056149,
+            "mean_ms": 106.08462500094902,
+            "p95_ms": 108.5254170029657,
+            "max_ms": 108.5254170029657
+          },
+          "output_shape": [
+            1,
+            138240
+          ],
+          "output_dtype": "float32",
+          "output_min": -0.5341796875,
+          "output_max": 0.491455078125,
+          "output_rms": 0.052070993930101395
+        },
+        "trace_tables": [
+          {
+            "schema": "coreml-os-signpost",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-coreml-os-signpost.xml"
+          },
+          {
+            "schema": "ane-hw-intervals-internal",
+            "status": "succeeded",
+            "row_count": 74,
+            "duration": {
+              "count": 74,
+              "total_ms": 48545.027454999996,
+              "min_ms": 0.987083,
+              "median_ms": 1.0409375,
+              "mean_ms": 656.013884527027,
+              "max_ms": 48221.580334,
+              "p95_ms": 30.611
+            },
+            "labels": [
+              "Apple Neural Engine"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-ane-hw-intervals-internal.xml"
+          },
+          {
+            "schema": "mps-hw-intervals",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-mps-hw-intervals.xml"
+          },
+          {
+            "schema": "metal-gpu-intervals",
+            "status": "succeeded",
+            "row_count": 35858,
+            "duration": {
+              "count": 4794,
+              "total_ms": 802.619095,
+              "min_ms": 0.001583,
+              "median_ms": 0.0792915,
+              "mean_ms": 0.1674215884438882,
+              "max_ms": 2.08525,
+              "p95_ms": 0.685167
+            },
+            "labels": [
+              "M4 Pro"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-metal-gpu-intervals.xml"
+          },
+          {
+            "schema": "metal-application-command-buffer-submissions",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-cpuAndNeuralEngine-20260601-w8a8-linear-matmul-bucket72-clean-metal-application-command-buffer-submissions.xml"
+          }
+        ]
+      },
+      {
+        "status": "succeeded",
+        "compute_units": "all",
+        "elapsed_ms": 31866.02475000109,
+        "trace_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean.trace",
+        "benchmark_output": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-benchmark.json",
+        "benchmark_result": {
+          "status": "succeeded",
+          "compute_units": "all",
+          "load_duration_ms": 21498.282375003328,
+          "warmup_runs": 1,
+          "measured_runs": 5,
+          "warmup": {
+            "min_ms": 1656.2072919987259,
+            "median_ms": 1656.2072919987259,
+            "mean_ms": 1656.2072919987259,
+            "p95_ms": 1656.2072919987259,
+            "max_ms": 1656.2072919987259
+          },
+          "measured": {
+            "min_ms": 83.33649999985937,
+            "median_ms": 84.52108300116379,
+            "mean_ms": 84.25714159820927,
+            "p95_ms": 84.90045799408108,
+            "max_ms": 84.90045799408108
+          },
+          "output_shape": [
+            1,
+            138240
+          ],
+          "output_dtype": "float32",
+          "output_min": -0.416015625,
+          "output_max": 0.471923828125,
+          "output_rms": 0.04943041875958443
+        },
+        "trace_tables": [
+          {
+            "schema": "coreml-os-signpost",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-coreml-os-signpost.xml"
+          },
+          {
+            "schema": "ane-hw-intervals-internal",
+            "status": "succeeded",
+            "row_count": 44,
+            "duration": {
+              "count": 44,
+              "total_ms": 15711.233709,
+              "min_ms": 1.325375,
+              "median_ms": 1.9448954999999999,
+              "mean_ms": 357.0734933863636,
+              "max_ms": 15571.04825,
+              "p95_ms": 8.521416
+            },
+            "labels": [
+              "Apple Neural Engine"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-ane-hw-intervals-internal.xml"
+          },
+          {
+            "schema": "mps-hw-intervals",
+            "status": "succeeded",
+            "row_count": 48,
+            "duration": {
+              "count": 47,
+              "total_ms": 238.95600100000001,
+              "min_ms": 0.110375,
+              "median_ms": 1.257625,
+              "mean_ms": 5.084170234042554,
+              "max_ms": 31.320667,
+              "p95_ms": 17.388666
+            },
+            "labels": [
+              "M4 Pro",
+              "MPSGraph"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-mps-hw-intervals.xml"
+          },
+          {
+            "schema": "metal-gpu-intervals",
+            "status": "succeeded",
+            "row_count": 6204,
+            "duration": {
+              "count": 1887,
+              "total_ms": 480.679797,
+              "min_ms": 0.000583,
+              "median_ms": 0.033584,
+              "mean_ms": 0.2547322718600954,
+              "max_ms": 31.320667,
+              "p95_ms": 0.568542
+            },
+            "labels": [
+              "M4 Pro"
+            ],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-metal-gpu-intervals.xml"
+          },
+          {
+            "schema": "metal-application-command-buffer-submissions",
+            "status": "succeeded",
+            "row_count": 0,
+            "duration": null,
+            "labels": [],
+            "xml_path": ".local/coreml-qwen3tts/traces/qwen3tts-decoder-coreml-all-20260601-w8a8-linear-matmul-bucket72-clean-metal-application-command-buffer-submissions.xml"
+          }
+        ]
+      }
+    ]
+  }
+}

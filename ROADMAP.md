@@ -330,6 +330,7 @@ Research
 
 - [ ] Evaluate a first-party Core ML Qwen3-TTS conversion instead of adopting the current FluidInference artifact as-is.
 - [ ] Preserve the existing runtime ownership model while deciding whether Core ML deserves a real backend slot beside the MLX-backed Qwen, Marvis, and Chatterbox paths.
+- [ ] Evaluate Apple's Core AI and `coreai-torch` path as a possible successor or complement to the hand-rolled Core ML conversion, especially for Qwen talker/code-predictor graph boundaries.
 - [ ] Own the conversion split points, tokenizer boundary, fixed-shape cache policy, precision choices, and stage-specific compute-unit assignments explicitly enough that performance claims are measurable.
 - [ ] Keep the first implementation as a standalone probe until tokenizer parity, tensor parity, performance, memory, and audio quality evidence justify runtime integration.
 
@@ -338,13 +339,101 @@ Research
 - [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
 - [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
+- [x] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [x] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
+- [ ] Resolve the Core AI mutable-cache/state boundary before any backend integration or latency comparison.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
 - [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
 - [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
 - [ ] Use Instruments and Core ML performance reports to verify actual CPU, GPU, and Neural Engine dispatch instead of inferring dispatch from configuration alone.
 - [ ] Build a calibration-data lane for Core ML compression, starting with decoder-only audio-code calibration from open speech datasets and widening later to full-stack prompts, code histories, and reference-conditioning cases.
+- [x] Add a decoder-first calibration expansion plan that keeps Core ML activation calibration input-only while reserving output-aware correction for a separate supervised tuning lane.
+- [x] Add preflight fixture plans for 24 LibriTTS-R encoded samples, Qwen talker-generated code capture, and decoder-output alignment against an fp16 PyTorch teacher.
+- [x] Expand the LibriTTS-R calibration preflight to explicit row offsets so the first 24-sample matrix covers 24 speakers instead of one contiguous speaker block.
+- [x] Capture the first Qwen3-TTS talker-generated decoder-code fixture and run a bucket-72 W8A8 probe against those production-shaped codes.
+- [x] Plan bucketed speech-tokenizer decoder packages for the first real-speech calibration shapes, starting with `[1, 40, 16]`, `[1, 72, 16]`, and `[1, 88, 16]`, so W8A8 activation calibration can use representative LibriTTS-R codes instead of the synthetic 8-step fixture.
+- [x] Convert the bucket-40 speech-tokenizer decoder package and pin its parity report.
+- [x] Convert bucket 72 and bucket 88 and pin their parity reports.
+- [x] Scope decoder activation quantization away from integer audio-code inputs, proving an fp16-base compute-only W8A8 smoke path over `conv`, `linear`, `matmul`, and `conv_transpose`.
+- [x] Add a private Swift resident decoder probe that compiles bucketed Core ML packages, loads an `MLModel`, pads Qwen talker codes, trims valid output samples, and records cold-load versus hot-prediction timing.
 - [ ] Probe W8A8 quantization for stages where Core ML Tools and Instruments show a realistic path to M4 Neural Engine execution.
 - [ ] Evaluate Swift/Metal FlashAttention as a separate custom-GPU-kernel lane for autoregressive Qwen attention if Core ML or MLX dispatch overhead becomes the limiting factor.
+- [ ] Evaluate whether autoregressive work can be batched, bucketed, prefetched, or otherwise shaped to avoid tiny per-token prediction overhead.
+- [ ] Try an offline overlapping decoder-window experiment later: decode fixed-size code windows with left/right overlap, keep only stable center regions, crossfade joins, and compare against full-sequence speech-tokenizer decode before considering any streaming-style decoder path.
+- [ ] Start the decoder-window experiment from upstream 12 Hz `chunked_decode(chunk_size=300, left_context_size=25)` behavior before trying smaller fixed buckets or custom overlap/crossfade variants.
+- [ ] Compare the first-party Core ML probe against the existing SpeakSwiftly Qwen MLX benchmark lane using matched input text, voice strategy, output duration, real-time factor, memory, startup time, and audible quality notes.
+- [ ] Decide whether the result should become a hidden experimental backend, stay probe-only, feed `SpeakSwiftlyMobile`, or be dropped with evidence.
+
+### Stage Notes
+
+- The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
+- A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
+- The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
+- Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
+- The first real Core AI probes now have matched Qwen3-TTS outputs for the code predictor and main-talker frozen-cache decode path. The code predictor converts to Core AI IR, and the main talker converts in BF16 and float32 with exact exported-program parity after omitting a redundant all-zero decode mask. Treat Core AI as promising but still gated on mutable cache state, runtime profiling, and end-to-end quality.
+- Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
+- The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
+- The first Core ML quantization preflight confirms Core ML Tools 9 exposes both int8 weight quantization and experimental activation quantization APIs. Bucketed decoder reports now cover the first representative LibriTTS-R calibration shapes, so the next representative W8A8 pass can use real speech-tokenizer codes instead of only the 8-step synthetic fixture.
+- A synthetic quantization smoke showed weight-only int8 can shrink the decoder package from about 436 MB to about 110 MB, while naive global W8A8 activation quantization fails by inserting a quantize op on an `int32` audio-code path. A scoped fp16-base W8A8 smoke now succeeds by activation-quantizing only compute-heavy float ops: `conv`, `linear`, `matmul`, and `conv_transpose`.
+- The fp16 decoder package is about 218 MB locally and matches the PyTorch wrapper with max absolute difference below `0.0018` on the 8-step fixture. The scoped W8A8 smoke produces a roughly 109 MB package and matches the fp16 package with max absolute difference below `0.009` on CPU-only prediction, but this is still a synthetic calibration smoke and not an audio-quality or ANE-dispatch decision.
+- Bucket 40 now has an fp16 representative-calibration W8A8 smoke using a real LibriTTS-R code tensor padded from 37 to 40 code steps. The package still saves, reloads, and predicts, but the valid output diverges from the fp16 bucket baseline with max absolute difference above `0.28` and mean absolute difference above `0.012`, so W8A8 needs quality investigation before any backend decision.
+- Bucket 40 audio inspection writes local baseline, W8A8, valid-region, and diff WAV artifacts and confirms the drift is broad: 8 of 12 quarter-second windows in the valid region exceed mean absolute difference `0.01`, with the largest mean-diff window around 1.25-1.5 seconds.
+- The first contiguous 24-row LibriTTS-R expansion was rejected because it still selected one speaker. The fixture generator now supports explicit Dataset Viewer row offsets, and the refreshed 24-row preflight covers 24 unique speakers with the intended short, medium, long, energy, and bucket-boundary spread.
+- Bucket 40 group-16 W8A8 was rerun with four diverse LibriTTS-R calibration samples. Whole-output mean absolute diff improved slightly to about `0.01235`, but valid-region audio on the original 37-step sample worsened slightly to about `0.01274`, the alert-window count stayed 8 of 12, and the top mean-diff window moved to 1.5-1.75 seconds. Broader input calibration alone is therefore not enough evidence to promote W8A8.
+- The first talker-code capture used the 0.6B CustomVoice model with three English prompts and monkeypatched `speech_tokenizer.decode` without modifying upstream source. The captured code lengths were 72, 67, and 84 steps, assigned to buckets 72, 72, and 88. Bucket 72 group-16 W8A8 over the two talker samples succeeded at about 110 MB, but still had mean absolute diff about `0.0118` and max absolute diff about `0.292` versus the fp16 Core ML package, so production-shaped codes do not clear the drift by themselves.
+- Bucket 72 talker audio inspection on `prompt-000` confirms the drift is broad in generated-code space too: 15 of 24 quarter-second windows exceed mean absolute diff `0.01`, the valid-region mean absolute diff is about `0.01235`, and the worst mean-diff window is 1.0-1.25 seconds.
+- Per-op activation-scope probing on bucket 72 talker codes shows `linear` + `matmul` activation quantization is the best current W8A8 candidate, cutting mean absolute diff to about `0.00631`. Convolutional activation scopes remain near the broader drift level, so decoder convolution/upsampling activations should stay fp16 unless tuning changes the picture.
+- Audio inspection keeps the `linear` + `matmul` scope alive: bucket 72 prompt-000 valid mean absolute diff fell to about `0.00624` with 5 alert windows instead of 15, and bucket 88 prompt-002 reached about `0.00483` valid mean absolute diff with 2 alert windows. This is good enough to continue bucket coverage and listening checks before Instruments dispatch work.
+- The held-out bucket 72 talker prompt-001 strengthens that direction: broad compute-only W8A8 had about `0.00654` valid mean absolute diff with 3 alert windows, while `linear` + `matmul` fell to about `0.00341` with zero alert windows.
+- Instruments dispatch profiling on the bucket 72 prompt-001 `linear` + `matmul` W8A8 package recorded Neural Engine interval rows for `cpuAndNeuralEngine` and `all`. Mean prediction time improved from about `138 ms` on `cpuOnly` to about `106 ms` on `cpuAndNeuralEngine` and about `84 ms` on `all`, though model-load/compile time remained high enough to keep backend integration gated on residency and cache behavior.
+- Bucket 88 dispatch profiling confirmed the same pattern on a longer padded shape: about `179 ms` on `cpuOnly`, `135 ms` on `cpuAndNeuralEngine`, and `110 ms` on `all`, with ANE rows present for both NE-capable settings. Load/compile was worse at this bucket, reinforcing that any usable Core ML backend needs resident hot models and explicit cache behavior.
+- `SpeakSwiftlyProbeTool coreml-qwen-decoder` now provides the first private Swift resident-decoder probe. On bucket 72 prompt-001 with the W8A8 `linear` + `matmul` package and `.all` compute units, the first pinned run compiled the raw `.mlpackage` in about `128 ms`, loaded the model in about `40.4 s`, warmed once in about `1.58 s`, then measured hot predictions at about `83.4 ms`. That keeps residency as the next required backend shape rather than a nice-to-have optimization.
+- The same Swift resident-decoder probe now has a pinned bucket 88 run for prompt-002. It compiled the raw `.mlpackage` in about `118 ms`, loaded the model in about `29.8 s`, warmed once in about `1.59 s`, and measured hot predictions at about `124.6 ms` for the longer `[1, 88, 16]` padded shape. The longer bucket remains viable only as a resident model, not a cold request path.
+- The Swift probe now also supports a resident bucket catalog with repeatable `--bucket-model` entries and `--catalog-passes` repeat passes. The two-pass catalog run loaded bucket 72 and bucket 88 once in the same process, confirmed first-use warmups around `1.6-1.7 s`, then settled pass-two hot timing at about `84.6 ms` for prompt-001 and about `109.2 ms` for prompt-002 with RSS flat around `616 MiB` after both buckets had predicted once.
+- The decoder closeout baseline now has a matching fp16 two-bucket resident catalog. In this probe shape, fp16 and W8A8 `linear` + `matmul` have similar pass-two hot timing, while W8A8 halves package size but pays larger first-use warmups. MacBook Pro speaker listening at roughly 60% volume found W8A8 acceptable for continued performance work, with prompt-001 very close and prompt-002 slightly muffled versus fp16. Keep W8A8 `linear` + `matmul` as the only current decoder W8A8 candidate, keep convolution and upsampling activations fp16, require explicit resident bucket warmup, and leave final backend-quality acceptance for a later end-to-end decision.
+- Core ML activation calibration is input-only: `sample_data` feeds model inputs through the float model to measure activation ranges, then Core ML Tools inserts quantize/dequantize pairs. Our current dataset does not calibrate against output audio targets or minimize output error.
+- Decoder tuning now has a distinct preflight lane: `probe-decoder-alignment-tuning.py` treats the fp16 PyTorch decoder as the teacher, trains a selected decoder-tail student with waveform L1 plus multi-resolution STFT loss, and leaves Core ML activation calibration semantics unchanged.
+- Talker-generated calibration inputs now have their own fixture generator. It monkeypatches `speech_tokenizer.decode`, records the exact `audio_codes` passed by normal Qwen3-TTS generation, and then calls the original decode so the generated audio remains a faithful evaluation artifact.
+- The decoder bucket plan now maps the first three real LibriTTS-R calibration samples to bucket 40, bucket 72, and bucket 88, and the conversion script can pad `audio_codes` to fixed bucket sizes with upstream-compatible `-1` padding.
+- Buckets 40, 72, and 88 converted successfully through the existing static-mask export path. CPU-only Core ML prediction produced `[1, 76800]`, `[1, 138240]`, and `[1, 168960]` samples with max absolute difference below `0.0003` versus the PyTorch wrapper, and each local `.mlpackage` remained about 436 MB.
+- The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
+- Follow-up FlashAttention triage found that `mpsops/mps-flash-attention` moves past the original runtime source parser problem by using MetalASM and `makeLibrary(data:)`, but local pipeline creation still crashes inside the AGX compiler service. The ccv-backed `metal-flash-sdpa` path runs non-causal attention accurately, but local causal tests fail by multi-point differences, so neither path is ready for Qwen autoregressive attention.
+- A bounded blocker probe now records the FlashAttention decision in structured JSON. `mps-flash-attn` reproduces the AGX compiler crash on a tiny non-causal `[1, 1, 16, 32]` shape, and `metal-flash-sdpa` lower-precision causal output matches the non-causal reference instead of the causal reference. Pause dependency adoption unless those upstream paths fix AGX pipeline creation and lower-precision causal masking.
+- Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
+
+### Exit Criteria
+
+- [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
+- [x] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
+- [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
+- [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
+
+## Milestone 33: First-Party Core ML Qwen3-TTS Port
+
+### Status
+
+Research
+
+### Scope
+
+- [ ] Evaluate a first-party Core ML Qwen3-TTS conversion instead of adopting the current FluidInference artifact as-is.
+- [ ] Preserve the existing runtime ownership model while deciding whether Core ML deserves a real backend slot beside the MLX-backed Qwen path.
+- [ ] Evaluate Apple's Core AI and `coreai-torch` path as a possible successor or complement to the hand-rolled Core ML conversion, especially for Qwen talker/code-predictor graph boundaries.
+- [ ] Own the conversion split points, tokenizer boundary, fixed-shape cache policy, precision choices, and stage-specific compute-unit assignments explicitly enough that performance claims are measurable.
+- [ ] Keep the first implementation as a standalone probe until tokenizer parity, tensor parity, performance, memory, and audio quality evidence justify runtime integration.
+
+### Tickets
+
+- [ ] Inventory upstream Qwen3-TTS inference from source: text tokenizer, prompt assembly, language and control tokens, reference conditioning, codec token flow, decode loop, stop conditions, and audio decoder expectations.
+- [ ] Produce a tiny Python golden path for one English sentence and one clone/reference path when practical, saving intermediate tensor shapes, token IDs, codec frames, sample rate, and final WAV output.
+- [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
+- [x] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
+- [x] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
+- [ ] Resolve the Core AI mutable-cache/state boundary before any backend integration or latency comparison.
+- [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
+- [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
+- [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
+- [ ] Use Instruments and Core ML performance reports to verify actual CPU, GPU, and Neural Engine dispatch instead of inferring dispatch from configuration alone.
 - [ ] Evaluate whether autoregressive work can be batched, bucketed, prefetched, or otherwise shaped to avoid tiny per-token prediction overhead.
 - [ ] Compare the first-party Core ML probe against the existing SpeakSwiftly Qwen MLX benchmark lane using matched input text, voice strategy, output duration, real-time factor, memory, startup time, and audible quality notes.
 - [ ] Decide whether the result should become a hidden experimental backend, stay probe-only, feed `SpeakSwiftlyMobile`, or be dropped with evidence.
@@ -354,15 +443,15 @@ Research
 - The current FluidInference Qwen3-TTS Core ML artifact is useful research input, but it is not the target architecture. Its closed Swift backend PR lacked a built-in tokenizer and pinned core generation stages away from the Neural Engine, including one CPU-only decoder path because other compute-unit choices produced NaNs.
 - A first-party port is a durable backend-extension investigation, not a local implementation detail. It only earns runtime integration if it proves a concrete advantage or a distinct Apple-platform deployment story.
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
-- The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
-- The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
-- Follow-up FlashAttention triage found that `mpsops/mps-flash-attention` moves past the original runtime source parser problem by using MetalASM and `makeLibrary(data:)`, but local pipeline creation still crashes inside the AGX compiler service. The ccv-backed `metal-flash-sdpa` path runs non-causal attention accurately, but local causal tests fail by multi-point differences, so neither path is ready for Qwen autoregressive attention.
-- A bounded blocker probe now records the FlashAttention decision in structured JSON. `mps-flash-attn` reproduces the AGX compiler crash on a tiny non-causal `[1, 1, 16, 32]` shape, and `metal-flash-sdpa` lower-precision causal output matches the non-causal reference instead of the causal reference. Pause dependency adoption unless those upstream paths fix AGX pipeline creation and lower-precision causal masking.
+- Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
+- The first real Core AI probes now have matched Qwen3-TTS outputs for the code predictor and main-talker frozen-cache decode path. The code predictor converts to Core AI IR, and the main talker converts in BF16 and float32 with exact exported-program parity after omitting a redundant all-zero decode mask. Treat Core AI as promising but still gated on mutable cache state, runtime profiling, and end-to-end quality.
+- Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
 - Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
 
 - [ ] The repository contains a documented decision on whether a first-party Core ML Qwen3-TTS port is technically worth continuing.
+- [x] The repository contains a documented runtime-choice matrix that says whether the next probe should continue hand-rolled Core ML, pivot to Core AI, use ExecuTorch MLX, compare ExecuTorch Core ML, or stop the Apple-native Qwen3-TTS port.
 - [ ] If continued, the branch has a runnable probe with reproducible conversion inputs, shape and parity notes, timing output, and device-dispatch evidence.
 - [ ] If not continued, the repository records the blocking evidence clearly enough that future backend work does not rediscover the same failure mode.
 

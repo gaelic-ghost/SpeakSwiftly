@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T18:43:33Z",
+  "mode": "coreml_decoder_audio_inspection",
+  "source": {
+    "baseline_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40-fp16.mlpackage",
+    "baseline_model_package_size_bytes": 228702882,
+    "candidate_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-40-fp16-w8a8-libritts-r-24-diverse-group-16.mlpackage",
+    "candidate_model_package_size_bytes": 114801996,
+    "calibration_fixture_path": ".local/coreml-qwen3tts/calibration-code-fixture-libritts-r-24-diverse-12hz.json",
+    "bucket_plan_path": ".local/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-libritts-r-24-diverse-12hz.json",
+    "compute_units": "cpuOnly",
+    "sample_rate": 24000
+  },
+  "sample": {
+    "id": "730_358_000003_000002",
+    "text_normalized": "[The moon] I gazed with a kind of wonder.",
+    "audio_codes_shape": [
+      37,
+      16
+    ],
+    "padded_input_shape": [
+      1,
+      40,
+      16
+    ],
+    "padded_step_count": 3,
+    "pad_value": -1,
+    "source_audio_seconds": 2.92,
+    "valid_output_sample_count": 71040,
+    "padded_output_sample_count": 76800
+  },
+  "artifacts": {
+    "baseline_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-40-libritts-r-24-diverse-group-16/baseline-fp16.wav",
+    "candidate_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-40-libritts-r-24-diverse-group-16/candidate-w8a8.wav",
+    "diff_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-40-libritts-r-24-diverse-group-16/candidate-minus-baseline.wav",
+    "baseline_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-40-libritts-r-24-diverse-group-16/baseline-fp16-valid.wav",
+    "candidate_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-40-libritts-r-24-diverse-group-16/candidate-w8a8-valid.wav"
+  },
+  "audio": {
+    "baseline": {
+      "sample_count": 76800,
+      "min": -0.84423828125,
+      "max": 0.478271484375,
+      "mean": 0.00028645407292060554,
+      "rms": 0.15877917408943176,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "candidate": {
+      "sample_count": 76800,
+      "min": -0.8095703125,
+      "max": 0.473876953125,
+      "mean": 0.0004002133500762284,
+      "rms": 0.1567506641149521,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "full_output_diff": {
+      "sample_count": 76800,
+      "max_abs_diff": 0.263427734375,
+      "mean_abs_diff": 0.012348680756986141,
+      "rms_diff": 0.018335465341806412
+    },
+    "valid_output_diff": {
+      "sample_count": 71040,
+      "max_abs_diff": 0.263427734375,
+      "mean_abs_diff": 0.012741940096020699,
+      "rms_diff": 0.018548525869846344
+    },
+    "padded_tail_diff": {
+      "sample_count": 5760,
+      "max_abs_diff": 0.1805419921875,
+      "mean_abs_diff": 0.007498471066355705,
+      "rms_diff": 0.015468294732272625
+    },
+    "windows": {
+      "window_seconds": 0.25,
+      "window_samples": 6000,
+      "count": 12,
+      "alert_mean_abs_diff": 0.01,
+      "alert_count": 8,
+      "alert_ratio": 0.6666666666666666,
+      "top_by_mean_abs_diff": [
+        {
+          "index": 6,
+          "start_sample": 36000,
+          "end_sample": 42000,
+          "start_seconds": 1.5,
+          "end_seconds": 1.75,
+          "baseline_rms": 0.1623886227607727,
+          "candidate_rms": 0.16003352403640747,
+          "max_abs_diff": 0.263427734375,
+          "mean_abs_diff": 0.01894017867743969,
+          "rms_diff": 0.027404455468058586
+        },
+        {
+          "index": 5,
+          "start_sample": 30000,
+          "end_sample": 36000,
+          "start_seconds": 1.25,
+          "end_seconds": 1.5,
+          "baseline_rms": 0.20885054767131805,
+          "candidate_rms": 0.2050073742866516,
+          "max_abs_diff": 0.18280029296875,
+          "mean_abs_diff": 0.017024269327521324,
+          "rms_diff": 0.0251394622027874
+        },
+        {
+          "index": 10,
+          "start_sample": 60000,
+          "end_sample": 66000,
+          "start_seconds": 2.5,
+          "end_seconds": 2.75,
+          "baseline_rms": 0.15460647642612457,
+          "candidate_rms": 0.15450991690158844,
+          "max_abs_diff": 0.200775146484375,
+          "mean_abs_diff": 0.01661343313753605,
+          "rms_diff": 0.02390916645526886
+        },
+        {
+          "index": 8,
+          "start_sample": 48000,
+          "end_sample": 54000,
+          "start_seconds": 2.0,
+          "end_seconds": 2.25,
+          "baseline_rms": 0.1738477498292923,
+          "candidate_rms": 0.1717701107263565,
+          "max_abs_diff": 0.08790206909179688,
+          "mean_abs_diff": 0.014384802430868149,
+          "rms_diff": 0.019237831234931946
+        },
+        {
+          "index": 0,
+          "start_sample": 0,
+          "end_sample": 6000,
+          "start_seconds": 0.0,
+          "end_seconds": 0.25,
+          "baseline_rms": 0.26076772809028625,
+          "candidate_rms": 0.25306135416030884,
+          "max_abs_diff": 0.10791015625,
+          "mean_abs_diff": 0.013666206039488316,
+          "rms_diff": 0.021480342373251915
+        },
+        {
+          "index": 9,
+          "start_sample": 54000,
+          "end_sample": 60000,
+          "start_seconds": 2.25,
+          "end_seconds": 2.5,
+          "baseline_rms": 0.17121993005275726,
+          "candidate_rms": 0.17543460428714752,
+          "max_abs_diff": 0.08544921875,
+          "mean_abs_diff": 0.013295295648276806,
+          "rms_diff": 0.017439303919672966
+        },
+        {
+          "index": 1,
+          "start_sample": 6000,
+          "end_sample": 12000,
+          "start_seconds": 0.25,
+          "end_seconds": 0.5,
+          "baseline_rms": 0.2985711097717285,
+          "candidate_rms": 0.2957327961921692,
+          "max_abs_diff": 0.0801544189453125,
+          "mean_abs_diff": 0.012395055033266544,
+          "rms_diff": 0.017026705667376518
+        },
+        {
+          "index": 7,
+          "start_sample": 42000,
+          "end_sample": 48000,
+          "start_seconds": 1.75,
+          "end_seconds": 2.0,
+          "baseline_rms": 0.08082856982946396,
+          "candidate_rms": 0.07903630286455154,
+          "max_abs_diff": 0.06972503662109375,
+          "mean_abs_diff": 0.010876192711293697,
+          "rms_diff": 0.013985422439873219
+        },
+        {
+          "index": 2,
+          "start_sample": 12000,
+          "end_sample": 18000,
+          "start_seconds": 0.5,
+          "end_seconds": 0.75,
+          "baseline_rms": 0.043857768177986145,
+          "candidate_rms": 0.042420756071805954,
+          "max_abs_diff": 0.0368194580078125,
+          "mean_abs_diff": 0.009638803079724312,
+          "rms_diff": 0.012073173187673092
+        },
+        {
+          "index": 11,
+          "start_sample": 66000,
+          "end_sample": 71040,
+          "start_seconds": 2.75,
+          "end_seconds": 2.96,
+          "baseline_rms": 0.012919479981064796,
+          "candidate_rms": 0.005525130778551102,
+          "max_abs_diff": 0.038585662841796875,
+          "mean_abs_diff": 0.0092711690813303,
+          "rms_diff": 0.011528536677360535
+        }
+      ],
+      "top_by_max_abs_diff": [
+        {
+          "index": 6,
+          "start_sample": 36000,
+          "end_sample": 42000,
+          "start_seconds": 1.5,
+          "end_seconds": 1.75,
+          "baseline_rms": 0.1623886227607727,
+          "candidate_rms": 0.16003352403640747,
+          "max_abs_diff": 0.263427734375,
+          "mean_abs_diff": 0.01894017867743969,
+          "rms_diff": 0.027404455468058586
+        },
+        {
+          "index": 10,
+          "start_sample": 60000,
+          "end_sample": 66000,
+          "start_seconds": 2.5,
+          "end_seconds": 2.75,
+          "baseline_rms": 0.15460647642612457,
+          "candidate_rms": 0.15450991690158844,
+          "max_abs_diff": 0.200775146484375,
+          "mean_abs_diff": 0.01661343313753605,
+          "rms_diff": 0.02390916645526886
+        },
+        {
+          "index": 5,
+          "start_sample": 30000,
+          "end_sample": 36000,
+          "start_seconds": 1.25,
+          "end_seconds": 1.5,
+          "baseline_rms": 0.20885054767131805,
+          "candidate_rms": 0.2050073742866516,
+          "max_abs_diff": 0.18280029296875,
+          "mean_abs_diff": 0.017024269327521324,
+          "rms_diff": 0.0251394622027874
+        },
+        {
+          "index": 0,
+          "start_sample": 0,
+          "end_sample": 6000,
+          "start_seconds": 0.0,
+          "end_seconds": 0.25,
+          "baseline_rms": 0.26076772809028625,
+          "candidate_rms": 0.25306135416030884,
+          "max_abs_diff": 0.10791015625,
+          "mean_abs_diff": 0.013666206039488316,
+          "rms_diff": 0.021480342373251915
+        },
+        {
+          "index": 8,
+          "start_sample": 48000,
+          "end_sample": 54000,
+          "start_seconds": 2.0,
+          "end_seconds": 2.25,
+          "baseline_rms": 0.1738477498292923,
+          "candidate_rms": 0.1717701107263565,
+          "max_abs_diff": 0.08790206909179688,
+          "mean_abs_diff": 0.014384802430868149,
+          "rms_diff": 0.019237831234931946
+        },
+        {
+          "index": 9,
+          "start_sample": 54000,
+          "end_sample": 60000,
+          "start_seconds": 2.25,
+          "end_seconds": 2.5,
+          "baseline_rms": 0.17121993005275726,
+          "candidate_rms": 0.17543460428714752,
+          "max_abs_diff": 0.08544921875,
+          "mean_abs_diff": 0.013295295648276806,
+          "rms_diff": 0.017439303919672966
+        },
+        {
+          "index": 4,
+          "start_sample": 24000,
+          "end_sample": 30000,
+          "start_seconds": 1.0,
+          "end_seconds": 1.25,
+          "baseline_rms": 0.05036196485161781,
+          "candidate_rms": 0.04843896999955177,
+          "max_abs_diff": 0.08349609375,
+          "mean_abs_diff": 0.008427849039435387,
+          "rms_diff": 0.012206542305648327
+        },
+        {
+          "index": 1,
+          "start_sample": 6000,
+          "end_sample": 12000,
+          "start_seconds": 0.25,
+          "end_seconds": 0.5,
+          "baseline_rms": 0.2985711097717285,
+          "candidate_rms": 0.2957327961921692,
+          "max_abs_diff": 0.0801544189453125,
+          "mean_abs_diff": 0.012395055033266544,
+          "rms_diff": 0.017026705667376518
+        },
+        {
+          "index": 7,
+          "start_sample": 42000,
+          "end_sample": 48000,
+          "start_seconds": 1.75,
+          "end_seconds": 2.0,
+          "baseline_rms": 0.08082856982946396,
+          "candidate_rms": 0.07903630286455154,
+          "max_abs_diff": 0.06972503662109375,
+          "mean_abs_diff": 0.010876192711293697,
+          "rms_diff": 0.013985422439873219
+        },
+        {
+          "index": 11,
+          "start_sample": 66000,
+          "end_sample": 71040,
+          "start_seconds": 2.75,
+          "end_seconds": 2.96,
+          "baseline_rms": 0.012919479981064796,
+          "candidate_rms": 0.005525130778551102,
+          "max_abs_diff": 0.038585662841796875,
+          "mean_abs_diff": 0.0092711690813303,
+          "rms_diff": 0.011528536677360535
+        }
+      ]
+    }
+  },
+  "interpretation": {
+    "status": "needs_audio_review",
+    "note": "This report compares Core ML decoder outputs from the fp16 bucket package and the representative W8A8 bucket package. It localizes numeric drift in the valid decoded region, but human listening is still required before making a quality decision."
+  }
+}

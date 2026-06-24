@@ -1,0 +1,74 @@
+{
+  "created_at_utc" : "2026-06-01T01:43:53Z",
+  "prediction" : {
+    "compile_duration_ms" : 117.73995833098888,
+    "full_output" : {
+      "max" : 0.47387695,
+      "mean" : 0.0002120690272105011,
+      "min" : -0.42578125,
+      "rms" : 0.053642116607642364,
+      "sample_count" : 168960
+    },
+    "load_duration_ms" : 29833.97366666794,
+    "measured" : {
+      "max_ms" : 128.95495833456516,
+      "mean_ms" : 124.62108333781362,
+      "median_ms" : 128.95495833456516,
+      "min_ms" : 120.28720834106207,
+      "p95_ms" : 128.95495833456516
+    },
+    "measured_runs" : 2,
+    "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+    "output_shape" : [
+      1,
+      168960
+    ],
+    "padded_tail" : {
+      "max" : 0.16052246,
+      "mean" : -0.0012962267113228638,
+      "min" : -0.21704102,
+      "rms" : 0.0215849509454156,
+      "sample_count" : 7680
+    },
+    "valid_output" : {
+      "max" : 0.47387695,
+      "mean" : 0.000283892633807328,
+      "min" : -0.42578125,
+      "rms" : 0.05470203997412141,
+      "sample_count" : 161280
+    },
+    "warmup" : {
+      "max_ms" : 1585.0425416603684,
+      "mean_ms" : 1585.0425416603684,
+      "median_ms" : 1585.0425416603684,
+      "min_ms" : 1585.0425416603684,
+      "p95_ms" : 1585.0425416603684
+    },
+    "warmup_runs" : 1
+  },
+  "sample" : {
+    "audio_codes_shape" : [
+      84,
+      16
+    ],
+    "id" : "prompt-002",
+    "pad_value" : -1,
+    "padded_input_shape" : [
+      1,
+      88,
+      16
+    ],
+    "padded_output_sample_count" : 168960,
+    "padded_step_count" : 4,
+    "text" : "Please keep this longer spoken passage natural, even, and consistent from beginning to end.",
+    "valid_output_sample_count" : 161280
+  },
+  "schema_version" : 1,
+  "source" : {
+    "compute_units" : "all",
+    "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-bucket-88-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage",
+    "sample_id" : "prompt-002",
+    "talker_code_fixture" : ".local\/coreml-qwen3tts\/talker-code-fixture-qwen3-12hz.json"
+  },
+  "tool_name" : "coreml-qwen-decoder"
+}

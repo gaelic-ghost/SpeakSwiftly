@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-23T00:00:00Z",
+  "mode": "coreai_talker_boundary_preflight",
+  "purpose": "Select the smallest Qwen3-TTS talker/code-predictor boundary worth trying through torch.export and coreai-torch before any full-model conversion or runtime backend integration.",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "coreai_torch_docs": "https://apple.github.io/coreai-torch/main/",
+    "coreai_torch_conversion_workflows": "https://apple.github.io/coreai-torch/main/guides/conversion-workflows.html",
+    "coreai_torch_externalization": "https://apple.github.io/coreai-torch/main/guides/externalization.html"
+  },
+  "target_subgraph": {
+    "name": "qwen3_tts_talker_first_codec_token_boundary",
+    "checkpoint": "0.6B Base before CustomVoice or reference-audio paths",
+    "voice_path": "fixed Base path with no reference audio and no audible output",
+    "why_this_boundary": "It exercises the hard Apple-native graph questions before the audio decoder: text-side conditioning, autoregressive talker attention, KV/cache shape, codebook ordering, and the first codec-token output.",
+    "required_boundaries": [
+      "text token ids and prompt-wrapped inputs stay explicit",
+      "attention or SDPA remains compiler-visible",
+      "RoPE remains compiler-visible",
+      "RMSNorm remains compiler-visible",
+      "KV cache input and output shapes are named and stable",
+      "first codebook token output is captured for parity",
+      "code predictor continuation boundary is identified but not required for the first smoke"
+    ],
+    "excluded_from_first_probe": [
+      "full Qwen3-TTS generation",
+      "reference-audio conditioning",
+      "speech-tokenizer audio decode",
+      "audible quality comparison",
+      "public SpeechBackend integration"
+    ]
+  },
+  "runtime_routes": [
+    {
+      "route": "coreai_torch",
+      "first_question": "Can torch.export plus coreai-torch preserve useful talker boundaries?",
+      "success_signal": "Inspectable Core AI IR with preserved composite op boundaries and fixed-shape inputs."
+    },
+    {
+      "route": "hand_rolled_core_ml",
+      "first_question": "Does the existing stage-by-stage Core ML path remain clearer for residency and dispatch?",
+      "success_signal": "Per-stage parity, timing, and dispatch evidence stay easier to reason about."
+    },
+    {
+      "route": "executorch_mlx",
+      "first_question": "Would ExecuTorch's MLX delegate avoid custom Apple GPU plumbing for autoregressive stages?",
+      "success_signal": "A Qwen-like exported graph runs with less bespoke code and acceptable runtime complexity."
+    },
+    {
+      "route": "executorch_core_ml",
+      "first_question": "Would ExecuTorch's Core ML delegate give useful partitioning and packaging comparison?",
+      "success_signal": "It exposes enough placement and timing evidence without hiding residency control."
+    }
+  ],
+  "first_slice": {
+    "status": "preflight_only",
+    "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode export-smoke --allow-runtime-imports --report docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
+    "acceptance_criteria": [
+      "records torch, coreai-torch, and Python versions",
+      "uses fixed tiny tensors or a tiny saved upstream fixture",
+      "does not download full model weights unless explicitly allowed",
+      "reports every preserved composite op boundary",
+      "reports every custom lowering or unsupported op",
+      "records whether first-token parity can be checked from the emitted outputs"
+    ],
+    "stop_conditions": [
+      "torch.export cannot capture the selected boundary without executing broad generation side effects",
+      "coreai-torch loses attention, RoPE, RMSNorm, or cache boundaries in a way that prevents useful parity checks",
+      "the route requires custom Metal kernels before a first-token parity probe exists"
+    ]
+  },
+  "second_slice": {
+    "status": "planned_after_toy_conversion",
+    "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode real-boundary-plan --report docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
+    "acceptance_criteria": [
+      "names the first real Qwen graph boundary to export after the toy smoke",
+      "records which existing fixtures feed the boundary",
+      "keeps model downloads and runtime imports opt-in",
+      "separates the main talker decode step from code-predictor continuation"
+    ]
+  },
+  "guardrails": [
+    "Do not add a public SpeechBackend for this slice.",
+    "Do not run real-model audible generation for this slice.",
+    "Do not download full Qwen3-TTS weights without an explicit opt-in flag.",
+    "Keep Core ML decoder residency evidence as the baseline until Core AI produces matched outputs."
+  ]
+}

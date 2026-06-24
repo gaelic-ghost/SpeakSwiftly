@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T16:55:13Z",
+  "mode": "runtime",
+  "source": {
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "coremltools_version": "9.0",
+    "torch_version": "2.7.0"
+  },
+  "conversion_target": {
+    "stage": "speech_tokenizer_decoder",
+    "wrapper_mode": "fixed_16q_static_mask",
+    "input_name": "audio_codes",
+    "input_shape": [
+      1,
+      40,
+      16
+    ],
+    "input_dtype": "int64",
+    "minimum_deployment_target": "macOS15",
+    "convert_to": "mlprogram",
+    "compute_precision": "float16",
+    "capture_mode": "export",
+    "export_decomposed": true,
+    "padding": {
+      "original_code_steps": 8,
+      "requested_code_steps": 40,
+      "pad_value": -1,
+      "padded_step_count": 32,
+      "samples_per_code_step": 1920,
+      "valid_output_sample_count": 15360,
+      "padded_output_sample_count": 76800
+    },
+    "torch_output_shape": [
+      1,
+      76800
+    ],
+    "torch_output_min": -0.23069410026073456,
+    "torch_output_max": 0.17230001091957092,
+    "torch_output_mean": 2.595265323179774e-05,
+    "torch_output_rms": 0.02335066720843315,
+    "upstream_max_abs_diff": 0.0
+  },
+  "trace": {
+    "status": "succeeded",
+    "capture_mode": "export",
+    "strict": false,
+    "export_decomposed": true,
+    "check_trace": false
+  },
+  "conversion": {
+    "status": "succeeded",
+    "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40-fp16.mlpackage"
+  },
+  "output_match": {
+    "status": "succeeded",
+    "compute_units": "cpuOnly",
+    "coreml_output_shape": [
+      1,
+      76800
+    ],
+    "coreml_output_dtype": "float32",
+    "coreml_output_min": -0.2379150390625,
+    "coreml_output_max": 0.16748046875,
+    "coreml_output_mean": 2.7072923330706544e-05,
+    "coreml_output_rms": 0.023295074701309204,
+    "max_abs_diff": 0.058486729860305786,
+    "mean_abs_diff": 0.0004596624639816582
+  }
+}

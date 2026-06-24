@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T21:51:32Z",
+  "mode": "coreml_decoder_audio_inspection",
+  "source": {
+    "baseline_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72-fp16.mlpackage",
+    "baseline_model_package_size_bytes": 228718254,
+    "candidate_model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-bucket-72-fp16-w8a8-talker-qwen3-linear-matmul-group-16.mlpackage",
+    "candidate_model_package_size_bytes": 114769327,
+    "calibration_fixture_path": "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json",
+    "talker_code_fixture_path": ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json",
+    "bucket_plan_path": "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json",
+    "sample_source": "talker",
+    "compute_units": "cpuOnly",
+    "sample_rate": 24000
+  },
+  "sample": {
+    "id": "prompt-001",
+    "text_normalized": "The quick brown fox jumps over the lazy dog while the room stays quiet.",
+    "audio_codes_shape": [
+      67,
+      16
+    ],
+    "padded_input_shape": [
+      1,
+      72,
+      16
+    ],
+    "padded_step_count": 5,
+    "pad_value": -1,
+    "source_audio_seconds": 5.36,
+    "valid_output_sample_count": 128640,
+    "padded_output_sample_count": 138240,
+    "generated_audio_path": ".local/coreml-qwen3tts/talker-code-fixtures/001-prompt-001.wav"
+  },
+  "artifacts": {
+    "baseline_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/baseline-fp16.wav",
+    "candidate_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/candidate-w8a8.wav",
+    "diff_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/candidate-minus-baseline.wav",
+    "baseline_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/baseline-fp16-valid.wav",
+    "candidate_valid_wav": ".local/coreml-qwen3tts/audio-inspection/bucket-72-talker-qwen3-linear-matmul-group-16-prompt-001/candidate-w8a8-valid.wav"
+  },
+  "audio": {
+    "baseline": {
+      "sample_count": 138240,
+      "min": -0.380859375,
+      "max": 0.423583984375,
+      "mean": -2.0410658180480823e-05,
+      "rms": 0.046566300094127655,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "candidate": {
+      "sample_count": 138240,
+      "min": -0.4072265625,
+      "max": 0.4501953125,
+      "mean": -3.6425928556127474e-05,
+      "rms": 0.047577425837516785,
+      "clipped_or_near_clipped_sample_count": 0
+    },
+    "full_output_diff": {
+      "sample_count": 138240,
+      "max_abs_diff": 0.109619140625,
+      "mean_abs_diff": 0.003363031428307295,
+      "rms_diff": 0.006255702115595341
+    },
+    "valid_output_diff": {
+      "sample_count": 128640,
+      "max_abs_diff": 0.109619140625,
+      "mean_abs_diff": 0.00341379689052701,
+      "rms_diff": 0.0062886993400752544
+    },
+    "padded_tail_diff": {
+      "sample_count": 9600,
+      "max_abs_diff": 0.0560760498046875,
+      "mean_abs_diff": 0.0026827759575098753,
+      "rms_diff": 0.005795443430542946
+    },
+    "windows": {
+      "window_seconds": 0.25,
+      "window_samples": 6000,
+      "count": 22,
+      "alert_mean_abs_diff": 0.01,
+      "alert_count": 0,
+      "alert_ratio": 0.0,
+      "top_by_mean_abs_diff": [
+        {
+          "index": 13,
+          "start_sample": 78000,
+          "end_sample": 84000,
+          "start_seconds": 3.25,
+          "end_seconds": 3.5,
+          "baseline_rms": 0.08058610558509827,
+          "candidate_rms": 0.08238998055458069,
+          "max_abs_diff": 0.053955078125,
+          "mean_abs_diff": 0.0076534138061106205,
+          "rms_diff": 0.010177988559007645
+        },
+        {
+          "index": 6,
+          "start_sample": 36000,
+          "end_sample": 42000,
+          "start_seconds": 1.5,
+          "end_seconds": 1.75,
+          "baseline_rms": 0.07311714440584183,
+          "candidate_rms": 0.0759340450167656,
+          "max_abs_diff": 0.0526275634765625,
+          "mean_abs_diff": 0.006045156624168158,
+          "rms_diff": 0.009504273533821106
+        },
+        {
+          "index": 9,
+          "start_sample": 54000,
+          "end_sample": 60000,
+          "start_seconds": 2.25,
+          "end_seconds": 2.5,
+          "baseline_rms": 0.0729304701089859,
+          "candidate_rms": 0.07449318468570709,
+          "max_abs_diff": 0.08498382568359375,
+          "mean_abs_diff": 0.005619576666504145,
+          "rms_diff": 0.010189018212258816
+        },
+        {
+          "index": 8,
+          "start_sample": 48000,
+          "end_sample": 54000,
+          "start_seconds": 2.0,
+          "end_seconds": 2.25,
+          "baseline_rms": 0.0656735971570015,
+          "candidate_rms": 0.06720412522554398,
+          "max_abs_diff": 0.0565185546875,
+          "mean_abs_diff": 0.005223431158810854,
+          "rms_diff": 0.007791262120008469
+        },
+        {
+          "index": 18,
+          "start_sample": 108000,
+          "end_sample": 114000,
+          "start_seconds": 4.5,
+          "end_seconds": 4.75,
+          "baseline_rms": 0.05437896400690079,
+          "candidate_rms": 0.05566369369626045,
+          "max_abs_diff": 0.0396270751953125,
+          "mean_abs_diff": 0.0047986265271902084,
+          "rms_diff": 0.007087102625519037
+        },
+        {
+          "index": 11,
+          "start_sample": 66000,
+          "end_sample": 72000,
+          "start_seconds": 2.75,
+          "end_seconds": 3.0,
+          "baseline_rms": 0.0591915100812912,
+          "candidate_rms": 0.059724342077970505,
+          "max_abs_diff": 0.0371856689453125,
+          "mean_abs_diff": 0.004651740193367004,
+          "rms_diff": 0.006272617261856794
+        },
+        {
+          "index": 4,
+          "start_sample": 24000,
+          "end_sample": 30000,
+          "start_seconds": 1.0,
+          "end_seconds": 1.25,
+          "baseline_rms": 0.06233476847410202,
+          "candidate_rms": 0.06276194751262665,
+          "max_abs_diff": 0.0277252197265625,
+          "mean_abs_diff": 0.0046297404915094376,
+          "rms_diff": 0.0061202761717140675
+        },
+        {
+          "index": 15,
+          "start_sample": 90000,
+          "end_sample": 96000,
+          "start_seconds": 3.75,
+          "end_seconds": 4.0,
+          "baseline_rms": 0.04406337812542915,
+          "candidate_rms": 0.04523009806871414,
+          "max_abs_diff": 0.045520782470703125,
+          "mean_abs_diff": 0.00428361538797617,
+          "rms_diff": 0.007003881502896547
+        },
+        {
+          "index": 14,
+          "start_sample": 84000,
+          "end_sample": 90000,
+          "start_seconds": 3.5,
+          "end_seconds": 3.75,
+          "baseline_rms": 0.05191514268517494,
+          "candidate_rms": 0.05312276631593704,
+          "max_abs_diff": 0.0587158203125,
+          "mean_abs_diff": 0.0038849033880978823,
+          "rms_diff": 0.006431914865970612
+        },
+        {
+          "index": 2,
+          "start_sample": 12000,
+          "end_sample": 18000,
+          "start_seconds": 0.5,
+          "end_seconds": 0.75,
+          "baseline_rms": 0.052996378391981125,
+          "candidate_rms": 0.05262286961078644,
+          "max_abs_diff": 0.109619140625,
+          "mean_abs_diff": 0.0036231251433491707,
+          "rms_diff": 0.009078752249479294
+        }
+      ],
+      "top_by_max_abs_diff": [
+        {
+          "index": 2,
+          "start_sample": 12000,
+          "end_sample": 18000,
+          "start_seconds": 0.5,
+          "end_seconds": 0.75,
+          "baseline_rms": 0.052996378391981125,
+          "candidate_rms": 0.05262286961078644,
+          "max_abs_diff": 0.109619140625,
+          "mean_abs_diff": 0.0036231251433491707,
+          "rms_diff": 0.009078752249479294
+        },
+        {
+          "index": 9,
+          "start_sample": 54000,
+          "end_sample": 60000,
+          "start_seconds": 2.25,
+          "end_seconds": 2.5,
+          "baseline_rms": 0.0729304701089859,
+          "candidate_rms": 0.07449318468570709,
+          "max_abs_diff": 0.08498382568359375,
+          "mean_abs_diff": 0.005619576666504145,
+          "rms_diff": 0.010189018212258816
+        },
+        {
+          "index": 5,
+          "start_sample": 30000,
+          "end_sample": 36000,
+          "start_seconds": 1.25,
+          "end_seconds": 1.5,
+          "baseline_rms": 0.04577537626028061,
+          "candidate_rms": 0.04846459627151489,
+          "max_abs_diff": 0.0687255859375,
+          "mean_abs_diff": 0.0027808090671896935,
+          "rms_diff": 0.006886090151965618
+        },
+        {
+          "index": 14,
+          "start_sample": 84000,
+          "end_sample": 90000,
+          "start_seconds": 3.5,
+          "end_seconds": 3.75,
+          "baseline_rms": 0.05191514268517494,
+          "candidate_rms": 0.05312276631593704,
+          "max_abs_diff": 0.0587158203125,
+          "mean_abs_diff": 0.0038849033880978823,
+          "rms_diff": 0.006431914865970612
+        },
+        {
+          "index": 8,
+          "start_sample": 48000,
+          "end_sample": 54000,
+          "start_seconds": 2.0,
+          "end_seconds": 2.25,
+          "baseline_rms": 0.0656735971570015,
+          "candidate_rms": 0.06720412522554398,
+          "max_abs_diff": 0.0565185546875,
+          "mean_abs_diff": 0.005223431158810854,
+          "rms_diff": 0.007791262120008469
+        },
+        {
+          "index": 13,
+          "start_sample": 78000,
+          "end_sample": 84000,
+          "start_seconds": 3.25,
+          "end_seconds": 3.5,
+          "baseline_rms": 0.08058610558509827,
+          "candidate_rms": 0.08238998055458069,
+          "max_abs_diff": 0.053955078125,
+          "mean_abs_diff": 0.0076534138061106205,
+          "rms_diff": 0.010177988559007645
+        },
+        {
+          "index": 12,
+          "start_sample": 72000,
+          "end_sample": 78000,
+          "start_seconds": 3.0,
+          "end_seconds": 3.25,
+          "baseline_rms": 0.03145937621593475,
+          "candidate_rms": 0.03135420009493828,
+          "max_abs_diff": 0.05303955078125,
+          "mean_abs_diff": 0.003440228523686528,
+          "rms_diff": 0.004973659757524729
+        },
+        {
+          "index": 6,
+          "start_sample": 36000,
+          "end_sample": 42000,
+          "start_seconds": 1.5,
+          "end_seconds": 1.75,
+          "baseline_rms": 0.07311714440584183,
+          "candidate_rms": 0.0759340450167656,
+          "max_abs_diff": 0.0526275634765625,
+          "mean_abs_diff": 0.006045156624168158,
+          "rms_diff": 0.009504273533821106
+        },
+        {
+          "index": 15,
+          "start_sample": 90000,
+          "end_sample": 96000,
+          "start_seconds": 3.75,
+          "end_seconds": 4.0,
+          "baseline_rms": 0.04406337812542915,
+          "candidate_rms": 0.04523009806871414,
+          "max_abs_diff": 0.045520782470703125,
+          "mean_abs_diff": 0.00428361538797617,
+          "rms_diff": 0.007003881502896547
+        },
+        {
+          "index": 18,
+          "start_sample": 108000,
+          "end_sample": 114000,
+          "start_seconds": 4.5,
+          "end_seconds": 4.75,
+          "baseline_rms": 0.05437896400690079,
+          "candidate_rms": 0.05566369369626045,
+          "max_abs_diff": 0.0396270751953125,
+          "mean_abs_diff": 0.0047986265271902084,
+          "rms_diff": 0.007087102625519037
+        }
+      ]
+    }
+  },
+  "interpretation": {
+    "status": "needs_audio_review",
+    "note": "This report compares Core ML decoder outputs from the fp16 bucket package and the representative W8A8 bucket package. It localizes numeric drift in the valid decoded region, but human listening is still required before making a quality decision."
+  }
+}

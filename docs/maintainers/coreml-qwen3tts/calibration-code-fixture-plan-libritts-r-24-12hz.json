@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T18:22:04Z",
+  "mode": "preflight",
+  "purpose": "Preview representative LibriTTS-R rows for Qwen3-TTS 12 Hz speech-tokenizer decoder calibration without downloading audio or model weights.",
+  "source": {
+    "dataset": "mythicinfinity/libritts_r",
+    "dataset_config": "clean",
+    "dataset_split": "train.clean.100",
+    "dataset_hub_url": "https://hf.co/datasets/mythicinfinity/libritts_r",
+    "row_offset": 0,
+    "row_offsets": [
+      0,
+      100,
+      250,
+      500,
+      750,
+      1000,
+      1500,
+      2000,
+      3000,
+      4000,
+      5000,
+      6000,
+      7000,
+      8000,
+      9000,
+      10000,
+      12000,
+      14000,
+      16000,
+      18000,
+      20000,
+      22000,
+      24000,
+      26000
+    ],
+    "requested_sample_count": 24,
+    "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "requested_revision": null,
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229"
+  },
+  "model_file_inventory": {
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+    "file_count": 6,
+    "total_size_bytes": 682300739,
+    "files": [
+      {
+        "path": "model.safetensors",
+        "size_bytes": 682293092
+      },
+      {
+        "path": "README.md",
+        "size_bytes": 3482
+      },
+      {
+        "path": "config.json",
+        "size_bytes": 2336
+      },
+      {
+        "path": ".gitattributes",
+        "size_bytes": 1519
+      },
+      {
+        "path": "preprocessor_config.json",
+        "size_bytes": 234
+      },
+      {
+        "path": "configuration.json",
+        "size_bytes": 76
+      }
+    ]
+  },
+  "sample_previews": [
+    {
+      "row_idx": 0,
+      "id": "730_358_000003_000002",
+      "speaker_id": "730",
+      "chapter_id": "358",
+      "text_normalized": "[The moon] I gazed with a kind of wonder.",
+      "text_original": "[The moon] I gazed with a kind of wonder.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 100,
+      "id": "2007_149877_000043_000000",
+      "speaker_id": "2007",
+      "chapter_id": "149877",
+      "text_normalized": "Drouet followed him with his eyes, much interested.",
+      "text_original": "Drouet followed him with his eyes, much interested.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 250,
+      "id": "1502_122615_000008_000001",
+      "speaker_id": "1502",
+      "chapter_id": "122615",
+      "text_normalized": "He would greatly have preferred silence and meditation to speech, when a discovery of his real condition might prove so instantly fatal.",
+      "text_original": "He would greatly have preferred silence and meditation to speech, when a discovery of his real condition might prove so instantly fatal.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 500,
+      "id": "1970_28415_000057_000004",
+      "speaker_id": "1970",
+      "chapter_id": "28415",
+      "text_normalized": "The crowds would never let them.",
+      "text_original": "The crowds would never let them.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 750,
+      "id": "1183_133256_000022_000000",
+      "speaker_id": "1183",
+      "chapter_id": "133256",
+      "text_normalized": "Better than any argument is the Restorative itself-for you to try.",
+      "text_original": "Better than any argument is the Restorative itself--for you to try.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 1000,
+      "id": "696_93314_000023_000000",
+      "speaker_id": "696",
+      "chapter_id": "93314",
+      "text_normalized": "The Onlooker had never done anything wronger than you have done, my good reader, and he never expected to meet a giant temptation, any more than you do.",
+      "text_original": "The Onlooker had never done anything wronger than you have done, my good reader, and he never expected to meet a giant temptation, any more than you do.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 1500,
+      "id": "1116_132847_000075_000000",
+      "speaker_id": "1116",
+      "chapter_id": "132847",
+      "text_normalized": "With one of the leaves of the cabbage they made her a coat, and another served for a waistcoat; but it took two for the wide breeches which were then in fashion.",
+      "text_original": "With one of the leaves of the cabbage they made her a coat, and another served for a waistcoat; but it took two for the wide breeches which were then in fashion.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 2000,
+      "id": "4267_78186_000009_000003",
+      "speaker_id": "4267",
+      "chapter_id": "78186",
+      "text_normalized": "Pugwash, I guess, don't understand the natur' of the crittur; she'll never go kind in harness for him.",
+      "text_original": "Pugwash, I guess, don't understand the natur' of the crittur; she'll never go kind in harness for him.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 3000,
+      "id": "196_122152_000001_000003",
+      "speaker_id": "196",
+      "chapter_id": "122152",
+      "text_normalized": "The face of the presiding magistrate, clean shaved and impassible, looked at him deadly pale between the red faces of the two nautical assessors.",
+      "text_original": "The face of the presiding magistrate, clean shaved and impassible, looked at him deadly pale between the red faces of the two nautical assessors.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 4000,
+      "id": "4160_11550_000004_000001",
+      "speaker_id": "4160",
+      "chapter_id": "11550",
+      "text_normalized": "He will not come back again until July, when he is to marry Miss Gower.\"",
+      "text_original": "He will not come back again until July, when he is to marry Miss Gower.\"",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 5000,
+      "id": "2910_131096_000014_000001",
+      "speaker_id": "2910",
+      "chapter_id": "131096",
+      "text_normalized": "We whose voices you hear are your servants and shall obey all your commands with our utmost care and diligence. Retire, therefore, to your chamber and repose on your bed of down, and when you see fit repair to the bath.",
+      "text_original": "We whose voices you hear are your servants and shall obey all your commands with our utmost care and diligence. Retire, therefore, to your chamber and repose on your bed of down, and when you see fit repair to the bath.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 6000,
+      "id": "7780_274562_000008_000003",
+      "speaker_id": "7780",
+      "chapter_id": "274562",
+      "text_normalized": "In the most enchanting of natural landscapes, there will always be found a defect or an excess-many excesses and defects.",
+      "text_original": "In the most enchanting of natural landscapes, there will always be found a defect or an excess--many excesses and defects.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 7000,
+      "id": "4195_186236_000039_000001",
+      "speaker_id": "4195",
+      "chapter_id": "186236",
+      "text_normalized": "\"I'll be ready, Patsy.\"",
+      "text_original": "\"I'll be ready, Patsy.\"",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 8000,
+      "id": "5393_19219_000047_000015",
+      "speaker_id": "5393",
+      "chapter_id": "19219",
+      "text_normalized": "Can one be too much alive, too happy? Moderate your joys.",
+      "text_original": "Can one be too much alive, too happy? Moderate your joys.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 9000,
+      "id": "3526_176653_000071_000006",
+      "speaker_id": "3526",
+      "chapter_id": "176653",
+      "text_normalized": "He smiled, remembering-he liked that.",
+      "text_original": "He smiled, remembering--he liked that.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 10000,
+      "id": "3436_172162_000011_000010",
+      "speaker_id": "3436",
+      "chapter_id": "172162",
+      "text_normalized": "\"Alas! for shame,\" said Sir Launcelot, \"that ever one knight should betray another! but it is an old saw, a good man is never in danger, but when he is in danger of a coward.\" Then Sir Launcelot went awhile and he was exceedingly cumbered by his armor, his shield, and his spear, and all that belonged to him.",
+      "text_original": "\"Alas! for shame,\" said Sir Launcelot, \"that ever one knight should betray another! but it is an old saw, a good man is never in danger, but when he is in danger of a coward.\" Then Sir Launcelot went awhile and he was exceedingly cumbered by his armor, his shield, and his spear, and all that belonged to him.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 12000,
+      "id": "6385_34655_000018_000010",
+      "speaker_id": "6385",
+      "chapter_id": "34655",
+      "text_normalized": "It was as if some magician had caught up the month of June and imprisoned it in a labyrinth.",
+      "text_original": "It was as if some magician had caught up the month of June and imprisoned it in a labyrinth.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 14000,
+      "id": "2436_2477_000070_000000",
+      "speaker_id": "2436",
+      "chapter_id": "2477",
+      "text_normalized": "They came to the corner of the deck, but turned back.",
+      "text_original": "They came to the corner of the deck, but turned back.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 16000,
+      "id": "8063_274115_000005_000001",
+      "speaker_id": "8063",
+      "chapter_id": "274115",
+      "text_normalized": "In the midst of his despair, he approached Porthos, who blocked up the whole of the passage leading from the back shop to the shop itself.",
+      "text_original": "In the midst of his despair, he approached Porthos, who blocked up the whole of the passage leading from the back shop to the shop itself.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 18000,
+      "id": "2836_5354_000078_000000",
+      "speaker_id": "2836",
+      "chapter_id": "5354",
+      "text_normalized": "\"Why did I come?\" repeated he.",
+      "text_original": "\"Why did I come?\" repeated he.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 20000,
+      "id": "3259_158083_000085_000004",
+      "speaker_id": "3259",
+      "chapter_id": "158083",
+      "text_normalized": "Slept hardly at all.",
+      "text_original": "Slept hardly at all.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 22000,
+      "id": "3830_12535_000027_000006",
+      "speaker_id": "3830",
+      "chapter_id": "12535",
+      "text_normalized": "I have often thought that some one ought to write a just tribute to their valor and patience, a book of their heroic deeds.",
+      "text_original": "I have often thought that some one ought to write a just tribute to their valor and patience, a book of their heroic deeds.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 24000,
+      "id": "6529_62554_000050_000001",
+      "speaker_id": "6529",
+      "chapter_id": "62554",
+      "text_normalized": "The shot, passing over the islet, fell into the sea at a distance which could not be calculated with exactitude.",
+      "text_original": "The shot, passing over the islet, fell into the sea at a distance which could not be calculated with exactitude.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    },
+    {
+      "row_idx": 26000,
+      "id": "5022_29405_000080_000002",
+      "speaker_id": "5022",
+      "chapter_id": "29405",
+      "text_normalized": "She took no notice of him.",
+      "text_original": "She took no notice of him.",
+      "audio": {
+        "asset_type": "audio/wav",
+        "src_available": true
+      }
+    }
+  ],
+  "stratification_targets": [
+    "short_utterances",
+    "medium_utterances",
+    "long_utterances",
+    "speaker_diversity",
+    "silence_and_energy_variety",
+    "decoder_bucket_boundaries"
+  ],
+  "next_command": "uv run --with 'numpy>=2.0.0' --with 'torch>=2.6.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'torchaudio>=2.6.0' scripts/repo-maintenance/coreml-qwen3tts/generate-calibration-code-fixture.py --no-preflight-only --allow-model-download --allow-audio-download --row-offsets 0 100 250 500 750 1000 1500 2000 3000 4000 5000 6000 7000 8000 9000 10000 12000 14000 16000 18000 20000 22000 24000 26000 --qwen-source /path/to/Qwen3-TTS --output .local/coreml-qwen3tts/qwen3tts-calibration-code-fixture.json"
+}

@@ -1,0 +1,331 @@
+{
+  "buckets" : [
+    {
+      "bucket" : 72,
+      "compile_duration_ms" : 98.125916659832,
+      "load_duration_ms" : 15874.783124998212,
+      "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72-fp16.mlpackage"
+    },
+    {
+      "bucket" : 88,
+      "compile_duration_ms" : 92.01708332449198,
+      "load_duration_ms" : 28820.475458338857,
+      "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-88-fp16.mlpackage"
+    }
+  ],
+  "created_at_utc" : "2026-06-01T02:54:22Z",
+  "memory_snapshots" : [
+    {
+      "label" : "start",
+      "resident_size_bytes" : 23134208
+    },
+    {
+      "label" : "after_load_bucket_72",
+      "resident_size_bytes" : 255639552
+    },
+    {
+      "label" : "after_load_bucket_88",
+      "resident_size_bytes" : 583532544
+    },
+    {
+      "label" : "after_prediction_pass_1_prompt-001",
+      "resident_size_bytes" : 607600640
+    },
+    {
+      "label" : "after_prediction_pass_1_prompt-002",
+      "resident_size_bytes" : 613613568
+    },
+    {
+      "label" : "after_prediction_pass_2_prompt-001",
+      "resident_size_bytes" : 613662720
+    },
+    {
+      "label" : "after_prediction_pass_2_prompt-002",
+      "resident_size_bytes" : 613662720
+    },
+    {
+      "label" : "end",
+      "resident_size_bytes" : 613662720
+    }
+  ],
+  "mode" : "resident_bucket_catalog",
+  "predictions" : [
+    {
+      "fixture_assigned_bucket" : 72,
+      "full_output" : {
+        "max" : 0.44799805,
+        "mean" : -0.00020380888987953465,
+        "min" : -0.41235352,
+        "rms" : 0.04857301419400203,
+        "sample_count" : 138240
+      },
+      "measured" : {
+        "max_ms" : 84.02295833081007,
+        "mean_ms" : 83.5648125000298,
+        "median_ms" : 84.02295833081007,
+        "min_ms" : 83.10666666924953,
+        "p95_ms" : 84.02295833081007
+      },
+      "measured_runs" : 2,
+      "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+      "output_shape" : [
+        1,
+        138240
+      ],
+      "padded_tail" : {
+        "max" : 0.12939453,
+        "mean" : -0.001229894155015548,
+        "min" : -0.2076416,
+        "rms" : 0.0210588335696801,
+        "sample_count" : 9600
+      },
+      "pass_index" : 1,
+      "sample" : {
+        "audio_codes_shape" : [
+          67,
+          16
+        ],
+        "id" : "prompt-001",
+        "pad_value" : -1,
+        "padded_input_shape" : [
+          1,
+          72,
+          16
+        ],
+        "padded_output_sample_count" : 138240,
+        "padded_step_count" : 5,
+        "text" : "The quick brown fox jumps over the lazy dog while the room stays quiet.",
+        "valid_output_sample_count" : 128640
+      },
+      "selected_bucket" : 72,
+      "valid_output" : {
+        "max" : 0.44799805,
+        "mean" : -0.0001272353626305784,
+        "min" : -0.41235352,
+        "rms" : 0.05002312041738171,
+        "sample_count" : 128640
+      },
+      "warmup" : {
+        "max_ms" : 455.31904166191816,
+        "mean_ms" : 455.31904166191816,
+        "median_ms" : 455.31904166191816,
+        "min_ms" : 455.31904166191816,
+        "p95_ms" : 455.31904166191816
+      },
+      "warmup_runs" : 1
+    },
+    {
+      "fixture_assigned_bucket" : 88,
+      "full_output" : {
+        "max" : 0.44848633,
+        "mean" : 0.00015025969989823572,
+        "min" : -0.4165039,
+        "rms" : 0.052770701271469614,
+        "sample_count" : 168960
+      },
+      "measured" : {
+        "max_ms" : 110.05412501096725,
+        "mean_ms" : 109.93443750590086,
+        "median_ms" : 110.05412501096725,
+        "min_ms" : 109.81475000083447,
+        "p95_ms" : 110.05412501096725
+      },
+      "measured_runs" : 2,
+      "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+      "output_shape" : [
+        1,
+        168960
+      ],
+      "padded_tail" : {
+        "max" : 0.11639404,
+        "mean" : -0.0010559307721753916,
+        "min" : -0.18518066,
+        "rms" : 0.019934436680212494,
+        "sample_count" : 7680
+      },
+      "pass_index" : 1,
+      "sample" : {
+        "audio_codes_shape" : [
+          84,
+          16
+        ],
+        "id" : "prompt-002",
+        "pad_value" : -1,
+        "padded_input_shape" : [
+          1,
+          88,
+          16
+        ],
+        "padded_output_sample_count" : 168960,
+        "padded_step_count" : 4,
+        "text" : "Please keep this longer spoken passage natural, even, and consistent from beginning to end.",
+        "valid_output_sample_count" : 161280
+      },
+      "selected_bucket" : 88,
+      "valid_output" : {
+        "max" : 0.44848633,
+        "mean" : 0.0002076973414255513,
+        "min" : -0.4165039,
+        "rms" : 0.053837077997400444,
+        "sample_count" : 161280
+      },
+      "warmup" : {
+        "max_ms" : 239.8078749999404,
+        "mean_ms" : 239.8078749999404,
+        "median_ms" : 239.8078749999404,
+        "min_ms" : 239.8078749999404,
+        "p95_ms" : 239.8078749999404
+      },
+      "warmup_runs" : 1
+    },
+    {
+      "fixture_assigned_bucket" : 72,
+      "full_output" : {
+        "max" : 0.44799805,
+        "mean" : -0.00020380888987953465,
+        "min" : -0.41235352,
+        "rms" : 0.04857301419400203,
+        "sample_count" : 138240
+      },
+      "measured" : {
+        "max_ms" : 83.54574999958277,
+        "mean_ms" : 83.44085416942835,
+        "median_ms" : 83.54574999958277,
+        "min_ms" : 83.33595833927393,
+        "p95_ms" : 83.54574999958277
+      },
+      "measured_runs" : 2,
+      "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+      "output_shape" : [
+        1,
+        138240
+      ],
+      "padded_tail" : {
+        "max" : 0.12939453,
+        "mean" : -0.001229894155015548,
+        "min" : -0.2076416,
+        "rms" : 0.0210588335696801,
+        "sample_count" : 9600
+      },
+      "pass_index" : 2,
+      "sample" : {
+        "audio_codes_shape" : [
+          67,
+          16
+        ],
+        "id" : "prompt-001",
+        "pad_value" : -1,
+        "padded_input_shape" : [
+          1,
+          72,
+          16
+        ],
+        "padded_output_sample_count" : 138240,
+        "padded_step_count" : 5,
+        "text" : "The quick brown fox jumps over the lazy dog while the room stays quiet.",
+        "valid_output_sample_count" : 128640
+      },
+      "selected_bucket" : 72,
+      "valid_output" : {
+        "max" : 0.44799805,
+        "mean" : -0.0001272353626305784,
+        "min" : -0.41235352,
+        "rms" : 0.05002312041738171,
+        "sample_count" : 128640
+      },
+      "warmup" : {
+        "max_ms" : 91.88770833611488,
+        "mean_ms" : 91.88770833611488,
+        "median_ms" : 91.88770833611488,
+        "min_ms" : 91.88770833611488,
+        "p95_ms" : 91.88770833611488
+      },
+      "warmup_runs" : 1
+    },
+    {
+      "fixture_assigned_bucket" : 88,
+      "full_output" : {
+        "max" : 0.44848633,
+        "mean" : 0.00015025969989823572,
+        "min" : -0.4165039,
+        "rms" : 0.052770701271469614,
+        "sample_count" : 168960
+      },
+      "measured" : {
+        "max_ms" : 111.02924999594688,
+        "mean_ms" : 111.01500000059605,
+        "median_ms" : 111.02924999594688,
+        "min_ms" : 111.00075000524521,
+        "p95_ms" : 111.02924999594688
+      },
+      "measured_runs" : 2,
+      "output_data_type" : "MLMultiArrayDataType(rawValue: 65552)",
+      "output_shape" : [
+        1,
+        168960
+      ],
+      "padded_tail" : {
+        "max" : 0.11639404,
+        "mean" : -0.0010559307721753916,
+        "min" : -0.18518066,
+        "rms" : 0.019934436680212494,
+        "sample_count" : 7680
+      },
+      "pass_index" : 2,
+      "sample" : {
+        "audio_codes_shape" : [
+          84,
+          16
+        ],
+        "id" : "prompt-002",
+        "pad_value" : -1,
+        "padded_input_shape" : [
+          1,
+          88,
+          16
+        ],
+        "padded_output_sample_count" : 168960,
+        "padded_step_count" : 4,
+        "text" : "Please keep this longer spoken passage natural, even, and consistent from beginning to end.",
+        "valid_output_sample_count" : 161280
+      },
+      "selected_bucket" : 88,
+      "valid_output" : {
+        "max" : 0.44848633,
+        "mean" : 0.0002076973414255513,
+        "min" : -0.4165039,
+        "rms" : 0.053837077997400444,
+        "sample_count" : 161280
+      },
+      "warmup" : {
+        "max_ms" : 123.16983333975077,
+        "mean_ms" : 123.16983333975077,
+        "median_ms" : 123.16983333975077,
+        "min_ms" : 123.16983333975077,
+        "p95_ms" : 123.16983333975077
+      },
+      "warmup_runs" : 1
+    }
+  ],
+  "schema_version" : 1,
+  "source" : {
+    "bucket_models" : [
+      {
+        "bucket" : 72,
+        "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72-fp16.mlpackage"
+      },
+      {
+        "bucket" : 88,
+        "model_package" : ".local\/coreml-qwen3tts\/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-88-fp16.mlpackage"
+      }
+    ],
+    "catalog_passes" : 2,
+    "compute_units" : "all",
+    "sample_ids" : [
+      "prompt-001",
+      "prompt-002"
+    ],
+    "talker_code_fixture" : ".local\/coreml-qwen3tts\/talker-code-fixture-qwen3-12hz.json"
+  },
+  "tool_name" : "coreml-qwen-decoder"
+}
