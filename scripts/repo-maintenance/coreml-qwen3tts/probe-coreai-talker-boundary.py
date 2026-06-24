@@ -33,6 +33,9 @@ DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
 DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT = (
   "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
 )
+DEFAULT_COREAI_COMPRESSION_PREFLIGHT_REPORT = (
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json"
+)
 DEFAULT_TEXT_TOKEN_FIXTURE = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
 DEFAULT_QWEN_SOURCE = ".local/coreai-qwen3tts/Qwen3-TTS-source"
 COREAI_RUNTIME_WITH_REQUIREMENTS = [
@@ -48,6 +51,9 @@ COREAI_RUNTIME_WITH_REQUIREMENTS = [
   "onnxruntime>=1.23.0",
   "einops>=0.8.0",
   "coreai-torch==0.4.0",
+]
+COREAI_COMPRESSION_WITH_REQUIREMENTS = COREAI_RUNTIME_WITH_REQUIREMENTS + [
+  "coreai-opt",
 ]
 LOCAL_PATH_REPLACEMENTS = [
   (str(Path.home()), "<local-home-path>"),
@@ -161,6 +167,308 @@ def dependency_report() -> dict[str, Any]:
     },
     "packages": [module_status(module, package_name=package) for module, package in package_names.items()],
     "uv_with_requirements": COREAI_RUNTIME_WITH_REQUIREMENTS,
+  }
+
+
+def compression_dependency_report() -> dict[str, Any]:
+  report = dependency_report()
+  report["packages"].append(module_status("coreai_opt", package_name="coreai-opt"))
+  report["uv_with_requirements"] = COREAI_COMPRESSION_WITH_REQUIREMENTS
+  return report
+
+
+def coreai_build_capability_report(args: argparse.Namespace) -> dict[str, Any]:
+  import os
+
+  env = os.environ.copy()
+  developer_dir_source = "environment"
+  if args.developer_dir:
+    env["DEVELOPER_DIR"] = str(args.developer_dir)
+    developer_dir_source = "argument"
+
+  help_output = command_output(["xcrun", "coreai-build", "--help"], env=env)
+  compile_help = command_output(["xcrun", "coreai-build", "help", "compile"], env=env)
+  inspect_help = command_output(["xcrun", "coreai-build", "help", "inspect"], env=env)
+  separate_inspect = command_output(["xcrun", "--find", "coreai-inspect"], env=env)
+  separate_perf = command_output(["xcrun", "--find", "coreai-perf"], env=env)
+
+  compile_stdout = compile_help.get("stdout") or ""
+  inspect_stdout = inspect_help.get("stdout") or ""
+  help_stdout = help_output.get("stdout") or ""
+  return {
+    "developer_dir_source": developer_dir_source if env.get("DEVELOPER_DIR") else "unset",
+    "developer_dir_is_set": bool(env.get("DEVELOPER_DIR")),
+    "coreai_build_found": help_output["found"],
+    "subcommands": [
+      subcommand
+      for subcommand in ["compile", "package", "inspect", "metadata"]
+      if subcommand in help_stdout
+    ],
+    "compile": {
+      "preferred_compute_values": [
+        value
+        for value in ["gpu", "neural-engine", "none"]
+        if value in compile_stdout
+      ],
+      "supports_frequent_reshapes_hint": "--expect-frequent-reshapes" in compile_stdout,
+    },
+    "inspect": {
+      "supports_json": "--json" in inspect_stdout,
+      "supports_storage": "--storage" in inspect_stdout,
+      "supports_compute": "--compute" in inspect_stdout,
+      "supports_ops": "--ops" in inspect_stdout,
+    },
+    "separate_tools": {
+      "coreai_inspect_found": separate_inspect["found"],
+      "coreai_perf_found": separate_perf["found"],
+    },
+    "raw": {
+      "help": help_output,
+      "compile_help": compile_help,
+      "inspect_help": inspect_help,
+      "coreai_inspect": separate_inspect,
+      "coreai_perf": separate_perf,
+    },
+  }
+
+
+def coreai_compression_api_report(allow_runtime_imports: bool) -> dict[str, Any]:
+  report: dict[str, Any] = {
+    "status": "not_imported",
+    "requires_allow_runtime_imports": True,
+  }
+  if not allow_runtime_imports:
+    return report
+
+  try:
+    import coreai_opt
+    import coreai_torch
+
+    api: dict[str, Any] = {
+      "coreai_opt_version": getattr(coreai_opt, "__version__", importlib.metadata.version("coreai-opt")),
+      "coreai_torch_version": getattr(coreai_torch, "__version__", importlib.metadata.version("coreai-torch")),
+    }
+    try:
+      from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
+      from coreai_opt.quantization import Quantizer, QuantizerConfig
+
+      api["quantization"] = {
+        "has_quantizer": inspect.isclass(Quantizer),
+        "has_quantizer_config": inspect.isclass(QuantizerConfig),
+        "has_w8_preset": hasattr(getattr(QuantizerConfig, "presets", object()), "w8"),
+        "has_w4_preset": hasattr(getattr(QuantizerConfig, "presets", object()), "w4"),
+      }
+      api["palettization"] = {
+        "has_kmeans_palettizer": inspect.isclass(KMeansPalettizer),
+        "has_kmeans_palettizer_config": inspect.isclass(KMeansPalettizerConfig),
+        "has_w8_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w8"),
+        "has_w6_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w6"),
+        "has_w4_preset": hasattr(getattr(KMeansPalettizerConfig, "presets", object()), "w4"),
+      }
+    except Exception as error:
+      api["api_import_error"] = {
+        "type": type(error).__name__,
+        "message": str(error),
+      }
+
+    return {
+      "status": "imported",
+      "requires_allow_runtime_imports": True,
+      "api": api,
+    }
+  except Exception as error:
+    return {
+      "status": "import_failed",
+      "requires_allow_runtime_imports": True,
+      "error": {
+        "type": type(error).__name__,
+        "message": str(error),
+      },
+    }
+
+
+def build_coreai_compression_preflight(args: argparse.Namespace) -> dict[str, Any]:
+  dependencies = compression_dependency_report()
+  package_by_name = {item["package"]: item for item in dependencies["packages"]}
+  coreai_build = coreai_build_capability_report(args)
+  compression_api = coreai_compression_api_report(args.allow_runtime_imports)
+  coreai_opt_package = package_by_name.get("coreai-opt", {"found": False, "version": None})
+  coreai_torch_package = package_by_name.get("coreai-torch", {"found": False, "version": None})
+  api = compression_api.get("api", {})
+  quantization_api = api.get("quantization", {})
+  palettization_api = api.get("palettization", {})
+
+  next_command = (
+    f"{runtime_command_prefix()} --with 'coreai-opt' "
+    "scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py "
+    "--mode coreai-compression-preflight --allow-runtime-imports "
+    "--developer-dir /Users/galew/Applications/Betas/Xcode-beta.app/Contents/Developer "
+    f"--report {DEFAULT_COREAI_COMPRESSION_PREFLIGHT_REPORT}"
+  )
+  first_probe_command = (
+    "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh -- "
+    f"{runtime_command_prefix()} --with 'coreai-opt' "
+    "scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py "
+    "--mode real-code-predictor-export-smoke --allow-runtime-imports --allow-model-load "
+    "--report .local/coreml-qwen3tts/coreai-code-predictor-w8-preflight.json"
+  )
+
+  return {
+    "schema_version": 1,
+    "mode": "coreai_ane_compression_plan",
+    "created_at_utc": args.created_at_utc or current_utc_timestamp(),
+    "status": (
+      "validated_tooling_preflight"
+      if compression_api["status"] == "imported" and coreai_build["coreai_build_found"]
+      else "design_only_no_model_probe"
+    ),
+    "source": {
+      "model_id": args.model_id,
+      "scope": "Core AI runtime and compression route for Qwen3-TTS talker/code-predictor stages",
+    },
+    "dependencies": dependencies,
+    "local_tooling": {
+      "xcode_beta_coreai_build": {
+        "found": coreai_build["coreai_build_found"],
+        "subcommands": coreai_build["subcommands"],
+        "compile_preferred_compute_values": coreai_build["compile"]["preferred_compute_values"],
+        "compile_supports_frequent_reshapes_hint": coreai_build["compile"]["supports_frequent_reshapes_hint"],
+        "inspect_json": coreai_build["inspect"]["supports_json"],
+        "inspect_compute": coreai_build["inspect"]["supports_compute"],
+        "inspect_storage": coreai_build["inspect"]["supports_storage"],
+        "inspect_ops": coreai_build["inspect"]["supports_ops"],
+      },
+      "separate_coreai_inspect_binary": {
+        "found": coreai_build["separate_tools"]["coreai_inspect_found"],
+        "note": "Use coreai-build inspect instead." if not coreai_build["separate_tools"]["coreai_inspect_found"] else None,
+      },
+      "separate_coreai_perf_binary": {
+        "found": coreai_build["separate_tools"]["coreai_perf_found"],
+      },
+      "ambient_coreai_opt_python_package": {
+        "found": coreai_opt_package["found"],
+        "version": coreai_opt_package["version"],
+        "note": (
+          "Install explicitly in an opt-in probe environment before compression runtime work."
+          if not coreai_opt_package["found"]
+          else "Available in the current probe environment."
+        ),
+      },
+      "coreai_torch": {
+        "observed_version": coreai_torch_package["version"] or "not_installed",
+        "compression_support_observed_in_installed_package": {
+          "palettized_weight_module": bool(palettization_api.get("has_kmeans_palettizer")),
+          "subbyte_quantization_helpers": bool(quantization_api.get("has_quantizer")),
+          "runtime_benchmarker": compression_api["status"] == "imported",
+        },
+      },
+    },
+    "compression_api": compression_api,
+    "route": {
+      "name": "coreai_opt_to_coreai_torch_to_coreai_build",
+      "steps": [
+        "Start from the PyTorch Qwen3-TTS boundary wrapper that already has exported-program parity.",
+        "Apply coreai-opt compression to the PyTorch module or selected submodules where the API supports the desired weight and activation form.",
+        "Validate compressed PyTorch parity against the frozen-cache or explicit-cache reference before conversion.",
+        "Convert with coreai-torch to Core AI IR and save a .aimodel asset.",
+        "Compile with coreai-build compile --preferred-compute neural-engine and a matched platform/deployment target.",
+        "Inspect the .aimodel or .aimodelc with coreai-build inspect --json to capture storage, operation, and compute evidence.",
+        "Profile with Core AI Runtime or Instruments before making ANE latency claims.",
+      ],
+      "why_coreai_torch_alone_is_not_enough": (
+        "coreai-torch converts PyTorch ExportedPrograms to Core AI IR; Core AI compression "
+        "is handled by the separate coreai-opt workflow or by compression modules already "
+        "represented in the PyTorch graph."
+      ),
+    },
+    "compression_options": [
+      {
+        "name": "w8_weight_only",
+        "package": "coreai-opt",
+        "first_target": "code-predictor linear layers",
+        "calibration_required": False,
+        "decision_use": "Fast size and storage smoke before activation quantization.",
+      },
+      {
+        "name": "w8a8_activation_quantization",
+        "package": "coreai-opt",
+        "first_target": "linear and matmul-heavy code-predictor or main-talker projections",
+        "calibration_required": True,
+        "decision_use": "ANE-relevant path if compressed PyTorch parity and Core AI compile/inspect survive.",
+      },
+      {
+        "name": "palettization",
+        "package": "coreai-opt",
+        "first_target": "large linear weights after W8 baseline",
+        "calibration_required": "optional_by_workflow",
+        "decision_use": (
+          "Size and memory-pressure candidate; do not assume latency wins until runtime "
+          "inspect/profile evidence exists."
+        ),
+      },
+      {
+        "name": "joint_palettization_activation_quantization",
+        "package": "coreai-opt",
+        "first_target": "defer until simple W8 or W8A8 probes have parity evidence",
+        "calibration_required": True,
+        "decision_use": "Escalation path for size or ANE dispatch only after simple routes are measured.",
+      },
+    ],
+    "first_probe": {
+      "name": "code_predictor_w8_weight_only_compile_inspect",
+      "status": "next_concrete_slice",
+      "reason": (
+        "The real code-predictor boundary already exports to Core AI IR with exact parity "
+        "and avoids the mutable main-talker KV-cache blocker."
+      ),
+      "acceptance_criteria": [
+        "coreai-opt or equivalent compression setup is installed only in an opt-in uv script environment",
+        "compressed PyTorch module preserves exported-program parity within a recorded tolerance",
+        "coreai-torch emits Core AI IR after compression",
+        "coreai-build compile accepts the saved .aimodel with --preferred-compute neural-engine",
+        "coreai-build inspect --json records storage, operation, and compute metadata",
+        "no public SpeechBackend or runtime dependency is added",
+      ],
+      "non_goals": [
+        "audible generation",
+        "full model conversion",
+        "resident runtime integration",
+        "claiming ANE benefit from compile preference alone",
+      ],
+    },
+    "ane_evidence_gates": [
+      {
+        "gate": "compile_preference",
+        "signal": "coreai-build accepts --preferred-compute neural-engine",
+        "sufficient_for_ane_claim": False,
+      },
+      {
+        "gate": "compiled_model_inspect",
+        "signal": "coreai-build inspect --json reports compute, storage, and operation metadata",
+        "sufficient_for_ane_claim": "partial",
+      },
+      {
+        "gate": "runtime_profile",
+        "signal": "Core AI Runtime or Instruments shows actual placement and latency for the compressed boundary",
+        "sufficient_for_ane_claim": True,
+      },
+    ],
+    "risks": [
+      "Core AI may compile with neural-engine preference while still dispatching some operations elsewhere.",
+      "Activation quantization may reproduce the Core ML decoder lesson: broad W8A8 can drift audibly, so per-op scope matters.",
+      "Main-talker mutable cache remains a separate blocker even if code-predictor compression works.",
+      "Palettization can reduce package size without improving hot latency.",
+    ],
+    "evidence_sources": [
+      "https://developer.apple.com/machine-learning/",
+      "https://developer.apple.com/documentation/coreai",
+      "https://github.com/apple/coreai-torch",
+      "https://apple.github.io/coreai-torch/main/",
+      "https://github.com/apple/coreai-optimization",
+      "https://apple.github.io/coreai-optimization/",
+    ],
+    "next_command": next_command,
+    "first_probe_command": first_probe_command,
   }
 
 
@@ -1551,6 +1859,7 @@ def parse_args() -> argparse.Namespace:
       "real-boundary-capture",
       "real-code-predictor-export-smoke",
       "real-main-talker-export-smoke",
+      "coreai-compression-preflight",
     ],
     default="preflight",
   )
@@ -1616,6 +1925,10 @@ def main() -> None:
     if args.report == Path(DEFAULT_REPORT):
       args.report = Path(DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT)
     report = run_real_main_talker_export_smoke(args)
+  elif args.mode == "coreai-compression-preflight":
+    if args.report == Path(DEFAULT_REPORT):
+      args.report = Path(DEFAULT_COREAI_COMPRESSION_PREFLIGHT_REPORT)
+    report = build_coreai_compression_preflight(args)
   else:
     report = build_report(args)
   write_report(resolve_package_path(args.report), report)

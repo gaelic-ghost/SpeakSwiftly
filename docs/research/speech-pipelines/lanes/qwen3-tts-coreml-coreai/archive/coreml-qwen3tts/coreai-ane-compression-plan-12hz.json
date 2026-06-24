@@ -1,11 +1,112 @@
 {
   "schema_version": 1,
   "mode": "coreai_ane_compression_plan",
-  "created_at_utc": "2026-06-24T15:50:00Z",
-  "status": "design_only_no_model_probe",
+  "created_at_utc": "2026-06-24T16:30:00Z",
+  "status": "validated_tooling_preflight",
   "source": {
     "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
     "scope": "Core AI runtime and compression route for Qwen3-TTS talker/code-predictor stages"
+  },
+  "dependencies": {
+    "python": {
+      "version": "3.12.12",
+      "implementation": "CPython"
+    },
+    "packages": [
+      {
+        "module": "torch",
+        "package": "torch",
+        "found": true,
+        "version": "2.11.0"
+      },
+      {
+        "module": "torchaudio",
+        "package": "torchaudio",
+        "found": true,
+        "version": "2.11.0"
+      },
+      {
+        "module": "transformers",
+        "package": "transformers",
+        "found": true,
+        "version": "4.57.3"
+      },
+      {
+        "module": "accelerate",
+        "package": "accelerate",
+        "found": true,
+        "version": "1.12.0"
+      },
+      {
+        "module": "numpy",
+        "package": "numpy",
+        "found": true,
+        "version": "2.3.5"
+      },
+      {
+        "module": "numba",
+        "package": "numba",
+        "found": true,
+        "version": "0.65.1"
+      },
+      {
+        "module": "soundfile",
+        "package": "soundfile",
+        "found": true,
+        "version": "0.14.0"
+      },
+      {
+        "module": "librosa",
+        "package": "librosa",
+        "found": true,
+        "version": "0.11.0"
+      },
+      {
+        "module": "sox",
+        "package": "sox",
+        "found": true,
+        "version": "1.5.0"
+      },
+      {
+        "module": "onnxruntime",
+        "package": "onnxruntime",
+        "found": true,
+        "version": "1.27.0"
+      },
+      {
+        "module": "einops",
+        "package": "einops",
+        "found": true,
+        "version": "0.8.2"
+      },
+      {
+        "module": "coreai_torch",
+        "package": "coreai-torch",
+        "found": true,
+        "version": "0.4.0"
+      },
+      {
+        "module": "coreai_opt",
+        "package": "coreai-opt",
+        "found": true,
+        "version": "0.2.0"
+      }
+    ],
+    "uv_with_requirements": [
+      "torch==2.11.0",
+      "torchaudio==2.11.0",
+      "transformers==4.57.3",
+      "accelerate==1.12.0",
+      "numpy>=2.0.0",
+      "numba>=0.61.0",
+      "soundfile>=0.13.0",
+      "librosa>=0.11.0",
+      "sox>=1.5.0",
+      "onnxruntime>=1.23.0",
+      "einops>=0.8.0",
+      "coreai-torch==0.4.0",
+      "coreai-opt"
+    ]
   },
   "local_tooling": {
     "xcode_beta_coreai_build": {
@@ -21,6 +122,7 @@
         "neural-engine",
         "none"
       ],
+      "compile_supports_frequent_reshapes_hint": true,
       "inspect_json": true,
       "inspect_compute": true,
       "inspect_storage": true,
@@ -30,9 +132,13 @@
       "found": false,
       "note": "Use coreai-build inspect instead."
     },
+    "separate_coreai_perf_binary": {
+      "found": false
+    },
     "ambient_coreai_opt_python_package": {
-      "found": false,
-      "note": "Install explicitly in an opt-in probe environment before compression runtime work."
+      "found": true,
+      "version": "0.2.0",
+      "note": "Available in the current probe environment."
     },
     "coreai_torch": {
       "observed_version": "0.4.0",
@@ -40,6 +146,27 @@
         "palettized_weight_module": true,
         "subbyte_quantization_helpers": true,
         "runtime_benchmarker": true
+      }
+    }
+  },
+  "compression_api": {
+    "status": "imported",
+    "requires_allow_runtime_imports": true,
+    "api": {
+      "coreai_opt_version": "0.2.0",
+      "coreai_torch_version": "0.4.0",
+      "quantization": {
+        "has_quantizer": true,
+        "has_quantizer_config": true,
+        "has_w8_preset": true,
+        "has_w4_preset": true
+      },
+      "palettization": {
+        "has_kmeans_palettizer": true,
+        "has_kmeans_palettizer_config": true,
+        "has_w8_preset": true,
+        "has_w6_preset": true,
+        "has_w4_preset": true
       }
     }
   },
@@ -105,6 +232,23 @@
       "claiming ANE benefit from compile preference alone"
     ]
   },
+  "ane_evidence_gates": [
+    {
+      "gate": "compile_preference",
+      "signal": "coreai-build accepts --preferred-compute neural-engine",
+      "sufficient_for_ane_claim": false
+    },
+    {
+      "gate": "compiled_model_inspect",
+      "signal": "coreai-build inspect --json reports compute, storage, and operation metadata",
+      "sufficient_for_ane_claim": "partial"
+    },
+    {
+      "gate": "runtime_profile",
+      "signal": "Core AI Runtime or Instruments shows actual placement and latency for the compressed boundary",
+      "sufficient_for_ane_claim": true
+    }
+  ],
   "risks": [
     "Core AI may compile with neural-engine preference while still dispatching some operations elsewhere.",
     "Activation quantization may reproduce the Core ML decoder lesson: broad W8A8 can drift audibly, so per-op scope matters.",
@@ -119,5 +263,6 @@
     "https://github.com/apple/coreai-optimization",
     "https://apple.github.io/coreai-optimization/"
   ],
-  "next_command": "uv run --script scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode real-code-predictor-export-smoke --allow-runtime-imports --allow-model-load --compression-preflight coreai-opt-w8 --report .local/coreml-qwen3tts/coreai-code-predictor-w8-preflight.json"
+  "next_command": "uv run --python 3.12 --with 'torch==2.11.0' --with 'torchaudio==2.11.0' --with 'transformers==4.57.3' --with 'accelerate==1.12.0' --with 'numpy>=2.0.0' --with 'numba>=0.61.0' --with 'soundfile>=0.13.0' --with 'librosa>=0.11.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coreai-torch==0.4.0' --with 'coreai-opt' scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode coreai-compression-preflight --allow-runtime-imports --developer-dir <local-home-path>/Applications/Betas/Xcode-beta.app/Contents/Developer --report docs/maintainers/coreml-qwen3tts/coreai-ane-compression-plan-12hz.json",
+  "first_probe_command": "scripts/repo-maintenance/coreml-qwen3tts/run-with-live-service-headroom.sh -- uv run --python 3.12 --with 'torch==2.11.0' --with 'torchaudio==2.11.0' --with 'transformers==4.57.3' --with 'accelerate==1.12.0' --with 'numpy>=2.0.0' --with 'numba>=0.61.0' --with 'soundfile>=0.13.0' --with 'librosa>=0.11.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coreai-torch==0.4.0' --with 'coreai-opt' scripts/repo-maintenance/coreml-qwen3tts/probe-coreai-talker-boundary.py --mode real-code-predictor-export-smoke --allow-runtime-imports --allow-model-load --report .local/coreml-qwen3tts/coreai-code-predictor-w8-preflight.json"
 }

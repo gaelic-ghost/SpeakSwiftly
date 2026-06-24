@@ -233,7 +233,7 @@ import Testing
 
     #expect(fixture.schemaVersion == 1)
     #expect(fixture.mode == "coreai_ane_compression_plan")
-    #expect(fixture.status == "design_only_no_model_probe")
+    #expect(["design_only_no_model_probe", "validated_tooling_preflight"].contains(fixture.status))
     #expect(fixture.localTooling.xcodeBetaCoreaiBuild.found)
     #expect(fixture.localTooling.xcodeBetaCoreaiBuild.subcommands == [
         "compile",
@@ -245,7 +245,6 @@ import Testing
     #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectJson)
     #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectCompute)
     #expect(fixture.localTooling.xcodeBetaCoreaiBuild.inspectStorage)
-    #expect(fixture.localTooling.ambientCoreaiOptPythonPackage.found == false)
     #expect(fixture.localTooling.coreaiTorch.observedVersion == "0.4.0")
     #expect(fixture.localTooling.coreaiTorch.compressionSupportObservedInInstalledPackage.palettizedWeightModule)
     #expect(fixture.route.name == "coreai_opt_to_coreai_torch_to_coreai_build")
@@ -258,7 +257,8 @@ import Testing
     #expect(fixture.firstProbe.acceptanceCriteria.contains("coreai-build compile accepts the saved .aimodel with --preferred-compute neural-engine"))
     #expect(fixture.firstProbe.nonGoals.contains("claiming ANE benefit from compile preference alone"))
     #expect(fixture.risks.contains("Core AI may compile with neural-engine preference while still dispatching some operations elsewhere."))
-    #expect(fixture.nextCommand.contains("--compression-preflight coreai-opt-w8"))
+    #expect(fixture.nextCommand.contains("--mode coreai-compression-preflight"))
+    #expect(fixture.nextCommand.contains("coreai-opt"))
 }
 
 private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
