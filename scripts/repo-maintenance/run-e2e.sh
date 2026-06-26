@@ -50,8 +50,6 @@ Suite names:
   quick | GeneratedFileE2ETests
   generated-file | GeneratedFileE2ETests
   generated-batch | GeneratedBatchE2ETests
-  chatterbox | ChatterboxE2ETests
-  marvis | MarvisE2ETests
   qwen | QwenE2ETests
   qwen-backends | QwenE2ETests with backend-variant coverage enabled
   queue-control | QueueControlE2ETests
@@ -60,7 +58,7 @@ Suite names:
   deep-trace | DeepTraceE2ETests
   qwen-benchmark | QwenBenchmarkE2ETests
   backend-benchmark | BackendBenchmarkE2ETests
-  qwen-quantization-benchmark | BackendBenchmarkE2ETests narrow 0.6B 6-bit versus 8-bit comparison
+  qwen-quantization-benchmark | QwenQuantizationBenchmarkE2ETests
 
 Flags:
   --audible
@@ -84,15 +82,14 @@ resolve_suite_name() {
     quick|QuickE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-file|GeneratedFileE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-batch|GeneratedBatchE2ETests) printf '%s\n' "GeneratedBatchE2ETests" ;;
-    chatterbox|ChatterboxE2ETests) printf '%s\n' "ChatterboxE2ETests" ;;
-    marvis|MarvisE2ETests) printf '%s\n' "MarvisE2ETests" ;;
     qwen|qwen-backends|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
     queue-control|QueueControlE2ETests) printf '%s\n' "QueueControlE2ETests" ;;
     qwen-longform|QwenLongFormE2ETests) printf '%s\n' "QwenLongFormE2ETests" ;;
     trace|TraceCaptureE2ETests) printf '%s\n' "TraceCaptureE2ETests" ;;
     deep-trace|DeepTraceE2ETests) printf '%s\n' "DeepTraceE2ETests" ;;
     qwen-benchmark|QwenBenchmarkE2ETests) printf '%s\n' "QwenBenchmarkE2ETests" ;;
-    backend-benchmark|qwen-quantization-benchmark|BackendBenchmarkE2ETests) printf '%s\n' "BackendBenchmarkE2ETests" ;;
+    backend-benchmark|BackendBenchmarkE2ETests) printf '%s\n' "BackendBenchmarkE2ETests" ;;
+    qwen-quantization-benchmark|QwenQuantizationBenchmarkE2ETests) printf '%s\n' "QwenQuantizationBenchmarkE2ETests" ;;
     *)
       return 1
       ;;
@@ -103,7 +100,7 @@ suite_name=$(resolve_suite_name "$suite_arg") \
   || die "Unsupported E2E suite '$suite_arg'. Use --help to see the supported top-level suite names."
 
 case "$suite_name" in
-  GeneratedFileE2ETests|GeneratedBatchE2ETests|ChatterboxE2ETests|MarvisE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests)
+  GeneratedFileE2ETests|GeneratedBatchE2ETests|QwenE2ETests|QueueControlE2ETests|QwenLongFormE2ETests|TraceCaptureE2ETests|DeepTraceE2ETests|QwenBenchmarkE2ETests|BackendBenchmarkE2ETests|QwenQuantizationBenchmarkE2ETests)
     ;;
   *)
     die "Refusing to run '$suite_name' because only one top-level E2E suite may run per invocation."
@@ -145,11 +142,11 @@ if [ -n "$benchmark_iterations" ]; then
   export SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS="$benchmark_iterations"
 fi
 
-if [ "$suite_name" = "BackendBenchmarkE2ETests" ] && [ "$suite_arg" != "qwen-quantization-benchmark" ]; then
+if [ "$suite_name" = "BackendBenchmarkE2ETests" ]; then
   export SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1
 fi
 
-if [ "$suite_arg" = "qwen-quantization-benchmark" ]; then
+if [ "$suite_name" = "QwenQuantizationBenchmarkE2ETests" ]; then
   export SPEAKSWIFTLY_QWEN_QUANTIZATION_BENCHMARK_E2E=1
 fi
 

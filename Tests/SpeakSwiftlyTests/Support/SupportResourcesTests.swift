@@ -30,8 +30,16 @@ import Testing
 
     for profileName in expectedProfiles {
         let profileURL = profilesURL.appendingPathComponent(profileName, isDirectory: true)
-        #expect(FileManager.default.fileExists(atPath: profileURL.appendingPathComponent("profile.json").path))
+        let manifestURL = profileURL.appendingPathComponent("profile.json", isDirectory: false)
+        #expect(FileManager.default.fileExists(atPath: manifestURL.path))
         #expect(FileManager.default.fileExists(atPath: profileURL.appendingPathComponent("reference.wav").path))
+
+        let manifestData = try Data(contentsOf: manifestURL)
+        let manifest = try JSONDecoder().decode(E2EProfileResourceManifest.self, from: manifestData)
+        for artifact in manifest.qwenConditioningArtifacts {
+            let artifactURL = profileURL.appendingPathComponent(artifact.artifactFile, isDirectory: false)
+            #expect(FileManager.default.fileExists(atPath: artifactURL.path))
+        }
     }
 }
 
@@ -40,4 +48,12 @@ import Testing
     #expect(rootURL.lastPathComponent == "profiles")
     #expect(rootURL.deletingLastPathComponent().lastPathComponent == "SystemProfiles")
     #expect(FileManager.default.fileExists(atPath: rootURL.path))
+}
+
+private struct E2EProfileResourceManifest: Decodable {
+    let qwenConditioningArtifacts: [E2EProfileQwenConditioningArtifact]
+}
+
+private struct E2EProfileQwenConditioningArtifact: Decodable {
+    let artifactFile: String
 }

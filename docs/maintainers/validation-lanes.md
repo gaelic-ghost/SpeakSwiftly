@@ -81,13 +81,18 @@ For GitHub Actions, keep the manifest sanity check as:
 swift package dump-package
 ```
 
-GitHub Actions currently keeps build-and-test coverage on the Xcode-backed
-package lane even though local ordinary package work starts with SwiftPM. The
-current macOS CI target set is:
+GitHub Actions currently keeps the ordinary macOS package lane on SwiftPM:
 
-- `SpeakSwiftlyTests/WorkerRuntimePlaybackTests`
-- `SpeakSwiftlyTests/LibrarySurfaceTests`
-- `SpeakSwiftlyTests/ModelClientsTests`
+```bash
+swift package dump-package
+swift build
+swift test
+```
+
+That CI lane intentionally leaves real-model E2E suites behind their explicit
+environment gates. If CI moves back to an Xcode-backed package lane, update this
+section and `.github/workflows/swift.yml` together so the documented lane and the
+actual workflow stay in sync.
 
 ## iOS Compile-And-Smoke Lane
 
@@ -134,6 +139,7 @@ sh scripts/repo-maintenance/run-e2e.sh --suite quick
 sh scripts/repo-maintenance/run-e2e.sh --suite qwen
 sh scripts/repo-maintenance/run-e2e.sh --suite qwen-backends
 sh scripts/repo-maintenance/run-e2e.sh --suite qwen-longform
+sh scripts/repo-maintenance/run-e2e.sh --suite qwen-quantization-benchmark
 sh scripts/repo-maintenance/run-e2e-full.sh
 ```
 
@@ -207,10 +213,9 @@ xcodebuild test-without-building -quiet \
   -destination 'platform=macOS' \
   -only-testing:'SpeakSwiftlyTests/GeneratedFileE2ETests' \
   -only-testing:'SpeakSwiftlyTests/GeneratedBatchE2ETests' \
-  -only-testing:'SpeakSwiftlyTests/ChatterboxE2ETests' \
   -only-testing:'SpeakSwiftlyTests/QueueControlE2ETests' \
-  -only-testing:'SpeakSwiftlyTests/MarvisE2ETests' \
-  -only-testing:'SpeakSwiftlyTests/QwenE2ETests'
+  -only-testing:'SpeakSwiftlyTests/QwenE2ETests' \
+  -only-testing:'SpeakSwiftlyTests/QwenQuantizationBenchmarkE2ETests'
 ```
 
 That lane excludes the opt-in `DeepTraceE2ETests` and `QwenBenchmarkE2ETests`
@@ -238,10 +243,36 @@ sh scripts/repo-maintenance/run-benchmark.sh --qwen-quantization --iterations 3
 ```
 
 Use the Qwen quantization lane when the question is specifically about the
-0.6B 6-bit build versus the 0.6B 8-bit build. That lane writes
-`qwen-0-6b-quantization-benchmark-latest.json` under `.local/benchmarks` and
-keeps the workload to the same two queued live requests used by the backend
-benchmark suite.
+Qwen backend quantization matrix. That lane runs `QwenQuantizationBenchmarkE2ETests`
+with `SPEAKSWIFTLY_QWEN_QUANTIZATION_BENCHMARK_E2E=1` and writes timestamped
+plus `latest.json` summaries under `.local/benchmarks/qwen-quant/<device>/`.
+
+For the friendly Qwen-quant wrapper, pass backend and device filters to
+`run-qwen-quant-benchmark.sh`; it translates those options into the environment
+variables read by the test suite:
+
+```bash
+sh scripts/repo-maintenance/run-qwen-quant-benchmark.sh --backend qwen3_smol_8bit --iterations 1
+sh scripts/repo-maintenance/run-qwen-quant-benchmark.sh --all --device-label macbook-pro-m4-pro-24gb
+```
+
+The lower-level generic benchmark wrapper keeps one canonical target spelling:
+`--qwen-quantization`.
+
+## Opt-In MLX Persistence Lane
+
+The baseline `swift test` run deliberately skips MLX conditioning persistence
+round trips. Use this opt-in lane when changing profile storage, prepared Qwen
+conditioning artifacts, or resident speech input loading:
+
+```bash
+SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter ProfileStoreTests
+SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter SpeechModelClientTests
+```
+
+Run the filters one at a time when the machine is already under model-memory
+pressure. They are still ordinary SwiftPM tests, but they exercise heavier
+conditioning persistence paths than the default unit lane.
 
 The benchmark harness also emits `OSSignposter` timeline markers under the
 `com.gaelic-ghost.SpeakSwiftly.benchmarks` subsystem. Use those markers when
@@ -286,21 +317,6 @@ sh scripts/repo-maintenance/run-benchmark-trace.sh --template "VM Tracker" --ite
 The trace wrapper stores `.trace` files under `.local/traces/qwen-quantization`
 and leaves benchmark JSON summaries under `.local/benchmarks`. Do not run more
 than one trace template at the same time.
-
-For the Marvis-specific resident-policy comparison lane, run the benchmark test
-directly so the filter stays narrow:
-
-```bash
-SPEAKSWIFTLY_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_E2E=1 SPEAKSWIFTLY_BACKEND_BENCHMARK_ITERATIONS=1 swift test --filter 'BackendBenchmarkE2ETests/compare marvis resident policies with three queued voice switches'
-```
-
-That lane compares `dual_resident_serialized` against
-`single_resident_dynamic` with a three-request voice order that goes
-`femme` -> `masc` -> `femme` again.
-
-For Marvis profiling, throughput investigation, and trace work, prefer the dedicated runbook:
-
-- [marvis-overlap-profiling-runbook-2026-04-16.md](marvis-overlap-profiling-runbook-2026-04-16.md)
 
 ## Practical Rules
 
