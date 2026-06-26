@@ -516,6 +516,8 @@ Planned
   choosing a Swift or Apple-runtime graph boundary.
 - [x] Add a no-weight Higgs Audio v3 tokenizer parity fixture for the first
   plain and control-tag prompt shapes.
+- [x] Add a no-weight Higgs Audio v3 synthetic delay-pattern fixture for
+  eight-codebook row ordering and BOC/EOC placement.
 
 ### Stage Notes
 
@@ -538,6 +540,9 @@ Planned
 - `docs/maintainers/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json`
   is the first checked-in no-weight parity artifact for official prompt token
   layout.
+- `docs/maintainers/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json` is
+  the first checked-in no-weight parity artifact for eight-codebook
+  delay-pattern layout.
 
 ### Exit Criteria
 

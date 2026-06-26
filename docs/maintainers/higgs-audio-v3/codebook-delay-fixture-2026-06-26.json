@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-26T00:00:00Z",
+  "mode": "higgs_audio_v3_codebook_delay_fixture",
+  "source": {
+    "source_map_path": "docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "official_sources": [
+      "SGLang-Omni sglang_omni/models/higgs_tts/sampler.py",
+      "vLLM-Omni vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py",
+      "vLLM-Omni vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py"
+    ],
+    "no_model_weights_downloaded": true
+  },
+  "constants": {
+    "num_codebooks": 8,
+    "num_real_codes": 1024,
+    "codebook_vocab_size": 1026,
+    "boc_id": 1024,
+    "eoc_id": 1025,
+    "delay_pattern": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "delayed_row_count_formula": "raw_frame_count + num_codebooks - 1"
+  },
+  "raw_codes": {
+    "shape": [
+      3,
+      8
+    ],
+    "rows": [
+      [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ]
+    ]
+  },
+  "delayed_codes": {
+    "shape": [
+      10,
+      8
+    ],
+    "rows": [
+      [
+        10,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      [
+        20,
+        11,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      [
+        30,
+        21,
+        12,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      [
+        1025,
+        31,
+        22,
+        13,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      [
+        1025,
+        1025,
+        32,
+        23,
+        14,
+        1024,
+        1024,
+        1024
+      ],
+      [
+        1025,
+        1025,
+        1025,
+        33,
+        24,
+        15,
+        1024,
+        1024
+      ],
+      [
+        1025,
+        1025,
+        1025,
+        1025,
+        34,
+        25,
+        16,
+        1024
+      ],
+      [
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        35,
+        26,
+        17
+      ],
+      [
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        36,
+        27
+      ],
+      [
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        1025,
+        37
+      ]
+    ],
+    "row_roles": [
+      "ramp_in_boc_for_later_codebooks",
+      "mixed_real_codes",
+      "ramp_down_eoc_for_earlier_codebooks"
+    ]
+  },
+  "reversed_codes": {
+    "shape": [
+      3,
+      8
+    ],
+    "rows": [
+      [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ]
+    ],
+    "matches_raw_codes": true
+  },
+  "streaming_implication": {
+    "right_holdback_frames_default": 4,
+    "why_it_matters": "Chunked codec decode should hold back trailing rows so delay-pattern reversal and codec context do not expose unstable tail samples."
+  }
+}

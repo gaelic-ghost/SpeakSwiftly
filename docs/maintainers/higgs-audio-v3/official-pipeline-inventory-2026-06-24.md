@@ -22,6 +22,11 @@ It was produced by
 [`../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py)
 without downloading model weights.
 
+The first synthetic codebook delay-pattern fixture is
+[`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json).
+It was produced by
+[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py).
+
 ## Source Inventory
 
 ### Boson And Hugging Face
@@ -214,6 +219,11 @@ Swift or Accelerate should own this first unless a graph boundary proves a
 measurable advantage. Keeping it Swift-owned makes delay-pattern tests, seed
 behavior, stop handling, and codebook ordering visible.
 
+The first checked-in synthetic delay fixture is
+[`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json).
+It pins a 3-frame by 8-codebook raw-code matrix, the 10-row delayed matrix, and
+the round trip back to raw rows.
+
 ### Codec And Vocoder Decode
 
 The codec/vocoder is the highest-risk boundary. Official sources load a bundled
@@ -254,6 +264,9 @@ settles it.
    expected prompt sections, model constants, and output-container expectations.
 4. Compare the fixture against SGLang/vLLM official serving behavior before
    choosing the first Core AI graph boundary.
+5. Extend the no-weight fixture set from prompt IDs into sampler state and
+   codec/vocoder metadata. The first delay-pattern fixture is checked in; the
+   next open item is official serving comparison or codec/vocoder shape capture.
 
 ## Current Decision
 

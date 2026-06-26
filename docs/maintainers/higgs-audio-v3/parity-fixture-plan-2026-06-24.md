@@ -77,6 +77,9 @@ least one official serving path.
 
 ### Sampler Expectations
 
+Status: synthetic delay-pattern fixture captured in
+[`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json).
+
 Record sampler policy explicitly:
 
 - Top-k value and whether it defaults to full vocabulary/no-op.
