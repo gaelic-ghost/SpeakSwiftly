@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-26T00:00:00Z",
+  "mode": "higgs_audio_v3_tokenizer_parity_fixture",
+  "source": {
+    "model_id": "bosonai/higgs-audio-v3-tts-4b",
+    "requested_revision": null,
+    "resolved_revision": "a7f70853f163c4cccbdd27ce9a80dd97961fc581",
+    "source_map_path": "docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "source_map_created_at_utc": "2026-06-24T00:00:00Z",
+    "files_downloaded": [
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "chat_template.jinja"
+    ],
+    "no_model_weights_downloaded": true
+  },
+  "official_runtime_constants": {
+    "model_type": "higgs_multimodal_qwen3",
+    "architecture": [
+      "HiggsMultimodalQwen3ForConditionalGeneration"
+    ],
+    "text_hidden_size": 2560,
+    "text_vocab_size": 151936,
+    "text_layers": 36,
+    "attention_heads": 32,
+    "kv_heads": 8,
+    "rope_parameters": {
+      "rope_theta": 1000000,
+      "rope_type": "default"
+    },
+    "audio_placeholder_id": -100,
+    "num_codebooks": 8,
+    "codebook_vocab_size": 1026,
+    "mel_per_sample": 8,
+    "uses_delay_pattern": true,
+    "codec_checkpoint_prefix": "tied.embedding.modality_embeddings.0.model.",
+    "sample_rate_hz": 24000,
+    "boc_id": 1024,
+    "eoc_id": 1025
+  },
+  "tokenizer": {
+    "tokenizer_config_class": "Qwen2Tokenizer",
+    "tokenizer_model_type": "BPE",
+    "model_max_length": 131072,
+    "added_token_count": 84,
+    "special_tokens": {
+      "<|tts|>": 151667,
+      "<|audio|>": 151670,
+      "<|audio_end|>": 151671,
+      "<|text|>": 151672,
+      "<|ref_audio|>": 151679,
+      "<|ref_text|>": 151680,
+      "<|emotion:elation|>": 151681,
+      "<|prosody:pause|>": 151722
+    },
+    "chat_template_available": true,
+    "chat_template_participates_in_tts_prompt": false,
+    "prompt_builder_source": "Official SGLang and vLLM Higgs prompt builders append token ids directly: [tts_id, text_id, tokenized target text..., audio_id]."
+  },
+  "cases": [
+    {
+      "name": "plain-english-tts",
+      "kind": "plain_tts",
+      "raw_text": "Welcome to SpeakSwiftly. This is the first official Higgs Audio v3 parity fixture.",
+      "prompt_shape": "<|tts|> <|text|> target text tokens <|audio|>",
+      "prompt_shape_note": "The spaces in prompt_shape are prose separators only. Official SGLang and vLLM prompt builders append token ids directly.",
+      "prompt_length": 22,
+      "prompt_ids": [
+        151667,
+        151672,
+        13936,
+        311,
+        67201,
+        55336,
+        398,
+        13,
+        1096,
+        374,
+        279,
+        1156,
+        3946,
+        472,
+        61147,
+        12352,
+        348,
+        18,
+        49615,
+        12507,
+        13,
+        151670
+      ],
+      "prompt_tokens": [
+        "<|tts|>",
+        "<|text|>",
+        "Welcome",
+        "Ġto",
+        "ĠSpeak",
+        "Swift",
+        "ly",
+        ".",
+        "ĠThis",
+        "Ġis",
+        "Ġthe",
+        "Ġfirst",
+        "Ġofficial",
+        "ĠH",
+        "iggs",
+        "ĠAudio",
+        "Ġv",
+        "3",
+        "Ġparity",
+        "Ġfixture",
+        ".",
+        "<|audio|>"
+      ],
+      "section_ranges": {
+        "tts_marker": [
+          0,
+          1
+        ],
+        "text_marker": [
+          1,
+          2
+        ],
+        "target_text": [
+          2,
+          21
+        ],
+        "audio_marker": [
+          21,
+          22
+        ]
+      }
+    },
+    {
+      "name": "control-tags-tts",
+      "kind": "plain_tts",
+      "raw_text": "<|emotion:elation|>Welcome aboard. Hello there <|prosody:pause|> and thanks for listening.",
+      "prompt_shape": "<|tts|> <|text|> target text tokens <|audio|>",
+      "prompt_shape_note": "The spaces in prompt_shape are prose separators only. Official SGLang and vLLM prompt builders append token ids directly.",
+      "prompt_length": 16,
+      "prompt_ids": [
+        151667,
+        151672,
+        151681,
+        13936,
+        36506,
+        13,
+        21927,
+        1052,
+        220,
+        151722,
+        323,
+        9339,
+        369,
+        14289,
+        13,
+        151670
+      ],
+      "prompt_tokens": [
+        "<|tts|>",
+        "<|text|>",
+        "<|emotion:elation|>",
+        "Welcome",
+        "Ġaboard",
+        ".",
+        "ĠHello",
+        "Ġthere",
+        "Ġ",
+        "<|prosody:pause|>",
+        "Ġand",
+        "Ġthanks",
+        "Ġfor",
+        "Ġlistening",
+        ".",
+        "<|audio|>"
+      ],
+      "section_ranges": {
+        "tts_marker": [
+          0,
+          1
+        ],
+        "text_marker": [
+          1,
+          2
+        ],
+        "target_text": [
+          2,
+          15
+        ],
+        "audio_marker": [
+          15,
+          16
+        ]
+      }
+    }
+  ],
+  "next_checks": [
+    "Compare prompt_ids with an official SGLang or vLLM preprocessing run for the same text.",
+    "Capture first decode-step shape from an official serving path before selecting a Core AI boundary.",
+    "Keep codec/vocoder parity separate from text-to-codebook parity."
+  ]
+}

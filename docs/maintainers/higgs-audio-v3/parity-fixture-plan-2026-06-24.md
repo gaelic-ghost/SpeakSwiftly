@@ -15,6 +15,9 @@ metadata before running large weights or exposing a backend.
 
 ## Fixture 1: Plain English TTS
 
+Status: token-layout fixture captured in
+[`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
+
 ### Input
 
 - Text:
@@ -126,6 +129,9 @@ Current source conflict to preserve:
 
 ## Fixture 2: Control Tags
 
+Status: token-layout fixture captured in
+[`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
+
 After plain TTS parity, add one control-tag input:
 
 ```text
@@ -168,6 +174,11 @@ Add a small no-weight tokenizer fixture generator that:
 3. Emits JSON under `docs/maintainers/higgs-audio-v3/`.
 4. Does not download safetensors weights.
 5. Fails with a specific error if required TTS special tokens are missing.
+
+Status: implemented by
+[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py).
+The first checked-in output is
+[`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
 
 ## First Core AI Candidate
 

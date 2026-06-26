@@ -514,6 +514,8 @@ Planned
   MLX-backed coverage.
 - [x] Record the official Higgs Audio v3 source map and runtime constants before
   choosing a Swift or Apple-runtime graph boundary.
+- [x] Add a no-weight Higgs Audio v3 tokenizer parity fixture for the first
+  plain and control-tag prompt shapes.
 
 ### Stage Notes
 
@@ -533,6 +535,9 @@ Planned
   `docs/maintainers/higgs-audio-v3/parity-fixture-plan-2026-06-24.md` records
   tokenizer, prompt, decoder, sampler, codec/vocoder, waveform, and output
   container constants before any implementation port.
+- `docs/maintainers/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json`
+  is the first checked-in no-weight parity artifact for official prompt token
+  layout.
 
 ### Exit Criteria
 

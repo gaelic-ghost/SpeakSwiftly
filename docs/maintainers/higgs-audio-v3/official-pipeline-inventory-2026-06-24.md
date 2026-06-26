@@ -16,6 +16,12 @@ It was produced by
 [`../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py`](../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py)
 without downloading model weights.
 
+The first prompt-token parity fixture is
+[`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
+It was produced by
+[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py)
+without downloading model weights.
+
 ## Source Inventory
 
 ### Boson And Hugging Face
@@ -238,9 +244,12 @@ settles it.
 
 ## First Artifacts To Build Next
 
-1. Add a parity fixture plan for one reference-free English prompt.
+1. Add a parity fixture plan for one reference-free English prompt. Done in
+   [`parity-fixture-plan-2026-06-24.md`](parity-fixture-plan-2026-06-24.md).
 2. Extend the inspector or a second probe to produce a tiny token-layout fixture
    from official tokenizer assets.
+   Done in
+   [`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
 3. Produce a JSON fixture with prompt text, special-token ids, prompt token ids,
    expected prompt sections, model constants, and output-container expectations.
 4. Compare the fixture against SGLang/vLLM official serving behavior before
