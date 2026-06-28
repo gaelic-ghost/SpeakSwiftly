@@ -3,6 +3,7 @@ import Darwin
 import Foundation
 @preconcurrency import MLX
 import MLXAudioCore
+import SpeakSwiftlyFileAudioOutput
 
 struct WorkerDependencies: @unchecked Sendable {
     private enum Environment {
@@ -59,10 +60,11 @@ struct WorkerDependencies: @unchecked Sendable {
                 )
             },
             writeWAV: { samples, sampleRate, url in
-                try AudioUtils.writeWavFile(
+                try GeneratedAudioFileEncoder.write(
                     samples: samples,
-                    sampleRate: Double(sampleRate),
-                    fileURL: url,
+                    sampleRate: sampleRate,
+                    format: .wav,
+                    to: url,
                 )
             },
             loadAudioSamples: { url, sampleRate in

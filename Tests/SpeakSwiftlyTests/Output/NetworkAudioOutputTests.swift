@@ -5,20 +5,61 @@ import SpeakSwiftlyNetworkAudioOutput
 import Testing
 
 @Test func `network audio frames round trip without a live peer`() throws {
-    let frame = NetworkGeneratedAudioFrame(
-        chunk: GeneratedAudioChunk(
-            requestID: "req-lan",
-            sequenceNumber: 1,
-            sampleRate: 24000,
-            channelCount: 1,
-            samples: [0.125],
-        ),
+    let chunk = GeneratedAudioChunk(
+        requestID: "req-lan",
+        sequenceNumber: 1,
+        sampleRate: 24000,
+        channelCount: 1,
+        samples: networkAudioTestSamples(),
     )
 
+    let frame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
     let encoded = try NetworkGeneratedAudioFrameCodec.encode(frame)
     let decoded = try NetworkGeneratedAudioFrameCodec.decode(encoded)
 
     #expect(decoded == frame)
+    #expect(decoded.payloadFormat == .aac)
+    #expect(!decoded.payload.isEmpty)
+}
+
+@Test func `network audio aac frames decode back to generated audio chunks`() throws {
+    let chunk = GeneratedAudioChunk(
+        requestID: "req-aac",
+        sequenceNumber: 2,
+        sampleRate: 24000,
+        channelCount: 1,
+        samples: networkAudioTestSamples(),
+    )
+
+    let frame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
+    let decoded = try NetworkGeneratedAudioFrameCodec.chunk(from: frame)
+
+    #expect(decoded.requestID == chunk.requestID)
+    #expect(decoded.sequenceNumber == chunk.sequenceNumber)
+    #expect(decoded.sampleRate == chunk.sampleRate)
+    #expect(decoded.channelCount == chunk.channelCount)
+    #expect(decoded.sampleFormat == chunk.sampleFormat)
+    #expect(decoded.isFinal == chunk.isFinal)
+    #expect(!decoded.samples.isEmpty)
+}
+
+@Test func `network audio aac frames preserve final chunks that carry samples`() throws {
+    let chunk = GeneratedAudioChunk(
+        requestID: "req-final-aac",
+        sequenceNumber: 3,
+        sampleRate: 24000,
+        channelCount: 1,
+        samples: networkAudioTestSamples(),
+        isFinal: true,
+    )
+
+    let frame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
+    let decoded = try NetworkGeneratedAudioFrameCodec.chunk(from: frame)
+
+    #expect(frame.isFinal)
+    #expect(!frame.payload.isEmpty)
+    #expect(decoded.isFinal)
+    #expect(!decoded.samples.isEmpty)
 }
 
 @Test func `network audio length prefixed frames decode after partial reads`() throws {
@@ -32,10 +73,11 @@ import Testing
         sequenceNumber: 0,
         sampleRate: 24000,
         channelCount: 1,
-        samples: [0.1, 0.2],
+        samples: networkAudioTestSamples(),
     )
+    let audioFrame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
     let handshakeData = try NetworkAudioLengthPrefixedFrameCodec.encode(.handshake(handshake))
-    let audioData = try NetworkAudioLengthPrefixedFrameCodec.encode(.audio(NetworkGeneratedAudioFrame(chunk: chunk)))
+    let audioData = try NetworkAudioLengthPrefixedFrameCodec.encode(.audio(audioFrame))
     let combined = handshakeData + audioData
 
     var partialBuffer = Data(combined.prefix(2))
@@ -43,7 +85,7 @@ import Testing
     partialBuffer.append(combined.dropFirst(2).prefix(handshakeData.count - 2))
     #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer) == [.handshake(handshake)])
     partialBuffer.append(combined.dropFirst(handshakeData.count))
-    #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer) == [.audio(NetworkGeneratedAudioFrame(chunk: chunk))])
+    #expect(try NetworkAudioLengthPrefixedFrameCodec.splitFrames(from: &partialBuffer) == [.audio(audioFrame)])
     #expect(partialBuffer.isEmpty)
 }
 
@@ -306,4 +348,11 @@ private func waitForListeningPort(_ listener: NetworkAudioStreamListener) async 
 
 private func uniqueLoopbackAdvertisement() -> NetworkAudioServiceAdvertisement {
     NetworkAudioServiceAdvertisement(name: "Loopback receiver \(UUID().uuidString)")
+}
+
+private func networkAudioTestSamples() -> [Float] {
+    let sampleRate = 24000
+    return (0..<sampleRate / 10).map { index in
+        Float(sin(2.0 * Double.pi * 440.0 * Double(index) / Double(sampleRate)) * 0.2)
+    }
 }

@@ -1,21 +1,141 @@
+@preconcurrency import AVFoundation
 import Foundation
 import SpeakSwiftlyCore
 
-public struct NetworkGeneratedAudioFrame: Codable, Sendable, Equatable {
-    public let chunk: GeneratedAudioChunk
+public enum NetworkAudioPayloadFormat: String, Codable, Sendable, Equatable, CaseIterable {
+    case aac
+}
 
-    public init(chunk: GeneratedAudioChunk) {
-        self.chunk = chunk
+public struct NetworkGeneratedAudioFrame: Codable, Sendable, Equatable {
+    public let requestID: String
+    public let sequenceNumber: Int
+    public let sampleRate: Int
+    public let channelCount: Int
+    public let sourceSampleFormat: GeneratedAudioSampleFormat
+    public let payloadFormat: NetworkAudioPayloadFormat
+    public let payloadStreamDescription: NetworkAudioStreamDescription
+    public let isFinal: Bool
+    public let packetCount: Int
+    public let maximumPacketSize: Int
+    public let packetDescriptions: [NetworkAudioPacketDescription]
+    public let payload: Data
+
+    public init(
+        requestID: String,
+        sequenceNumber: Int,
+        sampleRate: Int,
+        channelCount: Int,
+        sourceSampleFormat: GeneratedAudioSampleFormat,
+        payloadFormat: NetworkAudioPayloadFormat,
+        payloadStreamDescription: NetworkAudioStreamDescription,
+        isFinal: Bool,
+        packetCount: Int,
+        maximumPacketSize: Int,
+        packetDescriptions: [NetworkAudioPacketDescription],
+        payload: Data,
+    ) {
+        self.requestID = requestID
+        self.sequenceNumber = sequenceNumber
+        self.sampleRate = sampleRate
+        self.channelCount = channelCount
+        self.sourceSampleFormat = sourceSampleFormat
+        self.payloadFormat = payloadFormat
+        self.payloadStreamDescription = payloadStreamDescription
+        self.isFinal = isFinal
+        self.packetCount = packetCount
+        self.maximumPacketSize = maximumPacketSize
+        self.packetDescriptions = packetDescriptions
+        self.payload = payload
     }
 }
 
-public enum NetworkGeneratedAudioFrameCodec {
-    public static func encode(_ frame: NetworkGeneratedAudioFrame) throws -> Data {
-        try JSONEncoder().encode(frame)
+public struct NetworkAudioStreamDescription: Codable, Sendable, Equatable {
+    public let sampleRate: Double
+    public let formatID: UInt32
+    public let formatFlags: UInt32
+    public let bytesPerPacket: UInt32
+    public let framesPerPacket: UInt32
+    public let bytesPerFrame: UInt32
+    public let channelsPerFrame: UInt32
+    public let bitsPerChannel: UInt32
+
+    var audioStreamBasicDescription: AudioStreamBasicDescription {
+        AudioStreamBasicDescription(
+            mSampleRate: sampleRate,
+            mFormatID: formatID,
+            mFormatFlags: formatFlags,
+            mBytesPerPacket: bytesPerPacket,
+            mFramesPerPacket: framesPerPacket,
+            mBytesPerFrame: bytesPerFrame,
+            mChannelsPerFrame: channelsPerFrame,
+            mBitsPerChannel: bitsPerChannel,
+            mReserved: 0,
+        )
     }
 
-    public static func decode(_ data: Data) throws -> NetworkGeneratedAudioFrame {
-        try JSONDecoder().decode(NetworkGeneratedAudioFrame.self, from: data)
+    public init(
+        sampleRate: Double,
+        formatID: UInt32,
+        formatFlags: UInt32,
+        bytesPerPacket: UInt32,
+        framesPerPacket: UInt32,
+        bytesPerFrame: UInt32,
+        channelsPerFrame: UInt32,
+        bitsPerChannel: UInt32,
+    ) {
+        self.sampleRate = sampleRate
+        self.formatID = formatID
+        self.formatFlags = formatFlags
+        self.bytesPerPacket = bytesPerPacket
+        self.framesPerPacket = framesPerPacket
+        self.bytesPerFrame = bytesPerFrame
+        self.channelsPerFrame = channelsPerFrame
+        self.bitsPerChannel = bitsPerChannel
+    }
+
+    init(_ streamDescription: AudioStreamBasicDescription) {
+        self.init(
+            sampleRate: streamDescription.mSampleRate,
+            formatID: streamDescription.mFormatID,
+            formatFlags: streamDescription.mFormatFlags,
+            bytesPerPacket: streamDescription.mBytesPerPacket,
+            framesPerPacket: streamDescription.mFramesPerPacket,
+            bytesPerFrame: streamDescription.mBytesPerFrame,
+            channelsPerFrame: streamDescription.mChannelsPerFrame,
+            bitsPerChannel: streamDescription.mBitsPerChannel,
+        )
+    }
+}
+
+public struct NetworkAudioPacketDescription: Codable, Sendable, Equatable {
+    public let startOffset: Int64
+    public let variableFramesInPacket: UInt32
+    public let dataByteSize: UInt32
+
+    public init(
+        startOffset: Int64,
+        variableFramesInPacket: UInt32,
+        dataByteSize: UInt32,
+    ) {
+        self.startOffset = startOffset
+        self.variableFramesInPacket = variableFramesInPacket
+        self.dataByteSize = dataByteSize
+    }
+
+    init(_ packetDescription: AudioStreamPacketDescription) {
+        self.init(
+            startOffset: packetDescription.mStartOffset,
+            variableFramesInPacket: packetDescription.mVariableFramesInPacket,
+            dataByteSize: packetDescription.mDataByteSize,
+        )
+    }
+
+    var audioStreamPacketDescription: AudioStreamPacketDescription {
+        AudioStreamPacketDescription(
+            mStartOffset: startOffset,
+            mVariableFramesInPacket: variableFramesInPacket,
+            mDataByteSize: dataByteSize,
+        )
     }
 }
 
@@ -38,104 +158,58 @@ public struct NetworkAudioStreamHandshake: Codable, Sendable, Equatable {
     }
 }
 
-public enum NetworkAudioStreamFrame: Codable, Sendable, Equatable {
+public enum NetworkAudioStreamFrame: Sendable, Equatable {
     case handshake(NetworkAudioStreamHandshake)
     case audio(NetworkGeneratedAudioFrame)
-
-    private enum CodingKeys: String, CodingKey {
-        case kind
-        case handshake
-        case audio
-    }
-
-    private enum Kind: String, Codable {
-        case handshake
-        case audio
-    }
-
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        switch try container.decode(Kind.self, forKey: .kind) {
-            case .handshake:
-                self = try .handshake(container.decode(NetworkAudioStreamHandshake.self, forKey: .handshake))
-            case .audio:
-                self = try .audio(container.decode(NetworkGeneratedAudioFrame.self, forKey: .audio))
-        }
-    }
-
-    public func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-            case let .handshake(handshake):
-                try container.encode(Kind.handshake, forKey: .kind)
-                try container.encode(handshake, forKey: .handshake)
-            case let .audio(audio):
-                try container.encode(Kind.audio, forKey: .kind)
-                try container.encode(audio, forKey: .audio)
-        }
-    }
 }
 
-public enum NetworkAudioLengthPrefixedFrameCodec {
-    public static let prefixByteCount = 4
-    public static let defaultMaximumFrameByteCount = 8 * 1024 * 1024
-
-    public static func encode(
-        _ frame: NetworkAudioStreamFrame,
-        maximumFrameByteCount: Int = defaultMaximumFrameByteCount,
-    ) throws -> Data {
-        let payload = try JSONEncoder().encode(frame)
-        guard payload.count <= maximumFrameByteCount else {
-            throw GeneratedAudioOutputError.invalidChunk(
-                requestID: requestID(for: frame),
-                message: "Network audio frame payload is \(payload.count) bytes, which exceeds the configured maximum of \(maximumFrameByteCount) bytes.",
-            )
-        }
-
-        var length = UInt32(payload.count).bigEndian
-        var data = Data(bytes: &length, count: prefixByteCount)
-        data.append(payload)
-        return data
+extension NetworkGeneratedAudioFrame {
+    struct Header: Codable {
+        let requestID: String
+        let sequenceNumber: Int
+        let sampleRate: Int
+        let channelCount: Int
+        let sourceSampleFormat: GeneratedAudioSampleFormat
+        let payloadFormat: NetworkAudioPayloadFormat
+        let payloadStreamDescription: NetworkAudioStreamDescription
+        let isFinal: Bool
+        let packetCount: Int
+        let maximumPacketSize: Int
+        let packetDescriptions: [NetworkAudioPacketDescription]
+        let payloadByteCount: Int
     }
 
-    public static func decodePayload(_ payload: Data) throws -> NetworkAudioStreamFrame {
-        try JSONDecoder().decode(NetworkAudioStreamFrame.self, from: payload)
+    var header: Header {
+        Header(
+            requestID: requestID,
+            sequenceNumber: sequenceNumber,
+            sampleRate: sampleRate,
+            channelCount: channelCount,
+            sourceSampleFormat: sourceSampleFormat,
+            payloadFormat: payloadFormat,
+            payloadStreamDescription: payloadStreamDescription,
+            isFinal: isFinal,
+            packetCount: packetCount,
+            maximumPacketSize: maximumPacketSize,
+            packetDescriptions: packetDescriptions,
+            payloadByteCount: payload.count,
+        )
     }
 
-    public static func splitFrames(
-        from buffer: inout Data,
-        maximumFrameByteCount: Int = defaultMaximumFrameByteCount,
-    ) throws -> [NetworkAudioStreamFrame] {
-        var frames = [NetworkAudioStreamFrame]()
-        while buffer.count >= prefixByteCount {
-            let frameLength = Int(buffer.prefix(prefixByteCount).reduce(UInt32(0)) { partial, byte in
-                (partial << 8) | UInt32(byte)
-            })
-            guard frameLength <= maximumFrameByteCount else {
-                throw GeneratedAudioOutputError.transportFailed(
-                    requestID: "unknown",
-                    message: "Network audio frame declared \(frameLength) bytes, which exceeds the configured maximum of \(maximumFrameByteCount) bytes.",
-                )
-            }
-            guard buffer.count >= prefixByteCount + frameLength else {
-                break
-            }
-
-            let payloadStart = buffer.index(buffer.startIndex, offsetBy: prefixByteCount)
-            let payloadEnd = buffer.index(payloadStart, offsetBy: frameLength)
-            let payload = Data(buffer[payloadStart..<payloadEnd])
-            try frames.append(decodePayload(payload))
-            buffer.removeSubrange(buffer.startIndex..<payloadEnd)
-        }
-        return frames
-    }
-
-    private static func requestID(for frame: NetworkAudioStreamFrame) -> String {
-        switch frame {
-            case let .handshake(handshake):
-                handshake.requestID
-            case let .audio(frame):
-                frame.chunk.requestID
-        }
+    init(header: Header, payload: Data) {
+        self.init(
+            requestID: header.requestID,
+            sequenceNumber: header.sequenceNumber,
+            sampleRate: header.sampleRate,
+            channelCount: header.channelCount,
+            sourceSampleFormat: header.sourceSampleFormat,
+            payloadFormat: header.payloadFormat,
+            payloadStreamDescription: header.payloadStreamDescription,
+            isFinal: header.isFinal,
+            packetCount: header.packetCount,
+            maximumPacketSize: header.maximumPacketSize,
+            packetDescriptions: header.packetDescriptions,
+            payload: payload,
+        )
     }
 }

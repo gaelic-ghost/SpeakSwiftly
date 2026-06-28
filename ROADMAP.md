@@ -301,6 +301,7 @@ In Progress
 - [x] Add retained WAV and AAC/M4A file encoding and generated-file storage to `SpeakSwiftlyFileAudioOutput`.
 - [x] Add HTTP-friendly raw PCM payload framing with metadata headers to `SpeakSwiftlyHTTPAudioOutput`.
 - [x] Add Network.framework audio frame encoding and Bonjour audio-receiver discovery primitives to `SpeakSwiftlyNetworkAudioOutput`.
+- [x] Replace LAN generated-audio frames with AAC packet payloads backed by `AVAudioCompressedBuffer`, CoreAudio stream/packet metadata, and SwiftNIO length-prefixed framing.
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.
 - [x] Add `generate.audioStream(...)` so host boundaries can consume successful canonical chunk streams instead of failed request handles.
 - [x] Add memory-backed recent generated-audio replay on `runtime.playback`, including replay-one, replay-all, bounded retention configuration, and JSONL/tool controls.

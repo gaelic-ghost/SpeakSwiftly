@@ -154,8 +154,9 @@ public actor NetworkAudioStreamListener {
                                 )
                             }
 
-                            continuation.yield(audioFrame.chunk)
-                            if audioFrame.chunk.isFinal {
+                            let chunk = try NetworkGeneratedAudioFrameCodec.chunk(from: audioFrame)
+                            continuation.yield(chunk)
+                            if chunk.isFinal {
                                 continuation.finish()
                                 connection.cancel()
                                 return
@@ -263,8 +264,9 @@ public struct NetworkAudioStreamSender: Sendable {
             try await connection.sendFrame(.handshake(handshake), maximumFrameByteCount: maximumFrameByteCount)
             for try await chunk in chunks {
                 try Task.checkCancellation()
+                let frame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
                 try await connection.sendFrame(
-                    .audio(NetworkGeneratedAudioFrame(chunk: chunk)),
+                    .audio(frame),
                     maximumFrameByteCount: maximumFrameByteCount,
                 )
                 if chunk.isFinal {
@@ -420,7 +422,7 @@ private extension NetworkAudioStreamFrame {
             case let .handshake(handshake):
                 handshake.requestID
             case let .audio(frame):
-                frame.chunk.requestID
+                frame.requestID
         }
     }
 }

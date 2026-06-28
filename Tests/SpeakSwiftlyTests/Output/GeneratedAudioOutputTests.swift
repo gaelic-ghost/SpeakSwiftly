@@ -282,6 +282,16 @@ private actor GeneratedAudioChunkCollector {
     #expect(wav.starts(with: Data("RIFF".utf8)))
     #expect(wav.count > 44)
 
+    let wavURL = FileManager.default
+        .temporaryDirectory
+        .appendingPathComponent("speakswiftly-file-output-\(UUID().uuidString).wav")
+    defer { try? FileManager.default.removeItem(at: wavURL) }
+    try wav.write(to: wavURL)
+
+    let wavFile = try AVAudioFile(forReading: wavURL)
+    #expect(Int(wavFile.processingFormat.sampleRate.rounded()) == 24000)
+    #expect(wavFile.processingFormat.channelCount == 1)
+
     let m4a = try GeneratedAudioFileEncoder.encodedAudioData(
         samples: samples,
         sampleRate: 24000,
@@ -297,4 +307,5 @@ private actor GeneratedAudioChunkCollector {
 
     let file = try AVAudioFile(forReading: url)
     #expect(Int(file.processingFormat.sampleRate.rounded()) == 24000)
+    #expect(file.processingFormat.channelCount == 1)
 }
