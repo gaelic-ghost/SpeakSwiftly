@@ -61,6 +61,12 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Install Metal Toolchain
+        run: |
+          set -euo pipefail
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun --find metal >/dev/null
+
       - name: Publish runtime
         run: sh scripts/repo-maintenance/publish-runtime.sh --configuration "${{ matrix.configuration }}"
 
