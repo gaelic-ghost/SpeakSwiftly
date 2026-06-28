@@ -64,6 +64,7 @@ let package = Package(
         .target(
             name: "SpeakSwiftly",
             dependencies: [
+                "SpeakSwiftlyAudioSupport",
                 "SpeakSwiftlyCore",
                 "SpeakSwiftlyQwenGeneration",
                 "SpeakSwiftlyPlayback",
@@ -96,6 +97,13 @@ let package = Package(
         .target(
             name: "SpeakSwiftlyPlayback",
             dependencies: [
+                "SpeakSwiftlyAudioSupport",
+                "SpeakSwiftlyCore",
+            ],
+        ),
+        .target(
+            name: "SpeakSwiftlyAudioSupport",
+            dependencies: [
                 "SpeakSwiftlyCore",
             ],
         ),
@@ -108,6 +116,7 @@ let package = Package(
         .target(
             name: "SpeakSwiftlyFileAudioOutput",
             dependencies: [
+                "SpeakSwiftlyAudioSupport",
                 .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
         ),
@@ -145,6 +154,7 @@ let package = Package(
             name: "SpeakSwiftlyTests",
             dependencies: [
                 "SpeakSwiftly",
+                "SpeakSwiftlyAudioSupport",
                 "SpeakSwiftlyCore",
                 "SpeakSwiftlyPlayback",
                 "SpeakSwiftlyHTTPAudioOutput",

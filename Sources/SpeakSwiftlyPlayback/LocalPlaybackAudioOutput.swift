@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import SpeakSwiftlyAudioSupport
 import SpeakSwiftlyCore
 
 public enum LocalPlaybackAudioOutput {
@@ -115,15 +116,17 @@ public final class LocalGeneratedAudioPlayer {
         }
 
         stop()
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(chunk.sampleRate),
-            channels: AVAudioChannelCount(chunk.channelCount),
-            interleaved: false,
-        ) else {
+        let format: AVAudioFormat
+        do {
+            format = try GeneratedAudioPCM.float32Format(
+                sampleRate: Double(chunk.sampleRate),
+                channelCount: chunk.channelCount,
+                context: "local generated-audio playback for request '\(chunk.requestID)'",
+            )
+        } catch let error as GeneratedAudioPCMError {
             throw GeneratedAudioOutputError.invalidChunk(
                 requestID: chunk.requestID,
-                message: "Local generated-audio playback could not create an AVAudioFormat for request '\(chunk.requestID)' at \(chunk.sampleRate) Hz with \(chunk.channelCount) channel(s).",
+                message: error.localizedDescription,
             )
         }
 
@@ -155,30 +158,15 @@ public final class LocalGeneratedAudioPlayer {
             )
         }
 
-        let frameCount = AVAudioFrameCount(chunk.samples.count / chunk.channelCount)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
-            throw GeneratedAudioOutputError.invalidChunk(
-                requestID: chunk.requestID,
-                message: "Local generated-audio playback could not allocate a PCM buffer for request '\(chunk.requestID)'.",
+        let buffer: AVAudioPCMBuffer
+        do {
+            buffer = try GeneratedAudioPCM.buffer(
+                from: chunk,
+                format: format,
+                context: "local generated-audio playback for request '\(chunk.requestID)'",
             )
-        }
-
-        buffer.frameLength = frameCount
-        guard let channelData = buffer.floatChannelData else {
-            throw GeneratedAudioOutputError.invalidChunk(
-                requestID: chunk.requestID,
-                message: "Local generated-audio playback could not access PCM channel storage for request '\(chunk.requestID)'.",
-            )
-        }
-
-        if chunk.channelCount == 1 {
-            channelData[0].update(from: chunk.samples, count: chunk.samples.count)
-        } else {
-            for frameIndex in 0..<Int(frameCount) {
-                for channelIndex in 0..<chunk.channelCount {
-                    channelData[channelIndex][frameIndex] = chunk.samples[frameIndex * chunk.channelCount + channelIndex]
-                }
-            }
+        } catch let error as GeneratedAudioPCMError {
+            throw GeneratedAudioOutputError.invalidChunk(requestID: chunk.requestID, message: error.localizedDescription)
         }
         playerNode.scheduleBuffer(buffer)
     }

@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import SpeakSwiftlyAudioSupport
 import TextForSpeech
 
 // MARK: - Playback Lifecycle
@@ -107,15 +108,17 @@ extension AudioPlaybackDriver {
 
         let engine = AVAudioEngine()
         let node = AVAudioPlayerNode()
-        let format = AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: AudioPlaybackConfiguration.channels,
-        )
-
-        guard let format else {
+        let format: AVAudioFormat
+        do {
+            format = try GeneratedAudioPCM.float32Format(
+                sampleRate: sampleRate,
+                channelCount: Int(AudioPlaybackConfiguration.channels),
+                context: "live playback engine setup",
+            )
+        } catch let error as GeneratedAudioPCMError {
             throw WorkerError(
                 code: .audioPlaybackFailed,
-                message: "Live playback could not create an AVAudioFormat for sample rate \(sampleRate).",
+                message: "Live playback could not create an AVAudioFormat for sample rate \(sampleRate). \(error.localizedDescription)",
             )
         }
 
@@ -172,10 +175,14 @@ extension AudioPlaybackDriver {
         previousTrailingSample: Float?,
         applyFadeIn: Bool,
     ) -> (buffer: AVAudioPCMBuffer, frameCount: Int, firstSample: Float, lastSample: Float, fadeInApplied: Bool)? {
-        guard let format = streamingFormat ?? AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: AudioPlaybackConfiguration.channels,
-        ) else {
+        let format: AVAudioFormat
+        do {
+            format = try streamingFormat ?? GeneratedAudioPCM.float32Format(
+                sampleRate: sampleRate,
+                channelCount: Int(AudioPlaybackConfiguration.channels),
+                context: "live playback buffer creation",
+            )
+        } catch {
             return nil
         }
 
@@ -188,22 +195,13 @@ extension AudioPlaybackDriver {
         guard let firstSample = processedSamples.first, let lastSample = processedSamples.last else {
             return nil
         }
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: format,
-            frameCapacity: AVAudioFrameCount(processedSamples.count),
+        guard let buffer = try? GeneratedAudioPCM.buffer(
+            from: processedSamples,
+            format: format,
+            sourceChannelCount: Int(AudioPlaybackConfiguration.channels),
+            context: "live playback buffer creation",
         ) else {
             return nil
-        }
-
-        buffer.frameLength = AVAudioFrameCount(processedSamples.count)
-        if let channelData = buffer.floatChannelData {
-            processedSamples.withUnsafeBufferPointer { src in
-                guard let baseAddress = src.baseAddress else {
-                    return
-                }
-
-                channelData[0].update(from: baseAddress, count: processedSamples.count)
-            }
         }
 
         return (

@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import SpeakSwiftlyAudioSupport
 
 public enum GeneratedAudioFileEncoder {
     public static func encodedAudioData(
@@ -40,7 +41,7 @@ public enum GeneratedAudioFileEncoder {
             )
         }
 
-        let buffer = try monoFloat32PCMBuffer(samples: samples, sampleRate: sampleRate, formatName: "WAV")
+        let buffer = try outputBuffer(samples: samples, sampleRate: sampleRate, formatName: "WAV")
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: Double(sampleRate),
@@ -61,7 +62,7 @@ public enum GeneratedAudioFileEncoder {
             )
         }
 
-        let buffer = try monoFloat32PCMBuffer(samples: samples, sampleRate: sampleRate, formatName: "M4A")
+        let buffer = try outputBuffer(samples: samples, sampleRate: sampleRate, formatName: "M4A")
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: Double(sampleRate),
@@ -72,41 +73,28 @@ public enum GeneratedAudioFileEncoder {
         try file.write(from: buffer)
     }
 
-    private static func monoFloat32PCMBuffer(
+    private static func outputBuffer(
         samples: [Float],
         sampleRate: Int,
         formatName: String,
     ) throws -> AVAudioPCMBuffer {
-        guard let processingFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(sampleRate),
-            channels: 1,
-            interleaved: false,
-        ) else {
+        do {
+            let processingFormat = try GeneratedAudioPCM.float32Format(
+                sampleRate: Double(sampleRate),
+                channelCount: 1,
+                context: "\(formatName) file encoding",
+            )
+            return try GeneratedAudioPCM.buffer(
+                from: samples,
+                format: processingFormat,
+                sourceChannelCount: 1,
+                context: "\(formatName) file encoding",
+            )
+        } catch let error as GeneratedAudioPCMError {
             throw GeneratedAudioFileOutputError.invalidAudio(
-                message: "SpeakSwiftly could not create a Float32 PCM processing format for \(formatName) encoding at \(sampleRate) Hz.",
+                message: error.localizedDescription,
             )
         }
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: processingFormat,
-            frameCapacity: AVAudioFrameCount(max(samples.count, 1)),
-        ) else {
-            throw GeneratedAudioFileOutputError.invalidAudio(
-                message: "SpeakSwiftly could not allocate an audio buffer for \(samples.count) generated sample(s) while encoding \(formatName) output.",
-            )
-        }
-
-        buffer.frameLength = AVAudioFrameCount(samples.count)
-        guard let channelData = buffer.floatChannelData else {
-            throw GeneratedAudioFileOutputError.invalidAudio(
-                message: "SpeakSwiftly could not access Float32 PCM channel storage while encoding \(formatName) output.",
-            )
-        }
-
-        for index in samples.indices {
-            channelData[0][index] = samples[index]
-        }
-        return buffer
     }
 }
 
