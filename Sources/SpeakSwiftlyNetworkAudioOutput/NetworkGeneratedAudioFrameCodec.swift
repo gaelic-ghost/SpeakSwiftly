@@ -30,7 +30,7 @@ public enum NetworkGeneratedAudioFrameCodec {
             bitRate: bitRate,
             requestID: chunk.requestID,
         )
-        guard !chunk.samples.isEmpty, !chunk.isFinal else {
+        guard !chunk.samples.isEmpty else {
             return NetworkGeneratedAudioFrame(
                 requestID: chunk.requestID,
                 sequenceNumber: chunk.sequenceNumber,

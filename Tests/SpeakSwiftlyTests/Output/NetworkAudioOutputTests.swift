@@ -43,6 +43,25 @@ import Testing
     #expect(!decoded.samples.isEmpty)
 }
 
+@Test func `network audio aac frames preserve final chunks that carry samples`() throws {
+    let chunk = GeneratedAudioChunk(
+        requestID: "req-final-aac",
+        sequenceNumber: 3,
+        sampleRate: 24000,
+        channelCount: 1,
+        samples: networkAudioTestSamples(),
+        isFinal: true,
+    )
+
+    let frame = try NetworkGeneratedAudioFrameCodec.frame(chunk: chunk)
+    let decoded = try NetworkGeneratedAudioFrameCodec.chunk(from: frame)
+
+    #expect(frame.isFinal)
+    #expect(!frame.payload.isEmpty)
+    #expect(decoded.isFinal)
+    #expect(!decoded.samples.isEmpty)
+}
+
 @Test func `network audio length prefixed frames decode after partial reads`() throws {
     let handshake = NetworkAudioStreamHandshake(
         requestID: "req-lan",
