@@ -69,6 +69,13 @@ If you need custom text normalization behavior, create a ``SpeakSwiftly/Normaliz
 - ``SpeakSwiftly/NetworkAudioEndpoint``
 - ``SpeakSwiftly/NetworkAudioServiceAdvertisement``
 - ``SpeakSwiftly/NetworkAudioCapabilities``
+- ``SpeakSwiftly/NetworkAudioPayloadFormat``
+- ``SpeakSwiftly/NetworkAudioStreamDescription``
+- ``SpeakSwiftly/NetworkAudioPacketDescription``
+- ``SpeakSwiftly/NetworkGeneratedAudioFrame``
+- ``SpeakSwiftly/NetworkGeneratedAudioFrameCodec``
+- ``SpeakSwiftly/NetworkAudioLengthPrefixedFrameCodec``
+- ``SpeakSwiftly/NetworkAudioStreamFrame``
 - ``SpeakSwiftly/NetworkAudioStreamSender``
 - ``SpeakSwiftly/NetworkAudioStreamListener``
 - ``SpeakSwiftly/NetworkAudioInboundStream``

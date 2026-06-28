@@ -26,9 +26,12 @@ public extension SpeakSwiftly {
     typealias NetworkAudioDestinationBrowser = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestinationBrowser
     typealias NetworkAudioDestinationBrowserState = SpeakSwiftlyNetworkAudioOutput.NetworkAudioDestinationBrowserState
     typealias NetworkAudioEndpoint = SpeakSwiftlyNetworkAudioOutput.NetworkAudioEndpoint
+    typealias NetworkAudioPacketDescription = SpeakSwiftlyNetworkAudioOutput.NetworkAudioPacketDescription
+    typealias NetworkAudioPayloadFormat = SpeakSwiftlyNetworkAudioOutput.NetworkAudioPayloadFormat
     typealias NetworkAudioServiceAdvertisement = SpeakSwiftlyNetworkAudioOutput.NetworkAudioServiceAdvertisement
     typealias NetworkAudioInboundStream = SpeakSwiftlyNetworkAudioOutput.NetworkAudioInboundStream
     typealias NetworkAudioLengthPrefixedFrameCodec = SpeakSwiftlyNetworkAudioOutput.NetworkAudioLengthPrefixedFrameCodec
+    typealias NetworkAudioStreamDescription = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamDescription
     typealias NetworkAudioStreamFrame = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamFrame
     typealias NetworkAudioStreamHandshake = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamHandshake
     typealias NetworkAudioStreamListener = SpeakSwiftlyNetworkAudioOutput.NetworkAudioStreamListener
