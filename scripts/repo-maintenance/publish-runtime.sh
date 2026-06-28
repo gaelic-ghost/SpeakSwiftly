@@ -69,6 +69,20 @@ xcodebuild build \
   -derivedDataPath "$runtime_root" \
   -clonedSourcePackagesDirPath "$source_packages_path"
 
+if [ ! -x "$binary_path" ]; then
+  shared_products_path="$(dirname "$REPO_ROOT")/Build/Products/$configuration"
+  if [ -x "$shared_products_path/SpeakSwiftlyTool" ] && [ -f "$shared_products_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" ]; then
+    log "Xcode placed package products at $shared_products_path; linking them into the deterministic runtime layout."
+    mkdir -p "$(dirname "$products_path")"
+    if [ -L "$products_path" ]; then
+      rm "$products_path"
+    elif [ -e "$products_path" ]; then
+      rmdir "$products_path" 2>/dev/null || die "Cannot replace existing runtime products path at $products_path. Remove stale files there, then rerun publish-runtime.sh."
+    fi
+    ln -s "$shared_products_path" "$products_path"
+  fi
+fi
+
 [ -x "$binary_path" ] || die "The Xcode build finished, but no executable was found at $binary_path."
 [ -f "$metallib_path" ] || die "The Xcode build finished, but the MLX Metal shader bundle was not found at $metallib_path."
 
