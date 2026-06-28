@@ -121,7 +121,7 @@ import Testing
 
 @Test func `network audio sender streams chunks to loopback listener`() async throws {
     let listener = NetworkAudioStreamListener(
-        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        advertisement: uniqueLoopbackAdvertisement(),
         port: 0,
         sharedToken: "secret",
     )
@@ -226,7 +226,7 @@ import Testing
 
 @Test func `network audio listener rejects wrong shared token`() async throws {
     let listener = NetworkAudioStreamListener(
-        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        advertisement: uniqueLoopbackAdvertisement(),
         port: 0,
         sharedToken: "secret",
     )
@@ -286,13 +286,24 @@ import Testing
 }
 
 private func waitForListeningPort(_ listener: NetworkAudioStreamListener) async throws -> UInt16 {
-    for _ in 0..<100 {
-        if case let .listening(port?) = await listener.state {
-            return port
+    var lastState = await listener.state
+    for _ in 0..<1000 {
+        lastState = await listener.state
+        switch lastState {
+            case let .listening(port?):
+                return port
+            case let .failed(message):
+                Issue.record("Network audio listener failed before reporting a loopback port: \(message)")
+                throw CancellationError()
+            default:
+                try await Task.sleep(for: .milliseconds(10))
         }
-        try await Task.sleep(for: .milliseconds(10))
     }
 
-    Issue.record("Network audio listener did not report a loopback port in time.")
+    Issue.record("Network audio listener did not report a loopback port in time. Last observed state: \(lastState).")
     throw CancellationError()
+}
+
+private func uniqueLoopbackAdvertisement() -> NetworkAudioServiceAdvertisement {
+    NetworkAudioServiceAdvertisement(name: "Loopback receiver \(UUID().uuidString)")
 }

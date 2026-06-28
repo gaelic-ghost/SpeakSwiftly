@@ -158,6 +158,17 @@ swift build
 swift test
 ```
 
+Opt-in MLX conditioning persistence checks:
+
+```bash
+SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter ProfileStoreTests
+SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS=1 swift test --filter SpeechModelClientTests
+```
+
+Keep this lane separate from the baseline package checks. It exercises prepared
+Qwen conditioning persistence and may touch heavier MLX-backed code paths than
+the ordinary fast SwiftPM lane.
+
 Full repo-maintenance validation:
 
 ```bash

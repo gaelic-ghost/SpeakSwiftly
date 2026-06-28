@@ -67,13 +67,14 @@ USAGE
   esac
 done
 
-set -- "$SELF_DIR/run-benchmark.sh" --qwen-quant --iterations "$iterations"
 if [ -n "$backends" ]; then
-  set -- "$@" --backends "$backends"
+  export SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_BACKENDS="$backends"
 fi
 if [ -n "$device_label" ]; then
-  set -- "$@" --device-label "$device_label"
+  export SPEAKSWIFTLY_QWEN_QUANT_BENCHMARK_DEVICE_LABEL="$device_label"
 fi
+
+set -- "$SELF_DIR/run-benchmark.sh" --qwen-quantization --iterations "$iterations"
 if [ "$audible" = "true" ]; then
   set -- "$@" --audible
 fi

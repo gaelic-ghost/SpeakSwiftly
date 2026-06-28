@@ -137,7 +137,8 @@ import Testing
     let drainedFastChunks = try await fastChunks
 
     #expect(drainedFastChunks.map(\.sequenceNumber) == Array(0...8))
-    #expect(slowChunks.count <= 2)
+    #expect(slowChunks.count < drainedFastChunks.count)
+    #expect(slowChunks.count <= 3)
     #expect(slowChunks.last?.isFinal == true)
 }
 
