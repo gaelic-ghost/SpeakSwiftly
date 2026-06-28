@@ -61,6 +61,9 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Install Metal Toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Publish runtime
         run: sh scripts/repo-maintenance/publish-runtime.sh --configuration "${{ matrix.configuration }}"
 
