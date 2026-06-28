@@ -27,6 +27,11 @@ The first synthetic codebook delay-pattern fixture is
 It was produced by
 [`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py).
 
+The first no-weight codec/vocoder boundary fixture is
+[`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
+It was produced by
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codec-vocoder-boundary-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codec-vocoder-boundary-fixture.py).
+
 ## Source Inventory
 
 ### Boson And Hugging Face
@@ -232,9 +237,13 @@ Higgs Audio v2-style codec from the v3 checkpoint under
 codebook rows but cannot decode those rows to 24 kHz PCM is not a useful
 SpeakSwiftly backend.
 
-This should become a separate parity fixture before any runtime backend surface:
-raw delayed rows, reversed rows, decoded sample count, sample rate, and output
-container metadata.
+The first no-weight boundary fixture is
+[`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
+It captures the bundled codec prefix, weight-entry counts, codebook axis order,
+BOC/EOC filtering rule, 24 kHz sample rate, streaming chunk defaults, and the
+remaining unknown decoded sample count, dtype, channel count, and container
+questions. It still blocks runtime promotion until official serving comparison
+captures waveform metadata.
 
 ### Waveform Post-Processing And Output
 
@@ -265,8 +274,12 @@ settles it.
 4. Compare the fixture against SGLang/vLLM official serving behavior before
    choosing the first Core AI graph boundary.
 5. Extend the no-weight fixture set from prompt IDs into sampler state and
-   codec/vocoder metadata. The first delay-pattern fixture is checked in; the
-   next open item is official serving comparison or codec/vocoder shape capture.
+   codec/vocoder metadata.
+   Done for delay-pattern layout in
+   [`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json)
+   and for codec/vocoder boundary metadata in
+   [`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
+   The next open item is official serving comparison with waveform metadata.
 
 ## Current Decision
 

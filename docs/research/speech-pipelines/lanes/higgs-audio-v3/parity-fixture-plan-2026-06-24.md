@@ -96,6 +96,9 @@ the policies into a pretend common default.
 
 ### Codec/Vocoder Expectations
 
+Status: no-weight boundary fixture captured in
+[`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
+
 The first codec fixture does not need to include waveform samples yet, but it
 must record the expected boundary:
 
@@ -111,6 +114,10 @@ must record the expected boundary:
 
 The codec/vocoder fixture is mandatory before declaring any graph-only text to
 codebook proof useful for SpeakSwiftly.
+
+The current fixture intentionally records decoded sample count, decoded dtype,
+and decoded channel count as unknown until an official serving comparison
+captures them for the same prompt fixture.
 
 ### Output Container Expectations
 

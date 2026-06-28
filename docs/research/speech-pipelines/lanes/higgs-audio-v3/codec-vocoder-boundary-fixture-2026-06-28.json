@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-28T00:00:00Z",
+  "mode": "higgs_audio_v3_codec_vocoder_boundary_fixture",
+  "source": {
+    "source_map_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "codebook_delay_fixture_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json",
+    "official_sources": {
+      "codec_vocoder": [
+        "model.safetensors.index.json bundled codec prefix",
+        "SGLang audio_codec.py and vocoder_scheduler.py",
+        "vLLM higgs_audio_v3_code2wav.py"
+      ],
+      "output_container": [
+        "Boson create-speech API",
+        "SGLang Higgs cookbook",
+        "vLLM deploy YAML and OpenAI adapter"
+      ]
+    },
+    "no_model_weights_downloaded": true
+  },
+  "codec_vocoder_weight_boundary": {
+    "codec_checkpoint_prefix": "tied.embedding.modality_embeddings.0.model.",
+    "codec_weight_entry_count": 528,
+    "codec_weight_examples": [
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.conv_t1.bias",
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.conv_t1.weight",
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv1.bias",
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv1.weight",
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv2.bias",
+      "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv2.weight"
+    ],
+    "total_weight_entry_count": 927,
+    "total_weight_size_bytes": 8489763794,
+    "text_body_prefix": "body.layers.",
+    "text_body_weight_entry_count": 396,
+    "audio_embedding_prefix": "tied.embedding.modality_embeddings.0.embedding",
+    "audio_embedding_weight_entry_count": 1,
+    "separate_tied_head_weight_entry_count": 0,
+    "useful_backend_requires_codec_vocoder": true,
+    "negative_check": "A port without the bundled codec/vocoder tensors is not a useful SpeakSwiftly backend."
+  },
+  "codebook_decode_boundary": {
+    "raw_codes_shape": [
+      3,
+      8
+    ],
+    "delayed_codes_shape": [
+      10,
+      8
+    ],
+    "reversed_codes_shape": [
+      3,
+      8
+    ],
+    "codebook_axis_order": "frame_major_rows_codebook_columns",
+    "boc_id": 1024,
+    "eoc_id": 1025,
+    "filtering_rule": "reverse_delay_pattern_then_remove_boc_eoc_markers_before_codec_decode",
+    "sample_rate_hz": 24000,
+    "sample_rate_source": "official inventory and serving source snippets",
+    "output_sample_count_known": false,
+    "output_dtype_known": false,
+    "output_channel_count_known": false
+  },
+  "output_container_boundary": {
+    "non_streaming_container_known": false,
+    "streaming_container_conflict": "Some docs mention streaming WAV chunks, while current serving docs emphasize raw PCM for streaming.",
+    "streaming_pcm_is_current_serving_signal": true,
+    "requires_future_official_serving_comparison": true
+  },
+  "streaming_chunk_defaults": {
+    "codec_chunk_frames": 25,
+    "codec_left_context_frames": 25,
+    "codec_right_holdback_frames": 4,
+    "initial_codec_chunk_frames": 1
+  },
+  "promotion_gate": {
+    "graph_only_text_to_codebook_is_not_sufficient": true,
+    "runtime_integration_allowed": false,
+    "next_required_evidence": [
+      "official serving comparison for the same prompt fixture",
+      "waveform metadata capture",
+      "decoded sample count capture",
+      "decoded dtype capture",
+      "decoded channel count capture"
+    ]
+  }
+}
