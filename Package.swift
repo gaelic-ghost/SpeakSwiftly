@@ -59,6 +59,10 @@ let package = Package(
             url: "https://github.com/ml-explore/mlx-swift.git",
             .upToNextMajor(from: "0.30.6"),
         ),
+        .package(
+            url: "https://github.com/apple/swift-nio.git",
+            .upToNextMajor(from: "2.97.1"),
+        ),
     ],
     targets: [
         .target(
@@ -124,6 +128,7 @@ let package = Package(
             name: "SpeakSwiftlyNetworkAudioOutput",
             dependencies: [
                 "SpeakSwiftlyCore",
+                .product(name: "NIOCore", package: "swift-nio"),
             ],
         ),
         .executableTarget(
