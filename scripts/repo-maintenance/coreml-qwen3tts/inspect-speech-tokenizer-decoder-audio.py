@@ -31,9 +31,9 @@ DEFAULT_CANDIDATE_MODEL_PACKAGE = (
   ".local/coreml-qwen3tts/"
   "Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40-fp16-w8a8-representative.mlpackage"
 )
-DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
+DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
 DEFAULT_TALKER_CODE_FIXTURE_PATH = ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
-DEFAULT_BUCKET_PLAN_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
+DEFAULT_BUCKET_PLAN_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
 DEFAULT_OUTPUT_DIR = ".local/coreml-qwen3tts/audio-inspection/bucket-40-representative-w8a8"
 DEFAULT_SAMPLE_RATE = 24_000
 

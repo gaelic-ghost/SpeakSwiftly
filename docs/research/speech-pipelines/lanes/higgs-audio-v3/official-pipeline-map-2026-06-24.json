@@ -1,0 +1,3700 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-24T00:00:00Z",
+  "mode": "higgs_audio_v3_official_source_inventory",
+  "source_policy": {
+    "no_model_weights_downloaded": true,
+    "community_mlx_role": "comparison_only_after_official_sources_are_mapped"
+  },
+  "hugging_face": {
+    "model_id": "bosonai/higgs-audio-v3-tts-4b",
+    "requested_revision": "main",
+    "source_files": {
+      "README.md": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/README.md",
+        "bytes": 43728,
+        "lines": 551
+      },
+      "PROMPTING.md": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/PROMPTING.md",
+        "bytes": 2812,
+        "lines": 75
+      },
+      "config.json": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/config.json",
+        "bytes": 2755,
+        "lines": 112
+      },
+      "tokenizer_config.json": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/tokenizer_config.json",
+        "bytes": 1937,
+        "lines": 78
+      },
+      "tokenizer.json": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/tokenizer.json",
+        "bytes": 11433924,
+        "lines": 758002
+      },
+      "chat_template.jinja": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/chat_template.jinja",
+        "bytes": 2427,
+        "lines": 54
+      },
+      "model.safetensors.index.json": {
+        "url": "https://huggingface.co/bosonai/higgs-audio-v3-tts-4b/resolve/main/model.safetensors.index.json",
+        "bytes": 90103,
+        "lines": 934
+      }
+    },
+    "model_config": {
+      "architectures": [
+        "HiggsMultimodalQwen3ForConditionalGeneration"
+      ],
+      "model_type": "higgs_multimodal_qwen3",
+      "transformers_version": "5.5.0",
+      "audio_token_id": -100,
+      "ignore_index": -100,
+      "hidden_size_shortcut": 2560,
+      "vocab_size_shortcut": 151936
+    },
+    "text_config": {
+      "model_type": "qwen3",
+      "architecture": [
+        "Qwen3ForCausalLM"
+      ],
+      "dtype": "bfloat16",
+      "hidden_size": 2560,
+      "intermediate_size": 9728,
+      "num_hidden_layers": 36,
+      "num_attention_heads": 32,
+      "num_key_value_heads": 8,
+      "head_dim": 128,
+      "vocab_size": 151936,
+      "max_position_embeddings": 32768,
+      "max_window_layers": 36,
+      "bos_token_id": 151643,
+      "eos_token_id": 151643,
+      "pad_token_id": null,
+      "rms_norm_eps": 1e-06,
+      "rope_parameters": {
+        "rope_theta": 1000000,
+        "rope_type": "default"
+      },
+      "attention_dropout": 0.0,
+      "attention_bias": false,
+      "use_cache": true,
+      "tie_word_embeddings": true
+    },
+    "audio_encoder_config": {
+      "model_type": "higgs_audio_encoder",
+      "encoder_type": "discrete",
+      "num_codebooks": 8,
+      "vocab_size": 1026,
+      "mel_per_sample": 8,
+      "max_chunk_size": 50,
+      "out_dim": 2560,
+      "use_delay_pattern": true,
+      "tie_word_embeddings": true,
+      "whisper_config": null,
+      "qwen3_aut_config": null
+    },
+    "tokenizer": {
+      "model_type": "BPE",
+      "normalizer": "NFC",
+      "pre_tokenizer": "Sequence",
+      "post_processor": "ByteLevel",
+      "added_token_count": 84,
+      "interesting_added_tokens": [
+        {
+          "id": 151643,
+          "content": "<|endoftext|>",
+          "special": true
+        },
+        {
+          "id": 151646,
+          "content": "<|object_ref_start|>",
+          "special": true
+        },
+        {
+          "id": 151647,
+          "content": "<|object_ref_end|>",
+          "special": true
+        },
+        {
+          "id": 151659,
+          "content": "<|fim_prefix|>",
+          "special": false
+        },
+        {
+          "id": 151667,
+          "content": "<|tts|>",
+          "special": true
+        },
+        {
+          "id": 151668,
+          "content": "<|streaming_tts|>",
+          "special": true
+        },
+        {
+          "id": 151669,
+          "content": "<|audio_cont_txt|>",
+          "special": true
+        },
+        {
+          "id": 151670,
+          "content": "<|audio|>",
+          "special": true
+        },
+        {
+          "id": 151671,
+          "content": "<|audio_end|>",
+          "special": true
+        },
+        {
+          "id": 151672,
+          "content": "<|text|>",
+          "special": true
+        },
+        {
+          "id": 151673,
+          "content": "<|text_end|>",
+          "special": true
+        },
+        {
+          "id": 151678,
+          "content": "<|await_audio|>",
+          "special": true
+        },
+        {
+          "id": 151679,
+          "content": "<|ref_audio|>",
+          "special": true
+        },
+        {
+          "id": 151680,
+          "content": "<|ref_text|>",
+          "special": true
+        },
+        {
+          "id": 151681,
+          "content": "<|emotion:elation|>",
+          "special": true
+        },
+        {
+          "id": 151682,
+          "content": "<|emotion:amusement|>",
+          "special": true
+        },
+        {
+          "id": 151683,
+          "content": "<|emotion:enthusiasm|>",
+          "special": true
+        },
+        {
+          "id": 151684,
+          "content": "<|emotion:determination|>",
+          "special": true
+        },
+        {
+          "id": 151685,
+          "content": "<|emotion:pride|>",
+          "special": true
+        },
+        {
+          "id": 151686,
+          "content": "<|emotion:contentment|>",
+          "special": true
+        },
+        {
+          "id": 151687,
+          "content": "<|emotion:affection|>",
+          "special": true
+        },
+        {
+          "id": 151688,
+          "content": "<|emotion:relief|>",
+          "special": true
+        },
+        {
+          "id": 151689,
+          "content": "<|emotion:contemplation|>",
+          "special": true
+        },
+        {
+          "id": 151690,
+          "content": "<|emotion:confusion|>",
+          "special": true
+        },
+        {
+          "id": 151691,
+          "content": "<|emotion:surprise|>",
+          "special": true
+        },
+        {
+          "id": 151692,
+          "content": "<|emotion:awe|>",
+          "special": true
+        },
+        {
+          "id": 151693,
+          "content": "<|emotion:longing|>",
+          "special": true
+        },
+        {
+          "id": 151694,
+          "content": "<|emotion:arousal|>",
+          "special": true
+        },
+        {
+          "id": 151695,
+          "content": "<|emotion:anger|>",
+          "special": true
+        },
+        {
+          "id": 151696,
+          "content": "<|emotion:fear|>",
+          "special": true
+        },
+        {
+          "id": 151697,
+          "content": "<|emotion:disgust|>",
+          "special": true
+        },
+        {
+          "id": 151698,
+          "content": "<|emotion:bitterness|>",
+          "special": true
+        },
+        {
+          "id": 151699,
+          "content": "<|emotion:sadness|>",
+          "special": true
+        },
+        {
+          "id": 151700,
+          "content": "<|emotion:shame|>",
+          "special": true
+        },
+        {
+          "id": 151701,
+          "content": "<|emotion:helplessness|>",
+          "special": true
+        },
+        {
+          "id": 151704,
+          "content": "<|style:singing|>",
+          "special": true
+        },
+        {
+          "id": 151705,
+          "content": "<|style:shouting|>",
+          "special": true
+        },
+        {
+          "id": 151706,
+          "content": "<|style:whispering|>",
+          "special": true
+        },
+        {
+          "id": 151707,
+          "content": "<|sfx:cough|>",
+          "special": true
+        },
+        {
+          "id": 151708,
+          "content": "<|sfx:laughter|>",
+          "special": true
+        },
+        {
+          "id": 151709,
+          "content": "<|sfx:crying|>",
+          "special": true
+        },
+        {
+          "id": 151710,
+          "content": "<|sfx:screaming|>",
+          "special": true
+        },
+        {
+          "id": 151711,
+          "content": "<|sfx:burping|>",
+          "special": true
+        },
+        {
+          "id": 151712,
+          "content": "<|sfx:humming|>",
+          "special": true
+        },
+        {
+          "id": 151713,
+          "content": "<|sfx:sigh|>",
+          "special": true
+        },
+        {
+          "id": 151714,
+          "content": "<|sfx:sniff|>",
+          "special": true
+        },
+        {
+          "id": 151715,
+          "content": "<|sfx:sneeze|>",
+          "special": true
+        },
+        {
+          "id": 151716,
+          "content": "<|prosody:speed_very_slow|>",
+          "special": true
+        },
+        {
+          "id": 151717,
+          "content": "<|prosody:speed_slow|>",
+          "special": true
+        },
+        {
+          "id": 151718,
+          "content": "<|prosody:speed_fast|>",
+          "special": true
+        },
+        {
+          "id": 151719,
+          "content": "<|prosody:speed_very_fast|>",
+          "special": true
+        },
+        {
+          "id": 151720,
+          "content": "<|prosody:pitch_low|>",
+          "special": true
+        },
+        {
+          "id": 151721,
+          "content": "<|prosody:pitch_high|>",
+          "special": true
+        },
+        {
+          "id": 151722,
+          "content": "<|prosody:pause|>",
+          "special": true
+        },
+        {
+          "id": 151723,
+          "content": "<|prosody:long_pause|>",
+          "special": true
+        },
+        {
+          "id": 151725,
+          "content": "<|prosody:expressive_high|>",
+          "special": true
+        },
+        {
+          "id": 151726,
+          "content": "<|prosody:expressive_low|>",
+          "special": true
+        }
+      ]
+    },
+    "prompting": {
+      "tag_count_in_catalog_heading": 43,
+      "documented_tags_seen_in_examples": {
+        "emotion": [
+          "elation"
+        ],
+        "prosody": [
+          "long_pause",
+          "pause",
+          "speed_slow"
+        ],
+        "style": [
+          "whispering"
+        ],
+        "sfx": [
+          "cough",
+          "laughter",
+          "sigh",
+          "tag"
+        ]
+      },
+      "format_rule_line": 8,
+      "inline_sfx_rule_line": 15,
+      "inline_pause_rule_line": 12
+    },
+    "chat_template": {
+      "line_count": 54,
+      "uses_qwen_im_tokens": true
+    },
+    "weight_index": {
+      "metadata": {
+        "total_size": 8489763794
+      },
+      "weight_entry_count": 927,
+      "prefixes": {
+        "tied.embedding.modality_embeddings.0.model.": {
+          "count": 528,
+          "examples": [
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.conv_t1.bias",
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.conv_t1.weight",
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv1.bias",
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv1.weight",
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv2.bias",
+            "tied.embedding.modality_embeddings.0.model.acoustic_decoder.block.0.res_unit1.conv2.weight"
+          ]
+        },
+        "tied.embedding.modality_embeddings.0.embedding": {
+          "count": 1,
+          "examples": [
+            "tied.embedding.modality_embeddings.0.embedding.weight"
+          ]
+        },
+        "tied.embedding.text_embedding": {
+          "count": 1,
+          "examples": [
+            "tied.embedding.text_embedding.weight"
+          ]
+        },
+        "body.layers.": {
+          "count": 396,
+          "examples": [
+            "body.layers.0.input_layernorm.weight",
+            "body.layers.0.mlp.down_proj.weight",
+            "body.layers.0.mlp.gate_proj.weight",
+            "body.layers.0.mlp.up_proj.weight",
+            "body.layers.0.post_attention_layernorm.weight",
+            "body.layers.0.self_attn.k_norm.weight"
+          ]
+        },
+        "body.norm": {
+          "count": 1,
+          "examples": [
+            "body.norm.weight"
+          ]
+        },
+        "tied.head": {
+          "count": 0,
+          "examples": []
+        }
+      }
+    }
+  },
+  "official_serving_sources": {
+    "sglang_omni": {
+      "repo": "sgl-project/sglang-omni",
+      "requested_revision": "main",
+      "resolved_revision": "86e73bdbece7875255434e9730876c3892fec125",
+      "files": [
+        {
+          "path": "sglang_omni/models/higgs_tts/config.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/config.py",
+          "line_count": 77,
+          "symbols": [
+            {
+              "line": 13,
+              "declaration": "class HiggsTtsPipelineConfig(PipelineConfig):"
+            },
+            {
+              "line": 27,
+              "declaration": "def generation_sglang_role_to_stage(cls) -> dict[str, str]:"
+            },
+            {
+              "line": 70,
+              "declaration": "def requires_uploaded_voice_for_named_voice(self) -> bool:"
+            },
+            {
+              "line": 73,
+              "declaration": "def supports_uploaded_voice_references(self) -> bool:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_PKG",
+              "value": "\"sglang_omni.models.higgs_tts\"",
+              "line": 10
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 14,
+              "text": "\"\"\"4-stage TTS pipeline: preprocessing → audio_encoder → tts_engine → vocoder."
+            },
+            {
+              "line": 16,
+              "text": "Mirrors the V0 layout: preprocessing tokenises text + delay-pattern-encodes"
+            },
+            {
+              "line": 17,
+              "text": "the reference audio codes; audio_encoder runs the fused multi-codebook"
+            },
+            {
+              "line": 18,
+              "text": "embedding once on the delayed ref codes (CPU- or GPU-side); tts_engine"
+            },
+            {
+              "line": 20,
+              "text": "pasted at ``-100`` placeholder positions; vocoder reverses the delay"
+            },
+            {
+              "line": 21,
+              "text": "pattern and decodes to waveform via the higgs-audio-v2-tokenizer codec."
+            },
+            {
+              "line": 36,
+              "text": "next=\"audio_encoder\","
+            },
+            {
+              "line": 39,
+              "text": "name=\"audio_encoder\","
+            },
+            {
+              "line": 41,
+              "text": "factory=f\"{_PKG}.stages.create_audio_encoder_executor\","
+            },
+            {
+              "line": 53,
+              "text": "\"enable_async_decode\": True,"
+            },
+            {
+              "line": 56,
+              "text": "next=\"vocoder\","
+            },
+            {
+              "line": 57,
+              "text": "stream_to=[\"vocoder\"],"
+            },
+            {
+              "line": 60,
+              "text": "name=\"vocoder\","
+            },
+            {
+              "line": 62,
+              "text": "factory=f\"{_PKG}.stages.create_vocoder_executor\","
+            },
+            {
+              "line": 66,
+              "text": "can_accept_stream_before_payload=True,"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/hf_config.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/hf_config.py",
+          "line_count": 66,
+          "symbols": [
+            {
+              "line": 20,
+              "declaration": "def _build_text_config(raw: Any) -> transformers.PretrainedConfig:"
+            },
+            {
+              "line": 38,
+              "declaration": "class HiggsMultimodalQwen3Config(transformers.PretrainedConfig):"
+            },
+            {
+              "line": 50,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 64,
+              "declaration": "def get_text_config(self, decoder: bool = False) -> transformers.PretrainedConfig:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_QWEN3_ROPE_THETA",
+              "value": "1_000_000",
+              "line": 17
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 5,
+              "text": "the discrete-audio-encoder branch and ignores the Whisper side."
+            },
+            {
+              "line": 41,
+              "text": "``audio_encoder_config`` is a unified dict with an ``encoder_type``"
+            },
+            {
+              "line": 52,
+              "text": "audio_encoder_config: dict[str, Any] | None = None,"
+            },
+            {
+              "line": 54,
+              "text": "audio_token_id: int = -100,"
+            },
+            {
+              "line": 55,
+              "text": "mel_per_sample: int = 8,"
+            },
+            {
+              "line": 58,
+              "text": "self.audio_token_id = audio_token_id"
+            },
+            {
+              "line": 59,
+              "text": "self.mel_per_sample = mel_per_sample"
+            },
+            {
+              "line": 60,
+              "text": "self.audio_encoder_config = audio_encoder_config"
+            },
+            {
+              "line": 64,
+              "text": "def get_text_config(self, decoder: bool = False) -> transformers.PretrainedConfig:"
+            },
+            {
+              "line": 65,
+              "text": "del decoder"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/text_tokenizer.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/text_tokenizer.py",
+          "line_count": 72,
+          "symbols": [
+            {
+              "line": 31,
+              "declaration": "class HiggsTokenizerAdapter:"
+            },
+            {
+              "line": 32,
+              "declaration": "def __init__(self, tokenizer: Any) -> None:"
+            },
+            {
+              "line": 46,
+              "declaration": "def tokenizer(self) -> Any:"
+            },
+            {
+              "line": 49,
+              "declaration": "def build_prompt("
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "AUDIO_PLACEHOLDER_ID",
+              "value": "-100",
+              "line": 21
+            },
+            {
+              "name": "_REQUIRED_SPECIALS",
+              "value": "tuple[str, ...] = (",
+              "line": 23
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 2,
+              "text": "\"\"\"Text-prompt builder for HiggsMultimodalQwen3 TTS."
+            },
+            {
+              "line": 4,
+              "text": "Assembles, depending on ref-audio + ref-text presence:"
+            },
+            {
+              "line": 6,
+              "text": "- voice-clone + transcript: ``<|tts|> <|ref_text|> tok(ref) <|ref_audio|> [-100]×N <|text|> tok(text) <|audio|>``"
+            },
+            {
+              "line": 7,
+              "text": "- voice-clone, no transcript: ``<|tts|> <|ref_audio|> [-100]×N <|text|> tok(text) <|audio|>``"
+            },
+            {
+              "line": 8,
+              "text": "- zero-shot: ``<|tts|> <|text|> tok(text) <|audio|>``"
+            },
+            {
+              "line": 12,
+              "text": "at runtime; ``num_ref_tokens`` must match the *delayed* ref-code row count"
+            },
+            {
+              "line": 13,
+              "text": "(``T + num_codebooks - 1``)."
+            },
+            {
+              "line": 20,
+              "text": "# Matches Higgs ``audio_token_id`` and transformers' ``IGNORE_INDEX`` convention."
+            },
+            {
+              "line": 21,
+              "text": "AUDIO_PLACEHOLDER_ID = -100"
+            },
+            {
+              "line": 25,
+              "text": "\"<|ref_audio|>\","
+            },
+            {
+              "line": 27,
+              "text": "\"<|audio|>\","
+            },
+            {
+              "line": 31,
+              "text": "class HiggsTokenizerAdapter:"
+            },
+            {
+              "line": 32,
+              "text": "def __init__(self, tokenizer: Any) -> None:"
+            },
+            {
+              "line": 33,
+              "text": "self._tok = tokenizer"
+            },
+            {
+              "line": 34,
+              "text": "vocab = dict(tokenizer.get_added_vocab())"
+            },
+            {
+              "line": 37,
+              "text": "raise ValueError(f\"Tokenizer is missing Higgs TTS specials: {missing}\")"
+            },
+            {
+              "line": 39,
+              "text": "self.ref_audio_id: int = vocab[\"<|ref_audio|>\"]"
+            },
+            {
+              "line": 41,
+              "text": "self.audio_id: int = vocab[\"<|audio|>\"]"
+            },
+            {
+              "line": 42,
+              "text": "# Newer ckpts only; older ckpts fall back to audio-only voice-cloning."
+            },
+            {
+              "line": 46,
+              "text": "def tokenizer(self) -> Any:"
+            },
+            {
+              "line": 49,
+              "text": "def build_prompt("
+            },
+            {
+              "line": 51,
+              "text": "prompt_text: str,"
+            },
+            {
+              "line": 56,
+              "text": "\"\"\"``num_ref_tokens=0`` → zero-shot; non-zero must match delayed row count.\"\"\""
+            },
+            {
+              "line": 64,
+              "text": "ids.append(self.ref_audio_id)"
+            },
+            {
+              "line": 65,
+              "text": "ids.extend([AUDIO_PLACEHOLDER_ID] * num_ref_tokens)"
+            },
+            {
+              "line": 67,
+              "text": "ids.extend(self._tok.encode(prompt_text, add_special_tokens=False))"
+            },
+            {
+              "line": 68,
+              "text": "ids.append(self.audio_id)"
+            },
+            {
+              "line": 72,
+              "text": "__all__ = [\"AUDIO_PLACEHOLDER_ID\", \"HiggsTokenizerAdapter\"]"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/request_builders.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/request_builders.py",
+          "line_count": 207,
+          "symbols": [
+            {
+              "line": 22,
+              "declaration": "class HiggsSGLangRequestData(SGLangARRequestData):"
+            },
+            {
+              "line": 35,
+              "declaration": "class _ResettableHiggsModel(Protocol):"
+            },
+            {
+              "line": 36,
+              "declaration": "def reset_request(self, req_id: str) -> None: ..."
+            },
+            {
+              "line": 43,
+              "declaration": "def _perf_counter() -> float:"
+            },
+            {
+              "line": 47,
+              "declaration": "def _ref_audio_fingerprint(codes: list[list[int]] | None) -> str | None:"
+            },
+            {
+              "line": 67,
+              "declaration": "def build_sglang_higgs_request("
+            },
+            {
+              "line": 117,
+              "declaration": "def build_higgs_stream_metadata("
+            },
+            {
+              "line": 148,
+              "declaration": "def apply_higgs_result(state: HiggsTtsState, data: HiggsSGLangRequestData) -> None:"
+            },
+            {
+              "line": 158,
+              "declaration": "def make_higgs_scheduler_adapters("
+            },
+            {
+              "line": 171,
+              "declaration": "def request_builder(payload: StagePayload) -> HiggsSGLangRequestData:"
+            },
+            {
+              "line": 184,
+              "declaration": "def result_adapter(data: HiggsSGLangRequestData) -> StagePayload:"
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 16,
+              "text": "from sglang_omni.models.tts_streaming import INITIAL_CODEC_CHUNK_FRAMES_PARAM"
+            },
+            {
+              "line": 25,
+              "text": "reference_codes_delayed: list[list[int]] | None = None"
+            },
+            {
+              "line": 27,
+              "text": "num_codebooks: int = 8"
+            },
+            {
+              "line": 28,
+              "text": "codebook_size: int = 1026"
+            },
+            {
+              "line": 32,
+              "text": "stream_metadata: dict[str, Any] | None = None"
+            },
+            {
+              "line": 47,
+              "text": "def _ref_audio_fingerprint(codes: list[list[int]] | None) -> str | None:"
+            },
+            {
+              "line": 48,
+              "text": "\"\"\"Stable hash of the full N-codebook ref-audio sequence."
+            },
+            {
+              "line": 51,
+              "text": "zero-shot (no ref audio) so all zero-shot requests share the radix subtree."
+            },
+            {
+              "line": 52,
+              "text": "Each codec value packs into 2 bytes (range 0..1025) so the hash is"
+            },
+            {
+              "line": 53,
+              "text": "sensitive to every codebook, not just cb0."
+            },
+            {
+              "line": 70,
+              "text": "input_ids_list = list(state.prompt_token_ids)"
+            },
+            {
+              "line": 84,
+              "text": "# tokenizer_manager.normalize() is bypassed in our custom pipeline;"
+            },
+            {
+              "line": 85,
+              "text": "# without it stop_strs / stop_regex_strs stay None and the upstream"
+            },
+            {
+              "line": 87,
+              "text": "sampling_params.normalize(tokenizer=None)"
+            },
+            {
+              "line": 89,
+              "text": "# vocab_size = backbone text vocab so cb0 rides sglang's standard sampler path."
+            },
+            {
+              "line": 90,
+              "text": "# extra_key namespaces the radix cache per ref-audio fingerprint so prompts"
+            },
+            {
+              "line": 98,
+              "text": "extra_key=_ref_audio_fingerprint(state.reference_codes_delayed),"
+            },
+            {
+              "line": 100,
+              "text": "# V1's prefill manager probes these attrs; absence triggers AttributeError."
+            },
+            {
+              "line": 101,
+              "text": "req._codec_suppress_tokens = None"
+            },
+            {
+              "line": 107,
+              "text": "reference_codes_delayed=state.reference_codes_delayed,"
+            },
+            {
+              "line": 108,
+              "text": "num_codebooks=int(state.num_codebooks),"
+            },
+            {
+              "line": 109,
+              "text": "codebook_size=int(state.codebook_size),"
+            },
+            {
+              "line": 117,
+              "text": "def build_higgs_stream_metadata("
+            },
+            {
+              "line": 125,
+              "text": "if not bool(params.get(\"stream\", False)):"
+            },
+            {
+              "line": 128,
+              "text": "num_codebooks = int(data.num_codebooks)"
+            },
+            {
+              "line": 129,
+              "text": "codebook_size = int(data.codebook_size)"
+            },
+            {
+              "line": 130,
+              "text": "if num_codebooks <= 0 or codebook_size <= 2:"
+            },
+            {
+              "line": 132,
+              "text": "f\"Invalid Higgs stream codec contract: \""
+            },
+            {
+              "line": 133,
+              "text": "f\"num_codebooks={num_codebooks}, codebook_size={codebook_size}\""
+            },
+            {
+              "line": 136,
+              "text": "\"modality\": \"audio_codes\","
+            },
+            {
+              "line": 137,
+              "text": "\"stream\": True,"
+            },
+            {
+              "line": 138,
+              "text": "\"num_codebooks\": num_codebooks,"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/stages.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/stages.py",
+          "line_count": 520,
+          "symbols": [
+            {
+              "line": 91,
+              "declaration": "def _reference_audio_cache_key(reference_audio: Any) -> str | None:"
+            },
+            {
+              "line": 112,
+              "declaration": "def _reference_code_cache_key_from_waveform("
+            },
+            {
+              "line": 125,
+              "declaration": "def _uploaded_voice_cache_key("
+            },
+            {
+              "line": 144,
+              "declaration": "def _state_uploaded_voice_cache_key("
+            },
+            {
+              "line": 159,
+              "declaration": "def create_preprocessing_executor("
+            },
+            {
+              "line": 187,
+              "declaration": "def _preprocess(payload: StagePayload) -> StagePayload:"
+            },
+            {
+              "line": 316,
+              "declaration": "def create_audio_encoder_executor("
+            },
+            {
+              "line": 350,
+              "declaration": "def _encode(payload: StagePayload) -> StagePayload:"
+            },
+            {
+              "line": 398,
+              "declaration": "def create_sglang_tts_engine_executor("
+            },
+            {
+              "line": 485,
+              "declaration": "def create_vocoder_executor("
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_MAX_REF_AUDIO_SEC",
+              "value": "100",
+              "line": 84
+            },
+            {
+              "name": "_REF_CODE_CACHE_MAX_ITEMS",
+              "value": "256",
+              "line": 85
+            },
+            {
+              "name": "_REF_CODE_CACHE_MAX_BYTES",
+              "value": "256 * 1024 * 1024",
+              "line": 86
+            },
+            {
+              "name": "_REF_WAVEFORM_CACHE_MAX_ITEMS",
+              "value": "256",
+              "line": 87
+            },
+            {
+              "name": "_REF_WAVEFORM_CACHE_MAX_BYTES",
+              "value": "512 * 1024 * 1024",
+              "line": 88
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 6,
+              "text": "preprocessing → audio_encoder → tts_engine → vocoder"
+            },
+            {
+              "line": 8,
+              "text": "- ``create_preprocessing_executor``: text tokenize + (if raw audio path)"
+            },
+            {
+              "line": 9,
+              "text": "load waveform; fast path also delay-encodes client-supplied"
+            },
+            {
+              "line": 10,
+              "text": "``reference_codes`` and builds the prompt. Returns a"
+            },
+            {
+              "line": 12,
+              "text": "- ``create_audio_encoder_executor``: GPU codec encode for the raw-audio"
+            },
+            {
+              "line": 13,
+              "text": "path → delayed ref codes + prompt assembly. No-op on the fast path."
+            },
+            {
+              "line": 15,
+              "text": "sglang's worker; the model runner computes the fused multi-codebook"
+            },
+            {
+              "line": 16,
+              "text": "embedding inline in prefill from ``reference_codes_delayed`` and overlays"
+            },
+            {
+              "line": 18,
+              "text": "- ``create_vocoder_executor``: creates the Higgs vocoder scheduler, preserving"
+            },
+            {
+              "line": 19,
+              "text": "batched non-streaming decode and incremental streaming audio chunks."
+            },
+            {
+              "line": 32,
+              "text": "import torchaudio.functional as F_audio"
+            },
+            {
+              "line": 33,
+              "text": "from tokenizers import Tokenizer"
+            },
+            {
+              "line": 34,
+              "text": "from transformers import PreTrainedTokenizerFast"
+            },
+            {
+              "line": 39,
+              "text": "from sglang_omni.models.higgs_tts.text_tokenizer import HiggsTokenizerAdapter"
+            },
+            {
+              "line": 41,
+              "text": "apply_delay_pattern,"
+            },
+            {
+              "line": 42,
+              "text": "get_or_load_codec,"
+            },
+            {
+              "line": 43,
+              "text": "load_audio_to_24k,"
+            },
+            {
+              "line": 48,
+              "text": "from sglang_omni.models.higgs_tts.vocoder_scheduler import ("
+            },
+            {
+              "line": 49,
+              "text": "HiggsStreamingVocoderScheduler,"
+            },
+            {
+              "line": 82,
+              "text": "# Codec runs at 75 Hz; chunked prefill of the multi-codebook prompt is unsafe"
+            },
+            {
+              "line": 83,
+              "text": "# (sampler state machine has no rollback) so reject inputs past chunked_prefill_size."
+            },
+            {
+              "line": 84,
+              "text": "_MAX_REF_AUDIO_SEC = 100"
+            },
+            {
+              "line": 87,
+              "text": "_REF_WAVEFORM_CACHE_MAX_ITEMS = 256"
+            },
+            {
+              "line": 88,
+              "text": "_REF_WAVEFORM_CACHE_MAX_BYTES = 512 * 1024 * 1024"
+            },
+            {
+              "line": 91,
+              "text": "def _reference_audio_cache_key(reference_audio: Any) -> str | None:"
+            },
+            {
+              "line": 92,
+              "text": "\"\"\"Safe source key for preprocessing waveform-cache lookup.\"\"\""
+            },
+            {
+              "line": 93,
+              "text": "if isinstance(reference_audio, (str, Path)):"
+            },
+            {
+              "line": 94,
+              "text": "return _reference_path_cache_key(reference_audio)"
+            },
+            {
+              "line": 95,
+              "text": "if not isinstance(reference_audio, dict):"
+            },
+            {
+              "line": 97,
+              "text": "path = reference_audio.get(\"audio_path\") or reference_audio.get(\"path\")"
+            },
+            {
+              "line": 100,
+              "text": "if \"bytes\" in reference_audio:"
+            },
+            {
+              "line": 101,
+              "text": "data = reference_audio[\"bytes\"]"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/model.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/model.py",
+          "line_count": 592,
+          "symbols": [
+            {
+              "line": 42,
+              "declaration": "class HiggsGenParams:"
+            },
+            {
+              "line": 50,
+              "declaration": "def _resolve_max_running_requests() -> int:"
+            },
+            {
+              "line": 64,
+              "declaration": "def _flat_sampling_attr(sampling_info, attr: str) -> list | None:"
+            },
+            {
+              "line": 77,
+              "declaration": "class _HiggsMultimodalEmbedding(nn.Module):"
+            },
+            {
+              "line": 80,
+              "declaration": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 89,
+              "declaration": "class HiggsTTSModel(nn.Module):"
+            },
+            {
+              "line": 108,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 213,
+              "declaration": "def get_input_embeddings(self) -> nn.Embedding:"
+            },
+            {
+              "line": 216,
+              "declaration": "def get_multimodal_embedding(self) -> HiggsFusedMultiTextEmbedding:"
+            },
+            {
+              "line": 219,
+              "declaration": "def get_modality_head(self) -> HiggsFusedMultiTextHead:"
+            },
+            {
+              "line": 223,
+              "declaration": "def num_codebooks(self) -> int:"
+            },
+            {
+              "line": 227,
+              "declaration": "def codebook_vocab_size(self) -> int:"
+            },
+            {
+              "line": 231,
+              "declaration": "def sampler_pool_max_running_requests(self) -> int:"
+            },
+            {
+              "line": 234,
+              "declaration": "def acquire_row(self, req_id: str) -> int:"
+            },
+            {
+              "line": 250,
+              "declaration": "def set_request_seed(self, req_id: str, seed: int | None) -> None:"
+            },
+            {
+              "line": 258,
+              "declaration": "def release_row(self, req_id: str) -> None:"
+            },
+            {
+              "line": 265,
+              "declaration": "def reset_request(self, req_id: str) -> None:"
+            },
+            {
+              "line": 268,
+              "declaration": "def get_output_codes(self, req_id: str) -> torch.Tensor:"
+            },
+            {
+              "line": 279,
+              "declaration": "def decode_codebooks_batch("
+            },
+            {
+              "line": 354,
+              "declaration": "def decode_codebooks_batch_cg(self, hidden_states_BD: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 414,
+              "declaration": "def forward("
+            },
+            {
+              "line": 469,
+              "declaration": "def _decode_step_embeds_cg("
+            },
+            {
+              "line": 488,
+              "declaration": "def _is_decode_step(forward_batch) -> bool:"
+            },
+            {
+              "line": 495,
+              "declaration": "def _extract_batch_metadata("
+            },
+            {
+              "line": 510,
+              "declaration": "def _gen_params_for_batch(sampling_info, batch_size: int) -> list[HiggsGenParams]:"
+            },
+            {
+              "line": 534,
+              "declaration": "def _infer_batch_size(forward_batch) -> int:"
+            },
+            {
+              "line": 540,
+              "declaration": "def load_weights(self, weights: Iterable[Tuple[str, torch.Tensor]]) -> set[str]:"
+            },
+            {
+              "line": 584,
+              "declaration": "def _own_param_names(self) -> set[str]:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_BACKBONE_PREFIX_MAP",
+              "value": "dict[str, str] = {",
+              "line": 33
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 20,
+              "text": "from sglang_omni.models.higgs_tts.sampler import ("
+            },
+            {
+              "line": 23,
+              "text": "HiggsBatchedSamplerState,"
+            },
+            {
+              "line": 43,
+              "text": "\"\"\"Per-request decoding parameters consumed by :func:`sampler.step`.\"\"\""
+            },
+            {
+              "line": 80,
+              "text": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 83,
+              "text": "num_codebooks=num_codebooks,"
+            },
+            {
+              "line": 99,
+              "text": "to the embedding weight when ``audio_encoder_config.tie_word_embeddings``."
+            },
+            {
+              "line": 101,
+              "text": "the stream between the backbone and the multimodal modules."
+            },
+            {
+              "line": 103,
+              "text": "Multi-codebook input embedding overlay (the ``-100`` placeholder paste"
+            },
+            {
+              "line": 104,
+              "text": "from the reference audio) is performed by the engine model_runner; this"
+            },
+            {
+              "line": 124,
+              "text": "enc_cfg = config.audio_encoder_config or {}"
+            },
+            {
+              "line": 133,
+              "text": "num_codebooks: int = int(enc_cfg[\"num_codebooks\"])"
+            },
+            {
+              "line": 136,
+              "text": "self._num_codebooks = num_codebooks"
+            },
+            {
+              "line": 137,
+              "text": "self._codebook_vocab_size = vocab_size"
+            },
+            {
+              "line": 141,
+              "text": "num_codebooks=num_codebooks,"
+            },
+            {
+              "line": 146,
+              "text": "num_codebooks=num_codebooks,"
+            },
+            {
+              "line": 161,
+              "text": "self._sampler_pool = HiggsBatchedSamplerState("
+            },
+            {
+              "line": 163,
+              "text": "num_codebooks=num_codebooks,"
+            },
+            {
+              "line": 186,
+              "text": "pool_size, num_codebooks, dtype=torch.long, device=cg_device"
+            },
+            {
+              "line": 190,
+              "text": "pool_size, num_codebooks + 2, dtype=torch.long, device=cg_device"
+            },
+            {
+              "line": 194,
+              "text": "self._cg_active_delay_count = torch.zeros("
+            },
+            {
+              "line": 204,
+              "text": "pool_size, num_codebooks, dtype=torch.long, device=cg_device"
+            },
+            {
+              "line": 223,
+              "text": "def num_codebooks(self) -> int:"
+            },
+            {
+              "line": 224,
+              "text": "return self._num_codebooks"
+            },
+            {
+              "line": 227,
+              "text": "def codebook_vocab_size(self) -> int:"
+            },
+            {
+              "line": 228,
+              "text": "return self._codebook_vocab_size"
+            },
+            {
+              "line": 231,
+              "text": "def sampler_pool_max_running_requests(self) -> int:"
+            },
+            {
+              "line": 235,
+              "text": "\"\"\"Allocate or look up the sampler-pool row for ``req_id``. Idempotent.\"\"\""
+            },
+            {
+              "line": 241,
+              "text": "f\"HiggsTTSModel sampler pool exhausted \""
+            },
+            {
+              "line": 247,
+              "text": "self._sampler_pool.reset_row(row)"
+            },
+            {
+              "line": 251,
+              "text": "\"\"\"Pin ``req_id``'s sampler seed (``None`` -> unseeded/random). Constant"
+            },
+            {
+              "line": 254,
+              "text": "self._sampler_pool.seeds[row] = ("
+            },
+            {
+              "line": 272,
+              "text": "(0, self._num_codebooks),"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/modeling.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/modeling.py",
+          "line_count": 58,
+          "symbols": [
+            {
+              "line": 15,
+              "declaration": "class HiggsFusedMultiTextEmbedding(nn.Module):"
+            },
+            {
+              "line": 23,
+              "declaration": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 29,
+              "declaration": "def forward(self, codes_LN: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 37,
+              "declaration": "class HiggsFusedMultiTextHead(nn.Module):"
+            },
+            {
+              "line": 43,
+              "declaration": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 49,
+              "declaration": "def generate(self, hidden_LD: torch.Tensor) -> torch.Tensor:"
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 2,
+              "text": "\"\"\"Fused multi-codebook modules for HiggsMultimodalQwen3 (discrete TTS path)."
+            },
+            {
+              "line": 4,
+              "text": "Standalone ``nn.Module``s with no framework dependencies — the full"
+            },
+            {
+              "line": 16,
+              "text": "\"\"\"Fused multi-codebook embedding: one ``[N*V, D]`` weight + offset lookup."
+            },
+            {
+              "line": 18,
+              "text": "Equivalent to an ensemble of ``N`` per-codebook embeddings but stored"
+            },
+            {
+              "line": 20,
+              "text": "codebook axis."
+            },
+            {
+              "line": 23,
+              "text": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 25,
+              "text": "self.weight = nn.Parameter(torch.empty(num_codebooks * vocab_size, hidden_size))"
+            },
+            {
+              "line": 26,
+              "text": "self.num_codebooks = num_codebooks"
+            },
+            {
+              "line": 30,
+              "text": "N = self.num_codebooks"
+            },
+            {
+              "line": 38,
+              "text": "\"\"\"Fused multi-codebook head: ``[L, D]`` → ``[L, N, V]`` via one linear."
+            },
+            {
+              "line": 43,
+              "text": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 45,
+              "text": "self.weight = nn.Parameter(torch.empty(num_codebooks * vocab_size, hidden_size))"
+            },
+            {
+              "line": 46,
+              "text": "self.num_codebooks = num_codebooks"
+            },
+            {
+              "line": 53,
+              "text": "self.num_codebooks,"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/sampler.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/sampler.py",
+          "line_count": 447,
+          "symbols": [
+            {
+              "line": 34,
+              "declaration": "class HiggsSamplerState:"
+            },
+            {
+              "line": 47,
+              "declaration": "class HiggsBatchedSamplerState:"
+            },
+            {
+              "line": 63,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 96,
+              "declaration": "def reset_row(self, row: int) -> None:"
+            },
+            {
+              "line": 105,
+              "declaration": "def view_row(self, row: int) -> HiggsSamplerState:"
+            },
+            {
+              "line": 119,
+              "declaration": "def write_row(self, row: int, state: HiggsSamplerState) -> None:"
+            },
+            {
+              "line": 133,
+              "declaration": "def _sample_independent("
+            },
+            {
+              "line": 166,
+              "declaration": "def step("
+            },
+            {
+              "line": 231,
+              "declaration": "def _sample_independent_batched("
+            },
+            {
+              "line": 300,
+              "declaration": "def batched_step("
+            },
+            {
+              "line": 353,
+              "declaration": "def batched_step_direct("
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "NO_SEED",
+              "value": "-1",
+              "line": 24
+            },
+            {
+              "name": "STOP_CODE",
+              "value": "-1",
+              "line": 27
+            },
+            {
+              "name": "K_MAX",
+              "value": "1026",
+              "line": 30
+            },
+            {
+              "name": "_GREEDY_TEMP_THRESHOLD",
+              "value": "1e-5",
+              "line": 130
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 2,
+              "text": "\"\"\"Higgs TTS multi-codebook sampler — two parallel implementations of"
+            },
+            {
+              "line": 3,
+              "text": "the same delay/EOC state machine:"
+            },
+            {
+              "line": 5,
+              "text": "- ``step`` / ``HiggsSamplerState``: per-row, Python control flow."
+            },
+            {
+              "line": 7,
+              "text": "- ``batched_step`` / ``batched_step_direct`` / ``HiggsBatchedSamplerState``:"
+            },
+            {
+              "line": 18,
+              "text": "from sglang.srt.layers.sampler import multinomial_with_seed"
+            },
+            {
+              "line": 23,
+              "text": "# torch.multinomial path, so unseeded decode is byte-identical to before."
+            },
+            {
+              "line": 29,
+              "text": "# CG-baked top-k upper bound = full codec vocab, so the default value is a no-op filter."
+            },
+            {
+              "line": 34,
+              "text": "class HiggsSamplerState:"
+            },
+            {
+              "line": 35,
+              "text": "num_codebooks: int"
+            },
+            {
+              "line": 36,
+              "text": "delay_count: int = 0"
+            },
+            {
+              "line": 43,
+              "text": "# Batched (CUDA-Graph-compatible) sampler state"
+            },
+            {
+              "line": 47,
+              "text": "class HiggsBatchedSamplerState:"
+            },
+            {
+              "line": 48,
+              "text": "\"\"\"Per-request sampler state stored as ``[max_bs, ...]`` GPU tensors."
+            },
+            {
+              "line": 50,
+              "text": "Per-row meaning (matches :class:`HiggsSamplerState`):"
+            },
+            {
+              "line": 52,
+              "text": "- ``delay_count[i]``: how many AR steps row ``i`` has produced so far."
+            },
+            {
+              "line": 53,
+              "text": "While ``delay_count < num_codebooks`` we're in the delay window."
+            },
+            {
+              "line": 59,
+              "text": "- ``last_codes[i]``: last sampled multi-codebook row, used by the"
+            },
+            {
+              "line": 60,
+              "text": "model's decode-step input overlay."
+            },
+            {
+              "line": 66,
+              "text": "num_codebooks: int,"
+            },
+            {
+              "line": 70,
+              "text": "self.num_codebooks = int(num_codebooks)"
+            },
+            {
+              "line": 72,
+              "text": "self.delay_count = torch.zeros("
+            },
+            {
+              "line": 83,
+              "text": "self.num_codebooks,"
+            },
+            {
+              "line": 88,
+              "text": "# to seed each ``(step, codebook)`` draw reproducibly."
+            },
+            {
+              "line": 98,
+              "text": "self.delay_count[row] = 0"
+            },
+            {
+              "line": 105,
+              "text": "def view_row(self, row: int) -> HiggsSamplerState:"
+            },
+            {
+              "line": 106,
+              "text": "\"\"\"Materialise row ``row`` as a per-request :class:`HiggsSamplerState`."
+            },
+            {
+              "line": 107,
+              "text": "``last_codes`` is ``None`` while ``delay_count == 0`` (never sampled)."
+            },
+            {
+              "line": 109,
+              "text": "delay = int(self.delay_count[row].item())"
+            },
+            {
+              "line": 111,
+              "text": "return HiggsSamplerState("
+            },
+            {
+              "line": 112,
+              "text": "num_codebooks=self.num_codebooks,"
+            },
+            {
+              "line": 113,
+              "text": "delay_count=delay,"
+            },
+            {
+              "line": 116,
+              "text": "last_codes=None if delay == 0 else self.last_codes[row],"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/audio_codec.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/audio_codec.py",
+          "line_count": 279,
+          "symbols": [
+            {
+              "line": 43,
+              "declaration": "def _to_mono_3d(waveform: WaveformInput) -> torch.Tensor:"
+            },
+            {
+              "line": 65,
+              "declaration": "def _resolve_ckpt_dir(model_path: str | Path) -> str:"
+            },
+            {
+              "line": 73,
+              "declaration": "def _load_codec_state_dict(tts_ckpt_dir: str) -> dict[str, torch.Tensor]:"
+            },
+            {
+              "line": 104,
+              "declaration": "class HiggsAudioCodec:"
+            },
+            {
+              "line": 109,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 117,
+              "declaration": "def from_pretrained("
+            },
+            {
+              "line": 165,
+              "declaration": "def encode_reference("
+            },
+            {
+              "line": 188,
+              "declaration": "def _bucketed_batch("
+            },
+            {
+              "line": 224,
+              "declaration": "def encode_batch(self, waveforms: list[torch.Tensor]) -> list[torch.Tensor]:"
+            },
+            {
+              "line": 233,
+              "declaration": "def _batch_fn(batch_items: list[torch.Tensor]) -> list[torch.Tensor]:"
+            },
+            {
+              "line": 247,
+              "declaration": "def decode(self, codes_TN: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 261,
+              "declaration": "def decode_batch(self, codes_list: list[torch.Tensor]) -> list[torch.Tensor]:"
+            },
+            {
+              "line": 264,
+              "declaration": "def _batch_fn(batch_items: list[torch.Tensor]) -> list[torch.Tensor]:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_CODEC_IN_TTS_CKPT_PREFIX",
+              "value": "\"tied.embedding.modality_embeddings.0.model.\"",
+              "line": 32
+            },
+            {
+              "name": "_BUNDLED_CODEC_CONFIG_PATH",
+              "value": "os.path.join(",
+              "line": 36
+            },
+            {
+              "name": "SAMPLE_RATE",
+              "value": "int = 24_000",
+              "line": 107
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 1,
+              "text": "\"\"\"Thin facade over the vendored Higgs Audio V2 tokenizer."
+            },
+            {
+              "line": 3,
+              "text": "The codec weights are bundled inside the Higgs TTS checkpoint under the"
+            },
+            {
+              "line": 5,
+              "text": "acoustic_encoder, acoustic_decoder, quantizer, semantic_model, etc.)."
+            },
+            {
+              "line": 6,
+              "text": ":meth:`HiggsAudioCodec.from_pretrained` extracts those keys directly from"
+            },
+            {
+              "line": 8,
+              "text": "engine and the codec."
+            },
+            {
+              "line": 20,
+              "text": "import torchaudio"
+            },
+            {
+              "line": 24,
+              "text": "from sglang_omni.models.higgs_tts._vendored.higgs_audio_v2_tokenizer_hf import ("
+            },
+            {
+              "line": 25,
+              "text": "HiggsAudioV2TokenizerConfig,"
+            },
+            {
+              "line": 26,
+              "text": "HiggsAudioV2TokenizerModel,"
+            },
+            {
+              "line": 29,
+              "text": "WaveformInput = torch.Tensor | np.ndarray"
+            },
+            {
+              "line": 31,
+              "text": "# Codec weights live under this prefix inside the TTS checkpoint."
+            },
+            {
+              "line": 32,
+              "text": "_CODEC_IN_TTS_CKPT_PREFIX = \"tied.embedding.modality_embeddings.0.model.\""
+            },
+            {
+              "line": 34,
+              "text": "# Bundled codec config (taken byte-for-byte from"
+            },
+            {
+              "line": 35,
+              "text": "# https://huggingface.co/bosonai/higgs-audio-v2-tokenizer/blob/main/config.json)."
+            },
+            {
+              "line": 36,
+              "text": "_BUNDLED_CODEC_CONFIG_PATH = os.path.join("
+            },
+            {
+              "line": 39,
+              "text": "\"higgs_audio_v2_tokenizer_config.json\","
+            },
+            {
+              "line": 43,
+              "text": "def _to_mono_3d(waveform: WaveformInput) -> torch.Tensor:"
+            },
+            {
+              "line": 44,
+              "text": "\"\"\"Normalise (Tensor | ndarray) waveform to mono ``[1, 1, L]``.\"\"\""
+            },
+            {
+              "line": 45,
+              "text": "if isinstance(waveform, np.ndarray):"
+            },
+            {
+              "line": 46,
+              "text": "wav = torch.from_numpy(np.ascontiguousarray(waveform))"
+            },
+            {
+              "line": 47,
+              "text": "elif isinstance(waveform, torch.Tensor):"
+            },
+            {
+              "line": 48,
+              "text": "wav = waveform"
+            },
+            {
+              "line": 51,
+              "text": "f\"waveform must be Tensor or ndarray, got {type(waveform).__name__}\""
+            },
+            {
+              "line": 54,
+              "text": "if wav.ndim == 1:"
+            },
+            {
+              "line": 55,
+              "text": "return wav.view(1, 1, -1)"
+            },
+            {
+              "line": 56,
+              "text": "if wav.ndim == 2:"
+            },
+            {
+              "line": 57,
+              "text": "return wav[:1].unsqueeze(0)"
+            },
+            {
+              "line": 58,
+              "text": "if wav.ndim == 3:"
+            },
+            {
+              "line": 59,
+              "text": "if wav.shape[1] != 1:"
+            },
+            {
+              "line": 60,
+              "text": "raise ValueError(f\"audio must be mono, got shape {tuple(wav.shape)}\")"
+            },
+            {
+              "line": 61,
+              "text": "return wav"
+            },
+            {
+              "line": 62,
+              "text": "raise ValueError(f\"waveform must be 1-, 2- or 3-D, got {wav.ndim}-D\")"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/vocoder_scheduler.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/vocoder_scheduler.py",
+          "line_count": 547,
+          "symbols": [
+            {
+              "line": 26,
+              "declaration": "class _HiggsStreamState:"
+            },
+            {
+              "line": 36,
+              "declaration": "class HiggsStreamingVocoderScheduler(StreamingSimpleScheduler):"
+            },
+            {
+              "line": 39,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 73,
+              "declaration": "def is_streaming_payload(self, payload: StagePayload) -> bool:"
+            },
+            {
+              "line": 81,
+              "declaration": "def on_streaming_new_request(self, request_id: str, payload: StagePayload) -> None:"
+            },
+            {
+              "line": 139,
+              "declaration": "def on_stream_chunk("
+            },
+            {
+              "line": 177,
+              "declaration": "def on_stream_done(self, request_id: str) -> list[OutgoingMessage]:"
+            },
+            {
+              "line": 215,
+              "declaration": "def clear_stream_state(self, request_id: str) -> None:"
+            },
+            {
+              "line": 218,
+              "declaration": "def _latch_stream_metadata("
+            },
+            {
+              "line": 265,
+              "declaration": "def _latch_stream_contract("
+            },
+            {
+              "line": 299,
+              "declaration": "def _latch_initial_codec_chunk_frames_from_mapping("
+            },
+            {
+              "line": 313,
+              "declaration": "def _require_stream_contract("
+            },
+            {
+              "line": 324,
+              "declaration": "def _decode_delta("
+            },
+            {
+              "line": 407,
+              "declaration": "def _next_decode_rows_after_emit("
+            },
+            {
+              "line": 420,
+              "declaration": "def _audio_payload_from_stage_payload("
+            },
+            {
+              "line": 434,
+              "declaration": "def _vocode_payload(self, payload: StagePayload) -> StagePayload:"
+            },
+            {
+              "line": 437,
+              "declaration": "def _vocode_payloads(self, payloads: list[StagePayload]) -> list[StagePayload]:"
+            },
+            {
+              "line": 456,
+              "declaration": "def _prepare_vocoder_item("
+            },
+            {
+              "line": 473,
+              "declaration": "def _store_vocoder_result("
+            },
+            {
+              "line": 491,
+              "declaration": "def _decode_state_to_audio(self, state: HiggsTtsState) -> torch.Tensor | None:"
+            },
+            {
+              "line": 504,
+              "declaration": "def _decode_delayed_rows("
+            },
+            {
+              "line": 525,
+              "declaration": "def _build_usage(state: HiggsTtsState) -> dict[str, Any] | None:"
+            },
+            {
+              "line": 538,
+              "declaration": "def _resolve_samples_per_frame(codec: HiggsAudioCodec) -> int | None:"
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 2,
+              "text": "\"\"\"Streaming vocoder scheduler for Higgs TTS.\"\"\""
+            },
+            {
+              "line": 11,
+              "text": "from sglang_omni.models.higgs_tts.audio_codec import HiggsAudioCodec"
+            },
+            {
+              "line": 13,
+              "text": "from sglang_omni.models.higgs_tts.utils import reverse_delay_pattern"
+            },
+            {
+              "line": 14,
+              "text": "from sglang_omni.models.tts_streaming import ("
+            },
+            {
+              "line": 15,
+              "text": "INITIAL_CODEC_CHUNK_FRAMES_PARAM,"
+            },
+            {
+              "line": 16,
+              "text": "resolve_initial_codec_chunk_frames,"
+            },
+            {
+              "line": 18,
+              "text": "from sglang_omni.pipeline.stage.stream_queue import StreamItem"
+            },
+            {
+              "line": 21,
+              "text": "from sglang_omni.scheduling.streaming_simple_scheduler import StreamingSimpleScheduler"
+            },
+            {
+              "line": 22,
+              "text": "from sglang_omni.utils.audio_payload import audio_waveform_payload"
+            },
+            {
+              "line": 26,
+              "text": "class _HiggsStreamState:"
+            },
+            {
+              "line": 27,
+              "text": "delayed_rows: list[torch.Tensor] = field(default_factory=list)"
+            },
+            {
+              "line": 28,
+              "text": "emitted_raw_frames: int = 0"
+            },
+            {
+              "line": 29,
+              "text": "next_decode_rows: int = 0"
+            },
+            {
+              "line": 31,
+              "text": "num_codebooks: int | None = None"
+            },
+            {
+              "line": 32,
+              "text": "codebook_size: int | None = None"
+            },
+            {
+              "line": 33,
+              "text": "initial_codec_chunk_frames: int = 0"
+            },
+            {
+              "line": 36,
+              "text": "class HiggsStreamingVocoderScheduler(StreamingSimpleScheduler):"
+            },
+            {
+              "line": 37,
+              "text": "\"\"\"Decode Higgs codec rows incrementally, with batched final decode.\"\"\""
+            },
+            {
+              "line": 41,
+              "text": "codec: HiggsAudioCodec,"
+            },
+            {
+              "line": 43,
+              "text": "stream_stride: int = 75,"
+            },
+            {
+              "line": 44,
+              "text": "stream_followup_stride: int = 75,"
+            },
+            {
+              "line": 45,
+              "text": "stream_overlap_tokens: int = 8,"
+            },
+            {
+              "line": 46,
+              "text": "stream_holdback_tokens: int = 4,"
+            },
+            {
+              "line": 50,
+              "text": "if stream_stride <= 0 or stream_followup_stride <= 0:"
+            },
+            {
+              "line": 51,
+              "text": "raise ValueError(\"stream_stride and stream_followup_stride must be > 0\")"
+            },
+            {
+              "line": 52,
+              "text": "if stream_overlap_tokens < 0:"
+            },
+            {
+              "line": 53,
+              "text": "raise ValueError(\"stream_overlap_tokens must be >= 0\")"
+            },
+            {
+              "line": 54,
+              "text": "if stream_holdback_tokens < 0:"
+            },
+            {
+              "line": 55,
+              "text": "raise ValueError(\"stream_holdback_tokens must be >= 0\")"
+            },
+            {
+              "line": 57,
+              "text": "self._codec = codec"
+            },
+            {
+              "line": 58,
+              "text": "self._stream_stride = int(stream_stride)"
+            },
+            {
+              "line": 59,
+              "text": "self._stream_followup_stride = int(stream_followup_stride)"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/model_runner.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/model_runner.py",
+          "line_count": 419,
+          "symbols": [
+            {
+              "line": 29,
+              "declaration": "class HiggsTTSModelRunner(ModelRunner):"
+            },
+            {
+              "line": 32,
+              "declaration": "def __init__(self, tp_worker: Any, output_processor: Any) -> None:"
+            },
+            {
+              "line": 37,
+              "declaration": "def set_stream_outbox(self, outbox: Any) -> None:"
+            },
+            {
+              "line": 40,
+              "declaration": "def before_prefill(self, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 51,
+              "declaration": "def post_prefill(self, result, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 55,
+              "declaration": "def before_decode("
+            },
+            {
+              "line": 67,
+              "declaration": "def post_decode(self, result, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 71,
+              "declaration": "def post_decode_launch(self, result, forward_batch, requests):"
+            },
+            {
+              "line": 101,
+              "declaration": "def post_decode_resolve("
+            },
+            {
+              "line": 119,
+              "declaration": "def _populate_cg_buffers("
+            },
+            {
+              "line": 191,
+              "declaration": "def _extract_decode_sampling_params(forward_batch, n_real: int):"
+            },
+            {
+              "line": 217,
+              "declaration": "def _collect_step_outputs_cg("
+            },
+            {
+              "line": 243,
+              "declaration": "def _decode_pack_gpu(self, n_real: int) -> torch.Tensor:"
+            },
+            {
+              "line": 265,
+              "declaration": "def _decode_collect_host("
+            },
+            {
+              "line": 323,
+              "declaration": "def _build_prefill_input_embeds("
+            },
+            {
+              "line": 363,
+              "declaration": "def _collect_step_outputs(self, result: Any, requests: list) -> None:"
+            },
+            {
+              "line": 397,
+              "declaration": "def _mark_sampler_finished(req: Any, generation_done: bool) -> None:"
+            },
+            {
+              "line": 402,
+              "declaration": "def _emit_code_chunk(self, sched_req: Any, codes_N: torch.Tensor) -> None:"
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 4,
+              "text": "Decode-mode hooks gather sampler-pool state into ``_cg_active_*`` shadow"
+            },
+            {
+              "line": 21,
+              "text": "from sglang_omni.models.higgs_tts.sampler import K_MAX"
+            },
+            {
+              "line": 22,
+              "text": "from sglang_omni.models.higgs_tts.text_tokenizer import AUDIO_PLACEHOLDER_ID"
+            },
+            {
+              "line": 35,
+              "text": "self._vocoder_target = \"vocoder\""
+            },
+            {
+              "line": 37,
+              "text": "def set_stream_outbox(self, outbox: Any) -> None:"
+            },
+            {
+              "line": 40,
+              "text": "def before_prefill(self, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 47,
+              "text": "forward_batch.input_embeds = self._build_prefill_input_embeds("
+            },
+            {
+              "line": 51,
+              "text": "def post_prefill(self, result, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 55,
+              "text": "def before_decode("
+            },
+            {
+              "line": 67,
+              "text": "def post_decode(self, result, forward_batch, schedule_batch, requests):"
+            },
+            {
+              "line": 71,
+              "text": "def post_decode_launch(self, result, forward_batch, requests):"
+            },
+            {
+              "line": 72,
+              "text": "\"\"\"Async-decode GPU half: scatter + pack (GPU->GPU), then a"
+            },
+            {
+              "line": 85,
+              "text": "staging = self._decode_pack_gpu(n_real)"
+            },
+            {
+              "line": 90,
+              "text": "# available at launch — the host collect (post_decode_resolve) lags by"
+            },
+            {
+              "line": 91,
+              "text": "# one step under lookahead. For Higgs the decode input_ids is masked by"
+            },
+            {
+              "line": 92,
+              "text": "# _decode_step_embeds_cg (rows with codes use _cg_active_last_codes), so"
+            },
+            {
+              "line": 93,
+              "text": "# this only feeds the upstream bookkeeping. clamp>=0 keeps STOP_CODE(-1)"
+            },
+            {
+              "line": 101,
+              "text": "def post_decode_resolve("
+            },
+            {
+              "line": 104,
+              "text": "\"\"\"Async-decode host half: read the already-copied pinned snapshot and"
+            },
+            {
+              "line": 106,
+              "text": "``_collect_step_outputs_cg`` (shares ``_decode_collect_host``)."
+            },
+            {
+              "line": 112,
+              "text": "self._decode_collect_host("
+            },
+            {
+              "line": 122,
+              "text": "\"\"\"Fill the model's CG buffers for one decode step."
+            },
+            {
+              "line": 136,
+              "text": "model._sampler_pool.reset_row(model._padding_row)"
+            },
+            {
+              "line": 147,
+              "text": "# with pool.generation_done=True. Running the normal decode forward"
+            },
+            {
+              "line": 154,
+              "text": "# 1-wasted-step lag). On a fast-path (sync) decode step finished reqs"
+            },
+            {
+              "line": 158,
+              "text": "done = model._sampler_pool.generation_done[rows_t_real]"
+            },
+            {
+              "line": 163,
+              "text": "temps, top_ps, top_ks = self._extract_decode_sampling_params("
+            },
+            {
+              "line": 182,
+              "text": "pool = model._sampler_pool"
+            },
+            {
+              "line": 183,
+              "text": "model._cg_active_delay_count[:bs] = pool.delay_count[rows_t]"
+            },
+            {
+              "line": 191,
+              "text": "def _extract_decode_sampling_params(forward_batch, n_real: int):"
+            },
+            {
+              "line": 195,
+              "text": "unspecified top_k) are normalized to ``None`` — the downstream"
+            },
+            {
+              "line": 221,
+              "text": "then the host collect loop. Used when async decode is off; behavior is"
+            }
+          ]
+        },
+        {
+          "path": "sglang_omni/models/higgs_tts/weight_loader.py",
+          "url": "https://raw.githubusercontent.com/sgl-project/sglang-omni/main/sglang_omni/models/higgs_tts/weight_loader.py",
+          "line_count": 54,
+          "symbols": [
+            {
+              "line": 16,
+              "declaration": "class DiscreteWeightMapper:"
+            },
+            {
+              "line": 29,
+              "declaration": "def _instance_prefix_map(self) -> dict[str, str]:"
+            },
+            {
+              "line": 37,
+              "declaration": "def map(self, name: str) -> str | None:"
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 38,
+              "text": "\"\"\"Map ckpt name to downstream name; ``None`` to skip the weight.\"\"\""
+            },
+            {
+              "line": 43,
+              "text": "# Audio tokenizer backbone — frozen, not in the serving graph."
+            }
+          ]
+        }
+      ]
+    },
+    "vllm_omni": {
+      "repo": "vllm-project/vllm-omni",
+      "requested_revision": "main",
+      "resolved_revision": "67bd02f76782e75680e12d37a2241dc030ec3004",
+      "files": [
+        {
+          "path": "vllm_omni/model_executor/models/higgs_audio_v3/pipeline.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/model_executor/models/higgs_audio_v3/pipeline.py",
+          "line_count": 60,
+          "symbols": [],
+          "runtime_constants": [
+            {
+              "name": "_PROC",
+              "value": "\"vllm_omni.model_executor.stage_input_processors.higgs_audio_v3\"",
+              "line": 23
+            },
+            {
+              "name": "HIGGS_AUDIO_V3_PIPELINE",
+              "value": "PipelineConfig(",
+              "line": 25
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 3,
+              "text": "\"\"\"higgs-audio v3 pipeline: Talker (text -> 8-codebook codec) -> Code2Wav (codec -> 24 kHz PCM)."
+            },
+            {
+              "line": 9,
+              "text": "reverts the delay pattern once, and hands a single payload to Stage 1."
+            },
+            {
+              "line": 11,
+              "text": "has ``async_chunk: true``. Stage 0 dispatches per AR step; the streaming"
+            },
+            {
+              "line": 12,
+              "text": "adapter buffers raw delay-pattern rows, slides a window with left context"
+            },
+            {
+              "line": 13,
+              "text": "and right holdback, and emits codec-ready frames per chunk. Stage 1"
+            },
+            {
+              "line": 14,
+              "text": "trims the overlap on both ends so the client sees a coherent PCM stream."
+            },
+            {
+              "line": 23,
+              "text": "_PROC = \"vllm_omni.model_executor.stage_input_processors.higgs_audio_v3\""
+            },
+            {
+              "line": 25,
+              "text": "HIGGS_AUDIO_V3_PIPELINE = PipelineConfig("
+            },
+            {
+              "line": 27,
+              "text": "model_arch=\"HiggsAudioV3TalkerForConditionalGeneration\","
+            },
+            {
+              "line": 32,
+              "text": "model_stage=\"higgs_audio_v3\","
+            },
+            {
+              "line": 35,
+              "text": "owns_tokenizer=True,"
+            },
+            {
+              "line": 37,
+              "text": "# stop_token_ids: the model-owned sampler forces eos at ramp-down"
+            },
+            {
+              "line": 40,
+              "text": "#   151671 = <|audio_end|> (audio generation end marker)"
+            },
+            {
+              "line": 45,
+              "text": "async_chunk_process_next_stage_input_func=f\"{_PROC}.talker2code2wav_async_chunk\","
+            },
+            {
+              "line": 49,
+              "text": "model_stage=\"code2wav\","
+            },
+            {
+              "line": 53,
+              "text": "final_output_type=\"audio\","
+            },
+            {
+              "line": 54,
+              "text": "engine_output_type=\"audio\","
+            },
+            {
+              "line": 55,
+              "text": "model_arch=\"HiggsAudioV3Code2WavForConditionalGeneration\","
+            },
+            {
+              "line": 56,
+              "text": "sync_process_input_func=f\"{_PROC}.talker2code2wav\","
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py",
+          "line_count": 135,
+          "symbols": [
+            {
+              "line": 44,
+              "declaration": "def apply_delay_pattern(codes_tn: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 62,
+              "declaration": "def encode_reference_audio("
+            },
+            {
+              "line": 81,
+              "declaration": "class HiggsAudioV3TokenizerAdapter:"
+            },
+            {
+              "line": 84,
+              "declaration": "def __init__(self, tokenizer: Any) -> None:"
+            },
+            {
+              "line": 97,
+              "declaration": "def tokenizer(self) -> Any:"
+            },
+            {
+              "line": 100,
+              "declaration": "def build_prompt("
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "AUDIO_PLACEHOLDER_ID",
+              "value": "-100",
+              "line": 31
+            },
+            {
+              "name": "_REQUIRED_SPECIALS",
+              "value": "tuple[str, ...] = (",
+              "line": 33
+            },
+            {
+              "name": "BOC_ID",
+              "value": "1024",
+              "line": 40
+            },
+            {
+              "name": "EOC_ID",
+              "value": "1025",
+              "line": 41
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 3,
+              "text": "\"\"\"Prompt builder for higgs-audio v3 TTS."
+            },
+            {
+              "line": 5,
+              "text": "Prompt formats:"
+            },
+            {
+              "line": 7,
+              "text": "<|tts|> <|text|> {text tokens} <|audio|>"
+            },
+            {
+              "line": 9,
+              "text": "<|tts|> <|ref_audio|> [-100]×N <|text|> {text tokens} <|audio|>"
+            },
+            {
+              "line": 11,
+              "text": "<|tts|> <|ref_text|> {ref text tokens} <|ref_audio|> [-100]×N <|text|> {text tokens} <|audio|>"
+            },
+            {
+              "line": 13,
+              "text": "-100 placeholders are replaced at prefill time with fused multi-codebook"
+            },
+            {
+              "line": 14,
+              "text": "embeddings of the delay-pattern-encoded reference audio codes."
+            },
+            {
+              "line": 25,
+              "text": "\"HiggsAudioV3TokenizerAdapter\","
+            },
+            {
+              "line": 26,
+              "text": "\"AUDIO_PLACEHOLDER_ID\","
+            },
+            {
+              "line": 27,
+              "text": "\"encode_reference_audio\","
+            },
+            {
+              "line": 28,
+              "text": "\"apply_delay_pattern\","
+            },
+            {
+              "line": 31,
+              "text": "AUDIO_PLACEHOLDER_ID = -100"
+            },
+            {
+              "line": 36,
+              "text": "\"<|audio|>\","
+            },
+            {
+              "line": 39,
+              "text": "# Codec stream special token IDs (inside the codebook vocab, not the LM vocab)"
+            },
+            {
+              "line": 44,
+              "text": "def apply_delay_pattern(codes_tn: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 45,
+              "text": "\"\"\"Apply MusicGen-style delay pattern to raw codes."
+            },
+            {
+              "line": 47,
+              "text": "Input: [T, N] raw codes (T frames, N codebooks)."
+            },
+            {
+              "line": 48,
+              "text": "Output: [T + N - 1, N] delayed codes with BOC/EOC padding."
+            },
+            {
+              "line": 50,
+              "text": "Codebook c is delayed by c positions: rows 0..c-1 get BOC,"
+            },
+            {
+              "line": 55,
+              "text": "delayed = torch.full((L, N), EOC_ID, dtype=codes_tn.dtype)"
+            },
+            {
+              "line": 57,
+              "text": "delayed[:c, c] = BOC_ID"
+            },
+            {
+              "line": 58,
+              "text": "delayed[c : c + T, c] = codes_tn[:, c]"
+            },
+            {
+              "line": 59,
+              "text": "return delayed"
+            },
+            {
+              "line": 62,
+              "text": "def encode_reference_audio("
+            },
+            {
+              "line": 63,
+              "text": "wav: np.ndarray,"
+            },
+            {
+              "line": 66,
+              "text": "\"\"\"Encode a reference audio clip to codec codes [T, num_codebooks]."
+            },
+            {
+              "line": 68,
+              "text": "Uses the same HiggsAudioV2TokenizerModel as v2 (same codec)."
+            },
+            {
+              "line": 69,
+              "text": "Returns raw codes before delay pattern application."
+            },
+            {
+              "line": 71,
+              "text": "from vllm_omni.model_executor.models.higgs_audio_v2.higgs_audio_v2_tokenizer import ("
+            },
+            {
+              "line": 72,
+              "text": "_encode_ref_audio_codes,"
+            },
+            {
+              "line": 75,
+              "text": "# _encode_ref_audio_codes returns [num_codebooks, T_raw]"
+            },
+            {
+              "line": 76,
+              "text": "codes_qt = _encode_ref_audio_codes(wav, sr)"
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_talker.py",
+          "line_count": 1524,
+          "symbols": [
+            {
+              "line": 65,
+              "declaration": "class HiggsFusedMultiTextEmbedding(nn.Module):"
+            },
+            {
+              "line": 68,
+              "declaration": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 79,
+              "declaration": "def forward(self, codes: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 84,
+              "declaration": "class HiggsFusedMultiTextHead(nn.Module):"
+            },
+            {
+              "line": 87,
+              "declaration": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 93,
+              "declaration": "def generate(self, hidden: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 98,
+              "declaration": "class HiggsAudioV3TalkerForConditionalGeneration(nn.Module):"
+            },
+            {
+              "line": 116,
+              "declaration": "def __init__(self, *, vllm_config: VllmConfig, prefix: str = \"\"):"
+            },
+            {
+              "line": 239,
+              "declaration": "def _maybe_unwrap_flashinfer_api_wrappers(self) -> None:"
+            },
+            {
+              "line": 291,
+              "declaration": "def _resolve_token_ids(self) -> None:"
+            },
+            {
+              "line": 338,
+              "declaration": "def update_decode_step_metadata("
+            },
+            {
+              "line": 357,
+              "declaration": "def forward("
+            },
+            {
+              "line": 429,
+              "declaration": "def _run_qwen3_layers_eager(self, positions: torch.Tensor, hidden_states: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 438,
+              "declaration": "def _run_qwen3_layers_mlp_graph(self, positions: torch.Tensor, hidden_states: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 473,
+              "declaration": "def _run_qwen3_mlp_graph("
+            },
+            {
+              "line": 528,
+              "declaration": "def _is_decode_only_graph_batch(self, batch: int) -> bool:"
+            },
+            {
+              "line": 532,
+              "declaration": "def compute_logits(self, hidden_states: torch.Tensor, sampling_metadata: Any = None) -> torch.Tensor:"
+            },
+            {
+              "line": 536,
+              "declaration": "def embed_input_ids(self, input_ids: torch.Tensor, **_: Any) -> torch.Tensor:"
+            },
+            {
+              "line": 541,
+              "declaration": "def _set_last_step_query_start_loc(self, query_start_loc: Any) -> None:"
+            },
+            {
+              "line": 555,
+              "declaration": "def _apply_ref_audio_substitution("
+            },
+            {
+              "line": 645,
+              "declaration": "def _apply_audio_feedback(self, hidden_states: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 686,
+              "declaration": "def _is_single_token_decode_step(self, num_rows: int) -> bool:"
+            },
+            {
+              "line": 697,
+              "declaration": "def _step_request_count(self, num_tokens: int) -> int:"
+            },
+            {
+              "line": 703,
+              "declaration": "def _decode_request_token_positions("
+            },
+            {
+              "line": 728,
+              "declaration": "def _prefill_row_mask(self, num_rows: int, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 735,
+              "declaration": "def _reset_decode_state_rows(self, mask: torch.Tensor, num_rows: int, device: torch.device) -> None:"
+            },
+            {
+              "line": 743,
+              "declaration": "def _ensure_decode_state_capacity(self, num_rows: int, device: torch.device | None = None) -> None:"
+            },
+            {
+              "line": 779,
+              "declaration": "def _audio_seed_mask_from_step_input(self, num_rows: int, device: torch.device) -> torch.Tensor | None:"
+            },
+            {
+              "line": 805,
+              "declaration": "def _fast_audio_sampler_gpu_fallback_reason("
+            },
+            {
+              "line": 824,
+              "declaration": "def _clear_last_audio_outputs(self) -> None:"
+            },
+            {
+              "line": 831,
+              "declaration": "def _apply_audio_mode_bias_batched("
+            },
+            {
+              "line": 862,
+              "declaration": "def sample(self, logits: torch.Tensor, sampling_metadata: Any) -> Any:"
+            },
+            {
+              "line": 873,
+              "declaration": "def run_stock_sampler() -> Any:"
+            },
+            {
+              "line": 999,
+              "declaration": "def _get_audio_codes_buffer(self, num_rows: int, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 1007,
+              "declaration": "def _get_audio_gpu_staging_buffer(self, num_rows: int, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 1016,
+              "declaration": "def _get_audio_host_staging_buffer(self, num_rows: int) -> torch.Tensor:"
+            },
+            {
+              "line": 1026,
+              "declaration": "def _next_audio_staging_event(self) -> torch.cuda.Event:"
+            },
+            {
+              "line": 1034,
+              "declaration": "def _device_cache_key(device: torch.device) -> tuple[str, int]:"
+            },
+            {
+              "line": 1037,
+              "declaration": "def _get_row_indices(self, num_rows: int, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 1046,
+              "declaration": "def _get_codebook_indices(self, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 1054,
+              "declaration": "def _get_boc_frames(self, num_rows: int, device: torch.device) -> torch.Tensor:"
+            },
+            {
+              "line": 1064,
+              "declaration": "def postprocess("
+            },
+            {
+              "line": 1078,
+              "declaration": "def _postprocess_impl(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 1120,
+              "declaration": "def _audio_codebook_logits_from_rows("
+            },
+            {
+              "line": 1134,
+              "declaration": "def _apply_delay_pattern_masking_batched("
+            },
+            {
+              "line": 1202,
+              "declaration": "def _update_delay_state_batched("
+            },
+            {
+              "line": 1340,
+              "declaration": "def _sample_audio_codes(self, logits_2d: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 1368,
+              "declaration": "def make_omni_output(self, model_outputs: torch.Tensor | OmniOutput, **kwargs: Any) -> OmniOutput:"
+            },
+            {
+              "line": 1420,
+              "declaration": "def _build_required_keys(cls, num_layers: int) -> set[str]:"
+            },
+            {
+              "line": 1432,
+              "declaration": "def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:"
+            },
+            {
+              "line": 1485,
+              "declaration": "def _map_weight_name(self, name: str) -> str | None:"
+            },
+            {
+              "line": 1505,
+              "declaration": "class _BackboneWrapper(nn.Module):"
+            },
+            {
+              "line": 1513,
+              "declaration": "def __init__(self, model, lm_head, config):"
+            },
+            {
+              "line": 1519,
+              "declaration": "def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "BOC_ID",
+              "value": "1024",
+              "line": 50
+            },
+            {
+              "name": "EOC_ID",
+              "value": "1025",
+              "line": 51
+            },
+            {
+              "name": "_BACKBONE_PREFIX_MAP",
+              "value": "{",
+              "line": 54
+            },
+            {
+              "name": "_MODALITY_EMBEDDING_PREFIX",
+              "value": "\"tied.embedding.modality_embeddings.0.embedding.\"",
+              "line": 60
+            },
+            {
+              "name": "_MODALITY_HEAD_PREFIX",
+              "value": "\"tied.head.modality_heads.0.\"",
+              "line": 61
+            },
+            {
+              "name": "_CODEC_PREFIX",
+              "value": "\"tied.embedding.modality_embeddings.0.model.\"",
+              "line": 62
+            },
+            {
+              "name": "PLACEHOLDER",
+              "value": "-100",
+              "line": 572
+            },
+            {
+              "name": "_V3_LAYER_SUFFIXES",
+              "value": "(",
+              "line": 1405
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 3,
+              "text": "\"\"\"Stage-0 talker for higgs-audio v3 (Qwen3 backbone, fused multi-codebook)."
+            },
+            {
+              "line": 7,
+              "text": "- Fused multi-codebook embedding: [N*V, D] weight, offset lookup, sum across N"
+            },
+            {
+              "line": 8,
+              "text": "- Fused multi-codebook head: same weight (tied), reshape to [L, N, V]"
+            },
+            {
+              "line": 9,
+              "text": "- MusicGen-style delay pattern [0,1,...,7] with BOC/EOC"
+            },
+            {
+              "line": 10,
+              "text": "- Audio feedback: replace continuation-token embedding with fused codebook embed"
+            },
+            {
+              "line": 18,
+              "text": "tied.embedding.modality_embeddings.0.model.*    -> skipped (codec for code2wav)"
+            },
+            {
+              "line": 37,
+              "text": "from vllm.v1.outputs import SamplerOutput"
+            },
+            {
+              "line": 40,
+              "text": "from vllm_omni.transformers_utils.configs.higgs_audio_v3 import ("
+            },
+            {
+              "line": 41,
+              "text": "HiggsAudioV3Config,"
+            },
+            {
+              "line": 44,
+              "text": "__all__ = [\"HiggsAudioV3TalkerForConditionalGeneration\"]"
+            },
+            {
+              "line": 49,
+              "text": "# Delay pattern constants"
+            },
+            {
+              "line": 50,
+              "text": "BOC_ID = 1024  # beginning of codebook"
+            },
+            {
+              "line": 51,
+              "text": "EOC_ID = 1025  # end of codebook"
+            },
+            {
+              "line": 62,
+              "text": "_CODEC_PREFIX = \"tied.embedding.modality_embeddings.0.model.\""
+            },
+            {
+              "line": 66,
+              "text": "\"\"\"Fused multi-codebook embedding: [N*V, D] weight + offset lookup.\"\"\""
+            },
+            {
+              "line": 68,
+              "text": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 70,
+              "text": "self.weight = nn.Parameter(torch.empty(num_codebooks * vocab_size, hidden_size))"
+            },
+            {
+              "line": 71,
+              "text": "self.num_codebooks = num_codebooks"
+            },
+            {
+              "line": 75,
+              "text": "torch.arange(num_codebooks, dtype=torch.long) * vocab_size,"
+            },
+            {
+              "line": 85,
+              "text": "\"\"\"Fused multi-codebook head: [L, D] -> [L, N, V] via one linear.\"\"\""
+            },
+            {
+              "line": 87,
+              "text": "def __init__(self, num_codebooks: int, vocab_size: int, hidden_size: int):"
+            },
+            {
+              "line": 89,
+              "text": "self.weight = nn.Parameter(torch.empty(num_codebooks * vocab_size, hidden_size))"
+            },
+            {
+              "line": 90,
+              "text": "self.num_codebooks = num_codebooks"
+            },
+            {
+              "line": 95,
+              "text": "return logits.reshape(hidden.shape[0], self.num_codebooks, self.vocab_size)"
+            },
+            {
+              "line": 98,
+              "text": "class HiggsAudioV3TalkerForConditionalGeneration(nn.Module):"
+            },
+            {
+              "line": 99,
+              "text": "\"\"\"Stage-0 talker for higgs-audio v3."
+            },
+            {
+              "line": 101,
+              "text": "Wraps Qwen3Model backbone + fused multi-codebook modules for TTS generation"
+            },
+            {
+              "line": 102,
+              "text": "with MusicGen-style delay pattern sampling and audio feedback embedding."
+            },
+            {
+              "line": 105,
+              "text": "# Tell the AR runner to call model.sample() instead of the stock sampler."
+            },
+            {
+              "line": 106,
+              "text": "prefer_model_sampler: bool = True"
+            },
+            {
+              "line": 107,
+              "text": "# Tell the runner to call postprocess() to emit per-step audio codes."
+            },
+            {
+              "line": 110,
+              "text": "skips_model_sampler_output_token_history: bool = True"
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_code2wav.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_code2wav.py",
+          "line_count": 603,
+          "symbols": [
+            {
+              "line": 44,
+              "declaration": "class HiggsAudioV3Code2Wav(nn.Module):"
+            },
+            {
+              "line": 60,
+              "declaration": "def __init__("
+            },
+            {
+              "line": 104,
+              "declaration": "def _load_from_tokenizer_repo(self) -> None:"
+            },
+            {
+              "line": 138,
+              "declaration": "def _resolve_model_dir(self) -> str | None:"
+            },
+            {
+              "line": 156,
+              "declaration": "def _read_bundled_codec_state(self) -> dict[str, torch.Tensor]:"
+            },
+            {
+              "line": 177,
+              "declaration": "def _ensure_codec_loaded(self) -> None:"
+            },
+            {
+              "line": 214,
+              "declaration": "def embed_input_ids(self, input_ids: torch.Tensor, **_: Any) -> torch.Tensor:"
+            },
+            {
+              "line": 219,
+              "declaration": "def compute_logits(self, hidden_states: Any, sampling_metadata: Any = None) -> None:"
+            },
+            {
+              "line": 223,
+              "declaration": "def load_weights(self, weights_or_model_dir, device: torch.device | None = None):"
+            },
+            {
+              "line": 266,
+              "declaration": "def _load_from_bundled_state("
+            },
+            {
+              "line": 447,
+              "declaration": "def decode_codes(self, audio_codes: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 468,
+              "declaration": "def forward_chunk("
+            },
+            {
+              "line": 496,
+              "declaration": "def forward("
+            },
+            {
+              "line": 572,
+              "declaration": "def _validate_codes(self, audio_codes: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 593,
+              "declaration": "def _split_request_ids(ids: torch.Tensor, seq_token_counts: list[int] | None = None) -> list[torch.Tensor]:"
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_CODEC_PREFIX",
+              "value": "\"tied.embedding.modality_embeddings.0.model.\"",
+              "line": 41
+            },
+            {
+              "name": "_KNOWN_UNUSED_PREFIXES",
+              "value": "(",
+              "line": 410
+            },
+            {
+              "name": "_QUANTIZER_TRAINING_SUFFIXES",
+              "value": "(",
+              "line": 419
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 3,
+              "text": "\"\"\"Stage 1 (codec decoder) for higgs-audio v3."
+            },
+            {
+              "line": 5,
+              "text": "Reuses higgs-audio-v2's RVQ + DAC codec decoder but loads weights from the"
+            },
+            {
+              "line": 6,
+              "text": "v3 checkpoint's bundled codec (``tied.embedding.modality_embeddings.0.model.*``"
+            },
+            {
+              "line": 7,
+              "text": "prefix) rather than from a standalone tokenizer repo."
+            },
+            {
+              "line": 20,
+              "text": "from vllm_omni.model_executor.models.higgs_audio_v2.higgs_audio_decoder import ("
+            },
+            {
+              "line": 21,
+              "text": "HiggsAudioRVQ,"
+            },
+            {
+              "line": 22,
+              "text": "build_boson_dac_decoder,"
+            },
+            {
+              "line": 23,
+              "text": "build_higgs_audio_acoustic_decoder,"
+            },
+            {
+              "line": 24,
+              "text": "load_higgs_audio_codec,"
+            },
+            {
+              "line": 28,
+              "text": "from vllm_omni.transformers_utils.configs.higgs_audio_v3 import ("
+            },
+            {
+              "line": 29,
+              "text": "HiggsAudioV3Config,"
+            },
+            {
+              "line": 33,
+              "text": "\"HiggsAudioV3Code2Wav\","
+            },
+            {
+              "line": 34,
+              "text": "\"HiggsAudioV3Code2WavForConditionalGeneration\","
+            },
+            {
+              "line": 40,
+              "text": "# Prefix under which codec weights are stored in the v3 checkpoint."
+            },
+            {
+              "line": 41,
+              "text": "_CODEC_PREFIX = \"tied.embedding.modality_embeddings.0.model.\""
+            },
+            {
+              "line": 44,
+              "text": "class HiggsAudioV3Code2Wav(nn.Module):"
+            },
+            {
+              "line": 45,
+              "text": "\"\"\"Stage-1 codec decoder for higgs-audio v3."
+            },
+            {
+              "line": 47,
+              "text": "The codec architecture is identical to v2 (HiggsAudioRVQ + fc2 +"
+            },
+            {
+              "line": 48,
+              "text": "BosonDacDecoder); only the weight loading path differs. V3 bundles"
+            },
+            {
+              "line": 49,
+              "text": "codec weights inside the main checkpoint under a known prefix, while"
+            },
+            {
+              "line": 50,
+              "text": "v2 uses a standalone tokenizer repo."
+            },
+            {
+              "line": 53,
+              "text": "``load_higgs_audio_codec`` function when the audio tokenizer repo"
+            },
+            {
+              "line": 54,
+              "text": "is available. When not (or as primary path), we extract codec weights"
+            },
+            {
+              "line": 58,
+              "text": "input_modalities = \"audio\""
+            },
+            {
+              "line": 62,
+              "text": "config: HiggsAudioV3Config | None = None,"
+            },
+            {
+              "line": 71,
+              "text": "if isinstance(hf_config, HiggsAudioV3Config):"
+            },
+            {
+              "line": 74,
+              "text": "self.config = HiggsAudioV3Config(**hf_config.to_dict())"
+            },
+            {
+              "line": 79,
+              "text": "raise TypeError(\"HiggsAudioV3Code2Wav: provide either `config` or `vllm_config`.\")"
+            },
+            {
+              "line": 84,
+              "text": "self.sample_rate: int = int(self.config.sample_rate)"
+            },
+            {
+              "line": 85,
+              "text": "self.num_codebooks: int = int(self.config.num_codebooks)"
+            },
+            {
+              "line": 96,
+              "text": "# Codec modules (populated by load_weights)"
+            },
+            {
+              "line": 97,
+              "text": "self.quantizer: HiggsAudioRVQ | None = None"
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/model_executor/stage_input_processors/higgs_audio_v3.py",
+          "line_count": 387,
+          "symbols": [
+            {
+              "line": 52,
+              "declaration": "def _empty_code2wav_prompt() -> Any:"
+            },
+            {
+              "line": 61,
+              "declaration": "def _revert_delay_pattern(audio_codes_qt: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 84,
+              "declaration": "def _filter_real_code_frames(audio_codes_qt: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 98,
+              "declaration": "def talker2code2wav("
+            },
+            {
+              "line": 186,
+              "declaration": "def _extract_last_step_row(pooling_output: OmniPayload) -> torch.Tensor | None:"
+            },
+            {
+              "line": 215,
+              "declaration": "def talker2code2wav_async_chunk("
+            }
+          ],
+          "runtime_constants": [
+            {
+              "name": "_NUM_CODEBOOKS",
+              "value": "8",
+              "line": 41
+            },
+            {
+              "name": "_NUM_REAL_CODES",
+              "value": "1024",
+              "line": 42
+            },
+            {
+              "name": "_DEFAULT_CODEC_CHUNK_FRAMES",
+              "value": "25",
+              "line": 47
+            },
+            {
+              "name": "_DEFAULT_CODEC_LEFT_CONTEXT_FRAMES",
+              "value": "25",
+              "line": 48
+            },
+            {
+              "name": "_DEFAULT_CODEC_RIGHT_HOLDBACK_FRAMES",
+              "value": "4",
+              "line": 49
+            }
+          ],
+          "key_lines": [
+            {
+              "line": 3,
+              "text": "\"\"\"Stage-input processor for higgs-audio v3: Talker -> Code2Wav."
+            },
+            {
+              "line": 7,
+              "text": "* ``talker2code2wav`` is the sync (non-async-chunk) adapter that runs once,"
+            },
+            {
+              "line": 8,
+              "text": "after Stage 0 has finished, collecting every audio frame into a single"
+            },
+            {
+              "line": 9,
+              "text": "``OmniTokensPrompt`` for Stage 1."
+            },
+            {
+              "line": 10,
+              "text": "* ``talker2code2wav_async_chunk`` is the streaming adapter invoked once per"
+            },
+            {
+              "line": 11,
+              "text": "emitted talker step. It accumulates raw delay-pattern rows per request and"
+            },
+            {
+              "line": 12,
+              "text": "flushes a sliding-window chunk to Stage 1 once enough new frames are"
+            },
+            {
+              "line": 13,
+              "text": "available, holding back ``codec_right_holdback_frames`` trailing frames"
+            },
+            {
+              "line": 14,
+              "text": "so the codec has future context for the emit region's tail samples. Stage 1"
+            },
+            {
+              "line": 15,
+              "text": "trims ``left_context_size * hop`` samples off the front and"
+            },
+            {
+              "line": 16,
+              "text": "``right_holdback_size * hop`` off the end before emitting PCM."
+            },
+            {
+              "line": 18,
+              "text": "Key difference from v2: BOC/EOC filtering happens AFTER delay pattern reversal"
+            },
+            {
+              "line": 35,
+              "text": "from vllm_omni.inputs.data import OmniTokensPrompt"
+            },
+            {
+              "line": 37,
+              "text": "__all__ = [\"talker2code2wav\", \"talker2code2wav_async_chunk\"]"
+            },
+            {
+              "line": 41,
+              "text": "_NUM_CODEBOOKS = 8"
+            },
+            {
+              "line": 44,
+              "text": "# Defaults for async_chunk streaming when the deploy YAML connector config"
+            },
+            {
+              "line": 46,
+              "text": "# codec rate (25 frames = ~1.0 s of audio)."
+            },
+            {
+              "line": 47,
+              "text": "_DEFAULT_CODEC_CHUNK_FRAMES = 25"
+            },
+            {
+              "line": 48,
+              "text": "_DEFAULT_CODEC_LEFT_CONTEXT_FRAMES = 25"
+            },
+            {
+              "line": 49,
+              "text": "_DEFAULT_CODEC_RIGHT_HOLDBACK_FRAMES = 4"
+            },
+            {
+              "line": 52,
+              "text": "def _empty_code2wav_prompt() -> Any:"
+            },
+            {
+              "line": 53,
+              "text": "return OmniTokensPrompt("
+            },
+            {
+              "line": 54,
+              "text": "prompt_token_ids=[],"
+            },
+            {
+              "line": 61,
+              "text": "def _revert_delay_pattern(audio_codes_qt: torch.Tensor) -> torch.Tensor:"
+            },
+            {
+              "line": 62,
+              "text": "\"\"\"Reverse the MusicGen-style delay pattern."
+            },
+            {
+              "line": 64,
+              "text": "Input shape: [num_codebooks, seq_len + num_codebooks - 1]."
+            },
+            {
+              "line": 65,
+              "text": "Output shape: [num_codebooks, seq_len]."
+            },
+            {
+              "line": 67,
+              "text": "For each codebook i, extract delayed[i, i : i + seq_len] to remove"
+            },
+            {
+              "line": 70,
+              "text": "if audio_codes_qt.ndim != 2:"
+            },
+            {
+              "line": 71,
+              "text": "raise ValueError(f\"_revert_delay_pattern expects [Q, T] input; got {tuple(audio_codes_qt.shape)}\")"
+            },
+            {
+              "line": 72,
+              "text": "q, t = audio_codes_qt.shape"
+            },
+            {
+              "line": 73,
+              "text": "if q != _NUM_CODEBOOKS:"
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/entrypoints/openai/tts_adapters/higgs_audio_v3.py",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/entrypoints/openai/tts_adapters/higgs_audio_v3.py",
+          "line_count": 28,
+          "symbols": [
+            {
+              "line": 14,
+              "declaration": "class HiggsAudioV3Adapter(ARTTSAdapter):"
+            },
+            {
+              "line": 18,
+              "declaration": "def validate(self, request: \"OpenAICreateSpeechRequest\") -> str | None:"
+            },
+            {
+              "line": 24,
+              "declaration": "async def build("
+            }
+          ],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 2,
+              "text": "\"\"\"Higgs-Audio v3 serving adapter.\"\"\""
+            },
+            {
+              "line": 10,
+              "text": "from vllm_omni.entrypoints.openai.protocol.audio import OpenAICreateSpeechRequest"
+            },
+            {
+              "line": 14,
+              "text": "class HiggsAudioV3Adapter(ARTTSAdapter):"
+            },
+            {
+              "line": 15,
+              "text": "stage_keys = frozenset({\"higgs_audio_v3\"})"
+            },
+            {
+              "line": 16,
+              "text": "name = \"higgs_audio_v3\""
+            },
+            {
+              "line": 22,
+              "text": "return self.ctx.server._validate_higgs_audio_v3_request(request)"
+            },
+            {
+              "line": 25,
+              "text": "self, request: \"OpenAICreateSpeechRequest\", sampling_params_list: list, has_inline_ref_audio: bool"
+            },
+            {
+              "line": 27,
+              "text": "prompt = await self.ctx.server._build_higgs_audio_v3_params(request)"
+            },
+            {
+              "line": 28,
+              "text": "return PreparedRequest(prompt=prompt, tts_params={}, model_type=\"higgs_audio_v3\")"
+            }
+          ]
+        },
+        {
+          "path": "vllm_omni/deploy/higgs_multimodal_qwen3.yaml",
+          "url": "https://raw.githubusercontent.com/vllm-project/vllm-omni/main/vllm_omni/deploy/higgs_multimodal_qwen3.yaml",
+          "line_count": 81,
+          "symbols": [],
+          "runtime_constants": [],
+          "key_lines": [
+            {
+              "line": 1,
+              "text": "# Higgs-audio v3 deploy: Stage 0 (talker) -> Stage 1 (code2wav) via shared memory."
+            },
+            {
+              "line": 9,
+              "text": "# Plain TTS only (no voice cloning). async_chunk streams codec chunks from"
+            },
+            {
+              "line": 12,
+              "text": "# so the per-chunk codec windows stitch into a coherent PCM stream."
+            },
+            {
+              "line": 20,
+              "text": "# Stream PCM bytes back to the client as Stage 1 emits each chunk."
+            },
+            {
+              "line": 21,
+              "text": "codec_streaming: true"
+            },
+            {
+              "line": 22,
+              "text": "# Streaming chunk shape for talker2code2wav_async_chunk:"
+            },
+            {
+              "line": 23,
+              "text": "#   codec_chunk_frames        steady-state new frames per emit"
+            },
+            {
+              "line": 24,
+              "text": "#   codec_left_context_frames sliding past context to avoid leading-edge artifacts"
+            },
+            {
+              "line": 25,
+              "text": "#   codec_right_holdback_frames trailing frames held back so the codec"
+            },
+            {
+              "line": 26,
+              "text": "#                              has future context for emit-region tail samples"
+            },
+            {
+              "line": 27,
+              "text": "#   initial_codec_chunk_frames smaller first chunk to minimize TTFA"
+            },
+            {
+              "line": 28,
+              "text": "codec_chunk_frames: 25"
+            },
+            {
+              "line": 29,
+              "text": "codec_left_context_frames: 25"
+            },
+            {
+              "line": 30,
+              "text": "codec_right_holdback_frames: 4"
+            },
+            {
+              "line": 31,
+              "text": "initial_codec_chunk_frames: 1"
+            },
+            {
+              "line": 44,
+              "text": "# deferred ``codes.audio`` mm-output write (see higgs_audio_v3_talker.py)"
+            },
+            {
+              "line": 46,
+              "text": "# concurrent requests is a net throughput win. Stage 1 (codec decoder)"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "component_map": {
+    "tokenizer": {
+      "official_assets": [
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "chat_template.jinja"
+      ],
+      "owner": "Swift-owned loader and prompt checks should match official Hugging Face tokenizer assets.",
+      "known_constants": [
+        "Qwen2Tokenizer tokenizer class",
+        "BPE tokenizer with NFC normalizer and ByteLevel post-processor",
+        "<|tts|>, <|ref_audio|>, <|text|>, and <|audio|> required by official serving prompts"
+      ]
+    },
+    "prompt_builder": {
+      "official_sources": [
+        "PROMPTING.md",
+        "SGLang HiggsTokenizerAdapter",
+        "vLLM HiggsAudioV3TokenizerAdapter"
+      ],
+      "owner": "Swift should own prompt assembly and validate tags before graph execution.",
+      "plain_tts_shape": "<|tts|> <|text|> text tokens <|audio|>",
+      "reference_tts_shape": "<|tts|> optional <|ref_text|> text tokens <|ref_audio|> delayed reference placeholders <|text|> target tokens <|audio|>"
+    },
+    "decoder_prefill_decode": {
+      "official_sources": [
+        "HiggsMultimodalQwen3ForConditionalGeneration config",
+        "SGLang HiggsTTSModel and HiggsTTSModelRunner",
+        "vLLM HiggsAudioV3TalkerForConditionalGeneration"
+      ],
+      "core_ai_candidate": "Qwen3 decoder prefill/decode graph after tokenizer and prompt layout parity exists.",
+      "swift_owned_state": "KV-cache lifecycle, request lifecycle, stream policy, and codebook feedback orchestration."
+    },
+    "sampler": {
+      "official_sources": [
+        "SGLang sampler.py",
+        "vLLM higgs_audio_v3_talker.py"
+      ],
+      "owner": "Swift or Accelerate should own policy and testable codebook rows unless a graph boundary clearly wins.",
+      "known_constants": [
+        "8 codebooks",
+        "1026-code vocabulary per codebook",
+        "BOC 1024 and EOC 1025 in official serving sources",
+        "MusicGen-style delay pattern"
+      ]
+    },
+    "codec_vocoder": {
+      "official_sources": [
+        "model.safetensors.index.json bundled codec prefix",
+        "SGLang audio_codec.py and vocoder_scheduler.py",
+        "vLLM higgs_audio_v3_code2wav.py"
+      ],
+      "highest_risk": "A port without the bundled codec/vocoder tensors is not a useful SpeakSwiftly backend.",
+      "core_ai_candidate": "Codec decoder only after codebook-row parity and waveform metadata parity are available."
+    },
+    "waveform_post_processing": {
+      "official_sources": [
+        "SGLang vocoder scheduler",
+        "vLLM stage_input_processors/higgs_audio_v3.py",
+        "Boson and SGLang serving docs for PCM/WAV output behavior"
+      ],
+      "apple_framework_owner": "Accelerate for small numeric work, CoreMedia/CoreAudio for timestamped PCM buffers, AVFoundation for files/playback."
+    },
+    "output_container": {
+      "official_sources": [
+        "Boson create-speech API",
+        "SGLang Higgs cookbook",
+        "vLLM deploy YAML and OpenAI adapter"
+      ],
+      "known_conflict": "Some docs mention streaming WAV chunks, while current serving docs emphasize raw PCM for streaming."
+    }
+  }
+}

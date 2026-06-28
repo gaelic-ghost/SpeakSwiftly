@@ -265,7 +265,7 @@ def build_preflight_report(
       "--no-preflight-only --allow-model-download --replace-existing "
       "--qwen-source .local/coreml-qwen3tts/Qwen3-TTS-source "
       "--output .local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json "
-      "--summary-output docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json"
+      "--summary-output docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json"
     ),
   }
 

@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T16:55:00Z",
+  "mode": "coreml_quantization_preflight",
+  "source": {
+    "model_package": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage",
+    "model_package_exists": true,
+    "model_package_size_bytes": 456688989,
+    "conversion_report_path": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json",
+    "runtime_fixture_path": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json",
+    "calibration_fixture_path": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json",
+    "conversion_source": {
+      "upstream_repository": "https://github.com/QwenLM/Qwen3-TTS",
+      "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+      "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+      "requested_revision": null,
+      "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+      "qwen_source_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+      "coremltools_version": "9.0",
+      "torch_version": "2.7.0"
+    },
+    "conversion_target": {
+      "stage": "speech_tokenizer_decoder",
+      "wrapper_mode": "fixed_16q_static_mask",
+      "input_name": "audio_codes",
+      "input_shape": [
+        1,
+        8,
+        16
+      ],
+      "input_dtype": "int64",
+      "minimum_deployment_target": "macOS15",
+      "convert_to": "mlprogram",
+      "compute_precision": "float32",
+      "capture_mode": "export",
+      "export_decomposed": true,
+      "torch_output_shape": [
+        1,
+        15360
+      ],
+      "torch_output_min": -0.055284563452005386,
+      "torch_output_max": 0.055146411061286926,
+      "torch_output_mean": 1.583719495101832e-05,
+      "torch_output_rms": 0.032971180975437164,
+      "upstream_max_abs_diff": 0.0
+    }
+  },
+  "coremltools": {
+    "coremltools_version": "9.0",
+    "has_linear_quantize_weights": true,
+    "has_experimental_linear_quantize_activations": true,
+    "weight_quantization_note": "Core ML Tools weight-only quantization compresses stored weights; runtime computation for consuming ops still uses float precision.",
+    "w8a8_note": "Core ML Tools W8A8 requires activation quantization from calibration sample_data, then int8 weight quantization of the activation-quantized model.",
+    "activation_scope_note": "OptimizationConfig can scope activation quantization by op type or op name. The decoder's integer audio-code lookup path should not be globally activation-quantized."
+  },
+  "calibration_compatibility": {
+    "current_model_input_shape": [
+      1,
+      8,
+      16
+    ],
+    "synthetic_runtime_sample": {
+      "audio_codes_shape": [
+        8,
+        16
+      ],
+      "matches_current_model": true
+    },
+    "real_speech_calibration": {
+      "sample_count": 3,
+      "matching_sample_count": 0,
+      "mismatched_sample_count": 3,
+      "sample_shapes": [
+        {
+          "id": "730_358_000003_000002",
+          "audio_codes_shape": [
+            37,
+            16
+          ],
+          "audio_seconds": 2.92
+        },
+        {
+          "id": "730_358_000004_000001",
+          "audio_codes_shape": [
+            83,
+            16
+          ],
+          "audio_seconds": 6.6
+        },
+        {
+          "id": "730_358_000006_000003",
+          "audio_codes_shape": [
+            65,
+            16
+          ],
+          "audio_seconds": 5.16
+        }
+      ],
+      "suggested_decoder_buckets": [
+        40,
+        72,
+        88
+      ]
+    },
+    "bucketed_decoder_conversions": {
+      "status": "complete",
+      "required_input_shapes": [
+        [
+          1,
+          40,
+          16
+        ],
+        [
+          1,
+          72,
+          16
+        ],
+        [
+          1,
+          88,
+          16
+        ]
+      ],
+      "pinned_report_count": 3,
+      "missing_reports": []
+    },
+    "decision": "The original 8-step decoder package can only run a synthetic W8A8 smoke calibration. The checked bucketed decoder reports now provide the static shapes needed for representative real-speech activation calibration."
+  },
+  "quantization_plan": {
+    "weight_only_int8": {
+      "status": "available",
+      "purpose": "storage and load-size smoke test; not expected to prove Neural Engine dispatch by itself"
+    },
+    "w8a8_synthetic_smoke": {
+      "status": "available_when_local_model_exists",
+      "purpose": "API and model-load smoke test using the current 8-step synthetic fixture",
+      "known_risk": "Global activation quantization can try to quantize integer audio-code input paths. If that happens, scope activation quantization to float-producing ops or split the integer code lookup from the float decoder graph before treating W8A8 as blocked."
+    },
+    "w8a8_representative": {
+      "status": "ready_for_scoped_activation_probe",
+      "required_decoder_input_shapes": [
+        [
+          1,
+          40,
+          16
+        ],
+        [
+          1,
+          72,
+          16
+        ],
+        [
+          1,
+          88,
+          16
+        ]
+      ]
+    },
+    "w8a8_scope_strategy": {
+      "status": "identified",
+      "base_precision": "float16",
+      "activation_scope": "compute_only",
+      "activation_op_types": [
+        "conv",
+        "linear",
+        "matmul",
+        "conv_transpose"
+      ],
+      "reason": "Global activation quantization touches integer code lookup. Compute-only activation quantization on the float32 package avoids that path but fails on fp16 scale versus fp32 input dtype. The successful local path uses an fp16 base package."
+    }
+  },
+  "next_command": "uv run --python 3.12 scripts/repo-maintenance/coreml-qwen3tts/quantize-speech-tokenizer-decoder-coreml.py --no-preflight-only --run-weight-only --run-w8a8 --activation-scope compute_only --model-package .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16.mlpackage --w8a8-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-fp16-w8a8-compute-only.mlpackage --output .local/coreml-qwen3tts/qwen3tts-decoder-quantization-smoke.json"
+}

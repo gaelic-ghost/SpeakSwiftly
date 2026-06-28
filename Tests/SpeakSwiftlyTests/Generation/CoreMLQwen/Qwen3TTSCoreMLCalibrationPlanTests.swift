@@ -123,8 +123,8 @@ import Testing
     #expect(fixture.schemaVersion == 1)
     #expect(fixture.mode == "coreai_real_talker_boundary_plan")
     #expect(fixture.source.modelId == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
-    #expect(fixture.priorEvidence.textTokenFixture == "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json")
-    #expect(fixture.priorEvidence.toyCoreaiExport == "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json")
+    #expect(fixture.priorEvidence.textTokenFixture == "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/text-token-fixture-0.6b-base.json")
+    #expect(fixture.priorEvidence.toyCoreaiExport == "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json")
     #expect(fixture.targetBoundary.name == "qwen3_tts_main_talker_decode_step_after_prefill")
     #expect(fixture.targetBoundary.included.contains("prefilled main-talker KV cache"))
     #expect(fixture.targetBoundary.identifiedNotIncluded.contains("code-predictor continuation inputs for codebooks 1 through 15"))
@@ -249,7 +249,7 @@ private struct Qwen3TTSLibriTTSCalibrationPlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-plan-libritts-r-24-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-plan-libritts-r-24-12hz.json",
             as: Self.self,
         )
     }
@@ -286,7 +286,7 @@ private struct Qwen3TTSTalkerCodePlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/talker-code-fixture-plan-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/talker-code-fixture-plan-12hz.json",
             as: Self.self,
         )
     }
@@ -325,7 +325,7 @@ private struct Qwen3TTSTalkerCodeSummaryFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
             as: Self.self,
         )
     }
@@ -352,7 +352,7 @@ private struct Qwen3TTSDecoderAlignmentPlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/decoder-alignment-plan-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/decoder-alignment-plan-12hz.json",
             as: Self.self,
         )
     }
@@ -396,7 +396,7 @@ private struct Qwen3TTSCoreAITalkerBoundaryPlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
             as: Self.self,
         )
     }
@@ -457,7 +457,7 @@ private struct Qwen3TTSCoreAITalkerBoundaryExportSmokeFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json",
             as: Self.self,
         )
     }
@@ -503,7 +503,7 @@ private struct Qwen3TTSCoreAIRealBoundaryPlanFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json",
             as: Self.self,
         )
     }
@@ -586,7 +586,7 @@ private struct Qwen3TTSCoreAIRealBoundaryCaptureFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json",
             as: Self.self,
         )
     }
@@ -644,7 +644,7 @@ private struct Qwen3TTSCoreAIRealCodePredictorExportFixture: Decodable {
 
     static func load() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json",
             as: Self.self,
         )
     }
@@ -716,14 +716,14 @@ private struct Qwen3TTSCoreAIRealMainTalkerExportFixture: Decodable {
 
     static func loadBF16() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json",
             as: Self.self,
         )
     }
 
     static func loadFP32() throws -> Self {
         try loadQwen3TTSCoreMLPlanFixture(
-            "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-fp32-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-fp32-12hz.json",
             as: Self.self,
         )
     }

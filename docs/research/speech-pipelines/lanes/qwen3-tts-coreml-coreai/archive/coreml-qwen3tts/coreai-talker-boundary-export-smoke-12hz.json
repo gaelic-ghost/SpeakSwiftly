@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-23T00:00:00Z",
+  "mode": "coreai_talker_boundary_export_smoke",
+  "status": "converted_to_coreai_ir",
+  "purpose": "Try the smallest local Core AI / coreai-torch export smoke for the Qwen3-TTS talker first-codec-token boundary without downloading Qwen weights.",
+  "source": {
+    "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "upstream_commit": "022e286b98fbec7e1e916cb940cdf532cd9f488e",
+    "preflight_fixture": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
+  },
+  "dependencies": {
+    "python": {
+      "version": "3.12.12",
+      "implementation": "CPython"
+    },
+    "packages": [
+      {
+        "module": "torch",
+        "package": "torch",
+        "found": true,
+        "version": "2.11.0"
+      },
+      {
+        "module": "coreai_torch",
+        "package": "coreai-torch",
+        "found": true,
+        "version": "0.4.0"
+      }
+    ]
+  },
+  "local_tooling": {
+    "developer_dir_source": "argument",
+    "developer_dir_is_set": true,
+    "summary": {
+      "coreai_build_found": true,
+      "xctrace_found": true,
+      "core_ai_template_found": true
+    },
+    "coreai_build": {
+      "command": [
+        "xcrun",
+        "--find",
+        "coreai-build"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5194.15.R5dQdn/Metal.xctoolchain/usr/bin/coreai-build",
+      "stderr": ""
+    },
+    "xctrace": {
+      "command": [
+        "xcrun",
+        "--find",
+        "xctrace"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "<local-home-path>/Applications/Betas/Xcode-beta.app/Contents/Developer/usr/bin/xctrace",
+      "stderr": ""
+    },
+    "xctrace_core_ai_template": {
+      "command": [
+        "xcrun",
+        "xctrace",
+        "list",
+        "templates"
+      ],
+      "found": true,
+      "exit_code": 0,
+      "stdout": "== Standard Templates ==\nActivity Monitor\nAllocations\nAnimation Hitches\nApp Launch\nAudio System Trace\nCPU Counters\nCPU Profiler\nCore AI\nCore ML\nData Persistence\nFile Activity\nFoundation Models\nGame Memory\nGame Performance\nGame Performance Overview\nLeaks\nLogging\nMetal System Trace\nNetwork\nPower Profiler\nProcessor Trace\nRealityKit Trace\nSwift Concurrency\nSwiftUI\nSystem Trace\nTime Profiler",
+      "stderr": ""
+    }
+  },
+  "target_subgraph": {
+    "name": "toy_qwen_talker_first_codec_token_boundary",
+    "input_shapes": {
+      "input_embeds": [
+        1,
+        4,
+        32
+      ],
+      "key_cache": [
+        1,
+        4,
+        4,
+        8
+      ],
+      "value_cache": [
+        1,
+        4,
+        4,
+        8
+      ]
+    },
+    "features": [
+      "RMSNorm-style normalization",
+      "RoPE-style pair rotation",
+      "causal scaled_dot_product_attention",
+      "KV-cache-shaped inputs",
+      "first-codebook logits projection"
+    ]
+  },
+  "missing_dependencies": [],
+  "dependency_versions": {
+    "torch": "2.11.0",
+    "coreai-torch": "0.4.0"
+  },
+  "exported_graph": {
+    "call_targets": [
+      "aten.pow.Tensor_Scalar",
+      "aten.mean.dim",
+      "aten.add.Tensor",
+      "aten.rsqrt.default",
+      "aten.mul.Tensor",
+      "aten.mul.Tensor",
+      "aten.permute.default",
+      "aten.view.default",
+      "aten.mm.default",
+      "aten.view.default",
+      "aten.view.default",
+      "aten.permute.default",
+      "aten.slice.Tensor",
+      "aten.slice.Tensor",
+      "aten.neg.default",
+      "aten.unsqueeze.default",
+      "aten.unsqueeze.default",
+      "aten.cat.default",
+      "aten.view.default",
+      "aten.arange.start_step",
+      "aten.arange.start_step",
+      "aten.lt.Scalar",
+      "aten._to_copy.default",
+      "aten.mul.Tensor",
+      "aten.add.Tensor",
+      "aten.sub.Tensor",
+      "aten._to_copy.default",
+      "aten.mul.Tensor",
+      "aten.sub.Tensor",
+      "aten.where.self",
+      "aten.view.default",
+      "aten.view.default",
+      "aten.mul.Tensor",
+      "aten.cos.default",
+      "aten.mul.Tensor",
+      "aten.sin.default",
+      "aten.mul.Tensor",
+      "aten.add.Tensor",
+      "aten.scaled_dot_product_attention.default",
+      "aten.permute.default",
+      "aten.view.default",
+      "aten.select.int",
+      "aten.permute.default",
+      "aten.mm.default"
+    ],
+    "call_target_count": 44,
+    "contains_scaled_dot_product_attention": true,
+    "contains_rsqrt": true,
+    "contains_cos": true,
+    "contains_sin": true
+  },
+  "coreai_program": {
+    "python_type": "coreai.authoring.asset.AIProgram",
+    "repr_prefix": "<coreai._compiler._mlir_libs._mlir.ir.Module object at <address>>"
+  },
+  "next_action": "Review the exported call targets and Core AI program summary before trying the real Qwen3-TTS talker boundary."
+}

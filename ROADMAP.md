@@ -408,7 +408,7 @@ Research
 - The Swift/Metal FlashAttention package is relevant to a possible custom talker/code-predictor GPU path, but it is not a drop-in Core ML accelerator. The package builds locally, while runtime Metal JIT compilation currently fails under macOS 26.5 and Xcode 26.5 on private/removed simdgroup async-copy assembly hooks.
 - Follow-up FlashAttention triage found that `mpsops/mps-flash-attention` moves past the original runtime source parser problem by using MetalASM and `makeLibrary(data:)`, but local pipeline creation still crashes inside the AGX compiler service. The ccv-backed `metal-flash-sdpa` path runs non-causal attention accurately, but local causal tests fail by multi-point differences, so neither path is ready for Qwen autoregressive attention.
 - A bounded blocker probe now records the FlashAttention decision in structured JSON. `mps-flash-attn` reproduces the AGX compiler crash on a tiny non-causal `[1, 1, 16, 32]` shape, and `metal-flash-sdpa` lower-precision causal output matches the non-causal reference instead of the causal reference. Pause dependency adoption unless those upstream paths fix AGX pipeline creation and lower-precision causal masking.
-- Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
+- Keep detailed notes in `docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
 
@@ -455,7 +455,7 @@ Research
 - Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
 - The first real Core AI probes now have matched Qwen3-TTS outputs for the code predictor and main-talker frozen-cache decode path. The code predictor converts to Core AI IR, and the main talker converts in BF16 and float32 with exact exported-program parity after omitting a redundant all-zero decode mask. Treat Core AI as promising but still gated on mutable cache state, runtime profiling, and end-to-end quality.
 - Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
-- Keep detailed notes in `docs/maintainers/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/maintainers/coreml-qwen3tts-evaluation-2026-05-31.md`.
+- Keep detailed notes in `docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/coreml-qwen3tts-port-plan-2026-05-31.md` and preserve the earlier external-artifact review in `docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/coreml-qwen3tts-evaluation-2026-05-31.md`.
 
 ### Exit Criteria
 
@@ -512,6 +512,12 @@ Planned
 - [ ] Update validation lanes so first-party Apple pipeline probes have clear
   build, parity, profiling, and real-model E2E gates separate from legacy
   MLX-backed coverage.
+- [x] Record the official Higgs Audio v3 source map and runtime constants before
+  choosing a Swift or Apple-runtime graph boundary.
+- [x] Add a no-weight Higgs Audio v3 tokenizer parity fixture for the first
+  plain and control-tag prompt shapes.
+- [x] Add a no-weight Higgs Audio v3 synthetic delay-pattern fixture for
+  eight-codebook row ordering and BOC/EOC placement.
 
 ### Stage Notes
 
@@ -523,8 +529,20 @@ Planned
   as comparison evidence, but official model sources and Apple profiling
   results should drive implementation decisions.
 - The Higgs Audio v3 plan in
-  `docs/maintainers/higgs-audio-port-evaluation-2026-06-23.md` is the current
-  first concrete expression of this direction.
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/higgs-audio-port-evaluation-2026-06-23.md`
+  is the current first concrete expression of this direction.
+- The official-source Higgs follow-up in
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-inventory-2026-06-24.md`
+  and
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/parity-fixture-plan-2026-06-24.md` records
+  tokenizer, prompt, decoder, sampler, codec/vocoder, waveform, and output
+  container constants before any implementation port.
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json`
+  is the first checked-in no-weight parity artifact for official prompt token
+  layout.
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json` is
+  the first checked-in no-weight parity artifact for eight-codebook
+  delay-pattern layout.
 
 ### Exit Criteria
 
