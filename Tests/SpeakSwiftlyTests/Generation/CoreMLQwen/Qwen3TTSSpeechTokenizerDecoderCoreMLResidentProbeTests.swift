@@ -62,7 +62,7 @@ import Testing
     #expect(manifest.listenInOrder.allSatisfy { $0.validDurationSeconds > 0 })
     #expect(manifest.listenInOrder.allSatisfy { $0.baselineValidWav.hasPrefix(".local/coreml-qwen3tts/") })
     #expect(manifest.listenInOrder.allSatisfy { $0.candidateValidWav.hasPrefix(".local/coreml-qwen3tts/") })
-    #expect(manifest.listenInOrder.allSatisfy { $0.audioInspectionReport.hasPrefix("docs/maintainers/") })
+    #expect(manifest.listenInOrder.allSatisfy { $0.audioInspectionReport.hasPrefix("docs/research/") })
     #expect(manifest.listenInOrder[0].macbookProSpeakerListeningResult == "acceptable")
     #expect(manifest.listenInOrder[1].macbookProSpeakerListeningResult == "acceptable_with_muffled_quality")
 }
@@ -207,7 +207,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentProbeFixture: Decodab
         _ filename: String = bucket72Filename,
     ) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/\(filename)",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
@@ -270,7 +270,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLResidentCatalogFixture: Decod
         _ filename: String = w8a8Filename,
     ) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/\(filename)",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
@@ -303,7 +303,7 @@ private struct Qwen3TTSDecoderCloseoutListeningManifest: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/decoder-closeout-listening-manifest-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/decoder-closeout-listening-manifest-12hz.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
@@ -344,7 +344,7 @@ private struct Qwen3TTSDecoderCloseoutComparisonReport: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/decoder-closeout-fp16-vs-w8a8-resident-catalog-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/decoder-closeout-fp16-vs-w8a8-resident-catalog-12hz.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

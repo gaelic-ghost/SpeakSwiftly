@@ -107,7 +107,7 @@ private struct Qwen3TTSExternalCoreMLRepoInventory: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

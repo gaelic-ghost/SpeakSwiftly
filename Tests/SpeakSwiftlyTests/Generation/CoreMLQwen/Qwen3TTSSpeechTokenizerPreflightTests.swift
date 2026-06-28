@@ -66,7 +66,7 @@ private struct Qwen3TTSSpeechTokenizerPreflightFixture: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-preflight-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-preflight-12hz.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

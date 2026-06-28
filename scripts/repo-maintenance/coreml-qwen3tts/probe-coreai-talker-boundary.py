@@ -23,17 +23,17 @@ from typing import Any
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
-DEFAULT_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
-DEFAULT_EXPORT_SMOKE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
-DEFAULT_REAL_BOUNDARY_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json"
-DEFAULT_REAL_CAPTURE_REPORT = "docs/maintainers/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json"
+DEFAULT_REPORT = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json"
+DEFAULT_EXPORT_SMOKE_REPORT = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-export-smoke-12hz.json"
+DEFAULT_REAL_BOUNDARY_REPORT = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-boundary-plan-12hz.json"
+DEFAULT_REAL_CAPTURE_REPORT = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-boundary-capture-12hz.json"
 DEFAULT_REAL_CODE_PREDICTOR_EXPORT_REPORT = (
-  "docs/maintainers/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json"
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-code-predictor-export-smoke-12hz.json"
 )
 DEFAULT_REAL_MAIN_TALKER_EXPORT_REPORT = (
-  "docs/maintainers/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-real-main-talker-export-smoke-12hz.json"
 )
-DEFAULT_TEXT_TOKEN_FIXTURE = "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
+DEFAULT_TEXT_TOKEN_FIXTURE = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/text-token-fixture-0.6b-base.json"
 DEFAULT_QWEN_SOURCE = ".local/coreai-qwen3tts/Qwen3-TTS-source"
 COREAI_RUNTIME_WITH_REQUIREMENTS = [
   "torch==2.11.0",
@@ -324,10 +324,10 @@ def build_real_boundary_plan(args: argparse.Namespace) -> dict[str, Any]:
       "upstream_commit": args.upstream_commit,
     },
     "prior_evidence": {
-      "text_token_fixture": "docs/maintainers/coreml-qwen3tts/text-token-fixture-0.6b-base.json",
-      "talker_code_summary": "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
+      "text_token_fixture": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/text-token-fixture-0.6b-base.json",
+      "talker_code_summary": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/talker-code-fixture-qwen3-12hz-summary.json",
       "external_coreml_inventory": (
-        "docs/maintainers/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json"
+        "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/external-coreml-qwen3tts-repo-inventory-2026-06-04.json"
       ),
       "toy_coreai_export": DEFAULT_EXPORT_SMOKE_REPORT,
     },
@@ -801,7 +801,7 @@ def run_coreai_export_smoke(args: argparse.Namespace) -> dict[str, Any]:
     "source": {
       "model_id": args.model_id,
       "upstream_commit": args.upstream_commit,
-      "preflight_fixture": "docs/maintainers/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
+      "preflight_fixture": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/coreai-talker-boundary-plan-12hz.json",
     },
     "dependencies": dependencies,
     "local_tooling": beta_tooling_report(args),

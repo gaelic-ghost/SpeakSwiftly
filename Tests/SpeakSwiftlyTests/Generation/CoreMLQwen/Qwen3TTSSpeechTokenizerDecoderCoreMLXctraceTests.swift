@@ -135,7 +135,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLXctraceFixture: Decodable {
 
     static func load(_ filename: String = "speech-tokenizer-decoder-coreml-xctrace-static-mask-12hz.json") throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/\(filename)",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

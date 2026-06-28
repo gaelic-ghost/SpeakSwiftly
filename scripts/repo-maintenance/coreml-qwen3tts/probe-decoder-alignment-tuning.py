@@ -26,7 +26,7 @@ from huggingface_hub import HfApi
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-Tokenizer-12Hz"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
-DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
+DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
 DEFAULT_OUTPUT_DIR = ".local/coreml-qwen3tts/decoder-alignment"
 
 

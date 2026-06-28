@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-05-31T16:35:00Z",
+  "mode": "coreml_decoder_bucket_plan",
+  "source": {
+    "calibration_fixture_path": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json",
+    "runtime_fixture_path": "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json",
+    "dataset": "mythicinfinity/libritts_r",
+    "dataset_config": "clean",
+    "dataset_split": "train.clean.100",
+    "model_id": "Qwen/Qwen3-TTS-Tokenizer-12Hz",
+    "resolved_revision": "7dd38ad4e9bad454aae9cd937d0cd577604fe229"
+  },
+  "bucket_plan": {
+    "stage": "speech_tokenizer_decoder",
+    "wrapper_mode": "fixed_16q_static_mask",
+    "input_name": "audio_codes",
+    "input_dtype": "int64",
+    "quantizer_count": 16,
+    "samples_per_code_step": 1920,
+    "buckets": [
+      40,
+      72,
+      88
+    ],
+    "required_input_shapes": [
+      [
+        1,
+        40,
+        16
+      ],
+      [
+        1,
+        72,
+        16
+      ],
+      [
+        1,
+        88,
+        16
+      ]
+    ],
+    "sample_assignments": [
+      {
+        "id": "730_358_000003_000002",
+        "audio_codes_shape": [
+          37,
+          16
+        ],
+        "assigned_bucket": 40,
+        "bucket_input_shape": [
+          1,
+          40,
+          16
+        ],
+        "pad_value": -1,
+        "padded_step_count": 3,
+        "padded_output_sample_count": 76800,
+        "valid_output_sample_count": 71040
+      },
+      {
+        "id": "730_358_000004_000001",
+        "audio_codes_shape": [
+          83,
+          16
+        ],
+        "assigned_bucket": 88,
+        "bucket_input_shape": [
+          1,
+          88,
+          16
+        ],
+        "pad_value": -1,
+        "padded_step_count": 5,
+        "padded_output_sample_count": 168960,
+        "valid_output_sample_count": 159360
+      },
+      {
+        "id": "730_358_000006_000003",
+        "audio_codes_shape": [
+          65,
+          16
+        ],
+        "assigned_bucket": 72,
+        "bucket_input_shape": [
+          1,
+          72,
+          16
+        ],
+        "pad_value": -1,
+        "padded_step_count": 7,
+        "padded_output_sample_count": 138240,
+        "valid_output_sample_count": 124800
+      }
+    ]
+  },
+  "conversion_commands": [
+    {
+      "bucket": 40,
+      "input_shape": [
+        1,
+        40,
+        16
+      ],
+      "report_output": ".local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-40.json",
+      "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40.mlpackage",
+      "command": "uv run --python 3.12 --with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coremltools>=8.3.0,<10' scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py --no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask --verify-coreml-prediction --coreml-compute-units cpuOnly --fixture docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json --pad-code-steps 40 --qwen-source /path/to/Qwen3-TTS --allow-model-download --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-40.json --mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-40.mlpackage"
+    },
+    {
+      "bucket": 72,
+      "input_shape": [
+        1,
+        72,
+        16
+      ],
+      "report_output": ".local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-72.json",
+      "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72.mlpackage",
+      "command": "uv run --python 3.12 --with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coremltools>=8.3.0,<10' scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py --no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask --verify-coreml-prediction --coreml-compute-units cpuOnly --fixture docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json --pad-code-steps 72 --qwen-source /path/to/Qwen3-TTS --allow-model-download --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-72.json --mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-72.mlpackage"
+    },
+    {
+      "bucket": 88,
+      "input_shape": [
+        1,
+        88,
+        16
+      ],
+      "report_output": ".local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-88.json",
+      "mlpackage_output": ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-88.mlpackage",
+      "command": "uv run --python 3.12 --with 'numpy>=2.0.0' --with 'torch==2.7.0' --with 'torchaudio==2.7.0' --with 'transformers==4.57.3' --with 'librosa>=0.11.0' --with 'soundfile>=0.13.0' --with 'sox>=1.5.0' --with 'onnxruntime>=1.23.0' --with 'einops>=0.8.0' --with 'coremltools>=8.3.0,<10' scripts/repo-maintenance/coreml-qwen3tts/convert-speech-tokenizer-decoder-coreml.py --no-preflight-only --capture-mode export --export-decomposed --wrapper-mode fixed_16q_static_mask --verify-coreml-prediction --coreml-compute-units cpuOnly --fixture docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json --pad-code-steps 88 --qwen-source /path/to/Qwen3-TTS --allow-model-download --output .local/coreml-qwen3tts/qwen3tts-speech-tokenizer-decoder-conversion-bucket-88.json --mlpackage-output .local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-bucket-88.mlpackage"
+    }
+  ],
+  "w8a8_follow_up": {
+    "blocked_until": "bucketed_decoder_mlpackages_exist",
+    "next_quantization_work": "Load each bucketed package, build calibration sample_data from real LibriTTS-R codes assigned to that bucket, and scope activation quantization away from the integer audio_codes input path."
+  }
+}

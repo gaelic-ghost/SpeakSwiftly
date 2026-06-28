@@ -23,7 +23,7 @@ from huggingface_hub import HfApi
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-Tokenizer-12Hz"
 DEFAULT_UPSTREAM_COMMIT = "022e286b98fbec7e1e916cb940cdf532cd9f488e"
-DEFAULT_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+DEFAULT_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
 
 
 def local_path_pattern(path: Path) -> re.Pattern[str]:

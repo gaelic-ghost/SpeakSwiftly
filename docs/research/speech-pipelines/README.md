@@ -39,5 +39,5 @@ should be small, reproducible, and safe for the public repository.
 
 - [`higgs-audio-v3/`](lanes/higgs-audio-v3/) tracks the official Boson/Hugging
   Face Higgs Audio v3 TTS pipeline inventory and no-weight parity fixtures.
-- [`qwen3-tts-coreml-coreai.md`](lanes/qwen3-tts-coreml-coreai.md) indexes the
+- [`qwen3-tts-coreml-coreai/`](lanes/qwen3-tts-coreml-coreai/) indexes the
   existing first-party Qwen3-TTS Core ML and Core AI research archive.

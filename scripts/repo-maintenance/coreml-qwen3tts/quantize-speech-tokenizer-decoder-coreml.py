@@ -25,12 +25,12 @@ import numpy as np
 
 
 DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage"
-DEFAULT_RUNTIME_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
-DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
-DEFAULT_BUCKET_PLAN_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
-DEFAULT_TALKER_CODE_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
+DEFAULT_RUNTIME_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+DEFAULT_CALIBRATION_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/calibration-code-fixture-libritts-r-12hz.json"
+DEFAULT_BUCKET_PLAN_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-bucket-plan-12hz.json"
+DEFAULT_TALKER_CODE_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
 DEFAULT_CONVERSION_REPORT_PATH = (
-  "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
 )
 DEFAULT_WEIGHT_OUTPUT = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-w8.mlpackage"
 DEFAULT_W8A8_OUTPUT = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed-w8a8.mlpackage"
@@ -109,7 +109,7 @@ def calibration_code_shapes(calibration_fixture: dict[str, Any]) -> list[dict[st
 
 
 def bucket_conversion_report_path(bucket: int) -> Path:
-  return Path(f"docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-{bucket}-12hz.json")
+  return Path(f"docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-bucket-{bucket}-12hz.json")
 
 
 def bucketed_conversion_report(bucket_plan: dict[str, Any] | None) -> dict[str, Any]:

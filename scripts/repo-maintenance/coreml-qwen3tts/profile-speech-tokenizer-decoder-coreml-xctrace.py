@@ -24,10 +24,10 @@ from typing import Any
 
 DEFAULT_BENCHMARK_SCRIPT = "scripts/repo-maintenance/coreml-qwen3tts/benchmark-speech-tokenizer-decoder-coreml.py"
 DEFAULT_MODEL_PACKAGE = ".local/coreml-qwen3tts/Qwen3TTSSpeechTokenizerDecoder-static-mask-export-decomposed.mlpackage"
-DEFAULT_FIXTURE_PATH = "docs/maintainers/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
+DEFAULT_FIXTURE_PATH = "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-runtime-fixture-12hz.json"
 DEFAULT_TALKER_CODE_FIXTURE_PATH = ".local/coreml-qwen3tts/talker-code-fixture-qwen3-12hz.json"
 DEFAULT_CONVERSION_REPORT_PATH = (
-  "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
+  "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-conversion-static-mask-export-decomposed-12hz.json"
 )
 DEFAULT_TRACE_DIR = ".local/coreml-qwen3tts/traces"
 

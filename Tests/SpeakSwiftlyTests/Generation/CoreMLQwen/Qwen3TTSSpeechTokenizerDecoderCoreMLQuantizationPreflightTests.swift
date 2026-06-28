@@ -384,7 +384,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationPreflightFixture:
 
     static func load() throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-preflight-12hz.json",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/speech-tokenizer-decoder-coreml-quantization-preflight-12hz.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
@@ -435,7 +435,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLAudioInspectionFixture: Decod
 
     static func load(_ filename: String) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/\(filename)",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
@@ -512,7 +512,7 @@ private struct Qwen3TTSSpeechTokenizerDecoderCoreMLQuantizationRuntimeFixture: D
 
     static func load(_ filename: String) throws -> Self {
         let fixtureURL = try qwen3TTSFixtureURL(
-            "docs/maintainers/coreml-qwen3tts/\(filename)",
+            "docs/research/speech-pipelines/lanes/qwen3-tts-coreml-coreai/archive/coreml-qwen3tts/\(filename)",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()
