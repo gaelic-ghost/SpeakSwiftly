@@ -121,7 +121,7 @@ import Testing
 
 @Test func `network audio sender streams chunks to loopback listener`() async throws {
     let listener = NetworkAudioStreamListener(
-        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        advertisement: uniqueLoopbackAdvertisement(),
         port: 0,
         sharedToken: "secret",
     )
@@ -226,7 +226,7 @@ import Testing
 
 @Test func `network audio listener rejects wrong shared token`() async throws {
     let listener = NetworkAudioStreamListener(
-        advertisement: NetworkAudioServiceAdvertisement(name: "Loopback receiver"),
+        advertisement: uniqueLoopbackAdvertisement(),
         port: 0,
         sharedToken: "secret",
     )
@@ -302,4 +302,8 @@ private func waitForListeningPort(_ listener: NetworkAudioStreamListener) async 
 
     Issue.record("Network audio listener did not report a loopback port in time. Last observed state: \(lastState).")
     throw CancellationError()
+}
+
+private func uniqueLoopbackAdvertisement() -> NetworkAudioServiceAdvertisement {
+    NetworkAudioServiceAdvertisement(name: "Loopback receiver \(UUID().uuidString)")
 }
