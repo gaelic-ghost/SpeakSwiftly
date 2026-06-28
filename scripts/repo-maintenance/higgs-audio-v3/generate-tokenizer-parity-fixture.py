@@ -23,7 +23,7 @@ from tokenizers import Tokenizer
 
 
 DEFAULT_MODEL_ID = "bosonai/higgs-audio-v3-tts-4b"
-DEFAULT_SOURCE_MAP = "docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json"
+DEFAULT_SOURCE_MAP = "docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json"
 DEFAULT_PLAIN_TEXT = (
   "Welcome to SpeakSwiftly. This is the first official Higgs Audio v3 parity fixture."
 )

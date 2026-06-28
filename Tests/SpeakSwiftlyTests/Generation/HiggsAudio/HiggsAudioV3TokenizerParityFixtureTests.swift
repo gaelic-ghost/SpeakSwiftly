@@ -177,7 +177,7 @@ private struct HiggsAudioV3TokenizerParityFixture: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try higgsAudioV3FixtureURL(
-            "docs/maintainers/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json",
+            "docs/research/speech-pipelines/lanes/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

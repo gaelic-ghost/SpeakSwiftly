@@ -174,12 +174,12 @@ Add a small no-weight tokenizer fixture generator that:
    `chat_template.jinja` from the official Hugging Face repo.
 2. Uses a local tokenizer implementation or a temporary Python environment only
    if the standard-library inventory cannot produce token ids.
-3. Emits JSON under `docs/maintainers/higgs-audio-v3/`.
+3. Emits JSON under `docs/research/speech-pipelines/lanes/higgs-audio-v3/`.
 4. Does not download safetensors weights.
 5. Fails with a specific error if required TTS special tokens are missing.
 
 Status: implemented by
-[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py).
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py).
 The first checked-in output is
 [`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
 

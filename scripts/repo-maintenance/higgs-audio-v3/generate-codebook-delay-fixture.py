@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_OUTPUT = "docs/maintainers/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json"
+DEFAULT_OUTPUT = "docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json"
 NUM_CODEBOOKS = 8
 NUM_REAL_CODES = 1024
 CODEBOOK_VOCAB_SIZE = 1026
@@ -143,7 +143,7 @@ def parse_args() -> argparse.Namespace:
   )
   parser.add_argument(
     "--source-map",
-    default="docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    default="docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
   )
   parser.add_argument("--created-at-utc", default=None)
   parser.add_argument("--output", type=Path, default=Path(DEFAULT_OUTPUT))

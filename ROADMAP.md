@@ -529,18 +529,18 @@ Planned
   as comparison evidence, but official model sources and Apple profiling
   results should drive implementation decisions.
 - The Higgs Audio v3 plan in
-  `docs/maintainers/higgs-audio-port-evaluation-2026-06-23.md` is the current
-  first concrete expression of this direction.
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/higgs-audio-port-evaluation-2026-06-23.md`
+  is the current first concrete expression of this direction.
 - The official-source Higgs follow-up in
-  `docs/maintainers/higgs-audio-v3/official-pipeline-inventory-2026-06-24.md`
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-inventory-2026-06-24.md`
   and
-  `docs/maintainers/higgs-audio-v3/parity-fixture-plan-2026-06-24.md` records
+  `docs/research/speech-pipelines/lanes/higgs-audio-v3/parity-fixture-plan-2026-06-24.md` records
   tokenizer, prompt, decoder, sampler, codec/vocoder, waveform, and output
   container constants before any implementation port.
-- `docs/maintainers/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json`
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json`
   is the first checked-in no-weight parity artifact for official prompt token
   layout.
-- `docs/maintainers/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json` is
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json` is
   the first checked-in no-weight parity artifact for eight-codebook
   delay-pattern layout.
 

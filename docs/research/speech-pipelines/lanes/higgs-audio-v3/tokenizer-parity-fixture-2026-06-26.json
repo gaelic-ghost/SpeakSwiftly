@@ -6,7 +6,7 @@
     "model_id": "bosonai/higgs-audio-v3-tts-4b",
     "requested_revision": null,
     "resolved_revision": "a7f70853f163c4cccbdd27ce9a80dd97961fc581",
-    "source_map_path": "docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "source_map_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
     "source_map_created_at_utc": "2026-06-24T00:00:00Z",
     "files_downloaded": [
       "tokenizer.json",

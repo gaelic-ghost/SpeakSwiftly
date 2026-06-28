@@ -3,7 +3,7 @@
   "created_at_utc": "2026-06-26T00:00:00Z",
   "mode": "higgs_audio_v3_codebook_delay_fixture",
   "source": {
-    "source_map_path": "docs/maintainers/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "source_map_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
     "official_sources": [
       "SGLang-Omni sglang_omni/models/higgs_tts/sampler.py",
       "vLLM-Omni vllm_omni/model_executor/models/higgs_audio_v3/higgs_audio_v3_tokenizer.py",

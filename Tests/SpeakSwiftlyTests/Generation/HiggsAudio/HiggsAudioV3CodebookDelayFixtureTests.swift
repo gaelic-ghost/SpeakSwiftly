@@ -81,7 +81,7 @@ private struct HiggsAudioV3CodebookDelayFixture: Decodable {
 
     static func load() throws -> Self {
         let fixtureURL = try higgsAudioV3DelayFixtureURL(
-            "docs/maintainers/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json",
+            "docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json",
         )
         let data = try Data(contentsOf: fixtureURL)
         let decoder = JSONDecoder()

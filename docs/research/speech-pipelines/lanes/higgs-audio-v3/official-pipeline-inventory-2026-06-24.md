@@ -13,19 +13,19 @@ evidence only after this official map is understood.
 The generated companion artifact is
 [`official-pipeline-map-2026-06-24.json`](official-pipeline-map-2026-06-24.json).
 It was produced by
-[`../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py`](../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py)
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/inspect-official-higgs-assets.py)
 without downloading model weights.
 
 The first prompt-token parity fixture is
 [`tokenizer-parity-fixture-2026-06-26.json`](tokenizer-parity-fixture-2026-06-26.json).
 It was produced by
-[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py)
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-tokenizer-parity-fixture.py)
 without downloading model weights.
 
 The first synthetic codebook delay-pattern fixture is
 [`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json).
 It was produced by
-[`../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py`](../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py).
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codebook-delay-fixture.py).
 
 ## Source Inventory
 
