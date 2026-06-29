@@ -32,6 +32,11 @@ The first no-weight codec/vocoder boundary fixture is
 It was produced by
 [`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codec-vocoder-boundary-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-codec-vocoder-boundary-fixture.py).
 
+The first no-weight official-serving comparison fixture is
+[`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json).
+It was produced by
+[`../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-official-serving-comparison-fixture.py`](../../../../../scripts/repo-maintenance/higgs-audio-v3/generate-official-serving-comparison-fixture.py).
+
 ## Source Inventory
 
 ### Boson And Hugging Face
@@ -261,6 +266,13 @@ some model-card wording references streamed base64 WAV chunks. Treat streaming
 container behavior as an explicit parity question instead of assuming one doc
 settles it.
 
+The first no-weight official-serving comparison fixture is
+[`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json).
+It records the current vLLM serving signals for 24 kHz PCM and streaming PCM
+bytes while preserving the unresolved WAV/base64 wording conflict. It does not
+claim decoded sample count, dtype, channel count, or non-streaming container
+behavior because those require an executed official serving request.
+
 ## First Artifacts To Build Next
 
 1. Add a parity fixture plan for one reference-free English prompt. Done in
@@ -279,7 +291,11 @@ settles it.
    [`codebook-delay-fixture-2026-06-26.json`](codebook-delay-fixture-2026-06-26.json)
    and for codec/vocoder boundary metadata in
    [`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
-   The next open item is official serving comparison with waveform metadata.
+6. Start the official-serving comparison from archived official source signals.
+   Done in
+   [`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json).
+   The next open item is an executed official serving request with waveform
+   metadata.
 
 ## Current Decision
 
