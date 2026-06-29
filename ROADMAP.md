@@ -521,6 +521,9 @@ Planned
 - [x] Add a no-weight Higgs Audio v3 codec/vocoder boundary fixture for bundled
   codec prefix counts, decode-boundary constants, streaming chunk defaults, and
   waveform metadata gates.
+- [x] Start the no-weight Higgs Audio v3 official-serving comparison fixture
+  for archived 24 kHz PCM serving signals and remaining waveform metadata
+  gates.
 
 ### Stage Notes
 
@@ -550,6 +553,10 @@ Planned
   records the first no-weight codec/vocoder boundary artifact and keeps runtime
   integration blocked until official serving comparison captures waveform
   metadata.
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/official-serving-comparison-fixture-2026-06-29.json`
+  starts the no-weight official-serving comparison for the plain prompt and
+  keeps runtime integration blocked until an executed official serving request
+  captures decoded sample count, dtype, channel count, and container behavior.
 
 ### Exit Criteria
 

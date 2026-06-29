@@ -35,6 +35,10 @@ first-party Apple speech pipeline in SpeakSwiftly.
 - [`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json)
   pins the no-weight codec/vocoder weight-prefix boundary, codebook decode
   boundary, streaming chunk defaults, and remaining waveform metadata gates.
+- [`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json)
+  starts the no-weight official-serving comparison for the plain prompt,
+  preserving the PCM streaming signal, unresolved WAV/base64 wording conflict,
+  and remaining decoded waveform metadata gates.
 
 ## Promotion Rule
 

@@ -121,6 +121,9 @@ captures them for the same prompt fixture.
 
 ### Output Container Expectations
 
+Status: no-weight official-serving comparison started in
+[`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json).
+
 Record output separately for non-streaming and streaming:
 
 - Non-streaming expected container.
@@ -136,6 +139,10 @@ Current source conflict to preserve:
 
 - Boson and SGLang current serving docs emphasize `pcm` for streaming.
 - Some model-card wording describes streamed base64 WAV chunks.
+
+The current comparison fixture records the vLLM deploy YAML raw-PCM streaming
+signal and keeps non-streaming container, decoded sample count, decoded dtype,
+and decoded channel count blocked until an official serving request is executed.
 
 ## Fixture 2: Control Tags
 
