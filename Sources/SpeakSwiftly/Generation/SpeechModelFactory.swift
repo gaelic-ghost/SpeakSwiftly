@@ -29,21 +29,14 @@ enum ModelFactory {
     static func loadResidentModels(
         for backend: SpeakSwiftly.SpeechBackend,
     ) async throws -> ResidentSpeechModels {
-        switch backend {
-            case .qwen3_smol,
-                 .qwen3_smol_4bit,
-                 .qwen3_smol_5bit,
-                 .qwen3_smol_6bit,
-                 .qwen3_smol_8bit,
-                 .qwen3_smol_bf16,
-                 .qwen3_BIG,
-                 .qwen3_BIG_4bit,
-                 .qwen3_BIG_5bit,
-                 .qwen3_BIG_6bit,
-                 .qwen3_BIG_8bit,
-                 .qwen3_BIG_bf16:
-                try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
+        guard backend.isQwenFamily else {
+            throw WorkerError(
+                code: .internalError,
+                message: "SpeakSwiftly cannot load resident speech models for backend '\(backend.rawValue)' because the Generation module only has Qwen resident model routing for this backend value.",
+            )
         }
+
+        return try await .qwen3(loadModel(modelRepo: residentModelRepo(for: backend)))
     }
 
     static func residentModelRepo(for backend: SpeakSwiftly.SpeechBackend) -> String {

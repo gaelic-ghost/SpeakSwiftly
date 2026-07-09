@@ -38,6 +38,8 @@ Use Swift Package Manager as the source of truth for package structure. Keep fea
 
 Use Swift Testing for new package tests unless an existing external constraint requires XCTest. Keep operator-facing diagnostics descriptive enough that a maintainer can tell what broke and where to look next.
 
+For generation changes, keep Qwen stream handling on the shared event-stream path so raw reference-audio generation and prepared-conditioning generation record token, info, audio, live-chunk, and cancellation behavior consistently. Keep voice-profile reference-audio materialization in the shared Generation support path so generated profiles, rerolls, clone imports, and future profile-authoring flows normalize and persist canonical audio the same way.
+
 ### Asking For Review
 
 Before asking for review, make sure the docs split still holds:

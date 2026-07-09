@@ -6,6 +6,37 @@ import MLXAudioTTS
 // MARK: - Qwen Speech Synthesis
 
 extension SpeakSwiftly.Runtime {
+    enum QwenGenerationReference {
+        case raw(
+            materialization: StoredProfileMaterialization,
+            refAudio: MLXArray?,
+        )
+        case prepared(Qwen3TTSModel.Qwen3TTSReferenceConditioning)
+    }
+
+    struct QwenLiveChunkAccounting {
+        let startedAt = Date()
+        private(set) var sawFirstAudio = false
+        private(set) var audioChunkCount = 0
+        private(set) var sampleCount = 0
+
+        mutating func recordAudioChunk(_ samples: [Float]) -> Bool {
+            audioChunkCount += 1
+            sampleCount += samples.count
+
+            if sawFirstAudio {
+                return false
+            }
+
+            sawFirstAudio = true
+            return true
+        }
+
+        func elapsedMS(now: Date = Date()) -> Int {
+            Int((now.timeIntervalSince(startedAt) * 1000).rounded())
+        }
+    }
+
     func synthesisEventInfo(from info: ModelGenerationEvent.Info) -> SpeakSwiftly.SynthesisEventInfo {
         SpeakSwiftly.SynthesisEventInfo(
             promptTokenCount: info.promptTokenCount,
@@ -17,39 +48,85 @@ extension SpeakSwiftly.Runtime {
         )
     }
 
+    private func defaultLiveSpeechTextChunks(for text: String) -> [LiveSpeechTextChunk] {
+        [
+            LiveSpeechTextChunk(
+                index: 1,
+                text: text,
+                wordCount: max(SpeakSwiftly.DeepTrace.words(in: text).count, 1),
+                segmentation: .sentenceGroup,
+            ),
+        ]
+    }
+
+    private func qwenEventStream(
+        model: AnySpeechModel,
+        text: String,
+        reference: QwenGenerationReference,
+        generationParameters: GenerateParameters,
+        streamingInterval: Double,
+    ) -> AsyncThrowingStream<ModelGenerationEvent, Error> {
+        switch reference {
+            case let .raw(materialization, refAudio):
+                model.generateEventStream(
+                    text: text,
+                    voice: nil,
+                    refAudio: refAudio,
+                    refText: materialization.manifest.referenceText,
+                    language: nil,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+
+            case let .prepared(conditioning):
+                model.generateConditionedEventStream(
+                    text: text,
+                    conditioning: conditioning,
+                    generationParameters: generationParameters,
+                    streamingInterval: streamingInterval,
+                )
+        }
+    }
+
+    private func recordQwenGenerationEvent(
+        _ event: ModelGenerationEvent,
+        requestID: String,
+    ) -> [Float]? {
+        switch event {
+            case let .token(token):
+                recordSynthesisEvent(.token(token), for: requestID)
+                return nil
+            case let .info(info):
+                recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
+                return nil
+            case let .audio(samples):
+                recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                return samples
+        }
+    }
+
     func qwenGenerationStream(
         requestID: String,
         model: AnySpeechModel,
         text: String,
-        materialization: StoredProfileMaterialization,
-        refAudio: MLXArray?,
+        reference: QwenGenerationReference,
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let eventStream = model.generateEventStream(
+                    let eventStream = qwenEventStream(
+                        model: model,
                         text: text,
-                        voice: nil,
-                        refAudio: refAudio,
-                        refText: materialization.manifest.referenceText,
-                        language: nil,
+                        reference: reference,
                         generationParameters: generationParameters,
                         streamingInterval: streamingInterval,
                     )
-
                     for try await event in eventStream {
                         try Task.checkCancellation()
-
-                        switch event {
-                            case let .token(token):
-                                recordSynthesisEvent(.token(token), for: requestID)
-                            case let .info(info):
-                                recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
-                            case let .audio(samples):
-                                recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                                continuation.yield(samples)
+                        if let samples = recordQwenGenerationEvent(event, requestID: requestID) {
+                            continuation.yield(samples)
                         }
                     }
                     continuation.finish()
@@ -70,19 +147,11 @@ extension SpeakSwiftly.Runtime {
         model: AnySpeechModel,
         text: String,
         plannedChunks: [LiveSpeechTextChunk]?,
-        materialization: StoredProfileMaterialization,
-        refAudio: MLXArray?,
+        reference: QwenGenerationReference,
         generationParameters: GenerateParameters,
         streamingInterval: Double,
     ) -> AsyncThrowingStream<[Float], Error> {
-        let plannedChunks = plannedChunks ?? [
-            LiveSpeechTextChunk(
-                index: 1,
-                text: text,
-                wordCount: max(SpeakSwiftly.DeepTrace.words(in: text).count, 1),
-                segmentation: .sentenceGroup,
-            ),
-        ]
+        let plannedChunks = plannedChunks ?? defaultLiveSpeechTextChunks(for: text)
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -90,10 +159,7 @@ extension SpeakSwiftly.Runtime {
                     for plannedChunk in plannedChunks {
                         try Task.checkCancellation()
 
-                        let startedAt = Date()
-                        var sawFirstAudio = false
-                        var audioChunkCount = 0
-                        var sampleCount = 0
+                        var accounting = QwenLiveChunkAccounting()
 
                         await logQwenLiveChunkStarted(
                             requestID: requestID,
@@ -104,180 +170,30 @@ extension SpeakSwiftly.Runtime {
                             streamingInterval: streamingInterval,
                         )
 
-                        let eventStream = model.generateEventStream(
+                        let eventStream = qwenEventStream(
+                            model: model,
                             text: plannedChunk.text,
-                            voice: nil,
-                            refAudio: refAudio,
-                            refText: materialization.manifest.referenceText,
-                            language: nil,
+                            reference: reference,
                             generationParameters: generationParameters,
                             streamingInterval: streamingInterval,
                         )
 
                         for try await event in eventStream {
-                            switch event {
-                                case let .token(token):
-                                    recordSynthesisEvent(.token(token), for: requestID)
-                                case let .info(info):
-                                    recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
-                                case let .audio(samples):
-                                    audioChunkCount += 1
-                                    sampleCount += samples.count
-                                    recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                                    if !sawFirstAudio {
-                                        sawFirstAudio = true
-                                        await logQwenLiveChunkFirstAudio(
-                                            requestID: requestID,
-                                            op: op,
-                                            profileName: profileName,
-                                            chunk: plannedChunk,
-                                            totalChunkCount: plannedChunks.count,
-                                            timeToFirstAudioMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
-                                            sampleCount: samples.count,
-                                        )
-                                    }
-                                    continuation.yield(samples)
-                            }
-                        }
+                            try Task.checkCancellation()
 
-                        await logQwenLiveChunkFinished(
-                            requestID: requestID,
-                            op: op,
-                            profileName: profileName,
-                            chunk: plannedChunk,
-                            totalChunkCount: plannedChunks.count,
-                            elapsedMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
-                            audioChunkCount: audioChunkCount,
-                            sampleCount: sampleCount,
-                        )
-
-                        if plannedChunk.index < plannedChunks.count {
-                            continuation.yield([])
-                        }
-                    }
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish(throwing: CancellationError())
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-
-    func qwenGenerationStream(
-        requestID: String,
-        model: AnySpeechModel,
-        text: String,
-        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
-        generationParameters: GenerateParameters,
-        streamingInterval: Double,
-    ) -> AsyncThrowingStream<[Float], Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let eventStream = model.generateConditionedEventStream(
-                        text: text,
-                        conditioning: conditioning,
-                        generationParameters: generationParameters,
-                        streamingInterval: streamingInterval,
-                    )
-
-                    for try await event in eventStream {
-                        try Task.checkCancellation()
-
-                        switch event {
-                            case let .token(token):
-                                recordSynthesisEvent(.token(token), for: requestID)
-                            case let .info(info):
-                                recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
-                            case let .audio(samples):
-                                recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
+                            if let samples = recordQwenGenerationEvent(event, requestID: requestID) {
+                                if accounting.recordAudioChunk(samples) {
+                                    await logQwenLiveChunkFirstAudio(
+                                        requestID: requestID,
+                                        op: op,
+                                        profileName: profileName,
+                                        chunk: plannedChunk,
+                                        totalChunkCount: plannedChunks.count,
+                                        timeToFirstAudioMS: accounting.elapsedMS(),
+                                        sampleCount: samples.count,
+                                    )
+                                }
                                 continuation.yield(samples)
-                        }
-                    }
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish(throwing: CancellationError())
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-
-    func qwenLiveGenerationStream(
-        requestID: String,
-        op: String?,
-        profileName: String,
-        model: AnySpeechModel,
-        text: String,
-        plannedChunks: [LiveSpeechTextChunk]?,
-        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning,
-        generationParameters: GenerateParameters,
-        streamingInterval: Double,
-    ) -> AsyncThrowingStream<[Float], Error> {
-        let plannedChunks = plannedChunks ?? [
-            LiveSpeechTextChunk(
-                index: 1,
-                text: text,
-                wordCount: max(SpeakSwiftly.DeepTrace.words(in: text).count, 1),
-                segmentation: .sentenceGroup,
-            ),
-        ]
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    for plannedChunk in plannedChunks {
-                        try Task.checkCancellation()
-
-                        let startedAt = Date()
-                        var sawFirstAudio = false
-                        var audioChunkCount = 0
-                        var sampleCount = 0
-
-                        await logQwenLiveChunkStarted(
-                            requestID: requestID,
-                            op: op,
-                            profileName: profileName,
-                            chunk: plannedChunk,
-                            totalChunkCount: plannedChunks.count,
-                            streamingInterval: streamingInterval,
-                        )
-
-                        let eventStream = model.generateConditionedEventStream(
-                            text: plannedChunk.text,
-                            conditioning: conditioning,
-                            generationParameters: generationParameters,
-                            streamingInterval: streamingInterval,
-                        )
-
-                        for try await event in eventStream {
-                            switch event {
-                                case let .token(token):
-                                    recordSynthesisEvent(.token(token), for: requestID)
-                                case let .info(info):
-                                    recordSynthesisEvent(.info(synthesisEventInfo(from: info)), for: requestID)
-                                case let .audio(samples):
-                                    audioChunkCount += 1
-                                    sampleCount += samples.count
-                                    recordSynthesisEvent(.audioChunk(sampleCount: samples.count), for: requestID)
-                                    if !sawFirstAudio {
-                                        sawFirstAudio = true
-                                        await logQwenLiveChunkFirstAudio(
-                                            requestID: requestID,
-                                            op: op,
-                                            profileName: profileName,
-                                            chunk: plannedChunk,
-                                            totalChunkCount: plannedChunks.count,
-                                            timeToFirstAudioMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
-                                            sampleCount: samples.count,
-                                        )
-                                    }
-                                    continuation.yield(samples)
                             }
                         }
 
@@ -287,16 +203,15 @@ extension SpeakSwiftly.Runtime {
                             profileName: profileName,
                             chunk: plannedChunk,
                             totalChunkCount: plannedChunks.count,
-                            elapsedMS: Int((Date().timeIntervalSince(startedAt) * 1000).rounded()),
-                            audioChunkCount: audioChunkCount,
-                            sampleCount: sampleCount,
+                            elapsedMS: accounting.elapsedMS(),
+                            audioChunkCount: accounting.audioChunkCount,
+                            sampleCount: accounting.sampleCount,
                         )
 
                         if plannedChunk.index < plannedChunks.count {
                             continuation.yield([])
                         }
                     }
-
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
@@ -304,7 +219,6 @@ extension SpeakSwiftly.Runtime {
                     continuation.finish(throwing: error)
                 }
             }
-
             continuation.onTermination = { _ in task.cancel() }
         }
     }

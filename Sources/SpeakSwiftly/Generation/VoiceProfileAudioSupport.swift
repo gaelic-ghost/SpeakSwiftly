@@ -3,6 +3,16 @@ import Foundation
 // MARK: - Voice Profile Audio Support
 
 extension SpeakSwiftly.Runtime {
+    struct ProfileReferenceAudioMaterialization {
+        let rawSampleCount: Int
+        let sampleRate: Int
+        let canonicalAudioData: Data
+    }
+
+    struct GeneratedProfileReferenceAudio {
+        let materialization: ProfileReferenceAudioMaterialization
+    }
+
     func runBlockingFilesystemOperation<T: Sendable>(
         _ operation: @escaping @Sendable () throws -> T,
     ) async throws -> T {
@@ -28,6 +38,78 @@ extension SpeakSwiftly.Runtime {
         return try await runBlockingFilesystemOperation {
             try Data(contentsOf: tempWavURL)
         }
+    }
+
+    func materializeProfileReferenceAudio(
+        from rawAudio: [Float],
+        sampleRate: Int,
+    ) async throws -> ProfileReferenceAudioMaterialization {
+        let normalizedAudio = gainNormalizedProfileReferenceAudio(rawAudio)
+        let canonicalAudioData = try await canonicalAudioData(
+            from: normalizedAudio,
+            sampleRate: sampleRate,
+        )
+
+        return ProfileReferenceAudioMaterialization(
+            rawSampleCount: rawAudio.count,
+            sampleRate: sampleRate,
+            canonicalAudioData: canonicalAudioData,
+        )
+    }
+
+    func generateProfileReferenceAudio(
+        requestID id: String,
+        op: String,
+        profileName: String,
+        text: String,
+        voiceDescription: String,
+        modelLoadedEventName: String,
+        audioGeneratedEventName: String,
+    ) async throws -> GeneratedProfileReferenceAudio {
+        await emitProgress(id: id, stage: .loadingProfileModel)
+        let modelLoadStartedAt = dependencies.now()
+        let profileModel = try await dependencies.loadProfileModel()
+        await logRequestEvent(
+            modelLoadedEventName,
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "model_repo": .string(ModelFactory.profileModelRepo),
+                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
+            ],
+        )
+        try Task.checkCancellation()
+
+        await emitProgress(id: id, stage: .generatingProfileAudio)
+        let generationStartedAt = dependencies.now()
+        let rawAudio = try await profileModel.generate(
+            text: text,
+            voice: voiceDescription,
+            refAudio: nil,
+            refText: nil,
+            language: nil,
+            generationParameters: GenerationPolicy.profileModelParameters(for: text),
+        )
+        let materialization = try await materializeProfileReferenceAudio(
+            from: rawAudio,
+            sampleRate: profileModel.sampleRate,
+        )
+        await logRequestEvent(
+            audioGeneratedEventName,
+            requestID: id,
+            op: op,
+            profileName: profileName,
+            details: [
+                "duration_ms": .int(elapsedMS(since: generationStartedAt)),
+                "sample_count": .int(materialization.rawSampleCount),
+            ],
+        )
+        try Task.checkCancellation()
+
+        return GeneratedProfileReferenceAudio(
+            materialization: materialization,
+        )
     }
 
     func gainNormalizedProfileReferenceAudio(_ audio: [Float]) -> [Float] {

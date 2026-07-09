@@ -14,29 +14,15 @@ enum GenerationPolicy {
     private static let cloneTranscriptionMinimumChunkDuration: Float = 1.0
 
     static func residentParameters(
-        for backend: SpeakSwiftly.SpeechBackend,
+        for _: SpeakSwiftly.SpeechBackend,
         text _: String,
     ) -> GenerateParameters {
-        switch backend {
-            case .qwen3_smol,
-                 .qwen3_smol_4bit,
-                 .qwen3_smol_5bit,
-                 .qwen3_smol_6bit,
-                 .qwen3_smol_8bit,
-                 .qwen3_smol_bf16,
-                 .qwen3_BIG,
-                 .qwen3_BIG_4bit,
-                 .qwen3_BIG_5bit,
-                 .qwen3_BIG_6bit,
-                 .qwen3_BIG_8bit,
-                 .qwen3_BIG_bf16:
-                GenerateParameters(
-                    maxTokens: qwenResidentMaxTokens,
-                    temperature: qwenResidentTemperature,
-                    topP: qwenResidentTopP,
-                    repetitionPenalty: qwenResidentRepetitionPenalty,
-                )
-        }
+        GenerateParameters(
+            maxTokens: qwenResidentMaxTokens,
+            temperature: qwenResidentTemperature,
+            topP: qwenResidentTopP,
+            repetitionPenalty: qwenResidentRepetitionPenalty,
+        )
     }
 
     static func profileModelParameters(for _: String) -> GenerateParameters {

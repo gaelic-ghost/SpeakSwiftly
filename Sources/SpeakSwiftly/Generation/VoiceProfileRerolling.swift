@@ -10,49 +10,16 @@ extension SpeakSwiftly.Runtime {
         targetProfileName: String? = nil,
     ) async throws -> StoredProfile {
         let targetProfileName = targetProfileName ?? storedProfile.manifest.profileName
-        await emitProgress(id: id, stage: .loadingProfileModel)
-        let modelLoadStartedAt = dependencies.now()
-        let profileModel = try await dependencies.loadProfileModel()
-        await logRequestEvent(
-            "profile_model_loaded_for_reroll",
+        let generatedAudio = try await generateProfileReferenceAudio(
             requestID: id,
             op: op,
             profileName: storedProfile.manifest.profileName,
-            details: [
-                "model_repo": .string(ModelFactory.profileModelRepo),
-                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
-            ],
-        )
-        try Task.checkCancellation()
-
-        await emitProgress(id: id, stage: .generatingProfileAudio)
-        let generationStartedAt = dependencies.now()
-        let rawAudio = try await profileModel.generate(
             text: storedProfile.manifest.sourceText,
-            voice: storedProfile.manifest.voiceDescription,
-            refAudio: nil,
-            refText: nil,
-            language: nil,
-            generationParameters: GenerationPolicy.profileModelParameters(for: storedProfile.manifest.sourceText),
+            voiceDescription: storedProfile.manifest.voiceDescription,
+            modelLoadedEventName: "profile_model_loaded_for_reroll",
+            audioGeneratedEventName: "profile_audio_rerolled",
         )
-        let audio = gainNormalizedProfileReferenceAudio(rawAudio)
-        await logRequestEvent(
-            "profile_audio_rerolled",
-            requestID: id,
-            op: op,
-            profileName: storedProfile.manifest.profileName,
-            details: [
-                "duration_ms": .int(elapsedMS(since: generationStartedAt)),
-                "sample_count": .int(rawAudio.count),
-            ],
-        )
-        try Task.checkCancellation()
-
-        let audioData = try await canonicalAudioData(
-            from: audio,
-            sampleRate: profileModel.sampleRate,
-        )
-        try Task.checkCancellation()
+        let audioMaterialization = generatedAudio.materialization
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let replaceStartedAt = dependencies.now()
@@ -68,8 +35,8 @@ extension SpeakSwiftly.Runtime {
                     transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                     author: storedProfile.manifest.author,
                     seed: storedProfile.manifest.seed,
-                    sampleRate: profileModel.sampleRate,
-                    canonicalAudioData: audioData,
+                    sampleRate: audioMaterialization.sampleRate,
+                    canonicalAudioData: audioMaterialization.canonicalAudioData,
                     createdAt: storedProfile.manifest.createdAt,
                 )
             }
@@ -83,8 +50,8 @@ extension SpeakSwiftly.Runtime {
                 transcriptProvenance: storedProfile.manifest.transcriptProvenance,
                 author: .user,
                 seed: nil,
-                sampleRate: profileModel.sampleRate,
-                canonicalAudioData: audioData,
+                sampleRate: audioMaterialization.sampleRate,
+                canonicalAudioData: audioMaterialization.canonicalAudioData,
             )
         }
         await logRequestEvent(
