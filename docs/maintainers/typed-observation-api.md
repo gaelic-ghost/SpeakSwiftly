@@ -388,6 +388,11 @@ Used targeted tests for request observation, runtime control, worker protocol en
 - Singleton `updates()` streams replay the latest update by default,
   matching the practical behavior of the removed `statusEvents()` and making late UI
   or agent subscribers useful immediately.
+- Runtime observation stream implementations should share subscription setup,
+  replay, and termination cleanup helpers. Generate, Playback, Runtime, request,
+  and synthesis observations still expose distinct typed update families, but
+  their stream lifecycle should not drift into separate copy-and-paste
+  implementations.
 - `RequestHandle.completion()` still returns `RequestCompletion` in this
   pass. Operation-specific typed wait helpers can be considered later if real
   call sites show that the single completion enum is still too broad.
