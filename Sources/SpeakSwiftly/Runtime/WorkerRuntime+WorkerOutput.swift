@@ -13,39 +13,9 @@ extension SpeakSwiftly.Runtime {
                     op: nil,
                     profileName: payload.profileName,
                 )
-                let success = WorkerSuccessResponse(
-                    id: payload.id,
-                    generatedFile: payload.generatedFile,
-                    generatedFiles: payload.generatedFiles,
-                    generatedBatch: payload.generatedBatch,
-                    generatedBatches: payload.generatedBatches,
-                    generationJob: payload.generationJob,
-                    generationJobs: payload.generationJobs,
-                    profileName: payload.profileName,
-                    profilePath: payload.profilePath,
-                    profiles: payload.profiles,
-                    textProfile: payload.textProfile,
-                    textProfiles: payload.textProfiles,
-                    textProfileStyleOptions: payload.textProfileStyleOptions,
-                    textProfileStyle: payload.textProfileStyle,
-                    textProfilePath: payload.textProfilePath,
-                    activeRequest: payload.activeRequest,
-                    activeRequests: payload.activeRequests,
-                    queue: payload.queue,
-                    playbackState: payload.playbackState,
-                    runtimeOverview: payload.runtimeOverview,
-                    status: payload.status,
-                    speechBackend: payload.speechBackend,
-                    defaultVoiceProfile: payload.defaultVoiceProfile,
-                    recentGeneratedAudio: payload.recentGeneratedAudio,
-                    recentGeneratedAudioChunks: payload.recentGeneratedAudioChunks,
-                    replayRequestIDs: payload.replayRequestIDs,
-                    clearedCount: payload.clearedCount,
-                    cancelledRequestID: payload.cancelledRequestID,
-                )
-                await yieldRequestEvent(.completed(SpeakSwiftly.RequestCompletion(success)), for: request.id)
+                await yieldRequestEvent(.completed(SpeakSwiftly.RequestCompletion(payload)), for: request.id)
                 if !request.acknowledgesEnqueueImmediately || request.emitsTerminalSuccessAfterAcknowledgement {
-                    await emit(success)
+                    await emit(payload)
                 }
 
             case let .failure(error):
