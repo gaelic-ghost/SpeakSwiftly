@@ -40,6 +40,8 @@ Use Swift Testing for new package tests unless an existing external constraint r
 
 For generation changes, keep Qwen stream handling on the shared event-stream path so raw reference-audio generation and prepared-conditioning generation record token, info, audio, live-chunk, and cancellation behavior consistently. Keep voice-profile reference-audio materialization in the shared Generation support path so generated profiles, rerolls, clone imports, and future profile-authoring flows normalize and persist canonical audio the same way.
 
+For runtime changes, keep worker request execution rules on the shared `WorkerRequest.ExecutionPolicy` surface so queueing, acknowledgement, resident-model, playback, and ordered-control behavior stay in one place. Reuse the package response and artifact conversion models directly instead of introducing parallel payload or generated-file mapping shapes. Keep generated-audio chunk capture and observation-stream subscription behavior on shared Runtime helpers when live playback and stream output need the same lifecycle handling.
+
 ### Asking For Review
 
 Before asking for review, make sure the docs split still holds:
