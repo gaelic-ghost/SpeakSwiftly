@@ -81,189 +81,87 @@ final class AnyPlaybackDriver: @unchecked Sendable {
         AnyPlaybackDriver(
             prepare: { _ in true },
             play: { sampleRate, text, tuningProfile, stream, onEvent in
-                let startedAt = Date()
                 let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
-                var emittedFirstChunk = false
-                var emittedPrerollReady = false
-                var chunkCount = 0
-                var sampleCount = 0
-                var startupBufferedAudioMS: Int?
-                var timeToFirstChunkMS: Int?
-                var timeToPrerollReadyMS: Int?
-                var minQueuedAudioMS: Int?
-                var maxQueuedAudioMS: Int?
-                var queueDepthTotalMS = 0
-                var queueDepthSampleCount = 0
-                var maxInterChunkGapMS: Int?
-                var interChunkGapTotalMS = 0
-                var interChunkGapCount = 0
-                var maxBoundaryDiscontinuity: Double?
-                var maxLeadingAbsAmplitude: Double?
-                var maxTrailingAbsAmplitude: Double?
-                var fadeInChunkCount = 0
-                let starvationEventCount = 0
                 var pendingSampleCount = 0
-                var lastChunkAt: Date?
-                var previousTrailingSample: Float?
-                var generatedAudioQualityMonitor = GeneratedAudioQualityMonitor(sampleRate: sampleRate)
-                var emittedGenerationQualityWarningReasons = Set<GeneratedAudioQualityWarningReason>()
+                var accounting = PlaybackStreamAccounting(sampleRate: sampleRate)
 
                 func bufferedAudioMS() -> Int {
                     Int((Double(pendingSampleCount) / sampleRate * 1000).rounded())
                 }
 
-                func recordQueueDepth() {
-                    let queuedAudioMS = bufferedAudioMS()
-                    minQueuedAudioMS = min(minQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
-                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
-                    queueDepthTotalMS += queuedAudioMS
-                    queueDepthSampleCount += 1
-                }
-
                 for try await chunk in stream {
                     guard !chunk.isEmpty else { continue }
 
-                    let now = Date()
-                    chunkCount += 1
-                    sampleCount += chunk.count
                     pendingSampleCount += chunk.count
-                    recordQueueDepth()
-
-                    if let lastChunkAt {
-                        let gapMS = milliseconds(since: lastChunkAt)
-                        maxInterChunkGapMS = max(maxInterChunkGapMS ?? gapMS, gapMS)
-                        interChunkGapTotalMS += gapMS
-                        interChunkGapCount += 1
-                        if gapMS >= thresholds.chunkGapWarningMS {
-                            await onEvent(.chunkGapWarning(gapMS: gapMS, chunkIndex: chunkCount))
-                        }
-                    }
-                    lastChunkAt = now
-                    let qualityObservation = generatedAudioQualityMonitor.observe(
+                    let queuedAudioAfterMS = bufferedAudioMS()
+                    accounting.recordQueueDepth(queuedAudioMS: queuedAudioAfterMS)
+                    let recordedChunk = accounting.recordGeneratedChunk(
                         samples: chunk,
-                        chunkIndex: chunkCount,
+                        thresholds: thresholds,
+                        queuedAudioBeforeMS: nil,
+                        queuedAudioAfterMS: queuedAudioAfterMS,
+                        isRebuffering: false,
+                        fadeInApplied: !accounting.hasReceivedFirstChunk,
                     )
-                    if let warning = generatedAudioQualityMonitor.warning(for: qualityObservation),
-                       emittedGenerationQualityWarningReasons.insert(warning.reason).inserted {
+                    if let warning = recordedChunk.qualityWarning {
                         await onEvent(.generationQualityWarning(warning))
                     }
-
                     if let firstSample = chunk.first, let lastSample = chunk.last {
-                        let leadingAbs = Double(abs(firstSample))
-                        let trailingAbs = Double(abs(lastSample))
-                        maxLeadingAbsAmplitude = max(maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
-                        maxTrailingAbsAmplitude = max(maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
-                        if let previousTrailingSample {
-                            let jump = Double(abs(firstSample - previousTrailingSample))
-                            maxBoundaryDiscontinuity = max(maxBoundaryDiscontinuity ?? jump, jump)
-                        }
-                        previousTrailingSample = lastSample
+                        accounting.recordBufferShape(
+                            firstSample: firstSample,
+                            lastSample: lastSample,
+                            fadeInApplied: recordedChunk.fadeInApplied,
+                        )
                     }
 
-                    if !emittedFirstChunk {
-                        emittedFirstChunk = true
-                        fadeInChunkCount = 1
-                        timeToFirstChunkMS = milliseconds(since: startedAt)
+                    if let gapWarning = accounting.chunkGapWarning(for: recordedChunk, thresholds: thresholds) {
+                        await onEvent(gapWarning)
+                    }
+
+                    if recordedChunk.emittedFirstChunk {
                         await onEvent(.firstChunk)
                     }
 
-                    if !emittedPrerollReady, bufferedAudioMS() >= thresholds.startupBufferTargetMS {
-                        emittedPrerollReady = true
-                        startupBufferedAudioMS = bufferedAudioMS()
-                        minQueuedAudioMS = startupBufferedAudioMS
-                        timeToPrerollReadyMS = milliseconds(since: startedAt)
-                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
+                    if !accounting.hasEmittedPrerollReady, queuedAudioAfterMS >= thresholds.startupBufferTargetMS {
+                        let startupBufferedAudioMS = accounting.markPrerollReady(bufferedAudioMS: queuedAudioAfterMS)
+                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: thresholds))
                     }
 
                     if traceEnabled {
-                        await onEvent(
-                            .trace(
-                                PlaybackTraceEvent(
-                                    name: "generation_quality_chunk",
-                                    chunkIndex: chunkCount,
-                                    bufferIndex: nil,
-                                    sampleCount: chunk.count,
-                                    durationMS: Int((Double(chunk.count) / sampleRate * 1000).rounded()),
-                                    queuedAudioBeforeMS: nil,
-                                    queuedAudioAfterMS: bufferedAudioMS(),
-                                    gapMS: maxInterChunkGapMS,
-                                    isRebuffering: false,
-                                    fadeInApplied: chunkCount == 1,
-                                    generatedAudioQuality: qualityObservation,
-                                ),
-                            ),
-                        )
-                        await onEvent(
-                            .trace(
-                                PlaybackTraceEvent(
-                                    name: "chunk_received",
-                                    chunkIndex: chunkCount,
-                                    bufferIndex: nil,
-                                    sampleCount: chunk.count,
-                                    durationMS: Int((Double(chunk.count) / sampleRate * 1000).rounded()),
-                                    queuedAudioBeforeMS: nil,
-                                    queuedAudioAfterMS: bufferedAudioMS(),
-                                    gapMS: maxInterChunkGapMS,
-                                    isRebuffering: false,
-                                    fadeInApplied: chunkCount == 1,
-                                    generatedAudioQuality: nil,
-                                ),
-                            ),
-                        )
+                        await onEvent(.trace(accounting.generationQualityTrace(
+                            for: recordedChunk,
+                            queuedAudioBeforeMS: nil,
+                            queuedAudioAfterMS: queuedAudioAfterMS,
+                            isRebuffering: false,
+                        )))
+                        await onEvent(.trace(accounting.chunkReceivedTrace(
+                            for: recordedChunk,
+                            queuedAudioBeforeMS: nil,
+                            queuedAudioAfterMS: queuedAudioAfterMS,
+                            isRebuffering: false,
+                        )))
                     }
                 }
 
-                if !emittedPrerollReady, pendingSampleCount > 0 {
-                    emittedPrerollReady = true
-                    startupBufferedAudioMS = bufferedAudioMS()
-                    minQueuedAudioMS = startupBufferedAudioMS
-                    timeToPrerollReadyMS = milliseconds(since: startedAt)
-                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
+                if !accounting.hasEmittedPrerollReady, pendingSampleCount > 0 {
+                    let startupBufferedAudioMS = accounting.markPrerollReady(bufferedAudioMS: bufferedAudioMS())
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: thresholds))
                 }
 
-                let timeFromPrerollReadyToDrainMS: Int? = if let timeToPrerollReadyMS {
-                    max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
-                } else {
-                    nil
+                if let bufferShapeSummaryEvent = accounting.bufferShapeSummaryEvent {
+                    await onEvent(bufferShapeSummaryEvent)
                 }
 
-                if let maxBoundaryDiscontinuity, let maxLeadingAbsAmplitude, let maxTrailingAbsAmplitude {
-                    await onEvent(
-                        .bufferShapeSummary(
-                            maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
-                            maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
-                            maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                            fadeInChunkCount: fadeInChunkCount,
-                        ),
-                    )
-                }
-
-                return PlaybackSummary(
+                return accounting.summary(
                     thresholds: thresholds,
-                    chunkCount: chunkCount,
-                    sampleCount: sampleCount,
-                    startupBufferedAudioMS: startupBufferedAudioMS,
-                    timeToFirstChunkMS: timeToFirstChunkMS,
-                    timeToPrerollReadyMS: timeToPrerollReadyMS,
-                    timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS,
-                    minQueuedAudioMS: minQueuedAudioMS,
-                    maxQueuedAudioMS: maxQueuedAudioMS,
-                    avgQueuedAudioMS: queueDepthSampleCount == 0 ? nil : queueDepthTotalMS / queueDepthSampleCount,
-                    queueDepthSampleCount: queueDepthSampleCount,
                     rebufferEventCount: 0,
                     rebufferTotalDurationMS: 0,
                     longestRebufferDurationMS: 0,
-                    starvationEventCount: starvationEventCount,
-                    scheduleCallbackCount: chunkCount,
-                    playedBackCallbackCount: chunkCount,
-                    maxInterChunkGapMS: maxInterChunkGapMS,
-                    avgInterChunkGapMS: interChunkGapCount == 0 ? nil : interChunkGapTotalMS / interChunkGapCount,
+                    starvationEventCount: 0,
+                    scheduleCallbackCount: accounting.chunkCount,
+                    playedBackCallbackCount: accounting.chunkCount,
                     maxScheduleGapMS: nil,
                     avgScheduleGapMS: nil,
-                    maxBoundaryDiscontinuity: maxBoundaryDiscontinuity,
-                    maxLeadingAbsAmplitude: maxLeadingAbsAmplitude,
-                    maxTrailingAbsAmplitude: maxTrailingAbsAmplitude,
-                    fadeInChunkCount: fadeInChunkCount,
                 )
             },
             stop: {},

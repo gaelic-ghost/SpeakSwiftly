@@ -236,15 +236,13 @@ extension AudioPlaybackDriver {
                         return
                     }
 
-                    state.playedBackCallbackCount += 1
-                    state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24000)
+                    state.recordPlayedBackBuffer(sampleRate: engineSampleRate ?? 24000)
                     if state.generationFinished, state.queuedSampleCount == 0 {
                         state.resumeDrainContinuation()
                     }
                 }
             }
-            state.scheduleCallbackCount += 1
-            state.recordQueuedAudioDepth(sampleRate: engineSampleRate ?? 24000)
+            state.recordScheduledBuffer(sampleRate: engineSampleRate ?? 24000)
         }
     }
 }

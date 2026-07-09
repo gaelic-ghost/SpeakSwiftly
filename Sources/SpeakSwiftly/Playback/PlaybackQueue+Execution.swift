@@ -9,12 +9,6 @@ extension PlaybackQueue {
             await self.runPlayback(for: playbackState, sampleRate: sampleRate, hooks: hooks)
         }
         activePlayback = ActivePlayback(requestID: requestID, task: task)
-        activePlaybackIsStableForConcurrentGeneration = false
-        activePlaybackStableBufferedAudioMS = nil
-        activePlaybackStableBufferTargetMS = nil
-        activePlaybackConcurrentGenerationTargetMS = nil
-        activePlaybackFragileOverlapWindowProgress = nil
-        activePlaybackIsRebuffering = false
         playbackState.execution.playbackTask = task
         await hooks.playbackStarted(requestID)
         await hooks.activeRequestChanged()
@@ -73,12 +67,6 @@ extension PlaybackQueue {
         guard activePlayback?.requestID == requestID else { return }
 
         activePlayback = nil
-        activePlaybackIsStableForConcurrentGeneration = false
-        activePlaybackStableBufferedAudioMS = nil
-        activePlaybackStableBufferTargetMS = nil
-        activePlaybackConcurrentGenerationTargetMS = nil
-        activePlaybackFragileOverlapWindowProgress = nil
-        activePlaybackIsRebuffering = false
         queue.removeAll { $0 == requestID }
 
         guard let playbackState = jobs.removeValue(forKey: requestID) else {

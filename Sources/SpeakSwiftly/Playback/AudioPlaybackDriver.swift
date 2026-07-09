@@ -141,22 +141,12 @@ final class AudioPlaybackDriver {
         var emittedFirstChunk = false
         var emittedPrerollReady = false
         var startedPlayback = false
-        var chunkCount = 0
-        var sampleCount = 0
-        var startupBufferedAudioMS: Int?
-        var timeToFirstChunkMS: Int?
-        var timeToPrerollReadyMS: Int?
-        var lastChunkReceivedAt: Date?
-        var interChunkGapTotalMS = 0
-        var interChunkGapCount = 0
-        var maxInterChunkGapMS: Int?
         var lastScheduleAt: Date?
         var scheduleGapTotalMS = 0
         var scheduleGapCount = 0
         var maxScheduleGapMS: Int?
         var lastPreparedTrailingSample: Float?
-        var generatedAudioQualityMonitor = GeneratedAudioQualityMonitor(sampleRate: sampleRate)
-        var emittedGenerationQualityWarningReasons = Set<GeneratedAudioQualityWarningReason>()
+        var accounting = PlaybackStreamAccounting(sampleRate: sampleRate, startedAt: startedAt)
 
         func bufferedAudioMS() -> Int {
             state.queuedAudioMS(sampleRate: sampleRate)
@@ -199,37 +189,26 @@ final class AudioPlaybackDriver {
             let currentBufferIndex = queuedBuffer.bufferIndex ?? 0
             let currentEngineGeneration = queuedBuffer.engineGeneration ?? state.engineGeneration
 
-            let leadingAbs = Double(abs(queuedBuffer.firstSample))
-            let trailingAbs = Double(abs(queuedBuffer.lastSample))
-            state.maxLeadingAbsAmplitude = max(state.maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
-            state.maxTrailingAbsAmplitude = max(state.maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
-            if queuedBuffer.fadeInApplied {
-                state.fadeInChunkCount += 1
-            }
-            if let lastTrailingSample = state.lastTrailingSample {
-                let jump = Double(abs(queuedBuffer.firstSample - lastTrailingSample))
-                state.maxBoundaryDiscontinuity = max(state.maxBoundaryDiscontinuity ?? jump, jump)
-            }
-            state.lastTrailingSample = queuedBuffer.lastSample
-
-            state.scheduleCallbackCount += 1
-            state.recordQueuedAudioDepth(sampleRate: sampleRate)
+            state.recordPreparedBufferShape(
+                firstSample: queuedBuffer.firstSample,
+                lastSample: queuedBuffer.lastSample,
+                fadeInApplied: queuedBuffer.fadeInApplied,
+            )
+            state.recordScheduledBuffer(sampleRate: sampleRate)
             let queuedAudioAfterMS = state.queuedAudioMS(sampleRate: sampleRate)
             if traceEnabled {
                 await onEvent(
                     .trace(
-                        PlaybackTraceEvent(
-                            name: "buffer_scheduled",
+                        .bufferScheduled(
                             chunkIndex: queuedBuffer.chunkIndex,
                             bufferIndex: currentBufferIndex,
-                            sampleCount: queuedBuffer.frameCount,
-                            durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1000).rounded()),
+                            frameCount: queuedBuffer.frameCount,
+                            sampleRate: sampleRate,
                             queuedAudioBeforeMS: queuedAudioBeforeMS,
                             queuedAudioAfterMS: queuedAudioAfterMS,
                             gapMS: scheduleGapMS,
                             isRebuffering: state.isRebuffering,
                             fadeInApplied: queuedBuffer.fadeInApplied,
-                            generatedAudioQuality: nil,
                         ),
                     ),
                 )
@@ -248,25 +227,20 @@ final class AudioPlaybackDriver {
                         return
                     }
 
-                    state.playedBackCallbackCount += 1
-                    state.recordQueuedAudioDepth(sampleRate: sampleRate)
+                    state.recordPlayedBackBuffer(sampleRate: sampleRate)
 
                     let currentQueuedAudioMS = state.queuedAudioMS(sampleRate: sampleRate)
                     if self.traceEnabled {
                         await onEvent(
                             .trace(
-                                PlaybackTraceEvent(
-                                    name: "buffer_played_back",
+                                .bufferPlayedBack(
                                     chunkIndex: queuedBuffer.chunkIndex,
                                     bufferIndex: currentBufferIndex,
-                                    sampleCount: queuedBuffer.frameCount,
-                                    durationMS: Int((Double(queuedBuffer.frameCount) / sampleRate * 1000).rounded()),
-                                    queuedAudioBeforeMS: nil,
+                                    frameCount: queuedBuffer.frameCount,
+                                    sampleRate: sampleRate,
                                     queuedAudioAfterMS: currentQueuedAudioMS,
-                                    gapMS: nil,
                                     isRebuffering: state.isRebuffering,
                                     fadeInApplied: queuedBuffer.fadeInApplied,
-                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )
@@ -274,16 +248,7 @@ final class AudioPlaybackDriver {
                     if !state.generationFinished, !state.currentChunkFinished, currentQueuedAudioMS <= 0 {
                         state.starvationEventCount += 1
                         state.thresholdsController.recordStarvation()
-                        if !state.isRebuffering {
-                            state.isRebuffering = true
-                            state.rebufferEventCount += 1
-                            state.thresholdsController.recordRebuffer()
-                            let now = Date()
-                            state.rebufferStartedAt = now
-                            state.recentRebufferStartTimes.append(now)
-                            state.recentRebufferStartTimes.removeAll {
-                                now.timeIntervalSince($0) * 1000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
-                            }
+                        if state.beginRebuffer() {
                             await onEvent(.rebufferStarted(queuedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                         }
                         await onEvent(.starved)
@@ -294,20 +259,10 @@ final class AudioPlaybackDriver {
                        !state.currentChunkFinished,
                        currentQueuedAudioMS <= state.thresholdsController.thresholds.lowWaterTargetMS,
                        !state.isRebuffering {
-                        state.isRebuffering = true
-                        state.rebufferEventCount += 1
-                        state.thresholdsController.recordRebuffer()
-                        let now = Date()
-                        state.rebufferStartedAt = now
-                        state.recentRebufferStartTimes.append(now)
-                        state.recentRebufferStartTimes.removeAll {
-                            now.timeIntervalSince($0) * 1000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
-                        }
+                        state.beginRebuffer()
                         self.playerNode?.pause()
                         await onEvent(.rebufferStarted(queuedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
-                        if !state.emittedRebufferThrashWarning,
-                           state.recentRebufferStartTimes.count >= PlaybackMetricsConfiguration.rebufferThrashWarningCount {
-                            state.emittedRebufferThrashWarning = true
+                        if state.shouldEmitRebufferThrashWarning() {
                             await onEvent(
                                 .rebufferThrashWarning(
                                     rebufferEventCount: state.rebufferEventCount,
@@ -331,13 +286,7 @@ final class AudioPlaybackDriver {
                         if !self.isPlaybackPausedManually {
                             self.playerNode?.play()
                         }
-                        state.isRebuffering = false
-                        if let rebufferStartedAt = state.rebufferStartedAt {
-                            let durationMS = milliseconds(since: rebufferStartedAt)
-                            state.rebufferTotalDurationMS += durationMS
-                            state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
-                            state.rebufferStartedAt = nil
-                        }
+                        state.finishRebuffer()
                         await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                     }
 
@@ -368,18 +317,10 @@ final class AudioPlaybackDriver {
                     if traceEnabled {
                         await onEvent(
                             .trace(
-                                PlaybackTraceEvent(
-                                    name: "generation_chunk_finished",
-                                    chunkIndex: chunkCount,
-                                    bufferIndex: nil,
-                                    sampleCount: 0,
-                                    durationMS: 0,
-                                    queuedAudioBeforeMS: currentQueuedAudioMS,
-                                    queuedAudioAfterMS: currentQueuedAudioMS,
-                                    gapMS: nil,
+                                .generationChunkFinished(
+                                    chunkIndex: accounting.chunkCount,
+                                    queuedAudioMS: currentQueuedAudioMS,
                                     isRebuffering: state.isRebuffering,
-                                    fadeInApplied: false,
-                                    generatedAudioQuality: nil,
                                 ),
                             ),
                         )
@@ -389,13 +330,7 @@ final class AudioPlaybackDriver {
                         if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
                             playerNode?.play()
                         }
-                        state.isRebuffering = false
-                        if let rebufferStartedAt = state.rebufferStartedAt {
-                            let durationMS = milliseconds(since: rebufferStartedAt)
-                            state.rebufferTotalDurationMS += durationMS
-                            state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
-                            state.rebufferStartedAt = nil
-                        }
+                        state.finishRebuffer()
                         await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                     }
                     continue
@@ -404,66 +339,47 @@ final class AudioPlaybackDriver {
                 let resumesAfterFinishedChunkDrain = state.currentChunkFinished && state.queuedAudioMS(sampleRate: sampleRate) == 0
                 state.currentChunkFinished = false
 
-                let now = Date()
-                let chunkDurationMS = Int((Double(chunk.count) / sampleRate * 1000).rounded())
-                let interChunkGapMS: Int?
-                chunkCount += 1
-                sampleCount += chunk.count
-                if let lastChunkReceivedAt {
-                    let gapMS = milliseconds(since: lastChunkReceivedAt)
-                    interChunkGapMS = gapMS
-                    maxInterChunkGapMS = max(maxInterChunkGapMS ?? gapMS, gapMS)
-                    interChunkGapTotalMS += gapMS
-                    interChunkGapCount += 1
-                    state.thresholdsController.recordChunk(durationMS: chunkDurationMS, interChunkGapMS: gapMS)
-                    if startedPlayback, gapMS >= state.thresholdsController.thresholds.chunkGapWarningMS {
-                        await onEvent(.chunkGapWarning(gapMS: gapMS, chunkIndex: chunkCount))
-                    }
-                } else {
-                    interChunkGapMS = nil
-                    state.thresholdsController.recordChunk(durationMS: chunkDurationMS, interChunkGapMS: nil)
-                }
-                lastChunkReceivedAt = now
-                let qualityObservation = generatedAudioQualityMonitor.observe(
+                let queuedAudioBeforeChunkMS = bufferedAudioMS()
+                let recordedChunk = accounting.recordGeneratedChunk(
                     samples: chunk,
-                    chunkIndex: chunkCount,
+                    thresholds: state.thresholdsController.thresholds,
+                    queuedAudioBeforeMS: queuedAudioBeforeChunkMS,
+                    queuedAudioAfterMS: nil,
+                    isRebuffering: state.isRebuffering,
+                    fadeInApplied: !emittedFirstChunk,
                 )
-                if let warning = generatedAudioQualityMonitor.warning(for: qualityObservation),
-                   emittedGenerationQualityWarningReasons.insert(warning.reason).inserted {
+                state.thresholdsController.recordChunk(
+                    durationMS: recordedChunk.durationMS,
+                    interChunkGapMS: recordedChunk.interChunkGapMS,
+                )
+                if startedPlayback,
+                   let gapWarning = accounting.chunkGapWarning(
+                       for: recordedChunk,
+                       thresholds: state.thresholdsController.thresholds,
+                   ) {
+                    await onEvent(gapWarning)
+                }
+                if let warning = recordedChunk.qualityWarning {
                     await onEvent(.generationQualityWarning(warning))
                 }
                 if traceEnabled {
                     await onEvent(
                         .trace(
-                            PlaybackTraceEvent(
-                                name: "generation_quality_chunk",
-                                chunkIndex: chunkCount,
-                                bufferIndex: nil,
-                                sampleCount: chunk.count,
-                                durationMS: chunkDurationMS,
-                                queuedAudioBeforeMS: bufferedAudioMS(),
+                            accounting.generationQualityTrace(
+                                for: recordedChunk,
+                                queuedAudioBeforeMS: queuedAudioBeforeChunkMS,
                                 queuedAudioAfterMS: nil,
-                                gapMS: interChunkGapMS,
                                 isRebuffering: state.isRebuffering,
-                                fadeInApplied: !emittedFirstChunk,
-                                generatedAudioQuality: qualityObservation,
                             ),
                         ),
                     )
                     await onEvent(
                         .trace(
-                            PlaybackTraceEvent(
-                                name: "chunk_received",
-                                chunkIndex: chunkCount,
-                                bufferIndex: nil,
-                                sampleCount: chunk.count,
-                                durationMS: chunkDurationMS,
-                                queuedAudioBeforeMS: bufferedAudioMS(),
+                            accounting.chunkReceivedTrace(
+                                for: recordedChunk,
+                                queuedAudioBeforeMS: queuedAudioBeforeChunkMS,
                                 queuedAudioAfterMS: nil,
-                                gapMS: interChunkGapMS,
                                 isRebuffering: state.isRebuffering,
-                                fadeInApplied: !emittedFirstChunk,
-                                generatedAudioQuality: nil,
                             ),
                         ),
                     )
@@ -472,7 +388,7 @@ final class AudioPlaybackDriver {
                     from: chunk,
                     sampleRate: sampleRate,
                     previousTrailingSample: lastPreparedTrailingSample,
-                    applyFadeIn: !emittedFirstChunk,
+                    applyFadeIn: recordedChunk.fadeInApplied,
                 ) {
                     lastPreparedTrailingSample = buffer.lastSample
                     state.enqueueBuffer(
@@ -481,7 +397,7 @@ final class AudioPlaybackDriver {
                         firstSample: buffer.firstSample,
                         lastSample: buffer.lastSample,
                         fadeInApplied: buffer.fadeInApplied,
-                        chunkIndex: chunkCount,
+                        chunkIndex: recordedChunk.chunkIndex,
                     )
                     if startedPlayback {
                         try await scheduleQueuedBuffersIfPossible()
@@ -497,13 +413,7 @@ final class AudioPlaybackDriver {
                                 if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
                                     playerNode?.play()
                                 }
-                                state.isRebuffering = false
-                                if let rebufferStartedAt = state.rebufferStartedAt {
-                                    let durationMS = milliseconds(since: rebufferStartedAt)
-                                    state.rebufferTotalDurationMS += durationMS
-                                    state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
-                                    state.rebufferStartedAt = nil
-                                }
+                                state.finishRebuffer()
                                 await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                             }
                         }
@@ -512,20 +422,18 @@ final class AudioPlaybackDriver {
 
                 if !emittedFirstChunk {
                     emittedFirstChunk = true
-                    timeToFirstChunkMS = milliseconds(since: startedAt)
                     await onEvent(.firstChunk)
                 }
 
                 if !startedPlayback, bufferedAudioMS() >= state.thresholdsController.thresholds.startupBufferTargetMS {
-                    startupBufferedAudioMS = bufferedAudioMS()
+                    let startupBufferedAudioMS = accounting.markPrerollReady(bufferedAudioMS: bufferedAudioMS())
                     startedPlayback = true
                     emittedPrerollReady = true
-                    timeToPrerollReadyMS = milliseconds(since: startedAt)
                     if !isPlaybackPausedManually {
                         playbackState = .playing
                     }
                     try await scheduleQueuedBuffersIfPossible()
-                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: state.thresholdsController.thresholds))
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: state.thresholdsController.thresholds))
                 }
             }
 
@@ -535,17 +443,11 @@ final class AudioPlaybackDriver {
                 if !isPlaybackPausedManually {
                     playerNode?.play()
                 }
-                state.isRebuffering = false
-                if let rebufferStartedAt = state.rebufferStartedAt {
-                    let durationMS = milliseconds(since: rebufferStartedAt)
-                    state.rebufferTotalDurationMS += durationMS
-                    state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
-                    state.rebufferStartedAt = nil
-                }
+                state.finishRebuffer()
                 await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
             }
             if !startedPlayback, !state.queuedBuffers.isEmpty {
-                startupBufferedAudioMS = bufferedAudioMS()
+                _ = accounting.markPrerollReady(bufferedAudioMS: bufferedAudioMS())
                 startedPlayback = true
                 try await scheduleQueuedBuffersIfPossible()
                 if state.isRebuffering {
@@ -553,13 +455,7 @@ final class AudioPlaybackDriver {
                     if !isPlaybackPausedManually, !isPlaybackRecoveryActive {
                         playerNode?.play()
                     }
-                    state.isRebuffering = false
-                    if let rebufferStartedAt = state.rebufferStartedAt {
-                        let durationMS = milliseconds(since: rebufferStartedAt)
-                        state.rebufferTotalDurationMS += durationMS
-                        state.longestRebufferDurationMS = max(state.longestRebufferDurationMS, durationMS)
-                        state.rebufferStartedAt = nil
-                    }
+                    state.finishRebuffer()
                     await onEvent(.rebufferResumed(bufferedAudioMS: currentQueuedAudioMS, thresholds: state.thresholdsController.thresholds))
                 }
                 if !isPlaybackPausedManually {
@@ -567,11 +463,12 @@ final class AudioPlaybackDriver {
                 }
             }
 
-            if !emittedPrerollReady, chunkCount > 0 {
+            if !emittedPrerollReady, accounting.chunkCount > 0 {
                 emittedPrerollReady = true
-                startupBufferedAudioMS = startupBufferedAudioMS ?? state.queuedAudioMS(sampleRate: sampleRate)
-                timeToPrerollReadyMS = milliseconds(since: startedAt)
-                await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: state.thresholdsController.thresholds))
+                let startupBufferedAudioMS = accounting.hasEmittedPrerollReady
+                    ? accounting.startupBufferedAudioMS ?? state.queuedAudioMS(sampleRate: sampleRate)
+                    : accounting.markPrerollReady(bufferedAudioMS: state.queuedAudioMS(sampleRate: sampleRate))
+                await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: state.thresholdsController.thresholds))
             }
 
             try throwIfActivePlaybackInterrupted()
@@ -591,23 +488,12 @@ final class AudioPlaybackDriver {
                     ),
                 )
             }
-            let timeFromPrerollReadyToDrainMS: Int? = if let timeToPrerollReadyMS {
-                max(0, milliseconds(since: startedAt) - timeToPrerollReadyMS)
-            } else {
-                nil
-            }
 
             resetPlayerNodeForNextRequest()
             shouldPlayInterJobBoop = true
 
-            return PlaybackSummary(
+            return accounting.summary(
                 thresholds: state.thresholdsController.thresholds,
-                chunkCount: chunkCount,
-                sampleCount: sampleCount,
-                startupBufferedAudioMS: startupBufferedAudioMS,
-                timeToFirstChunkMS: timeToFirstChunkMS,
-                timeToPrerollReadyMS: timeToPrerollReadyMS,
-                timeFromPrerollReadyToDrainMS: timeFromPrerollReadyToDrainMS,
                 minQueuedAudioMS: state.minQueuedAudioMS,
                 maxQueuedAudioMS: state.maxQueuedAudioMS,
                 avgQueuedAudioMS: state.queueDepthSampleCount == 0 ? nil : state.queueDepthTotalMS / state.queueDepthSampleCount,
@@ -618,8 +504,6 @@ final class AudioPlaybackDriver {
                 starvationEventCount: state.starvationEventCount,
                 scheduleCallbackCount: state.scheduleCallbackCount,
                 playedBackCallbackCount: state.playedBackCallbackCount,
-                maxInterChunkGapMS: maxInterChunkGapMS,
-                avgInterChunkGapMS: interChunkGapCount == 0 ? nil : interChunkGapTotalMS / interChunkGapCount,
                 maxScheduleGapMS: maxScheduleGapMS,
                 avgScheduleGapMS: scheduleGapCount == 0 ? nil : scheduleGapTotalMS / scheduleGapCount,
                 maxBoundaryDiscontinuity: state.maxBoundaryDiscontinuity,
