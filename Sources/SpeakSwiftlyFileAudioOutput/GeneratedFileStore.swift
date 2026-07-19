@@ -1,5 +1,5 @@
 import Foundation
-import TextForSpeech
+import SpeakSwiftlyCore
 
 public struct GeneratedFileManifest: Codable, Equatable, Sendable {
     public let version: Int
@@ -7,8 +7,8 @@ public struct GeneratedFileManifest: Codable, Equatable, Sendable {
     public let createdAt: Date
     public let voiceProfile: String
     public let textProfile: String?
-    public let sourceFormat: TextForSpeech.SourceFormat?
-    public let requestContext: TextForSpeech.RequestContext?
+    public let sourceFormat: SourceFormat?
+    public let requestContext: RequestContext?
     public let sampleRate: Int
     public let audioFormat: GeneratedAudioFileFormat
     public let contentType: String
@@ -20,8 +20,8 @@ public struct GeneratedFileSummary: Codable, Equatable, Sendable {
     public let createdAt: Date
     public let voiceProfile: String
     public let textProfile: String?
-    public let sourceFormat: TextForSpeech.SourceFormat?
-    public let requestContext: TextForSpeech.RequestContext?
+    public let sourceFormat: SourceFormat?
+    public let requestContext: RequestContext?
     public let sampleRate: Int
     public let audioFormat: GeneratedAudioFileFormat
     public let contentType: String
@@ -92,8 +92,8 @@ public struct GeneratedFileStore: @unchecked Sendable {
         artifactID: String,
         voiceProfile: String,
         textProfile: String?,
-        sourceFormat: TextForSpeech.SourceFormat?,
-        requestContext: TextForSpeech.RequestContext?,
+        sourceFormat: SourceFormat?,
+        requestContext: RequestContext?,
         sampleRate: Int,
         audioFormat: GeneratedAudioFileFormat = .wav,
         audioData: Data,

@@ -16,11 +16,10 @@ output into small self-contained package modules.
   implementation swap unless that work is explicitly brought into this branch.
 - Treat `SpeakSwiftlyServer` adoption and real two-Mac LAN testing as follow-up
   integration work after this package exposes stable output modules.
-- TextForSpeech 0.23.0 removed
-  `TextForSpeech.RequestContext.RequestPurpose.audioStream` in
-  [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
-  SpeakSwiftly now relies on TextForSpeech decoding to reject stale JSONL
-  `request_context.reqPurpose: "audioStream"` payloads.
+- The earlier TextForSpeech 0.23.0 integration removed the `audioStream`
+  request-purpose case. SpeakSwiftly 12 now owns that request-context model in
+  `SpeakSwiftlyCore` and rejects stale
+  `request_context.reqPurpose: "audioStream"` payloads directly.
 
 ## Target Shape
 

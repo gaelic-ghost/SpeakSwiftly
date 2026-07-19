@@ -11,5 +11,7 @@ supports iOS.
 
 The current direction is to keep `SpeakSwiftly` as a macOS-only local speech
 worker package and pursue mobile speech in a separate `SpeakSwiftlyMobile` app.
-Shared text conditioning should live in `TextForSpeech` when that package can
-support the mobile app without desktop worker concepts.
+As of SpeakSwiftly 12, normalization is an internal package target rather than
+an independent dependency. The mobile app should begin with app-owned text
+conditioning; extract a vended cross-platform normalization product only after
+both apps prove a stable portable boundary.

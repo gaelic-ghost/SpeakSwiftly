@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 @Test func `request observation returns nil and finished stream for unknown request ID`() async throws {
     let runtime = try await makeRuntime(

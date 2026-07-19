@@ -3,7 +3,6 @@ import Foundation
 import MLXAudioTTS
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 private let longPlaybackPlannerFixtureText = """
 Hello from the real resident SpeakSwiftly playback path. This end to end test now uses a longer utterance so we can observe startup buffering, queue floor recovery, drain timing, and steady streaming behavior with enough generated audio to make the diagnostics useful instead of noisy.
@@ -227,7 +226,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -251,7 +250,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -295,7 +294,7 @@ private actor ProfileModelLoadObservation {
     Also say chrommmaticallly and qqqwweerrtyy once.
     """
 
-    let normalized = try await TextForSpeech.Normalize.text(original)
+    let normalized = try await normalizeTextForTest(original)
     let features = SpeakSwiftly.DeepTrace.features(
         originalText: original,
         normalizedText: normalized,
@@ -366,7 +365,7 @@ private actor ProfileModelLoadObservation {
     Please read /Users/galew/Workspace/SpeakSwiftly/Sources/SpeakSwiftly/SpeechTextNormalizer.swift, NSApplication.didFinishLaunchingNotification, camelCaseStuff, snake_case_stuff, and `profile?.sampleRate ?? 24000`.
     """
 
-    let normalized = try await TextForSpeech.Normalize.text(original)
+    let normalized = try await normalizeTextForTest(original)
 
     #expect(normalized.contains("gale wumbo Workspace Speak Swiftly"))
     #expect(normalized.contains("NSApplication dot did Finish Launching Notification"))
@@ -415,7 +414,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -468,7 +467,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -541,7 +540,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -614,7 +613,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Longer playback diagnostics check","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Longer playback diagnostics check","voice_profile":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsStderrJSONObject {
@@ -742,7 +741,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {
@@ -797,7 +796,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await firstRuntime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await firstRuntime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -838,7 +837,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await secondRuntime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","profile_name":"default-femme"}"#)
+    await secondRuntime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         secondOutput.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -905,7 +904,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-17b","op":"generate_speech","text":"Hello on the larger model","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-17b","op":"generate_speech","text":"Hello on the larger model","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-17b"
@@ -1103,7 +1102,7 @@ private actor ProfileModelLoadObservation {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -1154,7 +1153,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"generate_speech","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","profile_name":"default-femme"}
+        {"id":"req-1","op":"generate_speech","text":"Please read `fooBar()` and this block:\n```swift\nlet greeting = user?.displayName ?? \"friend\"\n```","voice_profile":"default-femme"}
         """#,
     )
 
@@ -1194,11 +1193,11 @@ private actor ProfileModelLoadObservation {
 
     let logs = try await runtime.normalizer.profiles.create(name: "Logs")
     _ = try await runtime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement("stderr", with: "standard error"),
+        SpeakSwiftly.TextReplacement("stderr", with: "standard error"),
         toProfile: logs.id,
     )
     _ = try await runtime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement(
+        SpeakSwiftly.TextReplacement(
             "snake case stuff",
             with: "settings token",
             during: .afterBuiltIns,
@@ -1215,7 +1214,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: #"""
-        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","profile_name":"default-femme","text_profile_id":"logs"}
+        {"id":"req-1","op":"generate_speech","text":"Please read stderr and snake_case_stuff once.","voice_profile":"default-femme","text_profile":"logs"}
         """#,
     )
 
@@ -1226,7 +1225,7 @@ private actor ProfileModelLoadObservation {
     #expect(normalized.contains("settings token"))
 }
 
-@Test func `speak live lets TextForSpeech detect source before resident generation`() async throws {
+@Test func `speak live lets SpeakSwiftly detect source before resident generation`() async throws {
     let output = OutputRecorder()
     let playback = PlaybackSpy()
     let residentRecorder = ResidentModelRecorder()
@@ -1259,7 +1258,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: #"""
-        {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme"}
+        {"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","voice_profile":"default-femme"}
         """#,
     )
 
@@ -1406,7 +1405,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-live","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme"}
+        {"id":"req-qwen-live","op":"generate_speech","text":"\(escapedText)","voice_profile":"default-femme"}
         """,
     )
 
@@ -1423,7 +1422,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-file","op":"generate_audio_file","text":"\(escapedText)","profile_name":"default-femme"}
+        {"id":"req-qwen-file","op":"generate_audio_file","text":"\(escapedText)","voice_profile":"default-femme"}
         """,
     )
 
@@ -1439,7 +1438,7 @@ private actor ProfileModelLoadObservation {
 
     await runtime.accept(
         line: """
-        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","profile_name":"default-femme","qwen_pre_model_text_chunking":true}
+        {"id":"req-qwen-live-chunked","op":"generate_speech","text":"\(escapedText)","voice_profile":"default-femme","qwen_pre_model_text_chunking":true}
         """,
     )
 

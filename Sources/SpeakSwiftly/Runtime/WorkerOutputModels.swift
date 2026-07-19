@@ -1,5 +1,4 @@
 import Foundation
-import TextForSpeech
 
 // MARK: - Response Envelope
 
@@ -15,7 +14,7 @@ public extension SpeakSwiftly {
             profile: SpeakSwiftly.TextProfileDetails?,
             profiles: [SpeakSwiftly.TextProfileSummary]?,
             styleOptions: [SpeakSwiftly.TextProfileStyleOption]?,
-            activeStyle: TextForSpeech.BuiltInProfileStyle?,
+            activeStyle: SpeakSwiftly.TextProfileStyle?,
             persistencePath: String?,
         )
         case queue(activeRequests: [ActiveRequest], queuedRequests: [QueuedRequest])
@@ -146,7 +145,7 @@ package extension SpeakSwiftly {
         let textProfile: SpeakSwiftly.TextProfileDetails?
         let textProfiles: [SpeakSwiftly.TextProfileSummary]?
         let textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]?
-        let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
+        let textProfileStyle: SpeakSwiftly.TextProfileStyle?
         let textProfilePath: String?
         let activeRequest: ActiveRequest?
         let activeRequests: [ActiveRequest]?
@@ -186,7 +185,7 @@ package extension SpeakSwiftly {
             textProfile: SpeakSwiftly.TextProfileDetails? = nil,
             textProfiles: [SpeakSwiftly.TextProfileSummary]? = nil,
             textProfileStyleOptions: [SpeakSwiftly.TextProfileStyleOption]? = nil,
-            textProfileStyle: TextForSpeech.BuiltInProfileStyle? = nil,
+            textProfileStyle: SpeakSwiftly.TextProfileStyle? = nil,
             textProfilePath: String? = nil,
             activeRequest: ActiveRequest? = nil,
             activeRequests: [ActiveRequest]? = nil,

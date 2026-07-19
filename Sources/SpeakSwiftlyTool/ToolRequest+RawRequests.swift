@@ -1,6 +1,5 @@
 import Foundation
 import SpeakSwiftly
-import TextForSpeech
 
 struct RawBatchItem: Decodable {
     enum CodingKeys: String, CodingKey {
@@ -31,10 +30,17 @@ struct RawBatchItem: Decodable {
         try Self.rejectRemovedGenerationContextKeys(in: container)
         try Self.rejectRemovedRequestContextKeys(in: container)
 
+        if container.contains(.textProfileID) {
+            throw DecodingError.dataCorruptedError(
+                forKey: .textProfileID,
+                in: container,
+                debugDescription: "Batch generation key 'text_profile_id' was removed. Use 'text_profile' to select a normalization profile for a batch item.",
+            )
+        }
+
         artifactID = try container.decodeIfPresent(String.self, forKey: .artifactID)
         text = try container.decodeIfPresent(String.self, forKey: .text)
         textProfile = try container.decodeIfPresent(String.self, forKey: .textProfile)
-            ?? container.decodeIfPresent(String.self, forKey: .textProfileID)
         requestContext = try container.decodeIfPresent(
             SpeakSwiftly.RequestContext.self,
             forKey: .requestContext,
@@ -90,142 +96,6 @@ struct RawWorkerRequest: Decodable {
         case audioFormat = "audio_format"
     }
 
-    private struct LegacyReplacementPayload: Decodable {
-        private enum LegacyMatchPayload: Decodable {
-            case match(TextForSpeech.Replacement.Match)
-
-            init(from decoder: any Decoder) throws {
-                if let match = try? TextForSpeech.Replacement.Match(from: decoder) {
-                    self = .match(match)
-                    return
-                }
-
-                let container = try decoder.singleValueContainer()
-                let rawValue = try container.decode(String.self)
-
-                switch rawValue {
-                    case "exact_phrase":
-                        self = .match(.exactPhrase)
-                    case "whole_token":
-                        self = .match(.wholeToken)
-                    default:
-                        throw DecodingError.dataCorruptedError(
-                            in: container,
-                            debugDescription: "Unsupported legacy replacement match '\(rawValue)'.",
-                        )
-                }
-            }
-
-            var resolved: TextForSpeech.Replacement.Match {
-                switch self {
-                    case let .match(match):
-                        match
-                }
-            }
-        }
-
-        private enum LegacyTransformPayload: Decodable {
-            case transform(TextForSpeech.Replacement.Transform)
-
-            init(from decoder: any Decoder) throws {
-                if let transform = try? TextForSpeech.Replacement.Transform(from: decoder) {
-                    self = .transform(transform)
-                    return
-                }
-
-                let container = try decoder.singleValueContainer()
-                let rawValue = try container.decode(String.self)
-
-                switch rawValue {
-                    case "spoken_path":
-                        self = .transform(.spokenPath)
-                    case "spoken_url":
-                        self = .transform(.spokenURL)
-                    case "spoken_identifier":
-                        self = .transform(.spokenIdentifier)
-                    case "spoken_code":
-                        self = .transform(.spokenCode)
-                    case "spell_out":
-                        self = .transform(.spellOut)
-                    default:
-                        throw DecodingError.dataCorruptedError(
-                            in: container,
-                            debugDescription: "Unsupported legacy replacement transform '\(rawValue)'.",
-                        )
-                }
-            }
-
-            var resolved: TextForSpeech.Replacement.Transform {
-                switch self {
-                    case let .transform(transform):
-                        transform
-                }
-            }
-        }
-
-        let id: String
-        let text: String
-        let replacement: String?
-        let phase: TextForSpeech.Replacement.Phase
-        let isCaseSensitive: Bool
-        let textFormats: Set<TextForSpeech.TextFormat>
-        let sourceFormats: Set<TextForSpeech.SourceFormat>
-        let priority: Int
-
-        private let transform: LegacyTransformPayload?
-        private let match: LegacyMatchPayload
-
-        func resolved() throws -> TextForSpeech.Replacement {
-            if let replacement {
-                return TextForSpeech.Replacement(
-                    text,
-                    with: replacement,
-                    id: id,
-                    matching: match.resolved,
-                    during: phase,
-                    caseSensitive: isCaseSensitive,
-                    forTextFormats: textFormats,
-                    forSourceFormats: sourceFormats,
-                    priority: priority,
-                )
-            }
-
-            guard let transform else {
-                throw DecodingError.dataCorrupted(
-                    DecodingError.Context(
-                        codingPath: [],
-                        debugDescription: "Replacement payload must provide either a literal 'replacement' or a 'transform'.",
-                    ),
-                )
-            }
-
-            if case let .literal(literal) = transform.resolved {
-                return TextForSpeech.Replacement(
-                    text,
-                    with: literal,
-                    id: id,
-                    matching: match.resolved,
-                    during: phase,
-                    caseSensitive: isCaseSensitive,
-                    forTextFormats: textFormats,
-                    forSourceFormats: sourceFormats,
-                    priority: priority,
-                )
-            }
-
-            return TextForSpeech.Replacement(
-                id: id,
-                matching: match.resolved,
-                using: transform.resolved,
-                during: phase,
-                caseSensitive: isCaseSensitive,
-                forTextFormats: textFormats,
-                forSourceFormats: sourceFormats,
-                priority: priority,
-            )
-        }
-    }
-
     let id: String?
     let op: String?
     let artifactID: String?
@@ -241,8 +111,8 @@ struct RawWorkerRequest: Decodable {
     let requestContext: SpeakSwiftly.RequestContext?
     let recentAudioID: String?
     let replayMode: SpeakSwiftly.RecentGeneratedAudioReplayMode?
-    let textProfileStyle: TextForSpeech.BuiltInProfileStyle?
-    let replacement: TextForSpeech.Replacement?
+    let textProfileStyle: SpeakSwiftly.TextProfileStyle?
+    let replacement: SpeakSwiftly.TextReplacement?
     let replacementID: String?
     let cwd: String?
     let repoRoot: String?
@@ -288,7 +158,7 @@ struct RawWorkerRequest: Decodable {
         recentAudioID = try container.decodeIfPresent(String.self, forKey: .recentAudioID)
         replayMode = try container.decodeIfPresent(SpeakSwiftly.RecentGeneratedAudioReplayMode.self, forKey: .replayMode)
         textProfileStyle = try container.decodeIfPresent(
-            TextForSpeech.BuiltInProfileStyle.self,
+            SpeakSwiftly.TextProfileStyle.self,
             forKey: .textProfileStyle,
         )
         replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
@@ -379,7 +249,7 @@ struct RawWorkerRequest: Decodable {
     static func requestContext(
         cwd: String?,
         repoRoot: String?,
-        reqPurpose: TextForSpeech.RequestContext.RequestPurpose,
+        reqPurpose: SpeakSwiftly.RequestContext.RequestPurpose,
         base: SpeakSwiftly.RequestContext? = nil,
         requestID id: String,
     ) throws -> SpeakSwiftly.RequestContext? {
@@ -439,16 +309,8 @@ struct RawWorkerRequest: Decodable {
     private static func decodeReplacementIfPresent(
         in container: KeyedDecodingContainer<CodingKeys>,
         forKey key: CodingKeys,
-    ) throws -> TextForSpeech.Replacement? {
-        guard container.contains(key) else { return nil }
-
-        do {
-            return try container.decodeIfPresent(TextForSpeech.Replacement.self, forKey: key)
-        } catch {
-            return try container
-                .decodeIfPresent(LegacyReplacementPayload.self, forKey: key)?
-                .resolved()
-        }
+    ) throws -> SpeakSwiftly.TextReplacement? {
+        try container.decodeIfPresent(ReplacementPayload.self, forKey: key)?.resolved()
     }
 }
 
@@ -523,7 +385,7 @@ private func rejectRemovedGenerationContextKeysInContainer<Key: CodingKey>(
         throw DecodingError.dataCorruptedError(
             forKey: key,
             in: container,
-            debugDescription: "Generation context key '\(key.stringValue)' was removed. Omit source-format hints and let TextForSpeech detect text and source structure from request text and path context.",
+            debugDescription: "Generation context key '\(key.stringValue)' was removed. Omit source-format hints and let SpeakSwiftly detect text and source structure from request text and path context.",
         )
     }
 }

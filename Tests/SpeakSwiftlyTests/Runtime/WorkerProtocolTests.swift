@@ -2,12 +2,11 @@ import Foundation
 @testable import SpeakSwiftly
 @testable import SpeakSwiftlyTool
 import Testing
-import TextForSpeech
 
 // MARK: - Request Decoding
 
 @Test func `decodes speak live request`() throws {
-    let request = try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme"}"#)
+    let request = try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"Hello","voice_profile":"default-femme"}"#)
 
     #expect(
         request == .queueSpeech(
@@ -42,7 +41,7 @@ import TextForSpeech
 
 @Test func `decodes speak file request`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-file","op":"generate_audio_file","text":"Hello","profile_name":"default-femme"}"#,
+        from: #"{"id":"req-file","op":"generate_audio_file","text":"Hello","voice_profile":"default-femme"}"#,
     )
 
     #expect(
@@ -61,7 +60,7 @@ import TextForSpeech
 
 @Test func `decodes speak file request with m4a audio format`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-file-m4a","op":"generate_audio_file","text":"Hello","profile_name":"default-femme","audio_format":"m4a"}"#,
+        from: #"{"id":"req-file-m4a","op":"generate_audio_file","text":"Hello","voice_profile":"default-femme","audio_format":"m4a"}"#,
     )
 
     #expect(
@@ -99,7 +98,7 @@ import TextForSpeech
 
 @Test func `decodes speak batch request`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-batch","op":"generate_batch","profile_name":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile_id":"logs"}]}"#,
+        from: #"{"id":"req-batch","op":"generate_batch","voice_profile":"default-femme","items":[{"text":"First file"},{"artifact_id":"custom-artifact","text":"Second file","text_profile":"logs"}]}"#,
     )
 
     #expect(
@@ -174,7 +173,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with request path context and profile`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","profile_name":"default-femme","text_profile_id":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
+        from: #"{"id":"req-1","op":"generate_speech","text":"Hello","voice_profile":"default-femme","text_profile":"logs","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}"#,
     )
 
     #expect(
@@ -197,7 +196,7 @@ import TextForSpeech
 
 @Test func `decodes speak live request with mixed markdown text`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","profile_name":"default-femme"}"#,
+        from: #"{"id":"req-embedded","op":"generate_speech","text":"```swift\nlet sampleRate = profile?.sampleRate ?? 24000\n```","voice_profile":"default-femme"}"#,
     )
 
     #expect(
@@ -285,7 +284,7 @@ import TextForSpeech
 
 @Test func `decodes qwen pre-model text chunking opt in`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-qwen-chunking","op":"generate_speech","text":"Hello","profile_name":"default-femme","qwen_pre_model_text_chunking":true}"#,
+        from: #"{"id":"req-qwen-chunking","op":"generate_speech","text":"Hello","voice_profile":"default-femme","qwen_pre_model_text_chunking":true}"#,
     )
 
     #expect(
@@ -572,7 +571,7 @@ import TextForSpeech
     #expect(
         add == .addTextReplacement(
             id: "req-text-add",
-            replacement: TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
+            replacement: SpeakSwiftly.TextReplacement("stderr", with: "standard error", id: "logs-rule"),
             profileID: "logs",
         ),
     )
@@ -583,7 +582,7 @@ import TextForSpeech
     #expect(
         replace == .replaceTextReplacement(
             id: "req-text-replace",
-            replacement: TextForSpeech.Replacement("stderr", with: "standard standard error", id: "logs-rule"),
+            replacement: SpeakSwiftly.TextReplacement("stderr", with: "standard standard error", id: "logs-rule"),
             profileID: "logs",
         ),
     )
@@ -733,13 +732,13 @@ import TextForSpeech
 
 @Test func `rejects missing required fields`() throws {
     #expect(throws: SpeakSwiftly.Error.self) {
-        try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","profile_name":"default-femme"}"#)
+        try ToolRequest.decode(from: #"{"id":"req-1","op":"generate_speech","text":"   ","voice_profile":"default-femme"}"#)
     }
 }
 
 @Test func `rejects removed generation context keys`() throws {
     let removedKeyPayloads = [
-        #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","profile_name":"default-femme","source_format":"swift_source"}"#,
+        #"{"id":"req-source","op":"generate_speech","text":"struct WorkerRuntime { let sampleRate: Int }","voice_profile":"default-femme","source_format":"swift_source"}"#,
         #"{"id":"req-batch-source","op":"generate_batch","items":[{"text":"Hello","source_format":"swift_source"}]}"#,
         #"{"id":"req-old-context","op":"generate_speech","text":"Hello","input_text_context":{"source_format":"swift_source"}}"#,
         #"{"id":"req-old-format","op":"generate_speech","text":"Hello","text_format":"source"}"#,
@@ -753,7 +752,27 @@ import TextForSpeech
         } catch let error as SpeakSwiftly.Error {
             #expect(error.code == .invalidRequest)
             #expect(error.message.contains("Generation context key"))
-            #expect(error.message.contains("TextForSpeech"))
+            #expect(error.message.contains("SpeakSwiftly"))
+        }
+    }
+}
+
+@Test func `rejects removed generation profile aliases`() throws {
+    let removedAliasPayloads = [
+        (#"{"id":"req-old-voice","op":"generate_speech","text":"Hello","profile_name":"default-femme"}"#, "profile_name", "voice_profile"),
+        (#"{"id":"req-old-text","op":"generate_audio_file","text":"Hello","text_profile_id":"logs"}"#, "text_profile_id", "text_profile"),
+        (#"{"id":"req-old-batch-voice","op":"generate_batch","profile_name":"default-femme","items":[{"text":"Hello"}]}"#, "profile_name", "voice_profile"),
+        (#"{"id":"req-old-batch-text","op":"generate_batch","items":[{"text":"Hello","text_profile_id":"logs"}]}"#, "text_profile_id", "text_profile"),
+    ]
+
+    for (payload, removedKey, replacementKey) in removedAliasPayloads {
+        do {
+            _ = try ToolRequest.decode(from: payload)
+            Issue.record("Expected removed generation profile alias '\(removedKey)' to be rejected.")
+        } catch let error as SpeakSwiftly.Error {
+            #expect(error.code == .invalidRequest)
+            #expect(error.message.contains(removedKey))
+            #expect(error.message.contains(replacementKey))
         }
     }
 }
@@ -938,7 +957,7 @@ import TextForSpeech
                     name: "Logs",
                     replacementCount: 1,
                 ),
-                replacements: [TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule")],
+                replacements: [SpeakSwiftly.TextReplacement("stderr", with: "standard error", id: "logs-rule")],
             ),
             textProfiles: [
                 SpeakSwiftly.TextProfileSummary(

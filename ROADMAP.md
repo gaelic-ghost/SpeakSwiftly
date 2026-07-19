@@ -258,24 +258,23 @@ In Progress
 
 - [x] Return `SpeakSwiftly` package metadata and current support docs to a clearly macOS-only local speech worker package.
 - [ ] Keep `SpeakSwiftlyServer` macOS-only and aligned with the streamlined `SpeakSwiftly` surface.
-- [ ] Prepare `TextForSpeech` as the shared normalization and profile foundation for `SpeakSwiftlyMobile` after conditioning any macOS-only behavior behind explicit platform checks or injectable providers.
-- [ ] Start `SpeakSwiftlyMobile` as a separate iOS app that depends on `TextForSpeech` and owns its mobile Core ML speech engine directly.
+- [x] Integrate normalization, summarization, text profiles, and persistence as the internal `SpeakSwiftlyNormalization` target while keeping lifecycle ownership on `SpeakSwiftly.Normalizer`.
+- [ ] Start `SpeakSwiftlyMobile` as a separate iOS app that owns its mobile Core ML speech engine and initial text-conditioning flow directly.
 
 ### Tickets
 
 - [x] Remove the current iOS support promise from `SpeakSwiftly` package metadata, README wording, API docs, and maintainer docs so the package no longer advertises an unsupported mobile runtime.
 - [ ] Delete or archive `SpeakSwiftly` iOS playback-only support that is no longer part of the macOS package contract.
-- [ ] Audit `TextForSpeech` for macOS-only behavior, especially summarization-provider defaults, persistence defaults, filesystem assumptions, and any Apple-framework availability checks that could affect an iOS app consumer.
-- [ ] Condition macOS-only `TextForSpeech` behavior with explicit platform checks or injected providers while preserving the existing iOS package platform support.
-- [ ] Keep `TextForSpeech` focused on speech-safe text normalization, built-in profiles, custom profile persistence, and profile-driven pronunciation overrides rather than moving speech generation or playback into it.
-- [ ] Define the initial `SpeakSwiftlyMobile` dependency shape as `TextForSpeech` plus app-owned Core ML model catalog, model loading, iOS audio-session ownership, and a narrow speak-text flow.
-- [ ] Defer any new shared package until both the macOS package and mobile app prove real duplication that cannot belong cleanly in `TextForSpeech`.
+- [x] Separate portable normalization algorithms from macOS runtime ownership inside the package graph.
+- [x] Keep speech generation and playback out of the normalization target.
+- [ ] Define the initial `SpeakSwiftlyMobile` shape as app-owned text conditioning, Core ML model catalog, model loading, iOS audio-session ownership, and a narrow speak-text flow.
+- [ ] Extract a vended cross-platform normalization product only after the macOS package and mobile app prove real duplication and a stable portable contract.
 
 ### Exit Criteria
 
 - [ ] `SpeakSwiftly` and `SpeakSwiftlyServer` are documented and packaged as macOS-only again.
-- [ ] `TextForSpeech` can be consumed by `SpeakSwiftlyMobile` without inheriting macOS-only behavior or desktop speech-worker concepts.
-- [ ] `SpeakSwiftlyMobile` has a documented first slice that uses `TextForSpeech` for text conditioning and keeps iOS Core ML generation inside the app until a shared boundary is earned.
+- [x] SpeakSwiftly has one package-owned normalization state owner and no external normalization-package dependency.
+- [ ] `SpeakSwiftlyMobile` has a documented first slice that keeps iOS text conditioning and Core ML generation inside the app until a shared boundary is earned.
 
 ## Milestone 32: Qwen-Only Output Modularization
 
@@ -305,7 +304,7 @@ In Progress
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.
 - [x] Add `generate.audioStream(...)` so host boundaries can consume successful canonical chunk streams instead of failed request handles.
 - [x] Add memory-backed recent generated-audio replay on `runtime.playback`, including replay-one, replay-all, bounded retention configuration, and JSONL/tool controls.
-- [x] Remove the local `request_context.reqPurpose: "audioStream"` rejection guard after TextForSpeech removed `RequestPurpose.audioStream` in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+- [x] Keep `request_context.reqPurpose: "audioStream"` rejected by the SpeakSwiftly-owned request-context decoder after the earlier external model removed that case.
 - [ ] Review and intentionally document the remaining non-playback output semantics: retained file generation should not inherit live-playback backpressure accidentally, while `generate.audioStream(...)` should define host-consumer cancellation, buffering, and slow-reader behavior explicitly before the next implementation pass.
 - [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
 - [x] Add organized unit and integration matrix coverage for every Qwen3 size and quant variant so routing, decoding, configuration, resident repo mapping, generation policy, and runtime scheduling stay covered without real-model downloads in the default suite.

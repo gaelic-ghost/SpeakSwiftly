@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 final class BlockingFilesystemCoordinator: @unchecked Sendable {
     private let enteredSemaphore = DispatchSemaphore(value: 0)
@@ -93,7 +92,7 @@ final class LockedFlag: @unchecked Sendable {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
@@ -109,7 +108,7 @@ final class LockedFlag: @unchecked Sendable {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hello again","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-2"
@@ -171,7 +170,7 @@ final class LockedFlag: @unchecked Sendable {
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-1","op":"generate_speech","text":"Hello there","voice_profile":"default-femme"}"#)
     #expect(await waitUntil {
         output.containsJSONObject {
             $0["id"] as? String == "req-1"
