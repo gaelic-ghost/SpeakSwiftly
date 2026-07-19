@@ -17,7 +17,7 @@ public struct RequestContext: Codable, Sendable, Equatable {
         case source
         case topic
         case cwd
-        case repoRoot
+        case repoRoot = "repo_root"
         case attributes
         case prefacePolicy
     }

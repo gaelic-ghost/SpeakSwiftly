@@ -161,7 +161,7 @@ struct RawWorkerRequest: Decodable {
             SpeakSwiftly.TextProfileStyle.self,
             forKey: .textProfileStyle,
         )
-        replacement = try Self.decodeReplacementIfPresent(in: container, forKey: .replacement)
+        replacement = try container.decodeIfPresent(SpeakSwiftly.TextReplacement.self, forKey: .replacement)
         replacementID = try container.decodeIfPresent(String.self, forKey: .replacementID)
         cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
         repoRoot = try container.decodeIfPresent(String.self, forKey: .repoRoot)
@@ -304,13 +304,6 @@ struct RawWorkerRequest: Decodable {
             sourceVersion: raw.sourceVersion?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
             sampleMediaPath: raw.sampleMediaPath?.trimmingCharacters(in: .whitespacesAndNewlines).emptyAsNil,
         )
-    }
-
-    private static func decodeReplacementIfPresent(
-        in container: KeyedDecodingContainer<CodingKeys>,
-        forKey key: CodingKeys,
-    ) throws -> SpeakSwiftly.TextReplacement? {
-        try container.decodeIfPresent(ReplacementPayload.self, forKey: key)?.resolved()
     }
 }
 

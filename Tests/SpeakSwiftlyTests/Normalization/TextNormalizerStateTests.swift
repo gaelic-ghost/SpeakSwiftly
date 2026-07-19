@@ -214,10 +214,30 @@ import Testing
     let data = try JSONEncoder().encode(details)
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let summary = try #require(object["summary"] as? [String: Any])
+    let replacement = try #require((object["replacements"] as? [[String: Any]])?.first)
 
     #expect(object["profile_id"] as? String == "logs")
     #expect(summary["replacement_count"] as? Int == 1)
+    #expect(replacement["match"] as? String == "exact_phrase")
+    #expect(replacement["replacement"] as? String == "standard error")
+    #expect(replacement["transform"] == nil)
     #expect(try JSONDecoder().decode(SpeakSwiftly.TextProfileDetails.self, from: data) == details)
+}
+
+@Test func `replacement state decodes legacy synthesized enums and writes canonical worker shape`() throws {
+    let legacy = Data(
+        #"{"id":"path-rule","text":"","transform":{"spokenPath":{}},"match":{"token":{"_0":"file_path"}},"phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}"#.utf8,
+    )
+    let replacement = try JSONDecoder().decode(SpeakSwiftly.TextReplacement.self, from: legacy)
+
+    #expect(replacement.match == .token(.filePath))
+    #expect(replacement.transform == .spokenPath)
+
+    let encoded = try JSONEncoder().encode(replacement)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(object["match"] as? String == "token:file_path")
+    #expect(object["transform"] as? String == "spoken_path")
+    #expect(try JSONDecoder().decode(SpeakSwiftly.TextReplacement.self, from: encoded) == replacement)
 }
 
 @Test func `normalization errors name the failed resource`() {

@@ -146,7 +146,7 @@ import Testing
 
 @Test func `decodes speak batch item with merged request path context`() throws {
     let request = try ToolRequest.decode(
-        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"reqPurpose":"audioFile","source":"batch_export","topic":"release"},"cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}]}"#,
+        from: #"{"id":"req-batch-context","op":"generate_batch","items":[{"artifact_id":"context-artifact","text":"File with path context.","request_context":{"reqPurpose":"audioFile","source":"batch_export","topic":"release","cwd":"/Users/galew/Workspace/SpeakSwiftly","repo_root":"/Users/galew/Workspace/SpeakSwiftly"}}]}"#,
     )
 
     #expect(
@@ -583,6 +583,22 @@ import Testing
         replace == .replaceTextReplacement(
             id: "req-text-replace",
             replacement: SpeakSwiftly.TextReplacement("stderr", with: "standard standard error", id: "logs-rule"),
+            profileID: "logs",
+        ),
+    )
+
+    let transform = try ToolRequest.decode(
+        from: #"{"id":"req-text-transform","op":"create_text_replacement","text_profile_id":"logs","replacement":{"id":"path-rule","text":"/tmp/output.wav","transform":"spoken_path","match":"exact_phrase","phase":"before_built_ins","isCaseSensitive":false,"textFormats":[],"sourceFormats":[],"priority":0}}"#,
+    )
+    #expect(
+        transform == .addTextReplacement(
+            id: "req-text-transform",
+            replacement: SpeakSwiftly.TextReplacement(
+                "/tmp/output.wav",
+                id: "path-rule",
+                matching: .exactPhrase,
+                using: .spokenPath,
+            ),
             profileID: "logs",
         ),
     )
