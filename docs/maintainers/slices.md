@@ -122,6 +122,8 @@ For one request, the normalizer:
 
 Generation callers use `textProfile` to select a stored profile by stable identifier and `requestContext` to carry caller metadata and path context. They do not provide source-format hints through the worker. SpeakSwiftly detects ordinary input structure from text and path context; direct Swift callers can use `speechSource(_:as:...)` when they intentionally possess a whole-source language type.
 
+Markdown tables are projected before inline-code and link normalization. A recognized header and delimiter become a concise column introduction, and each data row becomes labeled speech. Visual pipe and alignment syntax is removed, escaped cell pipes remain content, and ordinary non-table pipe prose is left unchanged.
+
 Summarization is opt-in per normalization call through `summarize: true`. Provider selection remains independent:
 
 - `normalizer.summarization.get()`
