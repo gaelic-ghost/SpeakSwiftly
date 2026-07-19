@@ -1,7 +1,6 @@
 import Foundation
 import SpeakSwiftlyCore
 import SpeakSwiftlyFileAudioOutput
-import TextForSpeech
 
 public extension SpeakSwiftly {
     /// Narrow adapter API used by the bundled JSONL executable for request-ID
@@ -363,7 +362,7 @@ public extension SpeakSwiftly.Tool {
     /// Sets the active text-profile style using a caller-provided request identifier.
     func setActiveTextProfileStyle(
         requestID: String,
-        to style: TextForSpeech.BuiltInProfileStyle,
+        to style: SpeakSwiftly.TextProfileStyle,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(.setActiveTextProfileStyle(id: requestID, style: style))
     }
@@ -423,7 +422,7 @@ public extension SpeakSwiftly.Tool {
     /// Adds a text replacement using a caller-provided request identifier.
     func addTextReplacement(
         requestID: String,
-        _ replacement: TextForSpeech.Replacement,
+        _ replacement: SpeakSwiftly.TextReplacement,
         profileID: SpeakSwiftly.TextProfileID? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(
@@ -438,7 +437,7 @@ public extension SpeakSwiftly.Tool {
     /// Replaces a text replacement using a caller-provided request identifier.
     func replaceTextReplacement(
         requestID: String,
-        _ replacement: TextForSpeech.Replacement,
+        _ replacement: SpeakSwiftly.TextReplacement,
         profileID: SpeakSwiftly.TextProfileID? = nil,
     ) async -> SpeakSwiftly.RequestHandle {
         await runtime.submit(

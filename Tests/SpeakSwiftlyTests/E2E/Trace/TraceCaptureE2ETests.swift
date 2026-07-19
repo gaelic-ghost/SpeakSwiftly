@@ -32,7 +32,7 @@ struct TraceCaptureE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-trace","op":"generate_speech","text":"\(E2EHarness.testingPlaybackText)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-trace","op":"generate_speech","text":"\(E2EHarness.testingPlaybackText)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 

@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 // MARK: - Queueing and Preload
 
@@ -266,12 +265,12 @@ import TextForSpeech
     )
     let logs = try await firstRuntime.normalizer.profiles.create(name: "Logs")
     _ = try await firstRuntime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement("stderr", with: "standard error", id: "logs-rule"),
+        SpeakSwiftly.TextReplacement("stderr", with: "standard error", id: "logs-rule"),
         toProfile: logs.id,
     )
     let ops = try await firstRuntime.normalizer.profiles.create(name: "Ops")
     _ = try await firstRuntime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement("stdout", with: "standard output", id: "ops-rule"),
+        SpeakSwiftly.TextReplacement("stdout", with: "standard output", id: "ops-rule"),
         toProfile: ops.id,
     )
     try await firstRuntime.normalizer.profiles.setActive(id: ops.id)
@@ -309,13 +308,13 @@ import TextForSpeech
     #expect(created.replacements.isEmpty)
 
     let added = try await runtime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement("stderr", with: "standard error", id: "stderr-rule"),
+        SpeakSwiftly.TextReplacement("stderr", with: "standard error", id: "stderr-rule"),
         toProfile: created.id,
     )
     #expect(added.replacements.map(\.id) == ["stderr-rule"])
 
     let replaced = try await runtime.normalizer.profiles.patchReplacement(
-        TextForSpeech.Replacement("stderr", with: "standard standard error", id: "stderr-rule"),
+        SpeakSwiftly.TextReplacement("stderr", with: "standard standard error", id: "stderr-rule"),
         inProfile: created.id,
     )
     #expect(replaced.replacements.first?.replacement == "standard standard error")
@@ -348,12 +347,12 @@ import TextForSpeech
     )
 
     let added = try await runtime.normalizer.profiles.addReplacement(
-        TextForSpeech.Replacement("stdout", with: "standard output", id: "stdout-rule"),
+        SpeakSwiftly.TextReplacement("stdout", with: "standard output", id: "stdout-rule"),
     )
     #expect(added.replacements.map(\.id) == ["stdout-rule"])
 
     let replaced = try await runtime.normalizer.profiles.patchReplacement(
-        TextForSpeech.Replacement("stdout", with: "standard out", id: "stdout-rule"),
+        SpeakSwiftly.TextReplacement("stdout", with: "standard out", id: "stdout-rule"),
     )
     #expect(replaced.replacements.first?.replacement == "standard out")
     #expect(await (runtime.normalizer.profiles.getActive()).replacements.map(\.id) == ["stdout-rule"])
@@ -560,7 +559,7 @@ import TextForSpeech
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"list_voice_profiles"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","voice_profile":"default-femme"}"#)
 
     #expect(await waitUntil {
         output.containsJSONObject {

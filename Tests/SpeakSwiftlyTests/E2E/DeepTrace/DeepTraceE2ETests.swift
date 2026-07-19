@@ -32,7 +32,7 @@ struct DeepTraceE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-deep-trace","op":"generate_speech","text":"\(E2EHarness.deepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-deep-trace","op":"generate_speech","text":"\(E2EHarness.deepTracePlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 
@@ -95,7 +95,7 @@ struct DeepTraceE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-segmented","op":"generate_speech","text":"\(E2EHarness.segmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-segmented","op":"generate_speech","text":"\(E2EHarness.segmentedDeepTracePlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 
@@ -168,7 +168,7 @@ struct DeepTraceE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-reversed-segmented","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-reversed-segmented","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedDeepTracePlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 
@@ -241,7 +241,7 @@ struct DeepTraceE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-conversational","op":"generate_speech","text":"\(E2EHarness.segmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-conversational","op":"generate_speech","text":"\(E2EHarness.segmentedConversationalPlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 
@@ -313,7 +313,7 @@ struct DeepTraceE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-live-reversed-conversational","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedConversationalPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-live-reversed-conversational","op":"generate_speech","text":"\(E2EHarness.reversedSegmentedConversationalPlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
 

@@ -1,166 +1,107 @@
 import Foundation
-import TextForSpeech
+import SpeakSwiftlyNormalization
 
 public extension SpeakSwiftly {
-    // MARK: Text Profile Transport
-
-    struct TextProfileSummary: Codable, Sendable, Equatable, Identifiable {
-        enum CodingKeys: String, CodingKey {
-            case id
-            case name
-            case replacementCount = "replacement_count"
-        }
-
-        public let id: String
-        public let name: String
-        public let replacementCount: Int
-
-        init(_ summary: TextForSpeech.Runtime.Profiles.Summary) {
-            id = summary.id
-            name = summary.name
-            replacementCount = summary.replacementCount
-        }
-
-        init(
-            id: String,
-            name: String,
-            replacementCount: Int,
-        ) {
-            self.id = id
-            self.name = name
-            self.replacementCount = replacementCount
-        }
-    }
-
-    struct TextProfileDetails: Codable, Sendable, Equatable, Identifiable {
-        enum CodingKeys: String, CodingKey {
-            case profileID = "profile_id"
-            case summary
-            case replacements
-        }
-
-        public let profileID: String
-        public let summary: TextProfileSummary
-        public let replacements: [TextForSpeech.Replacement]
-
-        public var id: String { profileID }
-
-        init(_ details: TextForSpeech.Runtime.Profiles.Details) {
-            profileID = details.id
-            summary = TextProfileSummary(details.summary)
-            replacements = details.replacements
-        }
-
-        init(
-            profileID: String,
-            summary: TextProfileSummary,
-            replacements: [TextForSpeech.Replacement],
-        ) {
-            self.profileID = profileID
-            self.summary = summary
-            self.replacements = replacements
-        }
-    }
-
-    struct TextProfileStyleOption: Codable, Sendable, Equatable, Identifiable {
-        public let style: TextForSpeech.BuiltInProfileStyle
-        public let summary: String
-
-        public var id: TextForSpeech.BuiltInProfileStyle { style }
-
-        init(_ option: TextForSpeech.Runtime.Style.Option) {
-            style = option.style
-            summary = option.summary
-        }
-
-        init(
-            style: TextForSpeech.BuiltInProfileStyle,
-            summary: String,
-        ) {
-            self.style = style
-            self.summary = summary
-        }
-    }
-
-    // MARK: Normalizer Handle
-
-    /// Wraps the shared TextForSpeech normalizer runtime used by SpeakSwiftly.
+    /// Owns speech-safe text normalization, summarization, profiles, and persistence.
     actor Normalizer {
-        let textRuntime: TextForSpeech.Runtime
+        enum Versioning {
+            static let currentPersistedStateVersion = 1
+        }
+
+        let fileManager: FileManager
         let configuredPersistenceURL: URL
 
+        var builtInStyle: TextProfileStyle
+        var activeSummarizationProvider: SummarizationProvider
+        var activeCustomProfileID: TextProfileID
+        var storedCustomProfilesByID: [TextProfileID: TextProfile]
+
         /// Accesses built-in text-style operations for this normalizer.
-        public nonisolated var style: Style {
-            Style(normalizer: self)
-        }
+        public nonisolated var style: Style { Style(normalizer: self) }
 
         /// Accesses stored custom-profile operations for this normalizer.
-        public nonisolated var profiles: Profiles {
-            Profiles(normalizer: self)
-        }
+        public nonisolated var profiles: Profiles { Profiles(normalizer: self) }
+
+        /// Accesses summarization-provider operations for this normalizer.
+        public nonisolated var summarization: Summarization { Summarization(normalizer: self) }
 
         /// Accesses persistence operations for this normalizer.
-        public nonisolated var persistence: Persistence {
-            Persistence(normalizer: self)
-        }
+        public nonisolated var persistence: Persistence { Persistence(normalizer: self) }
 
-        /// Creates a text normalizer that can be shared into a SpeakSwiftly runtime.
+        /// Creates a normalizer with one state owner and one persistence location.
         public init(
-            builtInStyle: TextForSpeech.BuiltInProfileStyle = .balanced,
+            builtInStyle: TextProfileStyle = .balanced,
             persistenceURL: URL? = nil,
-            state: TextForSpeech.PersistedState? = nil,
+            state: TextNormalizationState? = nil,
         ) throws {
-            let persistence: TextForSpeech.Runtime.PersistenceConfiguration
-            let resolvedPersistenceURL: URL
-            if let persistenceURL {
-                let standardizedURL = persistenceURL.standardizedFileURL
-                persistence = .file(standardizedURL)
-                resolvedPersistenceURL = standardizedURL
-            } else {
-                let defaultURL = ProfileStore.defaultTextProfilesURL(
+            let resolvedPersistenceURL = persistenceURL?.standardizedFileURL
+                ?? ProfileStore.defaultTextProfilesURL(
                     stateRootOverride: ProfileStore.runtimeStateRootOverridePath(
                         in: ProcessInfo.processInfo.environment,
                     ),
                 )
-                persistence = .file(defaultURL)
-                resolvedPersistenceURL = defaultURL
+
+            fileManager = .default
+            configuredPersistenceURL = resolvedPersistenceURL
+            self.builtInStyle = builtInStyle
+            activeSummarizationProvider = .foundationModels
+            activeCustomProfileID = TextProfile.default.id
+            storedCustomProfilesByID = [:]
+
+            if let state {
+                try Self.validate(state)
+                self.builtInStyle = state.builtInStyle
+                activeSummarizationProvider = state.summarizationProvider
+                activeCustomProfileID = state.activeCustomProfileID
+                storedCustomProfilesByID = state.profiles
+            } else if fileManager.fileExists(atPath: resolvedPersistenceURL.path) {
+                let loadedState = try Self.loadState(from: resolvedPersistenceURL)
+                try Self.validate(loadedState)
+                self.builtInStyle = loadedState.builtInStyle
+                activeSummarizationProvider = loadedState.summarizationProvider
+                activeCustomProfileID = loadedState.activeCustomProfileID
+                storedCustomProfilesByID = loadedState.profiles
             }
 
-            let runtime = try TextForSpeech.Runtime(
-                builtInStyle: builtInStyle,
-                persistence: persistence,
+            let repaired = Self.repairedProfileState(
+                activeProfileID: activeCustomProfileID,
+                profiles: storedCustomProfilesByID,
             )
-            if let state {
-                try runtime.persistence.restore(state)
+            activeCustomProfileID = repaired.activeProfileID
+            storedCustomProfilesByID = repaired.profiles
+
+            if state == nil, !fileManager.fileExists(atPath: resolvedPersistenceURL.path) {
+                try Self.writeState(
+                    TextNormalizationState(
+                        version: Self.Versioning.currentPersistedStateVersion,
+                        builtInStyle: self.builtInStyle,
+                        summarizationProvider: activeSummarizationProvider,
+                        activeCustomProfileID: activeCustomProfileID,
+                        profiles: storedCustomProfilesByID,
+                    ),
+                    to: resolvedPersistenceURL,
+                    fileManager: fileManager,
+                )
             }
-            textRuntime = runtime
-            configuredPersistenceURL = resolvedPersistenceURL
         }
     }
 }
 
 public extension SpeakSwiftly.Normalizer {
-    /// Accesses built-in style operations on a ``SpeakSwiftly/Normalizer``.
-    struct Style: Sendable {
-        let normalizer: SpeakSwiftly.Normalizer
-    }
+    /// Built-in text-style operations on a normalizer.
+    struct Style: Sendable { let normalizer: SpeakSwiftly.Normalizer }
 
-    /// Accesses stored custom-profile operations on a ``SpeakSwiftly/Normalizer``.
-    struct Profiles: Sendable {
-        let normalizer: SpeakSwiftly.Normalizer
-    }
+    /// Stored custom-profile operations on a normalizer.
+    struct Profiles: Sendable { let normalizer: SpeakSwiftly.Normalizer }
 
-    /// Accesses persistence operations on a ``SpeakSwiftly/Normalizer``.
-    struct Persistence: Sendable {
-        let normalizer: SpeakSwiftly.Normalizer
-    }
+    /// Summarization-provider operations on a normalizer.
+    struct Summarization: Sendable { let normalizer: SpeakSwiftly.Normalizer }
+
+    /// Persistence operations on a normalizer.
+    struct Persistence: Sendable { let normalizer: SpeakSwiftly.Normalizer }
 }
 
 public extension SpeakSwiftly.Runtime {
-    // MARK: Runtime Accessors
-
     /// Returns the text normalizer attached to this runtime.
-    nonisolated var normalizer: SpeakSwiftly.Normalizer {
-        normalizerRef
-    }
+    nonisolated var normalizer: SpeakSwiftly.Normalizer { normalizerRef }
 }

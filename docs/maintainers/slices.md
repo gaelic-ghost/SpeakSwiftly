@@ -2,52 +2,47 @@
 
 ## Why this exists
 
-This note explains the current post-`TextForSpeech 0.18.9` model in maintainer terms.
+This note explains the current normalization model in maintainer terms.
 
-The three concepts that most often get conflated are:
+The concepts that most often get conflated are:
 
 - built-in style
 - custom text profiles
+- summarization
 - deep-trace slices
 
-Those now live in three different places on purpose.
+The first three share one state owner. Deep-trace slices remain a separate analysis concern.
 
 ## The current model
 
-`SpeakSwiftly` now treats text normalization as one shared `TextForSpeech.Runtime` with three public handles exposed through `SpeakSwiftly.Normalizer`:
+`SpeakSwiftly.Normalizer` is the single actor that owns normalization state and lifecycle. It exposes four lightweight handles:
 
-- `style`
-  The built-in narration style such as `balanced`, `compact`, or `explicit`.
-- `profiles`
-  The stored custom profile library plus the active custom profile.
-- `persistence`
-  The persisted runtime state on disk or in memory.
+- `style` owns the active built-in narration posture.
+- `profiles` owns stored custom profiles, their active selection, and incremental replacement mutations.
+- `summarization` owns the active summarization-provider selection.
+- `persistence` owns state snapshots and disk reads and writes.
 
-That split is the public simplification. Generation then uses one shared `SpeakSwiftly.Normalizer.speechText(...)` entry point to call the async `TextForSpeech.Normalize` APIs, so live playback, retained files, source-format handling, custom profiles, built-in style, and summarization-provider selection all pass through the same package-owned path.
+The internal, non-vended `SpeakSwiftlyNormalization` target owns pure normalization and summarization algorithms plus their value models. `SpeakSwiftly` owns the public API, mutable state, persistence lifecycle, and generation integration. This keeps one production path without making package consumers import an implementation target.
 
-We no longer expose a mixed bag of “style plus active profile plus stored profiles plus raw replacement list” helpers on one surface, and we no longer support whole-profile replace/store/use workflows through `SpeakSwiftly`.
+Live playback and retained-file generation both call `SpeakSwiftly.Normalizer.speechText(...)`. Explicit whole-source callers use `speechSource(_:as:...)`. Both entry points delegate to the same internal typed normalization request.
 
 ## Built-In Style
 
-Built-in style is the broad normalization posture provided by `TextForSpeech`.
+Built-in style is the broad normalization posture applied before custom profile rules.
 
 It answers:
 
-> “How verbose should the built-in code-and-text narration be before any custom profile rules are layered on top?”
+> “How verbose should built-in code and text narration be before custom rules are layered on top?”
 
-That setting is:
+The setting is runtime-owned, persisted, and independent of the active custom profile.
 
-- runtime-owned
-- persisted
-- separate from the active custom profile
-
-The maintainer-facing operations are now:
+Swift operations:
 
 - `normalizer.style.getActive()`
 - `normalizer.style.list()`
 - `normalizer.style.setActive(to:)`
 
-The JSONL transport mirrors that split:
+JSONL operations:
 
 - `get_active_text_profile_style`
 - `list_text_profile_styles`
@@ -55,29 +50,19 @@ The JSONL transport mirrors that split:
 
 ## Custom Text Profiles
 
-Custom text profiles are the stored reusable rule sets layered on top of the built-in style.
+Custom text profiles are stored reusable rule sets layered over the built-in style. Stored profiles are addressed by stable identifier rather than mutable display name.
 
-The important point is that stored profiles are now addressed by stable identifier, not by mutable display name.
+Each profile has:
 
-Each stored profile has:
-
-- a stable identifier exposed as `profileID` in `SpeakSwiftly.TextProfileDetails` and `profile_id` in JSONL payloads
+- a stable `profileID`, encoded as `profile_id` in profile payloads
 - a mutable human-facing `name`
-- a `replacements` array
+- a typed `replacements` array
 
-The transport models on the SpeakSwiftly side are:
-
-- `SpeakSwiftly.TextProfileSummary`
-- `SpeakSwiftly.TextProfileDetails`
-
-Those are transport wrappers around the underlying `TextForSpeech.Runtime.Profiles.Summary` and `.Details` shapes.
-They are also the public Swift return models for text-profile reads and mutations; the raw `TextForSpeech.Runtime.Profiles.*` models stay behind the `SpeakSwiftly` API boundary.
+The public Swift models are `SpeakSwiftly.TextProfileSummary` and `SpeakSwiftly.TextProfileDetails`. Their concrete value storage lives in the internal target, but callers stay on the `SpeakSwiftly` namespace.
 
 ## Profile Lifecycle
 
-The profile library is now intentionally small and explicit.
-
-At the Swift surface:
+Swift operations:
 
 - `normalizer.profiles.getActive()`
 - `normalizer.profiles.get(id:)`
@@ -90,7 +75,7 @@ At the Swift surface:
 - `normalizer.profiles.reset(id:)`
 - `normalizer.profiles.factoryReset()`
 
-At the JSONL surface:
+JSONL operations:
 
 - `get_active_text_profile`
 - `get_text_profile`
@@ -103,28 +88,13 @@ At the JSONL surface:
 - `reset_text_profile`
 - `factory_reset_text_profiles`
 
-Important consequences:
-
-- profile creation is name-only
-- the runtime derives the stable profile ID
-- names are labels, not lookup keys
-- “clear all replacements” is no longer a separate operation
-- “store this whole profile object” is no longer a supported mutation path
-- “replace the active profile with this raw profile payload” is no longer supported
-
-If a caller wants an empty profile again, the supported operation is `reset`, not “clear replacements.”
+Creation is name-only and derives a stable identifier. Names remain editable labels. Resetting is the supported coarse replacement cleanup; whole-profile replacement and duplicate store/use paths are not part of the API.
 
 ## Replacements
 
-Replacements are still `TextForSpeech.Replacement`.
+Replacement rules use `SpeakSwiftly.TextReplacement` and are mutated incrementally.
 
-They are still the custom rules inside a profile, but the allowed mutation path is now narrower:
-
-- add one replacement
-- patch one replacement
-- remove one replacement
-
-At the Swift surface:
+Swift operations:
 
 - `normalizer.profiles.addReplacement(_:)`
 - `normalizer.profiles.addReplacement(_:toProfile:)`
@@ -133,42 +103,36 @@ At the Swift surface:
 - `normalizer.profiles.removeReplacement(id:)`
 - `normalizer.profiles.removeReplacement(id:fromProfile:)`
 
-At the JSONL surface:
+JSONL operations:
 
 - `create_text_replacement`
 - `replace_text_replacement`
 - `delete_text_replacement`
 
-The optional `text_profile_id` on those JSONL operations means:
-
-- omitted: mutate the active custom profile
-- present: mutate that stored profile directly
+For those profile-management operations, optional `text_profile_id` means “mutate this stored profile”; omitting it means “mutate the active profile.” This is the operation's identifier field, not the removed generation-request alias.
 
 ## Effective Normalization
 
-For any single generation request, the mental model is:
+For one request, the normalizer:
 
-1. pick the built-in style
-2. pick the requested stored custom profile, or the active custom profile when the request does not name one
-3. snapshot the active TextForSpeech summarization provider
-4. normalize the input text with optional whole-source format and `TextForSpeech.RequestContext`
+1. snapshots the active built-in style
+2. selects the requested stored profile or the active profile
+3. snapshots the active summarization provider
+4. processes text or explicitly typed whole-source input with its request context
 
-That is why the generation APIs now carry `textProfile` rather than `textProfileName`.
+Generation callers use `textProfile` to select a stored profile by stable identifier and `requestContext` to carry caller metadata and path context. They do not provide source-format hints through the worker. SpeakSwiftly detects ordinary input structure from text and path context; direct Swift callers can use `speechSource(_:as:...)` when they intentionally possess a whole-source language type.
 
-The generation request is selecting a stored profile by stable identifier, not by mutable label.
+Summarization is opt-in per normalization call through `summarize: true`. Provider selection remains independent:
 
-The typed generation surface also keeps text-shaping and caller metadata separate:
-
-- `requestContext`: what app, agent, project, topic, or path context the request belongs to
-
-Generation callers no longer provide source-format hints. `TextForSpeech`
-detects text and source structure from request text and path context.
+- `normalizer.summarization.get()`
+- `normalizer.summarization.list()`
+- `normalizer.summarization.set(_:)`
 
 ## Persistence
 
-Persistence now belongs to the runtime state as a whole, not to ad hoc profile blobs.
+Persistence covers the complete normalization state rather than ad hoc profile blobs.
 
-At the Swift surface:
+Swift operations:
 
 - `normalizer.persistence.url()`
 - `normalizer.persistence.state()`
@@ -178,19 +142,24 @@ At the Swift surface:
 - `normalizer.persistence.save()`
 - `normalizer.persistence.save(to:)`
 
-At the JSONL surface:
+JSONL operations:
 
 - `get_text_profile_persistence`
 - `load_text_profiles`
 - `save_text_profiles`
 
-The persisted shape is `TextForSpeech.PersistedState`.
+The public persisted shape is `SpeakSwiftly.TextNormalizationState`. Version 1 preserves the existing profile-state location and reads the former `summaryProvider` key during state migration, but writes only canonical `summarizationProvider` state.
 
 ## Wire Shapes
 
-The worker success payload no longer exposes top-level replacement lists for text-profile reads.
+Generation uses only these profile-selection keys:
 
-The current text-profile response fields are:
+- `voice_profile`
+- `text_profile`
+
+Removed generation aliases `profile_name` and `text_profile_id` are rejected with actionable diagnostics. Text-profile management continues to use `text_profile_id` where the operation genuinely targets a profile resource.
+
+Current text-profile response fields include:
 
 - `text_profile`
 - `text_profiles`
@@ -198,52 +167,29 @@ The current text-profile response fields are:
 - `text_profile_style_options`
 - `text_profile_path`
 
-Inside those payloads, the important keys are:
-
-- `text_profile.profile_id`
-- `text_profile.summary`
-- `text_profile.summary.replacement_count`
-- `text_profiles[].id`
-- `text_profiles[].replacement_count`
-
-This keeps the JSONL surface aligned with the simplified runtime model instead of leaking older compatibility fields.
+Nested profile payloads preserve `profile_id` and `replacement_count` coding keys.
 
 ## Slices
 
-“Slices” are not part of the text-profile model.
+“Slices” are not part of text normalization. They belong to SpeakSwiftly's deep-trace analysis of already-normalized content: sections, windows, forensic features, and chunk-to-text analysis.
 
-They belong to SpeakSwiftly’s deep-trace analysis of already-normalized content.
+The ownership boundary is:
 
-That work lives on the `SpeakSwiftly.DeepTrace` side and is still about:
-
-- sections
-- section windows
-- forensic features
-- chunk-to-text analysis
-
-So maintainers should keep the boundary clear:
-
-- `TextForSpeech` owns style, profiles, replacements, normalization, and persisted normalization state
-- `SpeakSwiftly` owns generation, playback, runtime orchestration, and deep-trace slicing
+- `SpeakSwiftlyNormalization` owns pure normalization and summarization algorithms and value models.
+- `SpeakSwiftly.Normalizer` owns state, lifecycle, persistence, and the public normalization API.
+- SpeakSwiftly generation and playback own speech production and delivery.
+- `SpeakSwiftly.DeepTrace` owns post-normalization slicing and analysis.
 
 ## What changed from the old model
 
-The old mental model mixed together:
+The removed model had an independent package boundary, duplicate runtime ownership, leaked dependency types, generation compatibility aliases, and parallel decoding paths.
 
-- whole-profile store/use flows
-- name-based profile targeting
-- separate replacement-list reads
-- broad “clear replacements” cleanup operations
-- text-style operations phrased as generic profile-style reads and writes
+The current model has:
 
-That model is gone.
-
-The new one is intentionally tighter:
-
-- style is its own handle
-- stored profiles are ID-addressed
-- creation is name-only
-- names are editable labels
-- replacements are edited incrementally
-- reset and factory-reset are the supported coarse cleanup actions
-- transport names stay verb-first snake_case and mirror the real resource ownership
+- one package graph and one state owner
+- one typed normalization processing path
+- four focused public handles
+- SpeakSwiftly-owned public names
+- stable profile identifiers and incremental replacement edits
+- canonical generation wire keys with removed aliases rejected
+- an internal target that can evolve with generation without a separate package release cycle

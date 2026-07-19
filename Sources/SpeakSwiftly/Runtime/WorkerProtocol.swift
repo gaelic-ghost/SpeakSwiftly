@@ -1,5 +1,4 @@
 import Foundation
-import TextForSpeech
 
 enum WorkerRequest: Equatable {
     case queueSpeech(
@@ -71,15 +70,15 @@ enum WorkerRequest: Equatable {
     case textProfilePersistence(id: String)
     case loadTextProfiles(id: String)
     case saveTextProfiles(id: String)
-    case setActiveTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
+    case setActiveTextProfileStyle(id: String, style: SpeakSwiftly.TextProfileStyle)
     case createTextProfile(id: String, profileName: String)
     case renameTextProfile(id: String, profileID: String, profileName: String)
     case setActiveTextProfile(id: String, profileID: String)
     case deleteTextProfile(id: String, profileID: String)
     case factoryResetTextProfiles(id: String)
     case resetTextProfile(id: String, profileID: String)
-    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
-    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
+    case addTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: String?)
+    case replaceTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: String?)
     case removeTextReplacement(id: String, replacementID: String, profileID: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)

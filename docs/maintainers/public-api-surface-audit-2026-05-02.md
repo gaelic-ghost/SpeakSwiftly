@@ -1,5 +1,9 @@
 # Public API Surface Audit
 
+> Historical note: the TextForSpeech boundary described by this May 2026 audit
+> was superseded by SpeakSwiftly 12. Current normalization ownership and API
+> guidance lives in [`slices.md`](slices.md).
+
 This note records the current public API audit for the standalone `SpeakSwiftly`
 Swift package. It is planning guidance for a focused simplification pass before
 the package treats its typed Swift API as a stable consumer contract.

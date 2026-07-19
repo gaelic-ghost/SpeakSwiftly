@@ -1,6 +1,5 @@
 import Foundation
 import SpeakSwiftlyFileAudioOutput
-import TextForSpeech
 
 public extension SpeakSwiftly {
     typealias GeneratedAudioFileFormat = SpeakSwiftlyFileAudioOutput.GeneratedAudioFileFormat
@@ -24,7 +23,7 @@ public extension SpeakSwiftly {
         let createdAt: Date
         let voiceProfile: String
         let textProfile: SpeakSwiftly.TextProfileID?
-        let sourceFormat: TextForSpeech.SourceFormat?
+        let sourceFormat: SpeakSwiftly.SourceFormat?
         let requestContext: SpeakSwiftly.RequestContext?
         let sampleRate: Int
         let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat
@@ -36,7 +35,7 @@ public extension SpeakSwiftly {
             createdAt: Date,
             voiceProfile: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            sourceFormat: TextForSpeech.SourceFormat?,
+            sourceFormat: SpeakSwiftly.SourceFormat?,
             requestContext: SpeakSwiftly.RequestContext?,
             sampleRate: Int,
             audioFormat: SpeakSwiftly.GeneratedAudioFileFormat,

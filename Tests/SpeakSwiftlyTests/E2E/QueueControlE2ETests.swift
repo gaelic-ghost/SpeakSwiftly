@@ -30,7 +30,7 @@ struct QueueControlE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-generation-active-e2e","op":"generate_audio_file","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-generation-active-e2e","op":"generate_audio_file","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
         _ = try #require(try await worker.waitForJSONObject(timeout: Self.queueControlTimeout) {
@@ -40,7 +40,7 @@ struct QueueControlE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-generation-queued-e2e","op":"generate_audio_file","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-generation-queued-e2e","op":"generate_audio_file","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
         _ = try #require(try await worker.waitForJSONObject(timeout: Self.queueControlTimeout) {
@@ -112,7 +112,7 @@ struct QueueControlE2ETests {
 
         try worker.sendJSON(
             """
-            {"id":"req-playback-active-e2e","op":"generate_speech","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","profile_name":"\(E2EHarness.testingProfileName)"}
+            {"id":"req-playback-active-e2e","op":"generate_speech","text":"\(E2EHarness.testingPlaybackText.jsonEscaped)","voice_profile":"\(E2EHarness.testingProfileName)"}
             """,
         )
         _ = try #require(try await worker.waitForJSONObject(timeout: Self.queueControlTimeout) {

@@ -5,9 +5,21 @@ import MLXAudioTTS
 @testable import SpeakSwiftly
 @testable import SpeakSwiftlyTool
 import Testing
-import TextForSpeech
 
 // MARK: - Opt-In Test Gates
+
+func normalizeTextForTest(_ text: String) async throws -> String {
+    let normalizer = try SpeakSwiftly.Normalizer(
+        persistenceURL: FileManager.default
+            .temporaryDirectory
+            .appending(path: "speakswiftly-normalization-test-\(UUID().uuidString).json"),
+        state: SpeakSwiftly.TextNormalizationState(
+            activeCustomProfileID: SpeakSwiftly.TextProfile.default.id,
+            profiles: [SpeakSwiftly.TextProfile.default.id: .default],
+        ),
+    )
+    return try await normalizer.speechText(text)
+}
 
 func mlxConditioningPersistenceTestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS"] == "1"

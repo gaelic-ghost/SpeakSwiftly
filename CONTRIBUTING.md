@@ -34,7 +34,7 @@ Keep changes focused on one coherent package concern: API, generation, normaliza
 
 ### Making Changes
 
-Use Swift Package Manager as the source of truth for package structure. Keep feature logic in its feature directory, keep public library surface in `Sources/SpeakSwiftly/API`, and mirror the source tree in `Tests/SpeakSwiftlyTests`.
+Use Swift Package Manager as the source of truth for package structure. Keep public normalization state, lifecycle, and API in `Sources/SpeakSwiftly`, and keep pure normalization and summarization algorithms in the internal `Sources/SpeakSwiftlyNormalization` target. Mirror those surfaces in `Tests/SpeakSwiftlyTests/Normalization` and `Tests/SpeakSwiftlyNormalizationTests` respectively. The internal target is not a package product; public callers use the `SpeakSwiftly` namespace.
 
 Use Swift Testing for new package tests unless an existing external constraint requires XCTest. Keep operator-facing diagnostics descriptive enough that a maintainer can tell what broke and where to look next.
 
@@ -70,6 +70,7 @@ Useful environment variables include:
 - `SPEAKSWIFTLY_SPEECH_BACKEND` for backend selection fallback, including `qwen3_smol`, `qwen3_smol_4bit`, `qwen3_smol_5bit`, `qwen3_smol_6bit`, `qwen3_smol_8bit`, `qwen3_smol_bf16`, `qwen3_big`, `qwen3_big_4bit`, `qwen3_big_5bit`, `qwen3_big_6bit`, `qwen3_big_8bit`, and `qwen3_big_bf16`
 - `SPEAKSWIFTLY_QWEN_RESIDENT_MODEL` is a deprecated compatibility alias for older hosts; choose a Qwen backend value instead
 - `SPEAKSWIFTLY_ALLOW_PROFILE_CPU_FALLBACK=1` to explicitly allow the voice-profile model to load on CPU when the process cannot see a Metal GPU device; this is off by default because CPU-generated voice-profile conditioning is slow and should not become the normal package or host behavior
+- `SPEAKSWIFTLY_NORMALIZATION_OPENAI_SUMMARY_MODEL` to select the OpenAI Responses model used by normalization summarization; the default remains package-owned
 - `SPEAKSWIFTLY_E2E=1` for opt-in real-model end-to-end tests
 - `SPEAKSWIFTLY_PLAYBACK_TRACE=1` for playback trace diagnostics
 

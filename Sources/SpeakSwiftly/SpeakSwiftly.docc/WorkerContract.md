@@ -38,13 +38,12 @@ For generation requests, the current worker keys are:
 
 - `voice_profile`: omit it to use the runtime default voice profile, which falls back to `swift-signal`.
 - `text_profile`: select a stored text-profile override for normalization.
-- `request_context`: pass caller, purpose, source/topic, and path context for `TextForSpeech`.
+- `request_context`: pass caller, purpose, source/topic, and path context for SpeakSwiftly normalization.
 - `qwen_pre_model_text_chunking`: set `true` to opt Qwen live playback into pre-model text chunking.
 
 ### RequestContext Fields
 
-`request_context` uses the shared `TextForSpeech.RequestContext` shape with a
-narrower SpeakSwiftly worker contract:
+`request_context` uses the shared `SpeakSwiftly.RequestContext` shape:
 
 - `reqPurpose` is required. Valid values are `speech` and `audioFile`.
 - Use `speech` for spoken output whether the generated audio is played locally,
@@ -62,7 +61,7 @@ Generation requests no longer accept:
 - `text_format`
 - `nested_source_format`
 
-Removed request-context keys `app`, `agent`, and `project` are also rejected. These removed keys produce explicit invalid-request diagnostics instead of being ignored. Source code files already have extensions, and `TextForSpeech` detects text and source structure from request text and path context.
+Removed request-context keys `app`, `agent`, and `project` are also rejected. These removed keys produce explicit invalid-request diagnostics instead of being ignored. Source code files already have extensions, and SpeakSwiftly detects text and source structure from request text and path context.
 
 ### Backend And Model Selection
 
@@ -78,9 +77,9 @@ Qwen resident model selection is part of the startup backend value:
 - Prepared Qwen conditioning is stored per resident model repo so a profile can lazily accumulate conditioning for each selected Qwen model.
 - Rerolling a profile regenerates every existing prepared Qwen conditioning artifact for that profile, plus the currently selected Qwen backend when applicable.
 
-### Compatibility Aliases
+### Removed Profile Aliases
 
-Older generation-request aliases such as `profile_name` and `text_profile_id` are still accepted for compatibility.
+Generation accepts only `voice_profile` and `text_profile`. Removed generation aliases `profile_name` and `text_profile_id` are rejected with an invalid-request diagnostic. Text-profile management operations still use `text_profile_id` when that field is the actual identifier of the profile resource being read or mutated.
 
 Representative operations include:
 

@@ -13,8 +13,8 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 ### Where To Look First
 
 - Start with `Package.swift`, `Package.resolved`, `README.md`, `CONTRIBUTING.md`, and `ROADMAP.md` for package shape, dependency state, public docs, contributor workflow, and planned work.
-- Read `Sources/SpeakSwiftly/API`, `Sources/SpeakSwiftly/Generation`, `Sources/SpeakSwiftly/Playback`, `Sources/SpeakSwiftly/Normalization`, and `Sources/SpeakSwiftly/Runtime` according to the feature surface being changed.
-- Mirror source-tree context in `Tests/SpeakSwiftlyTests` before adding or moving test coverage.
+- Read `Sources/SpeakSwiftly/API`, `Sources/SpeakSwiftly/Generation`, `Sources/SpeakSwiftly/Playback`, `Sources/SpeakSwiftly/Normalization`, `Sources/SpeakSwiftlyNormalization`, and `Sources/SpeakSwiftly/Runtime` according to the feature surface being changed.
+- Mirror package-owned normalization API and state coverage in `Tests/SpeakSwiftlyTests/Normalization`, and pure normalization and summarization coverage in `Tests/SpeakSwiftlyNormalizationTests`.
 - Use `docs/maintainers/validation-lanes.md` and `scripts/repo-maintenance/` for validation, release, runtime publishing, and maintainer operations.
 
 ## Working Rules
@@ -51,10 +51,10 @@ Repo-local guidance for the standalone `SpeakSwiftly` Swift package.
 ### Source of Truth
 
 - Keep `Sources/SpeakSwiftly/API` as the single home for public `SpeakSwiftly.Runtime` concern-handle accessors, `SpeakSwiftly.Name`, and other operator-facing library surface declarations.
-- Keep feature logic in its feature directory, not in `Runtime/`. Text-normalization logic belongs in `Normalization/`, generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
+- Keep feature logic in its feature directory, not in `Runtime/`. Public normalization API, state, persistence lifecycle, and generation integration belong in `Sources/SpeakSwiftly/Normalization`; pure normalization and summarization algorithms plus their value models belong in the internal, non-vended `SpeakSwiftlyNormalization` target. Generation and voice-profile logic belongs in `Generation/`, and playback logic belongs in `Playback/`.
 - Keep `Sources/SpeakSwiftly/Runtime` for runtime-only internals such as worker request handling, queue orchestration, lifecycle management, event emission, and other machinery that is genuinely part of the worker runtime itself.
 - Do not split one feature across three places when two will do. For any given feature, prefer one API file in `API/` plus one logic file in the relevant feature directory.
-- Mirror the source tree by feature area in tests so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find.
+- Mirror the source tree by feature area in tests so API, generation, playback, normalization, runtime, support, and e2e coverage are easy to find. Keep algorithm-focused normalization tests in `SpeakSwiftlyNormalizationTests` and public state/lifecycle tests in `SpeakSwiftlyTests/Normalization`.
 - For the JSONL worker surface, keep operation names snake_case and verb-first.
 - For JSONL reads, use `get_*` for one resource or snapshot and `list_*` for collections and queue snapshots.
 - For JSONL writes, prefer `create_*`, `update_*`, `replace_*`, and `delete_*` when those verbs fit the real semantics.

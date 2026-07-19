@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 private actor EnvironmentEventRecorder {
     private var storedEvents = [PlaybackEnvironmentEvent]()

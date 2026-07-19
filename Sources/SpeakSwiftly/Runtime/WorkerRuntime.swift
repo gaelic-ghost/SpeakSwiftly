@@ -1,6 +1,5 @@
 import Foundation
 import MLXAudioTTS
-import TextForSpeech
 
 // MARK: - Worker Runtime
 

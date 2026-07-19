@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 #if canImport(Darwin)
 import Darwin
 #endif
@@ -18,7 +17,7 @@ import Darwin
     _ = normalizer
 }
 
-@Test func `public request context aliases the TextForSpeech model`() throws {
+@Test func `public request context preserves the normalization wire model`() throws {
     let requestContext = SpeakSwiftly.RequestContext(
         reqPurpose: .speech,
         source: "codex",
@@ -26,7 +25,7 @@ import Darwin
         attributes: ["surface": "mcp"],
     )
     let encoded = try JSONEncoder().encode(requestContext)
-    let decoded = try JSONDecoder().decode(TextForSpeech.RequestContext.self, from: encoded)
+    let decoded = try JSONDecoder().decode(SpeakSwiftly.RequestContext.self, from: encoded)
 
     #expect(decoded == requestContext)
     #expect(decoded.source == "codex")
@@ -390,7 +389,7 @@ import Darwin
     let persistenceHandle: @Sendable (SpeakSwiftly.Normalizer) -> SpeakSwiftly.Normalizer.Persistence = { normalizer in
         normalizer.persistence
     }
-    let makeNormalizer: @Sendable (TextForSpeech.BuiltInProfileStyle, URL?, TextForSpeech.PersistedState?) throws -> SpeakSwiftly.Normalizer = {
+    let makeNormalizer: @Sendable (SpeakSwiftly.TextProfileStyle, URL?, SpeakSwiftly.TextNormalizationState?) throws -> SpeakSwiftly.Normalizer = {
         builtInStyle,
         persistenceURL,
         state in
@@ -409,13 +408,13 @@ import Darwin
     let liftoffWithStateRoot: @Sendable (URL) async -> SpeakSwiftly.Runtime = { stateRootURL in
         await SpeakSwiftly.liftoff(stateRootURL: stateRootURL)
     }
-    let activeStyle: @Sendable (SpeakSwiftly.Normalizer.Style) async -> TextForSpeech.BuiltInProfileStyle = { style in
+    let activeStyle: @Sendable (SpeakSwiftly.Normalizer.Style) async -> SpeakSwiftly.TextProfileStyle = { style in
         await style.getActive()
     }
     let styleOptions: @Sendable (SpeakSwiftly.Normalizer.Style) async -> [SpeakSwiftly.TextProfileStyleOption] = { style in
         await style.list()
     }
-    let setActiveStyle: @Sendable (SpeakSwiftly.Normalizer.Style, TextForSpeech.BuiltInProfileStyle) async throws -> Void = {
+    let setActiveStyle: @Sendable (SpeakSwiftly.Normalizer.Style, SpeakSwiftly.TextProfileStyle) async throws -> Void = {
         style,
         builtInStyle in
         try await style.setActive(to: builtInStyle)
@@ -463,23 +462,23 @@ import Darwin
     let reset: @Sendable (SpeakSwiftly.Normalizer.Profiles, String) async throws -> Void = { profiles, id in
         try await profiles.reset(id: id)
     }
-    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> SpeakSwiftly.TextProfileDetails = {
+    let addActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, SpeakSwiftly.TextReplacement) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement in
         try await profiles.addReplacement(replacement)
     }
-    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
+    let addStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, SpeakSwiftly.TextReplacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement,
         profileID in
         try await profiles.addReplacement(replacement, toProfile: profileID)
     }
-    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement) async throws -> SpeakSwiftly.TextProfileDetails = {
+    let replaceActiveReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, SpeakSwiftly.TextReplacement) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement in
         try await profiles.patchReplacement(replacement)
     }
-    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, TextForSpeech.Replacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
+    let replaceStoredReplacement: @Sendable (SpeakSwiftly.Normalizer.Profiles, SpeakSwiftly.TextReplacement, String) async throws -> SpeakSwiftly.TextProfileDetails = {
         profiles,
         replacement,
         profileID in
@@ -945,7 +944,7 @@ import Darwin
     let sampleRate: KeyPath<SpeakSwiftly.GenerationArtifact, Int> = \.sampleRate
     let voiceProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String> = \.voiceProfile
     let textProfile: KeyPath<SpeakSwiftly.GenerationArtifact, String?> = \.textProfile
-    let sourceFormat: KeyPath<SpeakSwiftly.GenerationArtifact, TextForSpeech.SourceFormat?> = \.sourceFormat
+    let sourceFormat: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.SourceFormat?> = \.sourceFormat
     let requestContext: KeyPath<SpeakSwiftly.GenerationArtifact, SpeakSwiftly.RequestContext?> = \.requestContext
 
     _ = artifactID
@@ -1076,11 +1075,11 @@ import Darwin
 @Test func `public text normalization surface exposes profile metadata`() {
     let textProfileID: KeyPath<SpeakSwiftly.TextProfileDetails, String> = \.profileID
     let textProfileSummary: KeyPath<SpeakSwiftly.TextProfileDetails, SpeakSwiftly.TextProfileSummary> = \.summary
-    let textProfileReplacements: KeyPath<SpeakSwiftly.TextProfileDetails, [TextForSpeech.Replacement]> = \.replacements
+    let textProfileReplacements: KeyPath<SpeakSwiftly.TextProfileDetails, [SpeakSwiftly.TextReplacement]> = \.replacements
     let textProfileSummaryID: KeyPath<SpeakSwiftly.TextProfileSummary, String> = \.id
     let textProfileSummaryName: KeyPath<SpeakSwiftly.TextProfileSummary, String> = \.name
     let textProfileSummaryReplacementCount: KeyPath<SpeakSwiftly.TextProfileSummary, Int> = \.replacementCount
-    let textProfileStyle: KeyPath<SpeakSwiftly.TextProfileStyleOption, TextForSpeech.BuiltInProfileStyle> = \.style
+    let textProfileStyle: KeyPath<SpeakSwiftly.TextProfileStyleOption, SpeakSwiftly.TextProfileStyle> = \.style
     let textProfileStyleSummary: KeyPath<SpeakSwiftly.TextProfileStyleOption, String> = \.summary
 
     _ = textProfileID

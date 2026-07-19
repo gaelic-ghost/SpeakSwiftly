@@ -26,11 +26,12 @@ extension ToolRequest {
 
         switch op {
             case "generate_speech":
+                try raw.rejectRemovedGenerationAliases(id: id)
                 let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileID: raw.textProfile ?? raw.textProfileID,
+                    textProfileID: raw.textProfile,
                 )
                 let requestContext = try RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
@@ -49,11 +50,12 @@ extension ToolRequest {
                 )
 
             case "generate_audio_file":
+                try raw.rejectRemovedGenerationAliases(id: id)
                 let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let resolved = try RawWorkerRequest.resolveSpeechTextInput(
                     id: id,
                     text: raw.text,
-                    textProfileID: raw.textProfile ?? raw.textProfileID,
+                    textProfileID: raw.textProfile,
                 )
                 let requestContext = try RawWorkerRequest.requestContext(
                     cwd: raw.cwd,
@@ -72,6 +74,7 @@ extension ToolRequest {
                 )
 
             case "generate_batch":
+                try raw.rejectRemovedGenerationAliases(id: id)
                 let profileName = try raw.resolvedVoiceProfileOrRuntimeDefault(id: id)
                 let items = try RawWorkerRequest.resolveBatchItems(id: id, rawItems: raw.items)
                 return .batch(id: id, voiceProfile: profileName, items: items)
@@ -300,7 +303,7 @@ extension ToolRequest {
                 return .defaultVoiceProfile(id: id)
 
             case "set_default_voice_profile":
-                let profileName = try requireNonEmpty(raw.voiceProfile ?? raw.profileName, field: "voice_profile", id: id)
+                let profileName = try requireNonEmpty(raw.voiceProfile, field: "voice_profile", id: id)
                 return .setDefaultVoiceProfile(id: id, profileName: profileName)
 
             case "set_speech_backend":
@@ -380,12 +383,26 @@ extension ToolRequest {
 
 private extension RawWorkerRequest {
     func resolvedVoiceProfileOrRuntimeDefault(id: String) throws -> SpeakSwiftly.Name? {
-        let candidate = voiceProfile ?? profileName
-        guard let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+        guard let trimmed = voiceProfile?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
         }
 
         return try ToolRequest.requireNonEmpty(trimmed, field: "voice_profile", id: id)
+    }
+
+    func rejectRemovedGenerationAliases(id: String) throws {
+        if profileName != nil {
+            throw SpeakSwiftly.Error(
+                code: .invalidRequest,
+                message: "Generation request '\(id)' uses removed key 'profile_name'. Use 'voice_profile' to select a voice profile.",
+            )
+        }
+        if textProfileID != nil {
+            throw SpeakSwiftly.Error(
+                code: .invalidRequest,
+                message: "Generation request '\(id)' uses removed key 'text_profile_id'. Use 'text_profile' to select a normalization profile.",
+            )
+        }
     }
 }
 

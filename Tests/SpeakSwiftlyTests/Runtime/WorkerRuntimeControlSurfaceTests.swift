@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 @Test func `list queue returns active and queued requests without waiting for active playback`() async throws {
     let output = OutputRecorder()
@@ -1059,7 +1058,7 @@ import TextForSpeech
     })
 
     await runtime.accept(line: #"{"id":"req-2","op":"delete_voice_profile","profile_name":"remove-me"}"#)
-    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","profile_name":"default-femme"}"#)
+    await runtime.accept(line: #"{"id":"req-3","op":"generate_speech","text":"Hi there","voice_profile":"default-femme"}"#)
 
     await profileGate.open()
 
@@ -1116,7 +1115,7 @@ import TextForSpeech
         }
     })
 
-    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hi there","profile_name":"brand-new"}"#)
+    await runtime.accept(line: #"{"id":"req-2","op":"generate_speech","text":"Hi there","voice_profile":"brand-new"}"#)
     await runtime.accept(line: #"{"id":"req-3","op":"list_voice_profiles"}"#)
 
     await profileGate.open()
