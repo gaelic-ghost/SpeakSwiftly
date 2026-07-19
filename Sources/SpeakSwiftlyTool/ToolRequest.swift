@@ -1,6 +1,5 @@
 import Foundation
 import SpeakSwiftly
-import TextForSpeech
 
 enum ToolPlaybackAction: Equatable {
     case pause
@@ -92,15 +91,15 @@ enum ToolRequest: Equatable {
     case textProfilePersistence(id: String)
     case loadTextProfiles(id: String)
     case saveTextProfiles(id: String)
-    case setActiveTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
+    case setActiveTextProfileStyle(id: String, style: SpeakSwiftly.TextProfileStyle)
     case createTextProfile(id: String, profileName: String)
     case renameTextProfile(id: String, profileID: SpeakSwiftly.TextProfileID, profileName: String)
     case setActiveTextProfile(id: String, profileID: SpeakSwiftly.TextProfileID)
     case deleteTextProfile(id: String, profileID: SpeakSwiftly.TextProfileID)
     case factoryResetTextProfiles(id: String)
     case resetTextProfile(id: String, profileID: SpeakSwiftly.TextProfileID)
-    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: SpeakSwiftly.TextProfileID?)
-    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: SpeakSwiftly.TextProfileID?)
+    case addTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: SpeakSwiftly.TextProfileID?)
+    case replaceTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: SpeakSwiftly.TextProfileID?)
     case removeTextReplacement(id: String, replacementID: String, profileID: SpeakSwiftly.TextProfileID?)
     case listQueue(id: String, queueType: SpeakSwiftly.QueueType)
     case status(id: String)

@@ -34,62 +34,16 @@ extension SpeakSwiftly.Runtime {
         )
         .opName
         try profileStore.validateProfileName(profileName)
-        await emitProgress(id: id, stage: .loadingProfileModel)
-        let modelLoadStartedAt = dependencies.now()
-        let profileModel = try await dependencies.loadProfileModel()
-        await logRequestEvent(
-            "profile_model_loaded",
+        let generatedAudio = try await generateProfileReferenceAudio(
             requestID: id,
             op: op,
             profileName: profileName,
-            details: [
-                "model_repo": .string(ModelFactory.profileModelRepo),
-                "duration_ms": .int(elapsedMS(since: modelLoadStartedAt)),
-            ],
-        )
-        try Task.checkCancellation()
-
-        await emitProgress(id: id, stage: .generatingProfileAudio)
-        let generationStartedAt = dependencies.now()
-        let rawAudio = try await profileModel.generate(
             text: text,
-            voice: voiceDescription,
-            refAudio: nil,
-            refText: nil,
-            language: nil,
-            generationParameters: GenerationPolicy.profileModelParameters(for: text),
+            voiceDescription: voiceDescription,
+            modelLoadedEventName: "profile_model_loaded",
+            audioGeneratedEventName: "profile_audio_generated",
         )
-        let audio = gainNormalizedProfileReferenceAudio(rawAudio)
-        await logRequestEvent(
-            "profile_audio_generated",
-            requestID: id,
-            op: op,
-            profileName: profileName,
-            details: [
-                "duration_ms": .int(elapsedMS(since: generationStartedAt)),
-                "sample_count": .int(rawAudio.count),
-            ],
-        )
-        try Task.checkCancellation()
-
-        let tempDirectory = dependencies.fileManager
-            .temporaryDirectory
-            .appendingPathComponent("SpeakSwiftly", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
-        defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
-
-        try Task.checkCancellation()
-        let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
-        let writeWAV = dependencies.writeWAV
-        try await runBlockingFilesystemOperation {
-            try writeWAV(audio, profileModel.sampleRate, tempWavURL)
-        }
-        try Task.checkCancellation()
-        let canonicalAudioData = try await runBlockingFilesystemOperation {
-            try Data(contentsOf: tempWavURL)
-        }
-        try Task.checkCancellation()
+        let audioMaterialization = generatedAudio.materialization
 
         await emitProgress(id: id, stage: .writingProfileAssets)
         let profileWriteStartedAt = dependencies.now()
@@ -104,8 +58,8 @@ extension SpeakSwiftly.Runtime {
                         voiceDescription: voiceDescription,
                         sourceText: text,
                         seed: seed,
-                        sampleRate: profileModel.sampleRate,
-                        canonicalAudioData: canonicalAudioData,
+                        sampleRate: audioMaterialization.sampleRate,
+                        canonicalAudioData: audioMaterialization.canonicalAudioData,
                         createdAt: upsertedAt,
                     )
                 case .user:
@@ -117,8 +71,8 @@ extension SpeakSwiftly.Runtime {
                         sourceText: text,
                         author: author,
                         seed: seed,
-                        sampleRate: profileModel.sampleRate,
-                        canonicalAudioData: canonicalAudioData,
+                        sampleRate: audioMaterialization.sampleRate,
+                        canonicalAudioData: audioMaterialization.canonicalAudioData,
                     )
             }
         }
@@ -204,7 +158,10 @@ extension SpeakSwiftly.Runtime {
             pathLabel: "clone source audio",
             op: op,
         )
-        let canonicalAudio = gainNormalizedProfileReferenceAudio(rawCanonicalAudio)
+        let audioMaterialization = try await materializeProfileReferenceAudio(
+            from: rawCanonicalAudio,
+            sampleRate: ModelFactory.canonicalProfileSampleRate,
+        )
         await logRequestEvent(
             "clone_source_audio_loaded",
             requestID: id,
@@ -228,25 +185,6 @@ extension SpeakSwiftly.Runtime {
         try Task.checkCancellation()
 
         await emitProgress(id: id, stage: .writingProfileAssets)
-        let tempDirectory = dependencies.fileManager
-            .temporaryDirectory
-            .appendingPathComponent("SpeakSwiftly", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try dependencies.fileManager.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
-        defer { try? dependencies.fileManager.removeItem(at: tempDirectory) }
-
-        try Task.checkCancellation()
-        let tempWavURL = tempDirectory.appendingPathComponent(ProfileStore.audioFileName)
-        let writeWAV = dependencies.writeWAV
-        try await runBlockingFilesystemOperation {
-            try writeWAV(canonicalAudio, ModelFactory.canonicalProfileSampleRate, tempWavURL)
-        }
-        try Task.checkCancellation()
-        let canonicalAudioData = try await runBlockingFilesystemOperation {
-            try Data(contentsOf: tempWavURL)
-        }
-        try Task.checkCancellation()
-
         let profileWriteStartedAt = dependencies.now()
         let profileStore = profileStore
         var storedProfile = try await runBlockingFilesystemOperation {
@@ -259,8 +197,8 @@ extension SpeakSwiftly.Runtime {
                 transcriptProvenance: resolvedTranscript.provenance,
                 author: .user,
                 seed: nil,
-                sampleRate: ModelFactory.canonicalProfileSampleRate,
-                canonicalAudioData: canonicalAudioData,
+                sampleRate: audioMaterialization.sampleRate,
+                canonicalAudioData: audioMaterialization.canonicalAudioData,
             )
         }
         await logRequestEvent(

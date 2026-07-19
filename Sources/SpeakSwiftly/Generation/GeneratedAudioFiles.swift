@@ -3,7 +3,6 @@ import Foundation
 import MLXAudioTTS
 @preconcurrency import MLXLMCommon
 import SpeakSwiftlyFileAudioOutput
-import TextForSpeech
 
 // MARK: - Generated Audio Files
 
@@ -125,8 +124,10 @@ extension SpeakSwiftly.Runtime {
                     requestID: requestID,
                     model: model,
                     text: text,
-                    materialization: materialization,
-                    refAudio: refAudio,
+                    reference: .raw(
+                        materialization: materialization,
+                        refAudio: refAudio,
+                    ),
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )
@@ -135,7 +136,7 @@ extension SpeakSwiftly.Runtime {
                     requestID: requestID,
                     model: model,
                     text: text,
-                    conditioning: conditioning,
+                    reference: .prepared(conditioning),
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )
@@ -161,8 +162,10 @@ extension SpeakSwiftly.Runtime {
                     model: model,
                     text: text,
                     plannedChunks: plannedTextChunks,
-                    materialization: materialization,
-                    refAudio: refAudio,
+                    reference: .raw(
+                        materialization: materialization,
+                        refAudio: refAudio,
+                    ),
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )
@@ -174,7 +177,7 @@ extension SpeakSwiftly.Runtime {
                     model: model,
                     text: text,
                     plannedChunks: plannedTextChunks,
-                    conditioning: conditioning,
+                    reference: .prepared(conditioning),
                     generationParameters: generationParameters,
                     streamingInterval: streamingInterval,
                 )

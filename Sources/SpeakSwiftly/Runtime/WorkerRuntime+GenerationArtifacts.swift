@@ -1,5 +1,4 @@
 import Foundation
-import TextForSpeech
 
 // MARK: - Worker Runtime Generation Support
 
@@ -380,22 +379,9 @@ extension SpeakSwiftly.Runtime {
                             return
                         }
                         if let generatedFile = payload.generatedFile {
-                            let artifact = SpeakSwiftly.GenerationArtifact(
-                                artifactID: generatedFile.artifactID,
-                                kind: .init(audioFormat: generatedFile.audioFormat),
-                                createdAt: generatedFile.createdAt,
-                                filePath: generatedFile.filePath,
-                                sampleRate: generatedFile.sampleRate,
-                                audioFormat: generatedFile.audioFormat,
-                                contentType: generatedFile.contentType,
-                                voiceProfile: generatedFile.voiceProfile,
-                                textProfile: generatedFile.textProfile,
-                                sourceFormat: generatedFile.sourceFormat,
-                                requestContext: generatedFile.requestContext,
-                            )
                             _ = try? generationJobStore.markCompleted(
                                 id: id,
-                                artifacts: [artifact],
+                                artifacts: [SpeakSwiftly.GenerationArtifact(generatedFile)],
                                 completedAt: dependencies.now(),
                             )
                         }
@@ -404,24 +390,9 @@ extension SpeakSwiftly.Runtime {
                             return
                         }
                         if let generatedBatch = payload.generatedBatch {
-                            let artifacts = generatedBatch.artifacts.map { generatedFile in
-                                SpeakSwiftly.GenerationArtifact(
-                                    artifactID: generatedFile.artifactID,
-                                    kind: .init(audioFormat: generatedFile.audioFormat),
-                                    createdAt: generatedFile.createdAt,
-                                    filePath: generatedFile.filePath,
-                                    sampleRate: generatedFile.sampleRate,
-                                    audioFormat: generatedFile.audioFormat,
-                                    contentType: generatedFile.contentType,
-                                    voiceProfile: generatedFile.voiceProfile,
-                                    textProfile: generatedFile.textProfile,
-                                    sourceFormat: generatedFile.sourceFormat,
-                                    requestContext: generatedFile.requestContext,
-                                )
-                            }
                             _ = try? generationJobStore.markCompleted(
                                 id: id,
-                                artifacts: artifacts,
+                                artifacts: generatedBatch.artifacts.map(SpeakSwiftly.GenerationArtifact.init),
                                 completedAt: dependencies.now(),
                             )
                         }

@@ -1,5 +1,4 @@
 import Foundation
-import TextForSpeech
 
 enum WorkerRequest: Equatable {
     case queueSpeech(
@@ -71,15 +70,15 @@ enum WorkerRequest: Equatable {
     case textProfilePersistence(id: String)
     case loadTextProfiles(id: String)
     case saveTextProfiles(id: String)
-    case setActiveTextProfileStyle(id: String, style: TextForSpeech.BuiltInProfileStyle)
+    case setActiveTextProfileStyle(id: String, style: SpeakSwiftly.TextProfileStyle)
     case createTextProfile(id: String, profileName: String)
     case renameTextProfile(id: String, profileID: String, profileName: String)
     case setActiveTextProfile(id: String, profileID: String)
     case deleteTextProfile(id: String, profileID: String)
     case factoryResetTextProfiles(id: String)
     case resetTextProfile(id: String, profileID: String)
-    case addTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
-    case replaceTextReplacement(id: String, replacement: TextForSpeech.Replacement, profileID: String?)
+    case addTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: String?)
+    case replaceTextReplacement(id: String, replacement: SpeakSwiftly.TextReplacement, profileID: String?)
     case removeTextReplacement(id: String, replacementID: String, profileID: String?)
     case listQueue(id: String, queueType: WorkerQueueType)
     case status(id: String)
@@ -92,6 +91,16 @@ enum WorkerRequest: Equatable {
     case playback(id: String, action: PlaybackAction)
     case clearQueue(id: String, queueType: WorkerQueueType?)
     case cancelRequest(id: String, requestID: String, queueType: WorkerQueueType?)
+
+    struct ExecutionPolicy: Equatable {
+        var isImmediateControlOperation = false
+        var acknowledgesEnqueueImmediately = false
+        var emitsTerminalSuccessAfterAcknowledgement = false
+        var requiresResidentModels = false
+        var requiresPlayback = false
+        var mutatesResidentState = false
+        var requiresPlaybackDrainBeforeStart = false
+    }
 
     static let runtimeDefaultVoiceProfilePlaceholder = "__speakswiftly_runtime_default_voice_profile__"
 
@@ -293,57 +302,56 @@ enum WorkerRequest: Equatable {
     }
 
     var requiresResidentModels: Bool {
-        switch self {
-            case .queueSpeech, .queueBatch:
-                true
-            default:
-                false
-        }
+        executionPolicy.requiresResidentModels
     }
 
     var mutatesResidentState: Bool {
-        switch self {
-            case .switchSpeechBackend, .reloadModels, .unloadModels:
-                true
-            default:
-                false
-        }
+        executionPolicy.mutatesResidentState
     }
 
     var requiresPlayback: Bool {
-        switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
-                true
-            default:
-                false
-        }
+        executionPolicy.requiresPlayback
     }
 
     var acknowledgesEnqueueImmediately: Bool {
-        switch self {
-            case .queueSpeech, .queueBatch, .replayRecentAudio, .switchSpeechBackend, .reloadModels, .unloadModels:
-                true
-            default:
-                false
-        }
+        executionPolicy.acknowledgesEnqueueImmediately
     }
 
     var emitsTerminalSuccessAfterAcknowledgement: Bool {
-        switch self {
-            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .stream, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
-                 .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
-                 .queueBatch,
-                 .switchSpeechBackend,
-                 .reloadModels,
-                 .unloadModels:
-                true
-            default:
-                false
-        }
+        executionPolicy.emitsTerminalSuccessAfterAcknowledgement
     }
 
     var isImmediateControlOperation: Bool {
+        executionPolicy.isImmediateControlOperation
+    }
+
+    var executionPolicy: ExecutionPolicy {
         switch self {
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .live, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _):
+                ExecutionPolicy(
+                    acknowledgesEnqueueImmediately: true,
+                    requiresResidentModels: true,
+                    requiresPlayback: true,
+                )
+            case .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .stream, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
+                 .queueSpeech(id: _, text: _, profileName: _, textProfileID: _, jobType: .file, audioFormat: _, requestContext: _, qwenPreModelTextChunking: _),
+                 .queueBatch:
+                ExecutionPolicy(
+                    acknowledgesEnqueueImmediately: true,
+                    emitsTerminalSuccessAfterAcknowledgement: true,
+                    requiresResidentModels: true,
+                )
+            case .replayRecentAudio:
+                ExecutionPolicy(acknowledgesEnqueueImmediately: true)
+            case .switchSpeechBackend,
+                 .reloadModels,
+                 .unloadModels:
+                ExecutionPolicy(
+                    acknowledgesEnqueueImmediately: true,
+                    emitsTerminalSuccessAfterAcknowledgement: true,
+                    mutatesResidentState: true,
+                    requiresPlaybackDrainBeforeStart: true,
+                )
             case .generatedFile,
                  .generatedFiles,
                  .generatedBatch,
@@ -382,19 +390,14 @@ enum WorkerRequest: Equatable {
                  .playback,
                  .clearQueue,
                  .cancelRequest:
-                true
+                ExecutionPolicy(isImmediateControlOperation: true)
             default:
-                false
+                ExecutionPolicy()
         }
     }
 
     var requiresPlaybackDrainBeforeStart: Bool {
-        switch self {
-            case .switchSpeechBackend, .reloadModels, .unloadModels:
-                true
-            default:
-                false
-        }
+        executionPolicy.requiresPlaybackDrainBeforeStart
     }
 
     var formsOrderedControlBarrier: Bool {

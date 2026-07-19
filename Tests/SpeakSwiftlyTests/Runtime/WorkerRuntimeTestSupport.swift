@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 actor LoadedBackendRecorder {
     private(set) var backends = [SpeakSwiftly.SpeechBackend]()

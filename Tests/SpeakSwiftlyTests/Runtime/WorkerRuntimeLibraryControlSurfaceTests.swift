@@ -1,7 +1,6 @@
 import Foundation
 @testable import SpeakSwiftly
 import Testing
-import TextForSpeech
 
 @Test func `library helpers submit profile and generated file worker protocol requests`() async throws {
     let output = OutputRecorder()

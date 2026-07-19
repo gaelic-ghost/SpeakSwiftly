@@ -39,61 +39,54 @@ extension SpeakSwiftly.Runtime {
         )
         try Task.checkCancellation()
 
-        switch speechBackend {
-            case .qwen3_smol,
-                 .qwen3_smol_4bit,
-                 .qwen3_smol_5bit,
-                 .qwen3_smol_6bit,
-                 .qwen3_smol_8bit,
-                 .qwen3_smol_bf16,
-                 .qwen3_BIG,
-                 .qwen3_BIG_4bit,
-                 .qwen3_BIG_5bit,
-                 .qwen3_BIG_6bit,
-                 .qwen3_BIG_8bit,
-                 .qwen3_BIG_bf16:
-                let backend = speechBackend
-                let residentModel = try residentQwenModelOrThrow()
-                switch qwenConditioningStrategy {
-                    case .legacyRaw:
-                        let materialization = try profile.qwenMaterialization(for: backend)
-                        let refAudioLoadStartedAt = dependencies.now()
-                        let refAudio = try dependencies.loadAudioSamples(materialization.referenceAudioURL, residentModel.sampleRate)
-                        await logRequestEvent(
-                            "reference_audio_loaded",
-                            requestID: id,
-                            op: op,
-                            profileName: profileName,
-                            details: [
-                                "speech_backend": .string(speechBackend.rawValue),
-                                "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
-                                "path": .string(materialization.referenceAudioURL.path),
-                                "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
-                                "sample_rate": .int(residentModel.sampleRate),
-                            ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
-                        )
-                        try Task.checkCancellation()
-                        return .qwenRaw(
-                            model: residentModel,
-                            profile: profile,
-                            materialization: materialization,
-                            refAudio: refAudio,
-                        )
+        guard speechBackend.isQwenFamily else {
+            throw WorkerError(
+                code: .internalError,
+                message: "SpeakSwiftly loaded profile '\(profileName)' for backend '\(speechBackend.rawValue)', but the Generation module only has resident speech input routing for Qwen backends. This indicates a backend-routing bug.",
+            )
+        }
 
-                    case .preparedConditioning:
-                        let conditioning = try await loadPreparedQwenConditioning(
-                            requestID: id,
-                            op: op,
-                            profile: profile,
-                            backend: backend,
-                            model: residentModel,
-                        )
-                        return .qwenPrepared(
-                            model: residentModel,
-                            profile: profile,
-                            conditioning: conditioning,
-                        )
-                }
+        let backend = speechBackend
+        let residentModel = try residentQwenModelOrThrow()
+        switch qwenConditioningStrategy {
+            case .legacyRaw:
+                let materialization = try profile.qwenMaterialization(for: backend)
+                let refAudioLoadStartedAt = dependencies.now()
+                let refAudio = try dependencies.loadAudioSamples(materialization.referenceAudioURL, residentModel.sampleRate)
+                await logRequestEvent(
+                    "reference_audio_loaded",
+                    requestID: id,
+                    op: op,
+                    profileName: profileName,
+                    details: [
+                        "speech_backend": .string(speechBackend.rawValue),
+                        "conditioning_strategy": .string(qwenConditioningStrategy.rawValue),
+                        "path": .string(materialization.referenceAudioURL.path),
+                        "duration_ms": .int(elapsedMS(since: refAudioLoadStartedAt)),
+                        "sample_rate": .int(residentModel.sampleRate),
+                    ].merging(memoryDetails(), uniquingKeysWith: { _, new in new }),
+                )
+                try Task.checkCancellation()
+                return .qwenRaw(
+                    model: residentModel,
+                    profile: profile,
+                    materialization: materialization,
+                    refAudio: refAudio,
+                )
+
+            case .preparedConditioning:
+                let conditioning = try await loadPreparedQwenConditioning(
+                    requestID: id,
+                    op: op,
+                    profile: profile,
+                    backend: backend,
+                    model: residentModel,
+                )
+                return .qwenPrepared(
+                    model: residentModel,
+                    profile: profile,
+                    conditioning: conditioning,
+                )
         }
     }
 

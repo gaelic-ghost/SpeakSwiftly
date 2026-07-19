@@ -50,21 +50,13 @@ extension SpeakSwiftly.Runtime {
         let replayUpdates = replayBuffered ? broker.replayUpdates : []
         let isTerminal = broker.isTerminal
 
-        return AsyncThrowingStream { continuation in
-            replayUpdates.forEach { continuation.yield($0) }
-
-            guard !isTerminal, requestBrokers[requestID] != nil else {
-                continuation.finish()
-                return
-            }
-
-            requestBrokers[requestID]?.subscriberContinuations[subscriberID] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task {
-                    await self?.removeRequestUpdateSubscriber(subscriberID, for: requestID)
-                }
-            }
-        }
+        return makeBufferedRequestObservationStream(
+            subscriberID: subscriberID,
+            replayUpdates: replayUpdates,
+            isTerminal: isTerminal,
+            subscribe: { self.requestBrokers[requestID]?.subscriberContinuations[$0] = $1 },
+            remove: { [weak self] in await self?.removeRequestUpdateSubscriber($0, for: requestID) },
+        )
     }
 
     func makeSynthesisUpdateStream(
@@ -81,18 +73,34 @@ extension SpeakSwiftly.Runtime {
         let replayEvents = replayBuffered ? broker.replaySynthesisUpdates : []
         let isTerminal = broker.isTerminal
 
-        return AsyncThrowingStream { continuation in
-            replayEvents.forEach { continuation.yield($0) }
+        return makeBufferedRequestObservationStream(
+            subscriberID: subscriberID,
+            replayUpdates: replayEvents,
+            isTerminal: isTerminal,
+            subscribe: { self.requestBrokers[requestID]?.synthesisContinuations[$0] = $1 },
+            remove: { [weak self] in await self?.removeSynthesisUpdateSubscriber($0, for: requestID) },
+        )
+    }
 
-            guard !isTerminal, requestBrokers[requestID] != nil else {
+    private func makeBufferedRequestObservationStream<Update: Sendable>(
+        subscriberID: UUID,
+        replayUpdates: [Update],
+        isTerminal: Bool,
+        subscribe: @escaping (UUID, AsyncThrowingStream<Update, any Swift.Error>.Continuation) -> Void,
+        remove: @escaping @Sendable (UUID) async -> Void,
+    ) -> AsyncThrowingStream<Update, any Swift.Error> {
+        AsyncThrowingStream { continuation in
+            replayUpdates.forEach { continuation.yield($0) }
+
+            guard !isTerminal else {
                 continuation.finish()
                 return
             }
 
-            requestBrokers[requestID]?.synthesisContinuations[subscriberID] = continuation
-            continuation.onTermination = { [weak self] _ in
+            subscribe(subscriberID, continuation)
+            continuation.onTermination = { _ in
                 Task {
-                    await self?.removeSynthesisUpdateSubscriber(subscriberID, for: requestID)
+                    await remove(subscriberID)
                 }
             }
         }
@@ -260,15 +268,12 @@ extension SpeakSwiftly.Runtime {
             makeGenerateUpdate(state: snapshot.state, advanceSequence: false)
         }
 
-        return AsyncStream { continuation in
-            generateObservationBroker.subscribe(id: subscriptionID, continuation: continuation)
-            continuation.yield(latestUpdate)
-            continuation.onTermination = { [weak self] _ in
-                Task {
-                    await self?.removeGenerateUpdateContinuation(subscriptionID)
-                }
-            }
-        }
+        return makeCurrentValueObservationStream(
+            subscriptionID: subscriptionID,
+            latestUpdate: latestUpdate,
+            subscribe: { self.generateObservationBroker.subscribe(id: $0, continuation: $1) },
+            remove: { [weak self] in await self?.removeGenerateUpdateContinuation($0) },
+        )
     }
 
     func playbackUpdates() async -> AsyncStream<SpeakSwiftly.PlaybackUpdate> {
@@ -280,12 +285,26 @@ extension SpeakSwiftly.Runtime {
             makePlaybackUpdate(snapshot: snapshot, advanceSequence: false)
         }
 
-        return AsyncStream { continuation in
-            playbackObservationBroker.subscribe(id: subscriptionID, continuation: continuation)
+        return makeCurrentValueObservationStream(
+            subscriptionID: subscriptionID,
+            latestUpdate: latestUpdate,
+            subscribe: { self.playbackObservationBroker.subscribe(id: $0, continuation: $1) },
+            remove: { [weak self] in await self?.removePlaybackUpdateContinuation($0) },
+        )
+    }
+
+    private func makeCurrentValueObservationStream<Update: Sendable>(
+        subscriptionID: UUID,
+        latestUpdate: Update,
+        subscribe: @escaping (UUID, AsyncStream<Update>.Continuation) -> Void,
+        remove: @escaping @Sendable (UUID) async -> Void,
+    ) -> AsyncStream<Update> {
+        AsyncStream { continuation in
+            subscribe(subscriptionID, continuation)
             continuation.yield(latestUpdate)
-            continuation.onTermination = { [weak self] _ in
+            continuation.onTermination = { _ in
                 Task {
-                    await self?.removePlaybackUpdateContinuation(subscriptionID)
+                    await remove(subscriptionID)
                 }
             }
         }

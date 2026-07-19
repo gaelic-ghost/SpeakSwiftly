@@ -10,6 +10,7 @@ The normalizer splits its public API into focused handles:
 
 - ``SpeakSwiftly/Normalizer/Style`` for built-in style selection.
 - ``SpeakSwiftly/Normalizer/Profiles`` for profile and replacement-rule management.
+- ``SpeakSwiftly/Normalizer/Summarization`` for summarization-provider selection.
 - ``SpeakSwiftly/Normalizer/Persistence`` for loading, saving, and restoring persisted state.
 
 ## Use The Runtime-Attached Normalizer
@@ -37,7 +38,7 @@ let styleOptions = await normalizer.style.list()
 
 Use the active profile when you want the currently selected custom profile, the stored list when you want the saved profiles on disk or in memory, and the effective profile when you want the merged result after built-in style and custom replacements are applied together.
 
-Generation uses the same normalizer through ``SpeakSwiftly/Normalizer/speechText(_:requestContext:textProfileID:)``. That shared path passes the selected text profile, active built-in style, request context, and TextForSpeech summarization provider into the current `TextForSpeech.Normalize` APIs before speech or retained-file generation starts. Generation requests no longer accept source-format hints; `TextForSpeech` detects text and source structure from the request text and path context.
+Generation uses the same normalizer through ``SpeakSwiftly/Normalizer/speechText(_:requestContext:textProfileID:summarize:)``. That shared path applies the selected text profile, active built-in style, request context, and optional summarization before speech or retained-file generation starts. Worker generation requests do not accept source-format hints; SpeakSwiftly detects ordinary text and source structure from the request text and path context. Direct Swift callers with an explicit whole-source language can use ``SpeakSwiftly/Normalizer/speechSource(_:as:requestContext:textProfileID:summarize:)``.
 
 ## Create Or Update Profiles
 
@@ -69,10 +70,10 @@ Use ``SpeakSwiftly/Normalizer/Style/setActive(to:)`` when the broad built-in nor
 Replacement rules can be managed on either the active profile or a specific stored profile:
 
 ```swift
-let replacement = TextForSpeech.Replacement(
-    id: "swiftpm",
-    pattern: "SwiftPM",
-    replacement: "Swift P M"
+let replacement = SpeakSwiftly.TextReplacement(
+    "SwiftPM",
+    with: "Swift P M",
+    id: "swiftpm"
 )
 
 try await normalizer.profiles.addReplacement(replacement)
@@ -92,7 +93,17 @@ try await normalizer.persistence.save()
 try await normalizer.persistence.load()
 ```
 
-Use ``SpeakSwiftly/Normalizer/Persistence/url()`` when you need the configured persistence location. Construct the normalizer with a seeded `TextForSpeech.PersistedState` when startup needs an in-memory snapshot restored immediately.
+Use ``SpeakSwiftly/Normalizer/Persistence/url()`` when you need the configured persistence location. Construct the normalizer with a seeded `SpeakSwiftly.TextNormalizationState` when startup needs an in-memory snapshot restored immediately.
+
+## Configure Summarization
+
+Summarization is off unless a normalization call passes `summarize: true`. Inspect or select the provider independently:
+
+```swift
+let providers = await normalizer.summarization.list()
+try await normalizer.summarization.set(.foundationModels)
+let condensed = try await normalizer.speechText(longText, summarize: true)
+```
 
 ## Where To Look Next
 

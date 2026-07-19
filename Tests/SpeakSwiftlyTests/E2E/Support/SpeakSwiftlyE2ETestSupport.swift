@@ -267,7 +267,7 @@ enum E2EHarness {
     ) async throws {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","voice_profile":"\(profileName)"}
             """,
         )
 
@@ -318,7 +318,7 @@ enum E2EHarness {
     ) async throws {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_speech","text":"\(text.jsonEscaped)","voice_profile":"\(profileName)"}
             """,
         )
 
@@ -420,7 +420,7 @@ enum E2EHarness {
     ) async throws -> [String: Any] {
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"generate_audio_file","text":"\(text.jsonEscaped)","profile_name":"\(profileName)"}
+            {"id":"\(id)","op":"generate_audio_file","text":"\(text.jsonEscaped)","voice_profile":"\(profileName)"}
             """,
         )
 
@@ -473,7 +473,7 @@ enum E2EHarness {
 
         try worker.sendJSON(
             """
-            {"id":"\(id)","op":"generate_batch","profile_name":"\(profileName)","items":\(compactItemsJSON)}
+            {"id":"\(id)","op":"generate_batch","voice_profile":"\(profileName)","items":\(compactItemsJSON)}
             """,
         )
 

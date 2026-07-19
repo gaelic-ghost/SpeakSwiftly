@@ -258,24 +258,23 @@ In Progress
 
 - [x] Return `SpeakSwiftly` package metadata and current support docs to a clearly macOS-only local speech worker package.
 - [ ] Keep `SpeakSwiftlyServer` macOS-only and aligned with the streamlined `SpeakSwiftly` surface.
-- [ ] Prepare `TextForSpeech` as the shared normalization and profile foundation for `SpeakSwiftlyMobile` after conditioning any macOS-only behavior behind explicit platform checks or injectable providers.
-- [ ] Start `SpeakSwiftlyMobile` as a separate iOS app that depends on `TextForSpeech` and owns its mobile Core ML speech engine directly.
+- [x] Integrate normalization, summarization, text profiles, and persistence as the internal `SpeakSwiftlyNormalization` target while keeping lifecycle ownership on `SpeakSwiftly.Normalizer`.
+- [ ] Start `SpeakSwiftlyMobile` as a separate iOS app that owns its mobile Core ML speech engine and initial text-conditioning flow directly.
 
 ### Tickets
 
 - [x] Remove the current iOS support promise from `SpeakSwiftly` package metadata, README wording, API docs, and maintainer docs so the package no longer advertises an unsupported mobile runtime.
 - [ ] Delete or archive `SpeakSwiftly` iOS playback-only support that is no longer part of the macOS package contract.
-- [ ] Audit `TextForSpeech` for macOS-only behavior, especially summarization-provider defaults, persistence defaults, filesystem assumptions, and any Apple-framework availability checks that could affect an iOS app consumer.
-- [ ] Condition macOS-only `TextForSpeech` behavior with explicit platform checks or injected providers while preserving the existing iOS package platform support.
-- [ ] Keep `TextForSpeech` focused on speech-safe text normalization, built-in profiles, custom profile persistence, and profile-driven pronunciation overrides rather than moving speech generation or playback into it.
-- [ ] Define the initial `SpeakSwiftlyMobile` dependency shape as `TextForSpeech` plus app-owned Core ML model catalog, model loading, iOS audio-session ownership, and a narrow speak-text flow.
-- [ ] Defer any new shared package until both the macOS package and mobile app prove real duplication that cannot belong cleanly in `TextForSpeech`.
+- [x] Separate portable normalization algorithms from macOS runtime ownership inside the package graph.
+- [x] Keep speech generation and playback out of the normalization target.
+- [ ] Define the initial `SpeakSwiftlyMobile` shape as app-owned text conditioning, Core ML model catalog, model loading, iOS audio-session ownership, and a narrow speak-text flow.
+- [ ] Extract a vended cross-platform normalization product only after the macOS package and mobile app prove real duplication and a stable portable contract.
 
 ### Exit Criteria
 
 - [ ] `SpeakSwiftly` and `SpeakSwiftlyServer` are documented and packaged as macOS-only again.
-- [ ] `TextForSpeech` can be consumed by `SpeakSwiftlyMobile` without inheriting macOS-only behavior or desktop speech-worker concepts.
-- [ ] `SpeakSwiftlyMobile` has a documented first slice that uses `TextForSpeech` for text conditioning and keeps iOS Core ML generation inside the app until a shared boundary is earned.
+- [x] SpeakSwiftly has one package-owned normalization state owner and no external normalization-package dependency.
+- [ ] `SpeakSwiftlyMobile` has a documented first slice that keeps iOS text conditioning and Core ML generation inside the app until a shared boundary is earned.
 
 ## Milestone 32: Qwen-Only Output Modularization
 
@@ -305,7 +304,7 @@ In Progress
 - [x] Add `generate.speech(... output:)` to the typed runtime surface.
 - [x] Add `generate.audioStream(...)` so host boundaries can consume successful canonical chunk streams instead of failed request handles.
 - [x] Add memory-backed recent generated-audio replay on `runtime.playback`, including replay-one, replay-all, bounded retention configuration, and JSONL/tool controls.
-- [x] Remove the local `request_context.reqPurpose: "audioStream"` rejection guard after TextForSpeech removed `RequestPurpose.audioStream` in [gaelic-ghost/TextForSpeech#33](https://github.com/gaelic-ghost/TextForSpeech/issues/33).
+- [x] Keep `request_context.reqPurpose: "audioStream"` rejected by the SpeakSwiftly-owned request-context decoder after the earlier external model removed that case.
 - [ ] Review and intentionally document the remaining non-playback output semantics: retained file generation should not inherit live-playback backpressure accidentally, while `generate.audioStream(...)` should define host-consumer cancellation, buffering, and slow-reader behavior explicitly before the next implementation pass.
 - [x] Add tests for canonical chunks, local playback chunk consumption, HTTP frames, Network frame round trips, Bonjour metadata, discovered-destination selection, and removed backend rejection.
 - [x] Add organized unit and integration matrix coverage for every Qwen3 size and quant variant so routing, decoding, configuration, resident repo mapping, generation policy, and runtime scheduling stay covered without real-model downloads in the default suite.
@@ -350,7 +349,10 @@ Research
 - [ ] Decide the first Core ML graph boundaries deliberately, including which work remains Swift-side and which stages should become separate Core ML models.
 - [x] Add a runtime-choice matrix comparing hand-rolled Core ML, Core AI through `coreai-torch`, ExecuTorch MLX, and ExecuTorch Core ML before adopting another runtime dependency.
 - [x] Probe whether `coreai-torch` can export the smallest useful Qwen3-TTS talker/code-predictor subgraphs to Core AI IR while preserving attention, RoPE, RMSNorm, cache, and codebook boundaries clearly enough for parity checks.
+- [x] Add a Core AI ANE/compression route plan that separates `coreai-torch` conversion from `coreai-opt` quantization, palettization, and activation-calibration work.
+- [x] Probe Core AI code-predictor weight-only W8 compression through `coreai-opt` and `coreai-torch`; eager mode converts to Core AI IR, but both broad W8 and linear-only W8 drift too far to compile/profile for ANE yet.
 - [ ] Resolve the Core AI mutable-cache/state boundary before any backend integration or latency comparison.
+- [ ] Probe a Core AI code-predictor compression path first, using `coreai-opt` weight-only W8 before W8A8 activation quantization, then compile with `coreai-build --preferred-compute neural-engine` and inspect compute/storage metadata.
 - [ ] Convert one stage at a time with Core ML Tools, recording deployment target, input/output names, fixed shapes, cache layout, precision, and known unsupported or numerically sensitive operations.
 - [ ] Build a standalone Swift probe that loads converted artifacts, checks per-stage tensor parity against the Python golden path, and emits structured timing and memory metrics.
 - [ ] Measure stage-specific `MLComputeUnits` choices on Gale's Apple silicon hardware, including `cpuAndGPU`, `cpuAndNeuralEngine`, `all`, and `cpuOnly` where safe.
@@ -380,6 +382,8 @@ Research
 - The simpler extension path of adding another MLX model repo is not enough because this work changes inference engine, artifact layout, conversion ownership, and profiling surface.
 - Core AI may become the better Apple-native runtime route if `coreai-torch` can preserve and lower Qwen3-TTS's talker/code-predictor structure more cleanly than the current Core ML Tools path. Treat that as an evidence question, not a naming pivot: the existing decoder residency and quality evidence still matters until Core AI produces matched Qwen3-TTS outputs.
 - The first real Core AI probes now have matched Qwen3-TTS outputs for the code predictor and main-talker frozen-cache decode path. The code predictor converts to Core AI IR, and the main talker converts in BF16 and float32 with exact exported-program parity after omitting a redundant all-zero decode mask. Treat Core AI as promising but still gated on mutable cache state, runtime profiling, and end-to-end quality.
+- `coreai-torch` is the conversion bridge, not the whole compression answer. For ANE-relevant Core AI work, route compressed PyTorch through `coreai-opt` first, then convert with `coreai-torch`, compile with `coreai-build --preferred-compute neural-engine`, and require `coreai-build inspect --json` or Instruments evidence before claiming Neural Engine benefit.
+- The first `coreai-opt` code-predictor W8 probe found two important boundaries: graph-mode W8 needs explicit per-channel axis configuration and then hits a functorch/vmap prepared-graph failure; eager-mode W8 with `PerChannelGranularity(axis=0)` reaches `coreai-torch` conversion, but both broad W8 and linear-only W8 collapse enough to show max absolute drift `12.8125`. Do not compile/profile those W8 graphs for ANE until compression parity is fixed.
 - Foundation Models is not a replacement path for Qwen3-TTS acoustic generation. It may matter later for app-level intelligence, prompt orchestration, or product features, but not for first-party Qwen3-TTS audio generation unless Apple exposes relevant speech/audio generation primitives.
 - The decoder calibration-data lane now has a first checked-in LibriTTS-R audio-code fixture for the 12 Hz speech-tokenizer decoder: three 24 kHz read-speech samples, 185 total code steps, 16 quantizers, and suggested first bucket sizes of 40, 72, and 88 code steps.
 - The first Core ML quantization preflight confirms Core ML Tools 9 exposes both int8 weight quantization and experimental activation quantization APIs. Bucketed decoder reports now cover the first representative LibriTTS-R calibration shapes, so the next representative W8A8 pass can use real speech-tokenizer codes instead of only the 8-step synthetic fixture.

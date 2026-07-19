@@ -61,6 +61,72 @@ final class AudioPlaybackRequestState {
         queueDepthSampleCount += 1
     }
 
+    func recordScheduledBuffer(sampleRate: Double) {
+        scheduleCallbackCount += 1
+        recordQueuedAudioDepth(sampleRate: sampleRate)
+    }
+
+    func recordPlayedBackBuffer(sampleRate: Double) {
+        playedBackCallbackCount += 1
+        recordQueuedAudioDepth(sampleRate: sampleRate)
+    }
+
+    func recordPreparedBufferShape(
+        firstSample: Float,
+        lastSample: Float,
+        fadeInApplied: Bool,
+    ) {
+        let leadingAbs = Double(abs(firstSample))
+        let trailingAbs = Double(abs(lastSample))
+        maxLeadingAbsAmplitude = max(maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
+        maxTrailingAbsAmplitude = max(maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
+        if fadeInApplied {
+            fadeInChunkCount += 1
+        }
+        if let lastTrailingSample {
+            let jump = Double(abs(firstSample - lastTrailingSample))
+            maxBoundaryDiscontinuity = max(maxBoundaryDiscontinuity ?? jump, jump)
+        }
+        lastTrailingSample = lastSample
+    }
+
+    @discardableResult
+    func beginRebuffer(now: Date = Date()) -> Bool {
+        guard !isRebuffering else { return false }
+
+        isRebuffering = true
+        rebufferEventCount += 1
+        thresholdsController.recordRebuffer()
+        rebufferStartedAt = now
+        recentRebufferStartTimes.append(now)
+        recentRebufferStartTimes.removeAll {
+            now.timeIntervalSince($0) * 1000 > Double(PlaybackMetricsConfiguration.rebufferThrashWindowMS)
+        }
+        return true
+    }
+
+    @discardableResult
+    func finishRebuffer(now: Date = Date()) -> Int? {
+        guard isRebuffering else { return nil }
+
+        isRebuffering = false
+        guard let rebufferStartedAt else { return nil }
+
+        let durationMS = Int((now.timeIntervalSince(rebufferStartedAt) * 1000).rounded())
+        rebufferTotalDurationMS += durationMS
+        longestRebufferDurationMS = max(longestRebufferDurationMS, durationMS)
+        self.rebufferStartedAt = nil
+        return durationMS
+    }
+
+    func shouldEmitRebufferThrashWarning() -> Bool {
+        guard !emittedRebufferThrashWarning else { return false }
+        guard recentRebufferStartTimes.count >= PlaybackMetricsConfiguration.rebufferThrashWarningCount else { return false }
+
+        emittedRebufferThrashWarning = true
+        return true
+    }
+
     func installDrainContinuation(
         _ continuation: CheckedContinuation<Void, Error>,
         sampleRate: Double,

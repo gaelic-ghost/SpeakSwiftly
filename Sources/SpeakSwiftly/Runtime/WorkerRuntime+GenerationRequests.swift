@@ -1,5 +1,4 @@
 import Foundation
-import TextForSpeech
 
 // MARK: - Runtime Generation Requests
 
@@ -39,21 +38,7 @@ extension SpeakSwiftly.Runtime {
                     )
                     let completedJob = try generationJobStore.markCompleted(
                         id: id,
-                        artifacts: [
-                            SpeakSwiftly.GenerationArtifact(
-                                artifactID: generatedFile.artifactID,
-                                kind: .init(audioFormat: generatedFile.audioFormat),
-                                createdAt: generatedFile.createdAt,
-                                filePath: generatedFile.filePath,
-                                sampleRate: generatedFile.sampleRate,
-                                audioFormat: generatedFile.audioFormat,
-                                contentType: generatedFile.contentType,
-                                voiceProfile: generatedFile.voiceProfile,
-                                textProfile: generatedFile.textProfile,
-                                sourceFormat: generatedFile.sourceFormat,
-                                requestContext: generatedFile.requestContext,
-                            ),
-                        ],
+                        artifacts: [SpeakSwiftly.GenerationArtifact(generatedFile)],
                         completedAt: dependencies.now(),
                     )
                     disposition = .requestCompleted(.success(
@@ -77,21 +62,7 @@ extension SpeakSwiftly.Runtime {
                     )
                     let completedJob = try generationJobStore.markCompleted(
                         id: id,
-                        artifacts: generatedFiles.map { generatedFile in
-                            SpeakSwiftly.GenerationArtifact(
-                                artifactID: generatedFile.artifactID,
-                                kind: .init(audioFormat: generatedFile.audioFormat),
-                                createdAt: generatedFile.createdAt,
-                                filePath: generatedFile.filePath,
-                                sampleRate: generatedFile.sampleRate,
-                                audioFormat: generatedFile.audioFormat,
-                                contentType: generatedFile.contentType,
-                                voiceProfile: generatedFile.voiceProfile,
-                                textProfile: generatedFile.textProfile,
-                                sourceFormat: generatedFile.sourceFormat,
-                                requestContext: generatedFile.requestContext,
-                            )
-                        },
+                        artifacts: generatedFiles.map(SpeakSwiftly.GenerationArtifact.init),
                         completedAt: dependencies.now(),
                     )
                     disposition = try .requestCompleted(.success(
@@ -363,14 +334,18 @@ extension SpeakSwiftly.Runtime {
         do {
             switch outputDestination {
                 case .localPlayback:
-                    for try await chunk in chunkStream {
-                        try Task.checkCancellation()
-                        await recordRecentGeneratedAudioChunk(chunk, recentAudioID: recentAudioID)
+                    try await streamGeneratedAudioChunks(
+                        chunkStream,
+                        requestID: id,
+                        recentAudioID: recentAudioID,
+                        failureMessage: { error in
+                            "Live speech generation failed while streaming audio for request '\(id)'. \(error.localizedDescription)"
+                        },
+                    ) { chunk in
                         if !chunk.isFinal {
                             playbackState.execution.continuation.yield(chunk.samples)
                         }
                     }
-                    await finishRecentGeneratedAudioCapture(recentAudioID: recentAudioID)
                     playbackState.execution.continuation.finish()
                 case .httpResponseStream,
                      .networkStream,
@@ -386,18 +361,8 @@ extension SpeakSwiftly.Runtime {
                         )
             }
         } catch {
-            await failRecentGeneratedAudioCapture(recentAudioID: recentAudioID, error: error)
             playbackState.execution.continuation.finish(throwing: error)
-            if let workerError = error as? WorkerError {
-                throw workerError
-            }
-            if error is CancellationError {
-                throw CancellationError()
-            }
-            throw WorkerError(
-                code: .modelGenerationFailed,
-                message: "Live speech generation failed while streaming audio for request '\(id)'. \(error.localizedDescription)",
-            )
+            throw error
         }
     }
 
@@ -445,16 +410,39 @@ extension SpeakSwiftly.Runtime {
         )
 
         do {
+            try await streamGeneratedAudioChunks(
+                chunkStream,
+                requestID: id,
+                recentAudioID: recentAudioID,
+                failureMessage: { error in
+                    "Generated-audio stream request '\(id)' failed while streaming canonical audio chunks. \(error.localizedDescription)"
+                },
+            ) { chunk in
+                try yieldGeneratedAudioChunk(chunk, for: id)
+            }
+            finishGeneratedAudioStream(for: id)
+        } catch {
+            finishGeneratedAudioStream(for: id, throwing: error)
+            throw error
+        }
+    }
+
+    private func streamGeneratedAudioChunks(
+        _ chunkStream: SpeakSwiftly.GeneratedAudioChunkStream,
+        requestID id: String,
+        recentAudioID: String?,
+        failureMessage: (any Swift.Error) -> String,
+        onChunk: (SpeakSwiftly.GeneratedAudioChunk) async throws -> Void,
+    ) async throws {
+        do {
             for try await chunk in chunkStream {
                 try Task.checkCancellation()
                 await recordRecentGeneratedAudioChunk(chunk, recentAudioID: recentAudioID)
-                try yieldGeneratedAudioChunk(chunk, for: id)
+                try await onChunk(chunk)
             }
             await finishRecentGeneratedAudioCapture(recentAudioID: recentAudioID)
-            finishGeneratedAudioStream(for: id)
         } catch {
             await failRecentGeneratedAudioCapture(recentAudioID: recentAudioID, error: error)
-            finishGeneratedAudioStream(for: id, throwing: error)
             if let workerError = error as? WorkerError {
                 throw workerError
             }
@@ -463,7 +451,7 @@ extension SpeakSwiftly.Runtime {
             }
             throw WorkerError(
                 code: .modelGenerationFailed,
-                message: "Generated-audio stream request '\(id)' failed while streaming canonical audio chunks. \(error.localizedDescription)",
+                message: failureMessage(error),
             )
         }
     }

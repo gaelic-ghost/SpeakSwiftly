@@ -1,6 +1,5 @@
 import Foundation
 import SpeakSwiftlyFileAudioOutput
-import TextForSpeech
 
 // MARK: - Generation Job API
 
@@ -25,7 +24,7 @@ public extension SpeakSwiftly {
         public let artifactID: String
         public let text: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let sourceFormat: TextForSpeech.SourceFormat?
+        public let sourceFormat: SpeakSwiftly.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
         public let audioFormat: SpeakSwiftly.GeneratedAudioFileFormat
 
@@ -35,7 +34,7 @@ public extension SpeakSwiftly {
             artifactID: String,
             text: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            sourceFormat: TextForSpeech.SourceFormat? = nil,
+            sourceFormat: SpeakSwiftly.SourceFormat? = nil,
             requestContext: SpeakSwiftly.RequestContext?,
             audioFormat: SpeakSwiftly.GeneratedAudioFileFormat = .wav,
         ) {
@@ -130,7 +129,7 @@ public extension SpeakSwiftly {
         public let contentType: String
         public let voiceProfile: String
         public let textProfile: SpeakSwiftly.TextProfileID?
-        public let sourceFormat: TextForSpeech.SourceFormat?
+        public let sourceFormat: SpeakSwiftly.SourceFormat?
         public let requestContext: SpeakSwiftly.RequestContext?
 
         init(
@@ -143,7 +142,7 @@ public extension SpeakSwiftly {
             contentType: String = SpeakSwiftly.GeneratedAudioFileFormat.wav.contentType,
             voiceProfile: String,
             textProfile: SpeakSwiftly.TextProfileID?,
-            sourceFormat: TextForSpeech.SourceFormat?,
+            sourceFormat: SpeakSwiftly.SourceFormat?,
             requestContext: SpeakSwiftly.RequestContext?,
         ) {
             self.artifactID = artifactID

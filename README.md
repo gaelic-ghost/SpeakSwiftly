@@ -17,9 +17,10 @@ Local speech for Swift apps, desktop tools, and agent workflows that need text r
 ### Status
 
 SpeakSwiftly is actively available as a macOS-only local speech package. Future
-mobile speech work belongs in a separate `SpeakSwiftlyMobile` app that can share
-text conditioning through `TextForSpeech` without inheriting this desktop worker
-runtime.
+mobile speech work belongs in a separate `SpeakSwiftlyMobile` app. Its first
+implementation should own mobile speech and text handling directly; a reusable
+normalization product should be extracted only after both apps prove a clean,
+cross-platform boundary.
 
 ### What This Project Is
 
@@ -66,11 +67,14 @@ Agent-facing maintainer guidance lives in [AGENTS.md](./AGENTS.md).
 |   |-- Playback/
 |   |-- Runtime/
 |   `-- SpeakSwiftly.docc/
+|-- Sources/SpeakSwiftlyCore/
+|-- Sources/SpeakSwiftlyNormalization/
 |-- Sources/SpeakSwiftlyFileAudioOutput/
 |-- Sources/SpeakSwiftlyHTTPAudioOutput/
 |-- Sources/SpeakSwiftlyNetworkAudioOutput/
 |-- Sources/SpeakSwiftlyPlayback/
 |-- Tests/SpeakSwiftlyTests/
+|-- Tests/SpeakSwiftlyNormalizationTests/
 |-- docs/maintainers/
 |-- docs/releases/
 `-- scripts/repo-maintenance/

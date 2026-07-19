@@ -48,8 +48,12 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/gaelic-ghost/TextForSpeech.git",
-            .upToNextMajor(from: "0.23.0"),
+            url: "https://github.com/swiftlang/swift-markdown.git",
+            .upToNextMajor(from: "0.7.3"),
+        ),
+        .package(
+            url: "https://github.com/scinfu/SwiftSoup.git",
+            .upToNextMajor(from: "2.13.4"),
         ),
         .package(
             url: "https://github.com/gaelic-ghost/mlx-audio-swift.git",
@@ -75,7 +79,7 @@ let package = Package(
                 "SpeakSwiftlyHTTPAudioOutput",
                 "SpeakSwiftlyFileAudioOutput",
                 "SpeakSwiftlyNetworkAudioOutput",
-                .product(name: "TextForSpeech", package: "TextForSpeech"),
+                "SpeakSwiftlyNormalization",
                 .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "MLXAudioCore", package: "mlx-audio-swift"),
@@ -91,6 +95,14 @@ let package = Package(
         ),
         .target(
             name: "SpeakSwiftlyCore",
+        ),
+        .target(
+            name: "SpeakSwiftlyNormalization",
+            dependencies: [
+                "SpeakSwiftlyCore",
+                .product(name: "Markdown", package: "swift-markdown"),
+                .product(name: "SwiftSoup", package: "SwiftSoup"),
+            ],
         ),
         .target(
             name: "SpeakSwiftlyQwenGeneration",
@@ -121,7 +133,7 @@ let package = Package(
             name: "SpeakSwiftlyFileAudioOutput",
             dependencies: [
                 "SpeakSwiftlyAudioSupport",
-                .product(name: "TextForSpeech", package: "TextForSpeech"),
+                "SpeakSwiftlyCore",
             ],
         ),
         .target(
@@ -135,7 +147,6 @@ let package = Package(
             name: "SpeakSwiftlyTool",
             dependencies: [
                 "SpeakSwiftly",
-                .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
         ),
         .plugin(
@@ -167,11 +178,16 @@ let package = Package(
                 "SpeakSwiftlyNetworkAudioOutput",
                 "SpeakSwiftlyTool",
                 "SpeakSwiftlyTestSupport",
-                .product(name: "TextForSpeech", package: "TextForSpeech"),
             ],
             resources: [
                 .copy("Resources/default.metallib"),
                 .copy("Resources/E2EProfiles"),
+            ],
+        ),
+        .testTarget(
+            name: "SpeakSwiftlyNormalizationTests",
+            dependencies: [
+                "SpeakSwiftlyNormalization",
             ],
         ),
         .target(

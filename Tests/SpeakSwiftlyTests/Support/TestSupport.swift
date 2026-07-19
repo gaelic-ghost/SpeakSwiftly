@@ -5,9 +5,21 @@ import MLXAudioTTS
 @testable import SpeakSwiftly
 @testable import SpeakSwiftlyTool
 import Testing
-import TextForSpeech
 
 // MARK: - Opt-In Test Gates
+
+func normalizeTextForTest(_ text: String) async throws -> String {
+    let normalizer = try SpeakSwiftly.Normalizer(
+        persistenceURL: FileManager.default
+            .temporaryDirectory
+            .appending(path: "speakswiftly-normalization-test-\(UUID().uuidString).json"),
+        state: SpeakSwiftly.TextNormalizationState(
+            activeCustomProfileID: SpeakSwiftly.TextProfile.default.id,
+            profiles: [SpeakSwiftly.TextProfile.default.id: .default],
+        ),
+    )
+    return try await normalizer.speechText(text)
+}
 
 func mlxConditioningPersistenceTestsEnabled() -> Bool {
     ProcessInfo.processInfo.environment["SPEAKSWIFTLY_MLX_PERSISTENCE_TESTS"] == "1"
@@ -331,7 +343,7 @@ final class PlaybackSpy: @unchecked Sendable {
                 lock.withLock { prepareCount += 1 }
                 return prepareCount == 1
             },
-            play: { [self] _, text, tuningProfile, stream, onEvent in
+            play: { [self] sampleRate, text, tuningProfile, stream, onEvent in
                 lock.withLock {
                     playCount += 1
                     playbackState = .playing
@@ -343,15 +355,7 @@ final class PlaybackSpy: @unchecked Sendable {
                 }
                 let thresholds = PlaybackThresholdController(text: text, tuningProfile: tuningProfile).thresholds
 
-                var emittedFirstChunk = false
-                var emittedPrerollReady = false
-                var chunkCount = 0
-                var sampleCount = 0
-                var startupBufferedAudioMS: Int?
-                var minQueuedAudioMS: Int?
-                var maxQueuedAudioMS: Int?
-                var queueDepthTotalMS = 0
-                var queueDepthSampleCount = 0
+                var accounting = PlaybackStreamAccounting(sampleRate: sampleRate)
                 var rebufferEventCount = 0
                 var starvationEventCount = 0
                 var pendingSampleCount = 0
@@ -362,85 +366,71 @@ final class PlaybackSpy: @unchecked Sendable {
                 var maxBoundaryDiscontinuity: Double?
                 var maxLeadingAbsAmplitude: Double?
                 var maxTrailingAbsAmplitude: Double?
-                var fadeInChunkCount = 0
+                var fadeInChunkCount: Int?
                 var rebufferTotalDurationMS = 0
                 var longestRebufferDurationMS = 0
                 var scheduleCallbackCount = 0
                 var playedBackCallbackCount = 0
 
                 func bufferedAudioMS() -> Int {
-                    Int((Double(pendingSampleCount) / 24000.0 * 1000).rounded())
-                }
-
-                func recordQueueDepth() {
-                    let queuedAudioMS = bufferedAudioMS()
-                    minQueuedAudioMS = min(minQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
-                    maxQueuedAudioMS = max(maxQueuedAudioMS ?? queuedAudioMS, queuedAudioMS)
-                    queueDepthTotalMS += queuedAudioMS
-                    queueDepthSampleCount += 1
+                    Int((Double(pendingSampleCount) / sampleRate * 1000).rounded())
                 }
 
                 for try await (chunkIndex, chunk) in [Float].asyncEnumerated(stream) {
                     guard !chunk.isEmpty else { continue }
 
                     let queuedAudioBeforeMS = bufferedAudioMS()
-                    chunkCount += 1
-                    sampleCount += chunk.count
                     pendingSampleCount += chunk.count
                     scheduleCallbackCount += 1
                     playedBackCallbackCount += 1
-                    recordQueueDepth()
                     let queuedAudioAfterMS = bufferedAudioMS()
-                    let chunkDurationMS = Int((Double(chunk.count) / 24000.0 * 1000).rounded())
+                    accounting.recordQueueDepth(queuedAudioMS: queuedAudioAfterMS)
+                    let recordedChunk = accounting.recordGeneratedChunk(
+                        samples: chunk,
+                        thresholds: thresholds,
+                        queuedAudioBeforeMS: queuedAudioBeforeMS,
+                        queuedAudioAfterMS: queuedAudioAfterMS,
+                        isRebuffering: false,
+                        fadeInApplied: chunkIndex == 0,
+                    )
 
                     if let firstSample = chunk.first, let lastSample = chunk.last {
-                        let leadingAbs = Double(abs(firstSample))
-                        let trailingAbs = Double(abs(lastSample))
-                        maxLeadingAbsAmplitude = max(maxLeadingAbsAmplitude ?? leadingAbs, leadingAbs)
-                        maxTrailingAbsAmplitude = max(maxTrailingAbsAmplitude ?? trailingAbs, trailingAbs)
-                        if chunkIndex > 0 {
-                            let jump = Double(abs(firstSample - (Float(chunkIndex) / 10 + 0.1)))
-                            maxBoundaryDiscontinuity = max(maxBoundaryDiscontinuity ?? jump, jump)
-                        }
+                        accounting.recordBufferShape(
+                            firstSample: firstSample,
+                            lastSample: lastSample,
+                            fadeInApplied: recordedChunk.fadeInApplied,
+                        )
                     }
 
-                    if !emittedFirstChunk {
-                        emittedFirstChunk = true
-                        fadeInChunkCount = 1
+                    if recordedChunk.emittedFirstChunk {
                         await onEvent(.firstChunk)
                     }
 
                     await onEvent(
                         .trace(
-                            PlaybackTraceEvent(
-                                name: "buffer_scheduled",
-                                chunkIndex: chunkIndex + 1,
+                            .bufferScheduled(
+                                chunkIndex: recordedChunk.chunkIndex,
                                 bufferIndex: chunkIndex + 1,
-                                sampleCount: chunk.count,
-                                durationMS: chunkDurationMS,
+                                frameCount: chunk.count,
+                                sampleRate: sampleRate,
                                 queuedAudioBeforeMS: queuedAudioBeforeMS,
                                 queuedAudioAfterMS: queuedAudioAfterMS,
                                 gapMS: nil,
                                 isRebuffering: false,
                                 fadeInApplied: chunkIndex == 0,
-                                generatedAudioQuality: nil,
                             ),
                         ),
                     )
 
-                    if !emittedPrerollReady, bufferedAudioMS() >= thresholds.startupBufferTargetMS {
-                        emittedPrerollReady = true
-                        startupBufferedAudioMS = bufferedAudioMS()
-                        minQueuedAudioMS = startupBufferedAudioMS
-                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
+                    if !accounting.hasEmittedPrerollReady, queuedAudioAfterMS >= thresholds.startupBufferTargetMS {
+                        let startupBufferedAudioMS = accounting.markPrerollReady(bufferedAudioMS: queuedAudioAfterMS)
+                        await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: thresholds))
                     }
                 }
 
-                if !emittedPrerollReady, pendingSampleCount > 0 {
-                    emittedPrerollReady = true
-                    startupBufferedAudioMS = bufferedAudioMS()
-                    minQueuedAudioMS = startupBufferedAudioMS
-                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS ?? 0, thresholds: thresholds))
+                if !accounting.hasEmittedPrerollReady, pendingSampleCount > 0 {
+                    let startupBufferedAudioMS = accounting.markPrerollReady(bufferedAudioMS: bufferedAudioMS())
+                    await onEvent(.prerollReady(startupBufferedAudioMS: startupBufferedAudioMS, thresholds: thresholds))
                 }
 
                 switch behavior {
@@ -459,8 +449,8 @@ final class PlaybackSpy: @unchecked Sendable {
                         await onEvent(.queueDepthLow(queuedAudioMS: 50))
                         await onEvent(.starved)
                         starvationEventCount = 1
-                        minQueuedAudioMS = 0
-                        maxQueuedAudioMS = max(maxQueuedAudioMS ?? 320, 320)
+                        accounting.recordQueueDepth(queuedAudioMS: 0)
+                        accounting.recordQueueDepth(queuedAudioMS: 320)
                         maxInterChunkGapMS = 510
                         avgInterChunkGapMS = 510
                         maxScheduleGapMS = 220
@@ -570,8 +560,8 @@ final class PlaybackSpy: @unchecked Sendable {
                         rebufferEventCount = 3
                         rebufferTotalDurationMS = 180
                         longestRebufferDurationMS = 80
-                        minQueuedAudioMS = 90
-                        maxQueuedAudioMS = 400
+                        accounting.recordQueueDepth(queuedAudioMS: 90)
+                        accounting.recordQueueDepth(queuedAudioMS: 400)
                         maxInterChunkGapMS = 520
                         avgInterChunkGapMS = 410
                         maxScheduleGapMS = 210
@@ -584,18 +574,9 @@ final class PlaybackSpy: @unchecked Sendable {
                         throw error
                 }
 
-                return PlaybackSummary(
+                return accounting.summary(
                     thresholds: thresholds,
-                    chunkCount: chunkCount,
-                    sampleCount: sampleCount,
-                    startupBufferedAudioMS: startupBufferedAudioMS,
-                    timeToFirstChunkMS: emittedFirstChunk ? 0 : nil,
-                    timeToPrerollReadyMS: emittedPrerollReady ? 0 : nil,
-                    timeFromPrerollReadyToDrainMS: emittedPrerollReady ? 0 : nil,
-                    minQueuedAudioMS: minQueuedAudioMS,
-                    maxQueuedAudioMS: maxQueuedAudioMS,
-                    avgQueuedAudioMS: queueDepthSampleCount == 0 ? nil : queueDepthTotalMS / queueDepthSampleCount,
-                    queueDepthSampleCount: queueDepthSampleCount,
+                    timeFromPrerollReadyToDrainMS: accounting.hasEmittedPrerollReady ? 0 : nil,
                     rebufferEventCount: rebufferEventCount,
                     rebufferTotalDurationMS: rebufferTotalDurationMS,
                     longestRebufferDurationMS: longestRebufferDurationMS,
