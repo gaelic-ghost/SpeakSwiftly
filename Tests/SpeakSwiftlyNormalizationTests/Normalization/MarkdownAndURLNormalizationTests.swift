@@ -90,6 +90,64 @@ import Testing
     #expect(normalized.contains("repo, link https://github.com/example/repo"))
 }
 
+@Test func `markdown tables become labeled speech rows`() {
+    let text = """
+    | Scenario | Expected speech |
+    |:---|---:|
+    | Simple table | Headers then values |
+    | Inline code | `status = "ready"` |
+    """
+
+    let normalized = TextNormalizer.normalizeMarkdownTablesForSpeech(text)
+
+    #expect(normalized.contains("Table columns: Scenario, Expected speech."))
+    #expect(normalized.contains("Scenario: Simple table; Expected speech: Headers then values"))
+    #expect(normalized.contains("Scenario: Inline code; Expected speech: `status = \"ready\"`"))
+    #expect(!normalized.contains("|:---|---:|"))
+    #expect(!normalized.contains("| Scenario |"))
+}
+
+@Test func `markdown tables preserve escaped pipes as cell content`() {
+    let text = """
+    | Surface | Value |
+    |---|---|
+    | Transport | HTTP \\| MCP |
+    """
+
+    let normalized = TextNormalizer.normalizeMarkdownTablesForSpeech(text)
+
+    #expect(normalized == "Table columns: Surface, Value.\nSurface: Transport; Value: HTTP | MCP")
+}
+
+@Test func `markdown table normalization preserves inline pipes and malformed tables`() {
+    let text = """
+    The transport choice is HTTP | MCP | CLI, based on the caller.
+    | Not | A table |
+    |--|--|
+    | Still | prose |
+    """
+
+    let normalized = TextNormalizer.normalizeMarkdownTablesForSpeech(text)
+
+    #expect(normalized == text)
+}
+
+@Test func `markdown table speech projection composes with the normalization pipeline`() async throws {
+    let text = """
+    | Surface | Value |
+    |---|---|
+    | State | `status = "ready"` |
+    """
+
+    let normalized = try await SpeakSwiftlyNormalization.Normalize.text(text)
+
+    #expect(normalized.contains("Table columns: Surface, Value."))
+    #expect(normalized.contains("Surface: State; Value: status equals"))
+    #expect(normalized.contains("ready"))
+    #expect(!normalized.contains("|---|"))
+    #expect(!normalized.contains("`"))
+}
+
 @Test func `priority bullets become spoken levels`() {
     let text = """
     - [P1] Fix the crash

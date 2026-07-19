@@ -45,6 +45,39 @@ extension TextNormalizer {
         return applyingMarkdownReplacements(replacements, to: text)
     }
 
+    static func normalizeMarkdownTablesForSpeech(_ text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var normalizedLines: [String] = []
+        var index = lines.startIndex
+
+        while index < lines.endIndex {
+            let header = lines[index]
+            let dividerIndex = lines.index(after: index)
+
+            guard header.contains("|"),
+                  dividerIndex < lines.endIndex,
+                  isMarkdownTableDivider(lines[dividerIndex]) else {
+                normalizedLines.append(header)
+                index = dividerIndex
+                continue
+            }
+
+            let headerCells = markdownTableCells(in: header)
+            var rows: [[String]] = []
+            var rowIndex = lines.index(after: dividerIndex)
+
+            while rowIndex < lines.endIndex, lines[rowIndex].contains("|") {
+                rows.append(markdownTableCells(in: lines[rowIndex]))
+                rowIndex = lines.index(after: rowIndex)
+            }
+
+            normalizedLines.append(spokenMarkdownTable(headerCells: headerCells, rows: rows))
+            index = rowIndex
+        }
+
+        return normalizedLines.joined(separator: "\n")
+    }
+
     // MARK: Markdown Replacement Collection
 
     private static func codeBlockReplacements(
@@ -108,6 +141,65 @@ extension TextNormalizer {
         }
 
         return result
+    }
+
+    private static func isMarkdownTableDivider(_ line: String) -> Bool {
+        line.firstMatch(of: /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/) != nil
+    }
+
+    private static func markdownTableCells(in line: String) -> [String] {
+        let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+        var cells: [String] = []
+        var cell = ""
+        var escaped = false
+
+        for character in trimmedLine {
+            if escaped {
+                cell.append(character)
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "|" {
+                cells.append(cell.trimmingCharacters(in: .whitespaces))
+                cell = ""
+            } else {
+                cell.append(character)
+            }
+        }
+
+        if escaped {
+            cell.append("\\")
+        }
+        cells.append(cell.trimmingCharacters(in: .whitespaces))
+
+        if trimmedLine.hasPrefix("|") {
+            cells.removeFirst()
+        }
+        if trimmedLine.hasSuffix("|") {
+            cells.removeLast()
+        }
+
+        return cells
+    }
+
+    private static func spokenMarkdownTable(
+        headerCells: [String],
+        rows: [[String]],
+    ) -> String {
+        let columns = headerCells.filter { !$0.isEmpty }
+        let intro = columns.isEmpty ? "Table." : "Table columns: \(columns.joined(separator: ", "))."
+        let spokenRows = rows.compactMap { row -> String? in
+            let values = columns.enumerated().compactMap { index, column -> String? in
+                guard index < row.count else { return nil }
+
+                let value = row[index].trimmingCharacters(in: .whitespaces)
+                return value.isEmpty ? nil : "\(column): \(value)"
+            }
+
+            return values.isEmpty ? nil : values.joined(separator: "; ")
+        }
+
+        return ([intro] + spokenRows).joined(separator: "\n")
     }
 
     private static func trimmedPriorityRemainder(_ remainder: Substring) -> String {

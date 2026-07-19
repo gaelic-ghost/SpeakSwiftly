@@ -39,6 +39,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - [Milestone 32: Qwen-Only Output Modularization](#milestone-32-qwen-only-output-modularization)
 - [Milestone 33: First-Party Core ML Qwen3-TTS Port](#milestone-33-first-party-core-ml-qwen3-tts-port)
 - [Milestone 34: First-Party Apple Speech Pipeline Ownership](#milestone-34-first-party-apple-speech-pipeline-ownership)
+- [Milestone 35: Normalization Consolidation Follow-Through](#milestone-35-normalization-consolidation-follow-through)
 - [Backlog Candidates](#backlog-candidates)
 - [History](#history)
 
@@ -53,6 +54,7 @@ This roadmap now keeps active milestones and the current release-hardening queue
 - Milestone 32: Qwen-Only Output Modularization - In Progress
 - Milestone 33: First-Party Core ML Qwen3-TTS Port - Research
 - Milestone 34: First-Party Apple Speech Pipeline Ownership - Planned
+- Milestone 35: Normalization Consolidation Follow-Through - In Progress
 
 ## Active Milestones
 
@@ -559,6 +561,40 @@ Planned
   the default answer.
 - [ ] Removing `mlx-audio-swift` is either scheduled behind concrete remaining
   blockers or completed with replacement validation.
+
+## Milestone 35: Normalization Consolidation Follow-Through
+
+### Status
+
+In Progress
+
+### Scope
+
+- [ ] Finish moving reusable Markdown-to-speech behavior out of downstream hooks and into the internal `SpeakSwiftlyNormalization` target.
+- [ ] Preserve every unfinished TextForSpeech roadmap decision in this repository without reviving a second package or adding compatibility shims.
+- [ ] Keep normalization deterministic, namespace-first, SourceKit-discoverable, and driven by explicit detection and style behavior.
+- [ ] Keep persistence lifecycle ownership on `SpeakSwiftly.Normalizer` while pure normalization, summarization, and value models stay in `SpeakSwiftlyNormalization`.
+
+The exhaustive retirement-to-issue mapping lives in
+`docs/maintainers/textforspeech-roadmap-migration-2026-07-19.md`.
+
+### Tickets
+
+- [ ] Project Markdown tables into speech-safe labeled prose and remove the temporary hook-side implementation after adoption. ([#111](https://github.com/gaelic-ghost/SpeakSwiftly/issues/111))
+- [ ] Make Markdown section exclusion a reusable, caller-configured speech projection. ([#112](https://github.com/gaelic-ghost/SpeakSwiftly/issues/112))
+- [ ] Add structured Swift source normalization while preserving the generic fallback and extensible source API. ([#114](https://github.com/gaelic-ghost/SpeakSwiftly/issues/114))
+- [ ] Add opt-in live summarization-provider checks and decide whether model selection belongs in the public configuration. ([#115](https://github.com/gaelic-ghost/SpeakSwiftly/issues/115))
+- [ ] Clarify the persistence archive contract and simplify common replacement authoring. ([#116](https://github.com/gaelic-ghost/SpeakSwiftly/issues/116))
+- [ ] Finish semantic-token classification and document compact, balanced, and explicit URL, Markdown-link, and path behavior. ([#117](https://github.com/gaelic-ghost/SpeakSwiftly/issues/117))
+- [ ] Audit normalization source responsibilities and docs after the v12 consolidation. ([#118](https://github.com/gaelic-ghost/SpeakSwiftly/issues/118))
+- [ ] Preserve conditional extension decisions without implementing speculative public surface. ([#119](https://github.com/gaelic-ghost/SpeakSwiftly/issues/119))
+
+### Exit Criteria
+
+- [ ] SpeakSwiftly is the only active implementation and planning home for normalization and summarization work.
+- [ ] Downstream consumers no longer duplicate shared Markdown projection behavior.
+- [ ] Every unfinished TextForSpeech roadmap item is implemented, explicitly retired, or linked to one canonical SpeakSwiftly issue.
+- [ ] The standalone TextForSpeech repository remains frozen and unarchived until Gale separately approves GitHub archival.
 
 ## Backlog Candidates
 

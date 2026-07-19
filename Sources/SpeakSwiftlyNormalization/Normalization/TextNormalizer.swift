@@ -69,6 +69,7 @@ enum TextNormalizer {
                     profile: profile,
                 )
             },
+            { text, _, _, _ in normalizeMarkdownTablesForSpeech(text) },
             { text, requestContext, profile, _ in
                 normalizeInlineCodeSpans(
                     text,
