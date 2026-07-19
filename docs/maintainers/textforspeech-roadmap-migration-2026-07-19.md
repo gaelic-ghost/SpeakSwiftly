@@ -43,3 +43,9 @@ Milestone 35 is complete when each mapped issue is implemented, explicitly
 retired with durable rationale, or remains intentionally trigger-gated in
 #119, and when an organization-wide dependency audit confirms no active
 consumer still resolves or imports TextForSpeech.
+
+The post-v12 consumer audit is recorded in
+`textforspeech-consumer-audit-2026-07-19.md`. It confirms that no active
+consumer resolves or imports TextForSpeech while preserving the explicit
+distinction between the active SpeakSwiftlyPrivate research branch and that
+repository's dormant pre-v12 default-branch snapshot.

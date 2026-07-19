@@ -571,12 +571,15 @@ In Progress
 ### Scope
 
 - [ ] Finish moving reusable Markdown-to-speech behavior out of downstream hooks and into the internal `SpeakSwiftlyNormalization` target.
-- [ ] Preserve every unfinished TextForSpeech roadmap decision in this repository without reviving a second package or adding compatibility shims.
+- [x] Preserve every unfinished TextForSpeech roadmap decision in this repository without reviving a second package or adding compatibility shims.
 - [ ] Keep normalization deterministic, namespace-first, SourceKit-discoverable, and driven by explicit detection and style behavior.
 - [ ] Keep persistence lifecycle ownership on `SpeakSwiftly.Normalizer` while pure normalization, summarization, and value models stay in `SpeakSwiftlyNormalization`.
 
 The exhaustive retirement-to-issue mapping lives in
 `docs/maintainers/textforspeech-roadmap-migration-2026-07-19.md`.
+The organization-wide dependency result and its active-branch classification
+live in
+`docs/maintainers/textforspeech-consumer-audit-2026-07-19.md`.
 
 ### Tickets
 
@@ -593,7 +596,7 @@ The exhaustive retirement-to-issue mapping lives in
 
 - [ ] SpeakSwiftly is the only active implementation and planning home for normalization and summarization work.
 - [ ] Downstream consumers no longer duplicate shared Markdown projection behavior.
-- [ ] Every unfinished TextForSpeech roadmap item is implemented, explicitly retired, or linked to one canonical SpeakSwiftly issue.
+- [x] Every unfinished TextForSpeech roadmap item is implemented, explicitly retired, or linked to one canonical SpeakSwiftly issue.
 - [ ] The standalone TextForSpeech repository remains frozen and unarchived until Gale separately approves GitHub archival.
 
 ## Backlog Candidates
