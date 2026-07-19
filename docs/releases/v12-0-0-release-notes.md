@@ -43,4 +43,5 @@ Summarization remains opt-in per call. Provider input and output are bounded, ca
 - `swift build`
 - `swift test`
 - `bash scripts/repo-maintenance/validate-all.sh`
+- `sh scripts/repo-maintenance/run-e2e.sh --suite quick`
 - release workflow validation for `v12.0.0`
