@@ -801,6 +801,7 @@ final class WorkerProcess: @unchecked Sendable {
         static let silentPlayback = "SPEAKSWIFTLY_SILENT_PLAYBACK"
         static let playbackTrace = "SPEAKSWIFTLY_PLAYBACK_TRACE"
         static let speechBackend = "SPEAKSWIFTLY_SPEECH_BACKEND"
+        static let deterministicQwen = "SPEAKSWIFTLY_DEBUG_DETERMINISTIC_QWEN"
     }
 
     private let artifacts: E2EWorkerArtifacts
@@ -821,6 +822,7 @@ final class WorkerProcess: @unchecked Sendable {
         playbackTrace: Bool = false,
         speechBackend: SpeakSwiftly.SpeechBackend? = nil,
         configuration: SpeakSwiftly.Configuration? = nil,
+        deterministicQwenSampling: Bool = false,
         caller: StaticString = #function,
     ) throws {
         let packageRootURL = try Self.packageRootURL()
@@ -876,6 +878,9 @@ final class WorkerProcess: @unchecked Sendable {
         }
         if let speechBackend {
             environment[Environment.speechBackend] = speechBackend.rawValue
+        }
+        if deterministicQwenSampling {
+            environment[Environment.deterministicQwen] = "1"
         }
         process.environment = environment
 

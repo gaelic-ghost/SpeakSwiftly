@@ -1,3 +1,4 @@
+import Foundation
 import MLXAudioSTT
 @preconcurrency import MLXLMCommon
 
@@ -15,7 +16,13 @@ enum GenerationPolicy {
         for _: SpeakSwiftly.SpeechBackend,
         text _: String,
     ) -> GenerateParameters {
-        GenerateParameters(
+#if DEBUG
+        if ProcessInfo.processInfo.environment["SPEAKSWIFTLY_DEBUG_DETERMINISTIC_QWEN"] == "1" {
+            return deterministicResidentParameters()
+        }
+#endif
+
+        return GenerateParameters(
             maxTokens: qwenResidentMaxTokens,
             temperature: qwenTemperature,
             topP: qwenTopP,
@@ -35,10 +42,7 @@ enum GenerationPolicy {
     }
 
 #if DEBUG
-    static func deterministicResidentParameters(
-        for _: SpeakSwiftly.SpeechBackend,
-        text _: String,
-    ) -> GenerateParameters {
+    static func deterministicResidentParameters() -> GenerateParameters {
         GenerateParameters(
             maxTokens: qwenResidentMaxTokens,
             temperature: 0,

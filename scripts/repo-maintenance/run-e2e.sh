@@ -49,6 +49,7 @@ Usage:
 Suite names:
   quick | GeneratedFileE2ETests
   generated-file | GeneratedFileE2ETests
+  retained-file-consistency | GeneratedFileE2ETests with repeated Qwen 1.7B 8-bit retained-file diagnostics
   generated-batch | GeneratedBatchE2ETests
   qwen | QwenE2ETests
   qwen-backends | QwenE2ETests with backend-variant coverage enabled
@@ -80,7 +81,7 @@ done
 resolve_suite_name() {
   case "$1" in
     quick|QuickE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
-    generated-file|GeneratedFileE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
+    generated-file|retained-file-consistency|GeneratedFileE2ETests) printf '%s\n' "GeneratedFileE2ETests" ;;
     generated-batch|GeneratedBatchE2ETests) printf '%s\n' "GeneratedBatchE2ETests" ;;
     qwen|qwen-backends|QwenE2ETests) printf '%s\n' "QwenE2ETests" ;;
     queue-control|QueueControlE2ETests) printf '%s\n' "QueueControlE2ETests" ;;
@@ -135,6 +136,10 @@ fi
 
 if [ "$suite_arg" = "qwen-backends" ]; then
   export SPEAKSWIFTLY_QWEN_BACKEND_E2E=1
+fi
+
+if [ "$suite_arg" = "retained-file-consistency" ]; then
+  export SPEAKSWIFTLY_RETAINED_FILE_CONSISTENCY_E2E=1
 fi
 
 if [ -n "$benchmark_iterations" ]; then

@@ -140,10 +140,7 @@ private let qwenBackendExpectations: [QwenBackendExpectation] = [
 }
 
 @Test func `deterministic qwen diagnostic policy disables sampling`() {
-    let parameters = GenerationPolicy.deterministicResidentParameters(
-        for: .qwen3_BIG_8bit,
-        text: "Repeatable retained-file diagnostic.",
-    )
+    let parameters = GenerationPolicy.deterministicResidentParameters()
 
     #expect(parameters.maxTokens == 4096)
     #expect(parameters.temperature == 0)
