@@ -132,10 +132,24 @@ private let qwenBackendExpectations: [QwenBackendExpectation] = [
         )
 
         #expect(parameters.maxTokens == 4096)
-        #expect(parameters.temperature == 0.9)
-        #expect(parameters.topP == 1.0)
+        #expect(parameters.temperature == 0.6)
+        #expect(parameters.topP == 0.9)
+        #expect(parameters.topK == 50)
         #expect(parameters.repetitionPenalty == 1.05)
     }
+}
+
+@Test func `deterministic qwen diagnostic policy disables sampling`() {
+    let parameters = GenerationPolicy.deterministicResidentParameters(
+        for: .qwen3_BIG_8bit,
+        text: "Repeatable retained-file diagnostic.",
+    )
+
+    #expect(parameters.maxTokens == 4096)
+    #expect(parameters.temperature == 0)
+    #expect(parameters.topP == 1)
+    #expect(parameters.topK == 1)
+    #expect(parameters.repetitionPenalty == 1.05)
 }
 
 @Test func `resident model helpers cover every qwen backend variant`() {

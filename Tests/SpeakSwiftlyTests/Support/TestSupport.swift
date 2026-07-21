@@ -259,6 +259,12 @@ final class OutputRecorder: @unchecked Sendable {
         }
     }
 
+    func recordedSystemLogEvents(_ predicate: (WorkerLogEvent) -> Bool) -> [WorkerLogEvent] {
+        lock.withLock {
+            systemLogEvents.filter(predicate)
+        }
+    }
+
     func firstStdoutJSONObjectIndex(_ predicate: ([String: Any]) -> Bool) -> Int? {
         lock.withLock {
             stdoutLines.firstIndex { line in
