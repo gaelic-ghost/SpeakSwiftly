@@ -96,6 +96,9 @@ the policies into a pretend common default.
 
 ### Codec/Vocoder Expectations
 
+Status: no-weight boundary fixture captured in
+[`codec-vocoder-boundary-fixture-2026-06-28.json`](codec-vocoder-boundary-fixture-2026-06-28.json).
+
 The first codec fixture does not need to include waveform samples yet, but it
 must record the expected boundary:
 
@@ -112,7 +115,14 @@ must record the expected boundary:
 The codec/vocoder fixture is mandatory before declaring any graph-only text to
 codebook proof useful for SpeakSwiftly.
 
+The current fixture intentionally records decoded sample count, decoded dtype,
+and decoded channel count as unknown until an official serving comparison
+captures them for the same prompt fixture.
+
 ### Output Container Expectations
+
+Status: no-weight official-serving comparison started in
+[`official-serving-comparison-fixture-2026-06-29.json`](official-serving-comparison-fixture-2026-06-29.json).
 
 Record output separately for non-streaming and streaming:
 
@@ -129,6 +139,10 @@ Current source conflict to preserve:
 
 - Boson and SGLang current serving docs emphasize `pcm` for streaming.
 - Some model-card wording describes streamed base64 WAV chunks.
+
+The current comparison fixture records the vLLM deploy YAML raw-PCM streaming
+signal and keeps non-streaming container, decoded sample count, decoded dtype,
+and decoded channel count blocked until an official serving request is executed.
 
 ## Fixture 2: Control Tags
 

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-06-29T00:00:00Z",
+  "mode": "higgs_audio_v3_official_serving_comparison_fixture",
+  "source": {
+    "source_map_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/official-pipeline-map-2026-06-24.json",
+    "tokenizer_fixture_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/tokenizer-parity-fixture-2026-06-26.json",
+    "codec_fixture_path": "docs/research/speech-pipelines/lanes/higgs-audio-v3/codec-vocoder-boundary-fixture-2026-06-28.json",
+    "official_sources": {
+      "waveform_post_processing": [
+        "SGLang vocoder scheduler",
+        "vLLM stage_input_processors/higgs_audio_v3.py",
+        "Boson and SGLang serving docs for PCM/WAV output behavior"
+      ],
+      "output_container": [
+        "Boson create-speech API",
+        "SGLang Higgs cookbook",
+        "vLLM deploy YAML and OpenAI adapter"
+      ]
+    },
+    "no_model_weights_downloaded": true,
+    "no_serving_request_executed": true
+  },
+  "prompt_case": {
+    "name": "plain-english-tts",
+    "kind": "plain_tts",
+    "raw_text": "Welcome to SpeakSwiftly. This is the first official Higgs Audio v3 parity fixture.",
+    "prompt_shape": "<|tts|> <|text|> target text tokens <|audio|>",
+    "prompt_length": 22
+  },
+  "official_serving_signals": [
+    {
+      "source": "vLLM HIGGS_AUDIO_V3_PIPELINE docstring",
+      "signal": "Talker text-to-eight-codebook rows feed Code2Wav codec-to-24-kHz-PCM output.",
+      "captured_from": "official-pipeline-map key lines for vllm_omni/model_executor/pipeline_configs/higgs_audio_v3.py"
+    },
+    {
+      "source": "vLLM Higgs multimodal deploy YAML",
+      "signal": "async_chunk streams PCM bytes back to the client as Stage 1 emits each chunk.",
+      "captured_from": "official-pipeline-map key lines for vllm_omni/deploy/higgs_multimodal_qwen3.yaml"
+    },
+    {
+      "source": "Boson/SGLang current serving docs versus model-card wording",
+      "signal": "Some docs mention streaming WAV chunks, while current serving docs emphasize raw PCM for streaming.",
+      "captured_from": "official-pipeline-map component_map.output_container.known_conflict"
+    }
+  ],
+  "non_streaming_output_contract": {
+    "container_known": false,
+    "container": null,
+    "serving_signal": "not captured by the current no-weight source map",
+    "requires_executed_official_serving_request": true
+  },
+  "streaming_output_contract": {
+    "container_known": true,
+    "container": "raw_pcm_bytes",
+    "container_conflict_preserved": "Some docs mention streaming WAV chunks, while current serving docs emphasize raw PCM for streaming.",
+    "pcm_signal_source": "vLLM deploy YAML",
+    "base64_wav_signal_still_unresolved": true,
+    "requires_executed_official_serving_request": true
+  },
+  "waveform_metadata": {
+    "sample_rate_hz": 24000,
+    "sample_rate_confirmed_by_source_map": true,
+    "decoded_sample_count_known": false,
+    "decoded_dtype_known": false,
+    "decoded_channel_count_known": false,
+    "observed_decoded_sample_count": null,
+    "observed_decoded_dtype": null,
+    "observed_decoded_channel_count": null,
+    "requires_executed_official_serving_request": true
+  },
+  "streaming_chunk_expectations": {
+    "codec_chunk_frames": 25,
+    "codec_left_context_frames": 25,
+    "codec_right_holdback_frames": 4,
+    "initial_codec_chunk_frames": 1,
+    "nominal_seconds_per_codec_chunk": 1.0,
+    "nominal_codec_frame_rate_hz": 25
+  },
+  "promotion_gate": {
+    "runtime_integration_allowed": false,
+    "official_serving_comparison_started": true,
+    "official_serving_request_executed": false,
+    "remaining_blockers": [
+      "execute one official serving request for the plain prompt fixture",
+      "capture non-streaming container behavior",
+      "capture decoded sample count",
+      "capture decoded dtype",
+      "capture decoded channel count",
+      "resolve raw PCM versus WAV/base64 streaming contract with observed output"
+    ],
+    "codec_fixture_runtime_promotion_allowed": false
+  }
+}

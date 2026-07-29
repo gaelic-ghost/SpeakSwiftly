@@ -524,6 +524,12 @@ Planned
   plain and control-tag prompt shapes.
 - [x] Add a no-weight Higgs Audio v3 synthetic delay-pattern fixture for
   eight-codebook row ordering and BOC/EOC placement.
+- [x] Add a no-weight Higgs Audio v3 codec/vocoder boundary fixture for bundled
+  codec prefix counts, decode-boundary constants, streaming chunk defaults, and
+  waveform metadata gates.
+- [x] Start the no-weight Higgs Audio v3 official-serving comparison fixture
+  for archived 24 kHz PCM serving signals and remaining waveform metadata
+  gates.
 
 ### Stage Notes
 
@@ -549,6 +555,14 @@ Planned
 - `docs/research/speech-pipelines/lanes/higgs-audio-v3/codebook-delay-fixture-2026-06-26.json` is
   the first checked-in no-weight parity artifact for eight-codebook
   delay-pattern layout.
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/codec-vocoder-boundary-fixture-2026-06-28.json`
+  records the first no-weight codec/vocoder boundary artifact and keeps runtime
+  integration blocked until official serving comparison captures waveform
+  metadata.
+- `docs/research/speech-pipelines/lanes/higgs-audio-v3/official-serving-comparison-fixture-2026-06-29.json`
+  starts the no-weight official-serving comparison for the plain prompt and
+  keeps runtime integration blocked until an executed official serving request
+  captures decoded sample count, dtype, channel count, and container behavior.
 
 ### Exit Criteria
 
