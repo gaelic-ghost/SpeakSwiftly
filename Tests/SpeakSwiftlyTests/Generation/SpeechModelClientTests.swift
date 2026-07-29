@@ -850,6 +850,103 @@ private actor ProfileModelLoadObservation {
     #expect(secondRecorder.audioLoadCallCount == 0)
 }
 
+#if DEBUG
+@Test func `identical retained qwen generations preserve conditioning and debug fingerprints`() async throws {
+    let output = OutputRecorder()
+    let storeRoot = makeTempDirectoryURL()
+    defer { try? FileManager.default.removeItem(at: storeRoot) }
+
+    let store = try makeProfileStore(rootURL: storeRoot)
+    _ = try store.createProfile(
+        profileName: "default-femme",
+        modelRepo: "test-model",
+        voiceDescription: "Warm and bright.",
+        sourceText: "Reference transcript",
+        sampleRate: 24000,
+        canonicalAudioData: Data([0x01, 0x02]),
+    )
+    let recorder = ResidentModelRecorder()
+    let residentModel = makeResidentModel(recorder: recorder, chunkCount: 2)
+    _ = try store.storeQwenConditioningArtifact(
+        named: "default-femme",
+        backend: .qwen3_smol,
+        modelRepo: ModelFactory.qwenResidentModelRepo,
+        conditioning: Qwen3TTSModel.Qwen3TTSReferenceConditioning(
+            speakerEmbedding: MLXArray([Float(0.25), 0.5]).reshaped([1, 2]),
+            referenceSpeechCodes: MLXArray([Int32(10), 11, 12, 13]).reshaped([1, 2, 2]),
+            referenceTextTokenIDs: MLXArray([Int32(101), 102, 103]).reshaped([1, 3]),
+            resolvedLanguage: "English",
+            codecLanguageID: 7,
+        ),
+    )
+
+    let runtime = try await makeRuntime(
+        rootURL: storeRoot,
+        output: output,
+        playback: PlaybackSpy(),
+        qwenConditioningStrategy: .preparedConditioning,
+        residentModelLoader: { _ in residentModel },
+    )
+
+    await runtime.start()
+    #expect(await waitUntil {
+        output.containsJSONObject {
+            $0["event"] as? String == "worker_status"
+                && $0["stage"] as? String == "resident_model_ready"
+        }
+    })
+
+    let text = "The same retained-file request should keep the same voice conditioning."
+    let firstHandle = await runtime.generate.audio(
+        text: text,
+        voiceProfile: "default-femme",
+    )
+    _ = try await firstHandle.completion()
+
+    let secondHandle = await runtime.generate.audio(
+        text: text,
+        voiceProfile: "default-femme",
+    )
+    _ = try await secondHandle.completion()
+
+    #expect(recorder.prepareConditioningCallCount == 0)
+    #expect(recorder.conditionedGenerationCallCount == 2)
+    #expect(recorder.recordedTexts.count == 2)
+    if recorder.recordedTexts.count == 2 {
+        #expect(recorder.recordedTexts[0] == recorder.recordedTexts[1])
+    }
+    #expect(output.containsSystemLogEvent { $0.event == "qwen_reference_conditioning_loaded" })
+    #expect(output.containsSystemLogEvent { $0.event == "qwen_reference_conditioning_cache_hit" })
+
+    let finishedEvents = output.recordedSystemLogEvents {
+        $0.event == "qwen_generation_debug_finished"
+    }
+    #expect(finishedEvents.count == 2)
+
+    let completedFingerprints = finishedEvents.compactMap { event -> (String, String, String)? in
+        guard
+            case let .string(outcome)? = event.details?["outcome"],
+            outcome == "completed",
+            case let .bool(referenceUnchanged)? = event.details?["reference_unchanged"],
+            referenceUnchanged,
+            case let .string(referenceFingerprint)? = event.details?["reference_fingerprint_after"],
+            case let .string(tokenDigest)? = event.details?["primary_codec_token_digest"],
+            case let .string(audioDigest)? = event.details?["audio_sample_digest"]
+        else {
+            return nil
+        }
+
+        return (referenceFingerprint, tokenDigest, audioDigest)
+    }
+    #expect(completedFingerprints.count == 2)
+    if completedFingerprints.count == 2 {
+        #expect(completedFingerprints[0].0 == completedFingerprints[1].0)
+        #expect(completedFingerprints[0].1 == completedFingerprints[1].1)
+        #expect(completedFingerprints[0].2 == completedFingerprints[1].2)
+    }
+}
+#endif
+
 @Test(
     .enabled(
         if: mlxConditioningPersistenceTestsEnabled(),

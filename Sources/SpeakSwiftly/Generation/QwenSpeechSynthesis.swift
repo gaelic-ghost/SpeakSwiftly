@@ -107,6 +107,8 @@ extension SpeakSwiftly.Runtime {
 
     func qwenGenerationStream(
         requestID: String,
+        op: String?,
+        profileName: String,
         model: AnySpeechModel,
         text: String,
         reference: QwenGenerationReference,
@@ -115,6 +117,20 @@ extension SpeakSwiftly.Runtime {
     ) -> AsyncThrowingStream<[Float], Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
+#if DEBUG
+                var diagnostics = QwenGenerationDiagnostics(reference: reference)
+                await logRequestEvent(
+                    "qwen_generation_debug_started",
+                    requestID: requestID,
+                    op: op,
+                    profileName: profileName,
+                    details: diagnostics.startedDetails(
+                        generationParameters: generationParameters,
+                        text: text,
+                        chunkIndex: nil,
+                    ),
+                )
+#endif
                 do {
                     let eventStream = qwenEventStream(
                         model: model,
@@ -125,14 +141,56 @@ extension SpeakSwiftly.Runtime {
                     )
                     for try await event in eventStream {
                         try Task.checkCancellation()
+#if DEBUG
+                        diagnostics.record(event)
+#endif
                         if let samples = recordQwenGenerationEvent(event, requestID: requestID) {
                             continuation.yield(samples)
                         }
                     }
+#if DEBUG
+                    await logRequestEvent(
+                        "qwen_generation_debug_finished",
+                        requestID: requestID,
+                        op: op,
+                        profileName: profileName,
+                        details: diagnostics.finishedDetails(
+                            reference: reference,
+                            outcome: "completed",
+                            chunkIndex: nil,
+                        ),
+                    )
+#endif
                     continuation.finish()
                 } catch is CancellationError {
+#if DEBUG
+                    await logRequestEvent(
+                        "qwen_generation_debug_finished",
+                        requestID: requestID,
+                        op: op,
+                        profileName: profileName,
+                        details: diagnostics.finishedDetails(
+                            reference: reference,
+                            outcome: "cancelled",
+                            chunkIndex: nil,
+                        ),
+                    )
+#endif
                     continuation.finish(throwing: CancellationError())
                 } catch {
+#if DEBUG
+                    await logRequestEvent(
+                        "qwen_generation_debug_finished",
+                        requestID: requestID,
+                        op: op,
+                        profileName: profileName,
+                        details: diagnostics.finishedDetails(
+                            reference: reference,
+                            outcome: "failed",
+                            chunkIndex: nil,
+                        ),
+                    )
+#endif
                     continuation.finish(throwing: error)
                 }
             }
@@ -160,6 +218,20 @@ extension SpeakSwiftly.Runtime {
                         try Task.checkCancellation()
 
                         var accounting = QwenLiveChunkAccounting()
+#if DEBUG
+                        var diagnostics = QwenGenerationDiagnostics(reference: reference)
+                        await logRequestEvent(
+                            "qwen_generation_debug_started",
+                            requestID: requestID,
+                            op: op,
+                            profileName: profileName,
+                            details: diagnostics.startedDetails(
+                                generationParameters: generationParameters,
+                                text: plannedChunk.text,
+                                chunkIndex: plannedChunk.index,
+                            ),
+                        )
+#endif
 
                         await logQwenLiveChunkStarted(
                             requestID: requestID,
@@ -170,31 +242,80 @@ extension SpeakSwiftly.Runtime {
                             streamingInterval: streamingInterval,
                         )
 
-                        let eventStream = qwenEventStream(
-                            model: model,
-                            text: plannedChunk.text,
-                            reference: reference,
-                            generationParameters: generationParameters,
-                            streamingInterval: streamingInterval,
-                        )
+                        do {
+                            let eventStream = qwenEventStream(
+                                model: model,
+                                text: plannedChunk.text,
+                                reference: reference,
+                                generationParameters: generationParameters,
+                                streamingInterval: streamingInterval,
+                            )
 
-                        for try await event in eventStream {
-                            try Task.checkCancellation()
+                            for try await event in eventStream {
+                                try Task.checkCancellation()
+#if DEBUG
+                                diagnostics.record(event)
+#endif
 
-                            if let samples = recordQwenGenerationEvent(event, requestID: requestID) {
-                                if accounting.recordAudioChunk(samples) {
-                                    await logQwenLiveChunkFirstAudio(
-                                        requestID: requestID,
-                                        op: op,
-                                        profileName: profileName,
-                                        chunk: plannedChunk,
-                                        totalChunkCount: plannedChunks.count,
-                                        timeToFirstAudioMS: accounting.elapsedMS(),
-                                        sampleCount: samples.count,
-                                    )
+                                if let samples = recordQwenGenerationEvent(event, requestID: requestID) {
+                                    if accounting.recordAudioChunk(samples) {
+                                        await logQwenLiveChunkFirstAudio(
+                                            requestID: requestID,
+                                            op: op,
+                                            profileName: profileName,
+                                            chunk: plannedChunk,
+                                            totalChunkCount: plannedChunks.count,
+                                            timeToFirstAudioMS: accounting.elapsedMS(),
+                                            sampleCount: samples.count,
+                                        )
+                                    }
+                                    continuation.yield(samples)
                                 }
-                                continuation.yield(samples)
                             }
+
+#if DEBUG
+                            await logRequestEvent(
+                                "qwen_generation_debug_finished",
+                                requestID: requestID,
+                                op: op,
+                                profileName: profileName,
+                                details: diagnostics.finishedDetails(
+                                    reference: reference,
+                                    outcome: "completed",
+                                    chunkIndex: plannedChunk.index,
+                                ),
+                            )
+#endif
+                        } catch is CancellationError {
+#if DEBUG
+                            await logRequestEvent(
+                                "qwen_generation_debug_finished",
+                                requestID: requestID,
+                                op: op,
+                                profileName: profileName,
+                                details: diagnostics.finishedDetails(
+                                    reference: reference,
+                                    outcome: "cancelled",
+                                    chunkIndex: plannedChunk.index,
+                                ),
+                            )
+#endif
+                            throw CancellationError()
+                        } catch {
+#if DEBUG
+                            await logRequestEvent(
+                                "qwen_generation_debug_finished",
+                                requestID: requestID,
+                                op: op,
+                                profileName: profileName,
+                                details: diagnostics.finishedDetails(
+                                    reference: reference,
+                                    outcome: "failed",
+                                    chunkIndex: plannedChunk.index,
+                                ),
+                            )
+#endif
+                            throw error
                         }
 
                         await logQwenLiveChunkFinished(

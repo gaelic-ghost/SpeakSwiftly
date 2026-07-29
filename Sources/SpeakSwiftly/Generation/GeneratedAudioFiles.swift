@@ -34,6 +34,8 @@ extension SpeakSwiftly.Runtime {
         let generationStartedAt = dependencies.now()
         let stream = residentGenerationStream(
             requestID: id,
+            op: op,
+            profileName: voiceProfile,
             text: normalizedText,
             inputs: residentInputs,
             generationParameters: GenerationPolicy.residentParameters(
@@ -113,6 +115,8 @@ extension SpeakSwiftly.Runtime {
 
     func residentGenerationStream(
         requestID: String,
+        op: String?,
+        profileName: String,
         text: String,
         inputs: ResidentSpeechInputs,
         generationParameters: GenerateParameters,
@@ -122,6 +126,8 @@ extension SpeakSwiftly.Runtime {
             case let .qwenRaw(model, _, materialization, refAudio):
                 qwenGenerationStream(
                     requestID: requestID,
+                    op: op,
+                    profileName: profileName,
                     model: model,
                     text: text,
                     reference: .raw(
@@ -134,6 +140,8 @@ extension SpeakSwiftly.Runtime {
             case let .qwenPrepared(model, _, conditioning):
                 qwenGenerationStream(
                     requestID: requestID,
+                    op: op,
+                    profileName: profileName,
                     model: model,
                     text: text,
                     reference: .prepared(conditioning),
